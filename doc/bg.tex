@@ -1,0 +1,35 @@
+\section{Background: needs and pitfalls of interlanguage embedding}
+\label{sec:bg}
+
+\subsection{Needs for embedding}
+
+special-purpose ``little languages'' that are usually embedded.
+URIs. regexps. JSON. SQL.
+
+Shells, scripts, and command-line escaping.
+Log files.
+
+Larger languages.  JavaScriopt/TypeScript within HTML/XHTML.
+Template-driven authoring languages (e.g., Hugo).
+
+\subsection{What often goes wrong}
+
+Convenience challenges.
+
+Error-proneness issues.
+
+Destructive interaction of inner and outer escaping mechanisms.
+
+Multiple levels of embedding: exploding complexity of manual escaping;
+potentially-exponential expansions with automatic escaping.
+(e.g., C-like escaping: `\verb|\|' becomes `\verb|\\|'
+and `\verb|"|' becomes `\verb|\"|',
+so $2^l$ size with $l$ levels of escaping.)
+
+\subsection{When security goes wrong}
+
+armoring of untrusted inputs,
+and what happens when that isn't done [correctly].
+
+TODO: Review the security literature for this kind of security bug.
+

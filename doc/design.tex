@@ -1,0 +1,160 @@
+\section{Introducing Matchertext}
+\label{sec:design}
+
+\subsection{Abstract matchertext}
+
+basic principle, given some set of matcher pairs --
+but leaving the decision of which pairs for later in
+\cref{sec:design:ascii}
+
+Basic rule: in matchertext, \emph{matchers must match}.
+
+Always-embeddability given that embedded string is valid matchertext.
+
+We assume some alphabet $A$.
+We further assuma a set $M$ of $k$ matcher pairs
+$\{(o_1,c_1),\dots,(o_k,c_k)\}$,
+where $o_1,\dots,o_k$ are \emph{openers} in $A$,
+and $c_1,\dots,c_k$ are corresponding \emph{closers} in $A$.
+Let the set $N$ of \emph{nonmatchers} be the subset of $A$
+excluding openers and closers:
+\ie $N = A \setminus \{o_1,\dots,o_n,c_1,\dots,c_n\}$.
+A \emph{nonmatcher string} $n$ is a string of any finite length
+(including empty)
+consisting only of nonmatchers in $N$.
+
+We can inductively define the language $L$ of \emph{matchertext strings}
+as follows:
+\begin{itemize}
+\item	For any nonmatcher string $n$,
+	$n$ is a matchertext string.
+\item	For any matchertext string $m$,
+	any corresponding open/close pair $(o_i,c_i) \in M$,
+	and any nonmatcher strings $n_1$ and $n_2$,
+	the concatenation $n_1\,o_i\,m\,c_i\,n_2$ is a matchertext string.
+\end{itemize}
+
+By construction, every opener is always paired
+with the corresponding closer later in the string,
+while nonmatchers may be interspersed without restriction.
+
+By the above definition,
+matchertext fulfills the classic definition of a syntactic \emph{language} --
+namely a set of strings mathematically defined to be in the language.
+In practice, however,
+we will refer to matchertext as a \emph{syntactic discipline}
+rather than a language
+because matchertext is devoid of semantic meaning,
+or even any syntactic structure outside the rule that ``matchers must match.''
+Matchertext is intended only to provide a structural background rule
+atop which any number of \emph{matchertext languages} may be defined,
+each with its own syntax further constraining the set of valid strings,
+and perhaps associating language-dependent semantic meaning to those strings.
+In particular, we can in principle take any arbitrary language $L$
+defined as a set of strings,
+and define the \emph{matchertext subset} of $L$
+simply as those strings $s \in L$ that are also matchertext strings.
+
+
+
+\subsection{Why ASCII matchers?}
+\label{sec:design:ascii}
+
+Why the ASCII matchers?
+To achieve interlanguage embeddability,
+we must agree on a cross-language standard for what character pairs
+pairs the sensitive matchers are.
+There is a strong tradition among most text-based machine-readable languages
+to use the ASCII punctuation characters -- and mostly \emph{only} those --
+as sensitive characters delimiting structural concepts
+and denoting hierarchical relationships.
+In particular, the three ASCII matcher pairs --
+the parentheses `\verb|(|',`\verb|)|',
+the square brackets `\verb|[|',`\verb|]|',
+and the curly braces `\verb|{|',`\verb|}|' --
+are almost always used in matched pairs
+(if used for syntactically-sensitive purposes at all)
+in most programming languages and other machine-readable syntaxes.
+
+
+Why all the ASCII matchers?  More redundancy, more robustness
+to undetected accidental errors or bugs.
+
+Why not the ASCII angle brackets?
+
+Why not the Unicode matchers too?
+
+
+\subsection{Writing matchertext in existing languages}
+
+In most popular langguages whose input is normally plaintext,
+it is already \emph{possible} -- using existing escaping mechanisms --
+to write a matchertext version
+(either manually or automatically)
+that is at least semantically equivalent
+to any given valid plaintext string in that language.
+
+Consider URIs, for example,
+which have a standard percent-escape code mechanism
+to replace potentially-sensitive ASCII characters with hexadecimal escape codes.
+By RFC XXX, URIs are normally not supposed to contain square brackets anyway
+except in matched pairs as part of IPv6 address syntax.
+But URIs may contain parentheses and curly braces (XXX ?),
+which might be unmatched in an arbitrary URI.
+Such an URI can always be rewritten
+into a semantically-equivalent matchertext URI
+(i.e., one that evaluates to the same canonical form XXX)
+by replacing all unmatched matcher characters with their
+equivalent percent-escape codes.
+For example, the URI `\verb|scheme://site/open(|'
+would become `\verb|scheme://site/open%28|',
+`\verb|scheme://site/close)|'
+becomes `\verb|scheme://site/close%29|'
+and `\verb|scheme://site/close)open(|' becomes
+`\verb|scheme://site/close%29open%28|'.
+The URI `\verb|scheme://site/open(close)|'
+need not be rewritten at all,
+since all the matchers it contains already (happen to) match.
+
+In SGML-derived languages such as HTML and XML, similarly,
+any valid plaintext string in the language
+can generally be converted to an equivalent matchertext string
+simply by replacing all unmatched ASCII matchers
+with the decimal escape codes
+`\verb|&#40;|', `\verb|&#41;|' or
+`\verb|&lpar;|', `\verb|&rpar;|' for parentheses,
+`\verb|&#91;|', `\verb|&#93;|' or
+`\verb|&lbrack;|', `\verb|&rbrack;|' for square brackets, and
+`\verb|&#123;|', `\verb|&#125;|' or
+`\verb|&lbrace;|', \verb|&rbrace;|' for curly braces.
+
+This does not mean that rewriting unmatched matchers into moderately-obscure
+(especially numeric) escape codes
+is particularly convenient or enjoyable to do manually, of course.
+Fortunately, given the prevalence with which ASCII matchers
+tend to be used in properly-matched fashion anyway --
+both in programming languages and in free-form human-language text strings --
+there is at least hope that we need not worry about escaping unmatched matchers
+\emph{all the time}.
+(XXX we will explore this question of frequency in the evaluation.)
+But \emph{sometimes} we will still need to express
+unmatched matcher characters in many languages --
+when we are trying to ``talk about'' those matchers
+as \emph{literal characters}, for example,
+whether in code or human-readable text.
+
+\subsection{Matchers in character and string literals}
+
+It is near-ubiquitous practice in mainstream programming languages 
+to use the ASCII single- and/or double-quote characters (\verb|'|, \verb|"|)
+to delimit literal characters or strings.
+
+\subsection{Gracefully evolving towards matchertext-friendly languages}
+
+We can envison backwards-compatible extensions to most popular languages
+that could 
+
+
+\subsection{Unmatched matchers in comments}
+
+
