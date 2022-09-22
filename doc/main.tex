@@ -1,0 +1,71 @@
+\documentclass[fullpage,twocolumn]{article}
+
+\usepackage{times}
+\usepackage{xspace}
+\usepackage{cite} % sort citation numbers
+\usepackage[breaklinks,colorlinks,
+	    linkcolor=blue,citecolor=blue,urlcolor=black]{hyperref}
+
+%%%%%%%%%%%%%%%%%%%%%%
+
+% Select one or other if want to see comments.
+% \com is sometimes displayed during draft.
+%\long\def\com#1{}
+\long\def\com#1{{\bf \sc comment: }{\small [#1]}{\bf \sc\ endcomment}\newline}
+\long\def\XXX#1{{\color{red} {\bf XXX }{\small [#1]}}}
+
+\long\def\xxx#1{{\color{red} {\bf XXX }{\small [#1]}}}
+%\long\def\xxx#1{}
+\long\def\red#1{{\color{red}#1}}
+
+% Choose regular version or version hacked for arXiv preprint submission
+\long\def\arxiv#1#2{#1}			% real version
+%\long\def\arxiv#1#2{#2}		% arXiv preprint version
+
+% Choose abbreviated or long-version alternatives in paper
+\long\def\abbr#1#2{#1}			% abbreviated version
+%\long\def\abbr#1#2{#2}			% long version
+
+% Choose abbreviations or long names/titles in bibliography
+%\def\bibbrev#1#2{#1}			% short version
+\def\bibbrev#1#2{#2}			% long version
+%\def\bibbrev#1#2{\abbr{#1}{#2}}		% follow abbr macro
+
+% Abbreviated or full citation lists: \abcite{basic}{others}
+\newcommand{\abcite}[2]{\abbr{\cite{#1}}{\cite{#1,#2}}}
+
+% Conference abbreviations: \bibconf[Nth]{SOSP}{Symposium on ...}
+\newcommand{\bibconf}[3][]{#1 \bibbrev{#2}{#3 (#2)}}
+
+% for paralist compactitem envs
+%\defaultleftmargin{\parindent}{}{}{}
+
+% Common abbreviations
+\newcommand{\ie}{{\em i.e.},\xspace}
+\newcommand{\eg}{{\em e.g.},\xspace}
+
+%%%%%%%%%%%%%%%%%%%%%%
+
+
+\begin{document}
+
+\title{Matchertext: Towards Escapeless Interlanguage Embedding}
+
+\author{AUTHORS}
+
+\maketitle
+
+\input{abs}
+\input{intro}
+% ...
+\input{rel}
+\input{concl}
+
+\bibliographystyle{plain}
+\arxiv{
+\bibliography{lang}
+}{
+\bibliography{main}
+}
+
+\end{document}
