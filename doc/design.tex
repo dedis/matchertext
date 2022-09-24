@@ -57,6 +57,26 @@ simply as those strings $s \in L$ that are also matchertext strings.
 
 
 
+\subsection{Embedding considerations}
+
+If a host language $L_H$ wishes to embed a language $L_E$,
+then in the contexts where strings of $L_E$ are expected,
+$L_H$ must impose \emph{no} constraints on characters allowed
+other than the matchertext discipline (matchers must match).
+Further $L_H$ must not transform the embedded strings of $L_E$ in any way
+while extracting and interpreting the embedded string.
+Specifically, any escaping mechanisms or other transformations
+that might normally apply to text in $L_H$
+must be disabled in the context of the embedded string.
+If any escaping mechanisms or other transformations
+are active within the embedded string,
+those must be that of $L_E$, not $L_H$.
+
+\xxx{Example with MRIs?}
+
+\xxx{Formalization?}
+
+
 \subsection{Why must the matchers be standardized?}
 
 
