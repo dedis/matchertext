@@ -1,0 +1,278 @@
+\section{Host language considerations}
+\label{sec:host}
+
+...
+
+One important observation is that
+languages need not \emph{be} matchertext-compliant in their syntax
+just in order to \emph{host} embedded matchertext.
+Host languages can preserve full compatibility
+with all their existing (non-embedded) code --
+continuing to allow unmatched matchers in string constants for example --
+while incrementally adding extensions that make it easy
+to embed matchertext strings verbatim within the host language.
+
+
+\subsection{C-like host languages}
+
+
+\subsection{SGML-style markup host languages}
+
+While the venerable
+Standard General Markup Languages (SGML)~\cite{iso8879sgml}
+itself has waned in popularity,
+its derivatives HTML~\cite{whatwg22html} and XML~\cite{w3c08xml}
+are now ubuiquitous in Web content and programming.
+Wherever the differences between these markup languages do not matter,
+we will refer to them all as \ml languages.
+
+In their basic role as markup languages
+used to produce rich, structured documents,
+\ml languages frequently play ``host'' to embedded strings
+in countless other languages:
+typically, in the language(s) of software or APIs
+that a marked-up document is written about.
+Embedding code in other languages as verbatim text
+is a basic and frequently-used purpose of HTML's
+\verb|<code>| and \verb|<pre>| tags,
+for example.
+Beyond merely marking up verbatim text in other languages, however,
+HTML in particular has evolved to include special-purpose support
+for embedding several other languages within HTML:
+namely scripting languages such as JavaScript or Tcl,
+cascading style sheets (CSS)~\cite{XXX},
+MathML~\cite{XXX},
+and SVG~\cite{XXX}.
+
+The \ml languages are surprisingly complex syntactically,
+especially given their simple-sounding purpose
+of ``merely'' describing structured markup of usually human-readable text.
+In particular,
+there are at least three different syntactic contexts
+in which strings in other languages are often embedded
+into \ml languages --
+and in which three different sets of quoting and escaping rules apply.
+Embedded strings are often embedded
+(1) as the content of an element,
+(2) as an attribute within an element's start tag, or
+(3) as verbatim text within a CDATA section.
+We address each of these syntactic contexts in turn,
+in each case suggesting potential matchertext extensions
+that could help mitigate the various forms of ``escaping hell''
+that these embedding contexts can create.
+
+\begin{figure*}
+\begin{center}
+\begin{footnotesize}
+\begin{tabular}{lrl}
+\multicolumn{3}{l}{\textbf{(a) Embedding strings in other languages as element content, in standard HTML or with matchertext hosting extensions (+M):}} \\
+& HTML	& \verb|<code>printf("Hello world!");/code>| \\
+& +M	& \verb|<code [printf("Hello world!");]>| \\
+& HTML	& \verb|<code>printf("Example &lt;b&gt;bold&lt;/b&gt; and &amp;bigstar; character in HTML");]>| \\
+& +M	& \verb|<code [printf("Example <b>bold</b> and &bigstar; character in HTML");]>| \\
+& HTML	& \verb|<script>document.getElementById("demo").innerHTML = "Hello world!";</script>| \\
+& +M	& \verb|<script [document.getElementById("demo").innerHTML = "Hello world!";]>| \\
+& HTML	& \verb|<script>document.getElementById("demo").innerHTML = "a <" + "/script> end tag";]>| \\
+& +M	& \verb|<script [document.getElementById("demo").innerHTML = "a </script> end tag";]>| \\
+\\
+\multicolumn{3}{l}{\textbf{(b) Embedding strings in other languages within element attributes:}} \\
+& HTML	& \verb|<button onclick="okClicked()">OK</button>| \\
+& +M	& \verb|<button onclick=[okClicked()]>OK</button>| \\
+& HTML	& \verb|<button onclick="emitCharacter('\'')">Emit Apostrophe</button>| \\
+& +M	& \verb|<button onclick=[emitCharacter("'")]>Emit Apostrophe</button>| \\
+\\
+\multicolumn{3}{l}{\textbf{(b) Embedding strings in other languages within CDATA (character data) sections:}} \\
+& HTML	& \verb|<code>example <![CDATA[<b>bold</b>]]> markup</code>| \\
+& +M	& \verb|<code>example <![MDATA[<b>bold</b>]]> markup</code>| \\
+& HTML	& \verb|<code>example <![CDATA[<![CDATA[character data]]]]><![CDATA[>]]> markup</code>| \\
+& +M	& \verb|<code>example <![MDATA[<![CDATA[character data]]>]]> markup</code>| \\
+& HTML	& \verb|<code>example <![CDATA[<![CDATA[<![CDATA[double embedded]]]]]]>| \\
+&	& \verb|<![CDATA[><![CDATA[>]]]]><![CDATA[>]]> markup</code>| \\
+& +M	& \verb|<code>example <![MDATA[<![MDATA[<![MDATA[double embedded]]>]]>]]> markup</code>| \\
+\end{tabular}
+\end{footnotesize}
+\end{center}
+\label{fig:ml-emb}
+\caption{Examples of embedded strings in standard HTML
+	and with potential matchertext extensions (+M).}
+\end{figure*}
+
+
+\subsubsection{Strings embedded as element content}
+
+One common form of embedding into \ml 
+is marked-up text serving as the content of an element:
+\eg example code between \verb|<code>| and \verb|</code>| tags
+or between \verb|<pre>| and \verb|</pre>| tags in HTML.
+Further, the \verb|<script>| and \verb|<style>| tags in HTML
+exist specifically to embed scripting language code
+and cascading style sheet (CSS) code, respectively,
+as their content.
+
+The syntactic rules governing
+what can appear in text embedded as element content,
+however,
+depend intricately on the tag, the d\ml language in question,
+and even the language version.
+In most elements such as \verb|<code>| and \verb|<pre>|,
+any characters \verb|<| and \verb|&| appearing in the embedded string
+must be escaped (as \verb|&lt;| and \verb|&amp;|),
+to prevent the \ml parser misinterpreting them as
+the start of a tag or a character reference,
+respectively.
+In XML, this rule applies to the content of all element,
+including the content of \verb|<script>| and \verb|<style>| tags
+of XML-based XHTML.
+In HTML, however, the content of \verb|<script>| and \verb|<style>| tags
+is raw character data,
+uninterpreted by the HTML parser except to find the end tag.
+The content of such tags therefore \emph{can} contain
+unescaped \verb|<| and \verb|&| characters --
+and \emph{cannot} use HTML character entity references for escaping.
+In HTML4, this uninterpreted content is terminated
+by the first instance of a \verb|</| character sequence,
+whether or it is part of the corresponding end tag
+(\verb|</script>| or \verb|</style>|).
+HTML5 in contrast terminates the content with a sequence \verb|</|
+followed by the appropriate end tag name.
+In all of these cases, figuring out what \emph{must be},
+what \emph{can be}, and what \emph{cannot be}
+escaped is subtle and potentially confusing.
+
+As a potential extension enabling any of the \ml languages
+to host embedded matchertext conveniently,
+we suggest the following new element syntax:
+
+\begin{center}
+\verb|<|\emph{name attributes }\verb|[|\emph{matchertext content}\verb|]>|
+\end{center}
+
+The \emph{name} and \emph{attributes} are the tag name and optional attributes
+as they normally appear in a start tag,
+and \emph{matchertext content} is the element content as literal matchertext
+enclosed in square brackets,
+uninterpreted except to find the end by matching matchers.
+This syntax represents the entire element,
+with no end tag,
+so it is more concise than traditional start/end tag pairs.
+Since the content within brackets is uninterpreted except to match matchers,
+the content cannot contain further markup (child elements)
+or \ml character entity references when using this syntax.
+
+\Cref{fig:ml-emb}(a) illustrates a few examples
+of embedding JavaScript into a \verb|<code>| or \verb|<script>| element,
+either in standard HTML or with the proposed matchertext content syntax (+M).
+The first example is for embedding trivial and non-problematic code.
+The second example illustrates the more troublesome corner case
+where the embedded JavaScript wishes to output
+an \verb|</script>| end tag within a string literal.
+Since HTML entity references are unavailable within a \verb|<script>| element,
+the code must either use JavaScript escapes,
+or construct the \verb|</script>| tag from two string literals,
+to prevent the embedded string literal from prematurely ending
+the \verb|<script>| element.
+In matchertext content syntax,
+neither example is problematic and both are more concise.
+
+
+In XML, which is much more strict than HTML,
+the `\verb|<|' and `\verb|>|' characters (which delimit tags)
+and `\verb|&|' characters (which introduce entity references)
+are not allowed at all in element content,
+and hence must normally be escaped as
+\verb|&lt;|, \verb|&gt;|, or \verb|&amp;| respectively.
+Similarly, single quotes \verb|'| must be escaped as \verb|&apos;|
+in single-quoted attribute values,
+and double quotes \verb|"| must be escaped as \verb|&quot;|
+in double-quoted attribute values.
+
+\xxx{ explore: PHP-generated HTML with inline JavaScript.
+See for example \href{http://www.zedwood.com/article/how-to-properly-escape-inline-javascript}{How to properly escape inline javascript} }
+
+
+\subsubsection{Strings embedded as attribute values}
+
+Besides element content,
+scripting language code is often embedded in the attribute values
+of \ml start tags,
+most commonly to handle events in active user interface elements.
+Attribute values represent a different syntactic context
+in which different escaping rules apply.
+When attribute values are delimited with single or double quotes,
+the quote character that introduced the value must be escaped
+(as \verb|&apos;| or \verb|quot;|)
+if it is embedded in the attribute value.
+Character references may appear and are substituted in attribute values,
+like normal elements such as \verb|<code>| in HTML
+but unlike \verb|<script>| or \verb|<style>| content.
+As \href{https://www.w3.org/TR/html401/appendix/notes.html#notes-specifying-data}{the HTML specification notes},
+this means that script and style data cannot be simply
+cut-and-pasted between element content and attribute values
+without care for the changed escaping rules.
+HTML forgivingly allows \verb|<| and ``unambiguous'' \verb|&| characters
+to appear unescaped in attribute values,
+while XML requires them to be escaped (along with the active quote character).
+
+One potential matchertext hosting extension
+would be simply to allow square brackets as a third ``quoting style''
+for attribute values,
+where the text between the brackets is uninterpreted
+except to match matchers and find the end.
+With this extension as well as the above,
+the quoting and escaping environments for matchertext element content
+and matchertext attribute values would be identical,
+allowing code to be cut-and-pasted between these contexts freely.
+
+\Cref{fig:ml-emb}(b) illustrates examples
+of script text embedded in attribute values,
+without and with matchertext hosting extensions.
+The second illustrates the fact that any time
+a character or string literal is needed in such embedded text,
+the embedding effectively ``consumes'' both quote characters
+in standard HTML or XHTML,
+while matchertext embedding preserves JavaScript's ``syntactic freedom''
+of using one quote character to quote a verbatim instance of the other.
+
+
+\subsubsection{Strings embedded in CDATA sections}
+
+A third syntactic context in which strings are often embedded in \ml
+is via CDATA sections of the form \verb|<![CDATA[|\emph{text}\verb|]]>|,
+where \emph{text} is mostly-uninterpreted character data.
+Note that CDATA \emph{sections} are distinct from
+CDATA-typed \emph{entities} or \emph{attributes}
+as declared in an SGML document type definition (DTD).
+CDATA sections offer the ``greatest protection''
+from typical \ml escaping requirements,
+in that \emph{only} the section-terminator sequence \verb|]]>|
+is disallowed within the embedded text.
+Because \ml escape sequences are unavailable within CDATA sections, however,
+they also require the most-awkward syntactic contortions
+in the hopefully-rare event that a \verb|]]>| sequence
+needs to appear in an embedded string.
+This ``worst-case scenario'' readily comes to pass
+whenever one is \emph{writing about} CDATA sections and their issues
+in a \ml markup language, for example.
+
+A straightforward extension to host matchertext in a CDATA-like section
+would be simply to add a matchertext section form
+such as \verb|<![MDATA[|\emph{matchertext}\verb|]]>|,
+where \emph{matchertext} is uninterpreted matchertext.
+\Cref{fig:ml-emb}(b) illustrates three examples of markup
+using CDATA sections versus corresponding MDATA sections.
+The first example is simple and non-problematic in either case.
+The second example illustrates how MDATA sections eliminate the problem
+of embedding a \verb|]]>| sequence within such a verbatim section --
+provided that matchers still match, of course.
+The third example shows the more-extreme case of ``double embedding'' --
+where the complexity and visual obfuscation of CDATA sections explodes,
+while MDATA sections nest arbitrarily with no difficulty.
+This double-embedding scenario might seem contrived,
+but it is exactly what is needed, for example,
+when attempting to write in \ml markup a visual example
+(\eg in a \verb|<code>| block)
+of the single-embedding problem and its standarde ``preferred'' solution
+of replacing \verb|]]>| sequences with \verb|]]]]><![CDATA[>| sequences
+to ``close and reopen'' the outer CDATA section.
+
+

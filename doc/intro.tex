@@ -60,20 +60,20 @@ and
 (2) 
 we could impose the universal ``syntactic discipline''
 that \emph{matchers must properly match} in nested pairs
-throughout any valid string, without exception,
-in any ``compliant'' language.
+throughout any valid string -- without exception --
+in any compliant language.
 If \emph{plain text} is an unstructured linear sequence of characters
 in a character set like ASCII or Unicode,
 then we define \emph{matchertext} to be plain text
 conforming to the syntactic discipline
-that matchers must match.
+that ASCII matchers must match.
 For example, the strings `\verb|(a{b}c)|' and `\verb|a({'}["])d|'
 are valid matchertext,
 while the strings
 `\verb|(|', `\verb|{a]|', `\verb|[(])|', and `\verb|}{|'
 are plain text but are not valid matchertext.
 
-\begin{figure*}
+\begin{figure*}[t]
 \begin{center}
 \begin{small}
 \begin{tabular}{ll}
@@ -106,6 +106,34 @@ with traditional URI syntax where the sensitive
 colon (\verb|:|) and slash (\verb|/|) characters
 must be escaped as \verb|%3A| and \verb|%2F%|, respectively.
 
+\begin{figure*}[t]
+\begin{center}
+\includegraphics[width=0.95\textwidth]{fig/territorial-integrity.eps}
+\end{center}
+\label{fig:territorial-integrity}
+\caption{Illustration of how different languages' escaping rules
+	combine to increase syntactic complexity
+	in traditional embedding practice,
+	while in matchertext only one language's escaping rules
+	are ever active at a given text position.}
+\end{figure*}
+
+Adopting the matchertext discipline
+does not eliminate the need for character escape sequences:
+in fact it can slightly increase the ``escaping obligations''
+within a language, as discussed below.
+But matchertext enables languages to preserve
+the ``territorial integrity'' of their escaping and other syntactic rules,
+ensuring that developers need to think about
+\emph{only one language's rules at a time}
+at any given text position,
+even in a string composed from multiple languages.
+Thus, matchertext arguably reduces the cognitive load
+of writing (or reading) cross-language embedded code.
+Figure~\ref{fig:territorial-integrity} illustrates this difference
+with a simple example with C code embedded in HTML
+including the use of escape codes in both languages.
+
 Existing languages could be adapted incrementally
 to support and leverage matchertext.
 C-like languages, for example,
@@ -136,7 +164,7 @@ or maps like \verb|{a:1, b:"hi"}|.
 The challenge is mainly in handling the exception cases
 where unmatched matchers may commonly appear.
 
-\begin{table*}
+\begin{table*}[t]
 \begin{center}
 \begin{footnotesize}
 \begin{tabular}{ll||ll|ll|ll||ll|ll}
@@ -248,10 +276,10 @@ XXX to be tested empirically.
 \xxx{ paper roadmap}
 
 
-\subsection*{Open source research project}
+\subsection*{An open research project}
 
 This draft represents a ``work-in-progress'' snapshot
-of an experimental open source research project.
+of an experimental open research project.
 Anyone with adequate interest, skills, and motivation
 is welcome to contribute to this research project,
 and potentially become a co-author on making a substantial contribution.

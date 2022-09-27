@@ -3,7 +3,20 @@
 
 \subsection{URIs}
 
-\subsection{C-like languages}
+\subsection{C-like strings and character escapes}
+
+A wide variety of languages have adopted C-like string literal syntax,
+in which either single or double quotes surround a string literal,
+and backslashes within the literal introduce escape sequences
+used to include sensitive or special characters literally in the string
+(\eg \verb|\'|, \verb|\"|, \verb|\\|, \verb|\n|, \verb|\t|, etc.).
+There are two main ways in which we might wish to enhance such languages
+to support matchertext,
+depending on whether the language in question is the host language
+or the embedded language.
+
+\subsubsection{Hosting matchertext within C-like strings}
+
 
 triple-quoted multiline comments
 
@@ -32,6 +45,18 @@ even helpfully suggests that the ``preferred approach''
 to work around this problem is to use multiple CDATA sections,
 ``splitting each occurrence of the triad
 just before the ``\verb|>|''.
+
+relevant:
+\href{http://www.flightlab.com/~joe/sgml/cdata.html}{CDATA Confusion}
+
+
+Potential extension: MDATA.
+\verb|<![MDATA[|$m$\verb|]]>|,
+where $m$ is any valid matchertext.
+Thus, basically like CDATA except that
+an instance of the \verb|]]>| triad within $m$
+will \emph{not} prematurely end the MDATA section
+provided that matchers within $m$ are properly matched.
 
 
 \subsection{Regular expressions}
@@ -90,6 +115,13 @@ that uses \verb|\c(| for BS or \verb|\c[| or \verb|\c{| for ESC.
 Technically such uses \emph{could} exist, however,
 so adding \verb|\c()|, \verb|\c[]|, and \verb|\c{}| as a close-matcher escapes
 would technically constitute a non-backwards-compatible extension to Tcl.
+
+\textbf{Research question:}
+In a large body of Tcl code, how often are \verb|\c| escape sequences used,
+and how often are the equivalent sequences for introducing control codes used
+(\eg single-letter sequences, or octal or hex numeric sequences)?
+Which specific escape sequences does \verb|\c| get used for
+and with which characters $X$?
 
 Relevant: \href{https://www.tcl.tk/man/tcl8.5/tutorial/Tcl21.html}{More Quoting Hell - Regular Expressions 102}.
 Also \href{https://wiki.tcl-lang.org/page/Quoting+hell}{Quoting hell}

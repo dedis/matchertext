@@ -17,3 +17,35 @@ Some key questions to evaluate:
 	multiple levels of embedding?
 \end{itemize}
 
+
+\subsection{Prevalence of embedding versus unmatched matchers}
+
+The key advantage of matchertext is to simplify embedding,
+but it has the cost of making it more cumbersome
+to express unmatched matchers.
+Is this a worthwhile tradeoff?
+
+\textbf{Experiment:}
+For each of several popular programming languages,
+(a) find a large repository of source code in that language
+(\eg an open source software distribution);
+(b) find a mature scanner/parser for that language;
+(c) write a heuristic recognizer for a variety
+of commonly-embedded strings in other ``big'' or ``little'' language syntaxes
+(\eg regexes, URIs, IP addresses, JavaScript, $dots$);
+(d) count the number of times that cross-language embeddings
+appear in some form,
+and the number of times that unmatched matchers appear.
+Record and provide statistics on the contexts in which embeddings
+and unmatched matchers appear
+(\eg in function calls, if statements, case statements, comments, $dots$).
+
+Priority languages to evaluate include:
+HTML (especially detecting embedded JavaScript);
+JavaScript/TypeScript (especially with embedded HTML);
+C, C++, Java, Go, Swift, Perl, Raku, PHP.
+
+It would probably be worth trying to
+make the heuristic embedded string recognizer portable across languages
+or find an existing one that is in some way.
+
