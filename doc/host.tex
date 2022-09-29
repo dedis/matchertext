@@ -29,6 +29,7 @@ to the incremental adoption of matchertext.
 
 
 \subsection{C-like host languages}
+\label{sec:host:c}
 
 An enormous variety of today's popular programming languages
 are derived, either closely or loosely, from C~\cite{kernighan88c}.
@@ -389,8 +390,125 @@ of replacing \verb|]]>| sequences with \verb|]]]]><![CDATA[>| sequences
 to ``close and reopen'' the outer CDATA section.
 
 
-\subsection{Resource Identifiers}
-\label{sec:host:ri}
+\subsection{Uniform Resource Identifiers}
+\label{sec:host:uri}
+
+Uniform resource identifier (URI) syntax~\cite{rfc3986}
+has become a ubiquitous notation for naming and locating
+not only web pages but innumerable other Internet resources.
+As a ``small'' special-purpose syntax,
+as opposed to a general-purpose programming language,
+it is arguably more often useful as an embedded rather than a host syntax,
+as we will focus on later in \cref{sec:embed:uri}.
+In practice, however, innumerable other identifier syntaxes
+get embedded into URIs regularly,
+either as scheme-specific text
+(\eg file names, phone numbers, cryptographic hashes),
+or even as query parameter values.
+This common and intentional use of URI syntax
+as a uniform ``wrapper'' for other identifier syntaxes
+makes URIs worth careful consideration as a potential host syntax
+for matchertext embedding.
+
+We suggest two syntactic extensions
+to host matchertext within URIs,
+which are potentially complementary
+and could be adopted either together or individually.
+
+First, extending the existing ``percent-encoding'' scheme
+for escaping special characters
+(\eg \verb|%20| to represent an ASCII space),
+we suggest \emph{matchertext escape} sequences
+of the form \verb|%[|$m$\verb|]|.
+Like the backslash-escape form \verb|\[|$m$\verb|]|
+suggested in \cref{sec:host:c} for C-like languages,
+the matchertext $m$ is uninterpreted by the URI processor
+other than to verify that matchers match
+and find the terminating close bracket.
+For example, \verb|file:///%[a<b>c@d]| becomes
+a valid URI usable to access a local file named \verb|a<b>c@d|,
+containing characters typically allowed in Unix-derived file systems
+but traditionally forbidden in URIs.
+Since percent-encoding by the host URI processor
+is disabled within the embedded matchertext $m$,
+\verb|%[100%]| becomes valid and equivalent to \verb|100%25|.
+In effect, this matchertext escape syntax offers
+a more concise, less obfuscated way to express arbitrary portions of URIs
+in which several characters
+would otherwise have to be individual percent-encoded.
+
+A second potential syntactic extension is to allow
+square-bracketed sequences \verb|[|$m$\verb|]|
+to appear verbatim within the URI body,
+where $m$ is otherwise-uninterpreted matchertext.
+This is not an escape sequence,
+in that the square brackets are \emph{not} eliminated in URI processing:
+\eg \verb|[@]| is equivalent to \verb|%5B%40%5D|.
+This extension essentially serves as a matchertext-friendly quoting syntax
+that may be used in specific URI syntaxes,
+or within pathname components or query strings,
+to embed substrings in other identifier syntaxes (or even other URIs)
+without obfuscation.
+\xxx{examples}
+This extension does not conflict with existing (valid) URI syntax
+because current syntax permits brackets to be used \emph{only}
+for special-purpose IPv6 address syntax within the authority field.
 
 
+\subsubsection{Precedents for URI syntax extensions}
+
+Originally standardized as uniform resource locators or URLs~\cite{rfc1738},
+URIs traditionally allow only a small subset of ASCII characters
+to appear verbatim.
+Non-graphical characters,
+or those deemed ``unsafe'' for various reasons,
+must be escaped via percent-encoding.
+The set of allowed characters, and their purposes,
+has been ``liberalized'' multiple times, however.
+
+IP version 6 introduced colon-separated hexadecimal addresses
+(\eg \verb|1234::abcd|~\cite{rfc2373}),
+which conflicted with the URI's use of the colon to separate
+an IP address from a port number (\eg, \verb|http://1.2.3.4:80/|).
+The square brackets \verb|[]| were therefore shifted
+from forbidden to ``reserved'' characters in URIs,
+for use \emph{only} in embedding IPv6 addresses
+into the ``authority'' field of URIs,
+like \verb|http://[1234::abcd]:80/|~\cite{rfc2732}.
+
+International Resource Identifiers or IRIs~\cite{rfc3987}
+further liberalized URI syntax,
+allow most of the graphical characters
+in the extended Unicode/UCS character sets to appear verbatim in URIs.
+IRIs preserved backwards compatibility
+in part by defining standard conversion processes back and forth
+between internationalized IRIs and legacy ASCII-only URIs.
+The set of ASCII characters allowed in IRIs remained tightly restricted,
+however.
+
+Still later, IPv6 introduced scoped identifier syntax,
+allowing an interface number or name to be specified with an IPv6 address,
+\eg \verb|1234::abcd%1| or \verb|1234::abcd%if0|~\cite{rfc4007}.
+This new syntax again conflicted with URI syntax,
+leading to further syntactic hacks involving
+mandatory percent-escaping of the percent sign
+indicating a scoped identifier~\cite{rfc6874}.
+
+These points in in URI evolution illustrate
+a repeating precedent for liberalizing URI syntax
+to accept previously-forbidden characters
+and to make URIs more ``friendly'' and accommodating
+of embedded strings derived from other languages --
+whether machine-readable (\eg IPv6 addresses)
+or human-readable (international languages).
+Adopting matchertext hosting extensions such as those above,
+permitting URIs to host other syntaxes more cleanly
+without the traditional  syntactic hacks and percent-encoding obfuscation,
+could be a key step in allowing URIs to fulfill their ambition
+of being a uniform ``meta-syntax'' framework
+accommodating an unlimited variety of specific identifier syntaxes.
+
+\xxx{ There are probably many, many other examples
+in RFCs and elsewhere on ugly syntactic hacks to embed
+random syntax X into URIs.  Make a list and summarize it briefly.}
 
