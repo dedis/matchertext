@@ -59,6 +59,36 @@ simply as those strings $s \in L$ that are also matchertext strings.
 
 
 
+\subsubsection{Character set and encoding}
+
+The matchertext discipline does not dictate any particular choice
+of character set or encoding.
+For example, a matchertext string or text file could be in plain ASCII,
+in Unicode/UCS encoded via UTF-8 or UTF-16,
+in any of the numerous pre-Unicode character sets and encodings,
+or in any subset of one of these character sets.
+The matchertext rule merely states that
+wherever the ASCII matchers
+\verb|()[]{}|
+%\verb|(|,\verb|)|,\verb|[|,\verb|]|,\verb|{|,\verb|}|
+might appear in plain text,
+they must occur in matched pairs.
+A plain text string in a character set restricted to contain no ASCII matchers
+is trivially matchertext,
+because it by definition has no characters
+that could violate the matchertext rule.
+
+One implication of this orthogonality between the matchertext rule
+and character set choice
+is that residual syntactic issues may still arise
+whenever a host language might ``disagree'' with an embedded language
+on character set choices.
+Matchertext addresses some embedding issues, but not all of them.
+We will return to this issue later in \cref{sec:embed:mri:liberal}
+when we consider character set constraints
+in uniform resource identifiers (URIs).
+
+
 \subsection{Embedding considerations}
 
 If a host language $L_H$ wishes to embed a language $L_E$,

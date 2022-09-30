@@ -1,28 +1,324 @@
-\section{Embedded language considerations}
+\section{Embedded syntax considerations}
 \label{sec:embed}
 
-\subsection{C-like strings and character escapes}
+Having focused above on host language considerations,
+we now switch focus to considerations for languages
+to \emph{be embedded} as matchertext.
+The languages of interest for embedding
+overlaps heavily with those of interest as host languages;
+we separate these discussions mainly to emphasize the orthogonality
+of host- and embedded-language issues.
 
-A wide variety of languages have adopted C-like string literal syntax,
-in which either single or double quotes surround a string literal,
-and backslashes within the literal introduce escape sequences
-used to include sensitive or special characters literally in the string
-(\eg \verb|\'|, \verb|\"|, \verb|\\|, \verb|\n|, \verb|\t|, etc.).
-There are two main ways in which we might wish to enhance such languages
-to support matchertext,
-depending on whether the language in question is the host language
-or the embedded language.
+It is already readily feasible to write valid matchertext
+in most of the languages we will consider for embedding.
+This is because most popular machine-readable languages
+already largely conform to the ``matchers must match'' rule
+in their explicit uses of the matcher characters.
+Violations of the matchertext rule most commonly occur
+only in embedded ``free-form'' text such as string literals and comments.
+The language extensions we will propose are motivated almost exclusively
+by increasing convenience and visual clarity,
+and are by no means essential.
 
-\subsubsection{Hosting matchertext within C-like strings}
+\subsection{String literals in C-like languages}
+
+Almost certainly the most common context in which unmatched matchers
+appear in most today's existing source code is within string literals.
+This is especially true of code to print, or parse,
+machine-readable code in most any syntax.
+Structured pretty-printing code frequently includes code sequences like this:
+
+\begin{quote}
+\verb|print("[")| \\
+\emph{output all elements of a list} \\
+\verb|print("]")|
+\end{quote}
+
+Similarly, parsing code often uses \verb|if|, \verb|switch|,
+or \verb|case| conditionals
+to recognize and parse matcher-delimited syntactic structures,
+as in:
+
+\begin{quote}
+\verb|if peekNextChar() == '[':| \\
+\verb|  scanChar('[')| \\
+\verb|  |\emph{scan all elements of a list} \\
+\verb|  scanChar(']')| 
+\end{quote}
+
+Printing and scanning code like this generally violates the matchertext rule,
+and adapting such code most likely represents the biggest ``pain point''
+in any venture to write readily-embeddable matchertext.
+
+Almost all programming language already offer a workable
+if slightly cumbersome solution:
+simply replace unmatched matchers in string literals
+with suitable numeric character escapes.
+Instead of \verb|print("[")|, for example,
+write \verb|print("\x5B")| (C, C++, JavaScript)
+or \verb|print("\u005B")| (Java, JavaScript, Go).
+This always works;
+the main annoyance is that it requires the writer (and reader) of the code
+to remember or look up the codes for the matcher characters in an ASCII table.
+
+The usual solution in C-like languages
+to handle ``special'' characters in string literals
+is simply to backslash-escape the special character,
+like \verb|\[|.
+This traditional solution does not work for unmatched matchers in matchertext,
+however,
+because the matchertext rule is deliberately language-independent
+and oblivious to language-specific syntax such as that of string literals.
+So an ``escaped'' unmatched bracket \verb|\[|
+is just as much a matchertext violation as the bracket alone.
+
+There is a solution that avoids the need for ASCII tables, however.
+Because literal matchers are a problem in matchertext only when unmatched,
+we can simply introduce escape sequences that incorporate
+\emph{both} matchers as a properly-matched pair,
+while ``selecting'' only the opener or closer of the pair.
+In C-like languages, for example,
+we suggest the sequence \verb|\o()| to escape an open parenthesis,
+\verb|\c()| to escape a close parenthesis.
+Similarly,
+\verb|\o[]| and \verb|\c[]| represent open/close square brackets,
+and \verb|\o{}| and \verb|\c{}| represent open/close curly braces.
+
+The choice of the letters \verb|o| and \verb|c| to escape the matchers
+is consistent with their standardized character classes:
+\href{https://www.compart.com/en/unicode/category/Ps}{``Open Puntuation (Ps)''}
+and
+\href{https://www.compart.com/en/unicode/category/Pe}{``Close Punctuation (Pe)''},
+respectively.
+We might consider \verb|l| and \verb|r| for ``left'' and ``right'',
+escept \verb|\r| is a near-universal escape for carriage return (CR).
+A few languages already use \verb|o| or \verb|c| in escape sequences:
+\eg Raku uses \verb|\o[|$n$\verb|]|
+to denote the ASCII character with octal value $n$,
+and uses \verb|\c[|$n$\verb|]|
+to denote a Unicode character with name or decimal value $n$.
+Many of these existing uses are technically not in conflict syntactically,
+provided the existing use requires a non-empty string between the matchers --
+as Raku does in the above cases, for example.
+In any case, different languages need not agree
+on specific escapes sequences for unmatched matchers
+and are free to make their own stylistic choices.
+
+\xxx{relationship: triple-quoted/multiline literals}
 
 
-triple-quoted multiline comments
+\subsection{Comments and derived documentation}
+
+Another context in which unmatched matchers may regularly appear
+in typical source code is within comments:
+\eg as part of human-readable text \emph{describing}
+how the associated code handles particular characters.
+Conventional language processors usually just ignore unmatched matchers
+(along with everything else) in a comment.
+But the matchertext discipline operates below and oblivious to
+the syntax of a particular language,
+and hence does not know what a ``comment'' is --
+so the matchertext discipline must disallow unmatched matchers even in comments.
+
+Since comments are generally intended for humans reading the source code,
+it is usually possible simply to rephrase the comment
+to avoid a literal use of unmatched matcher characters:
+\eg just name it (`open parenthesis')
+instead of writing it (`\verb|(|').
+Another alternative,
+if a language adopts the above extensions for string literals,
+is simply to use these matchertext-friendly escapes in comments as well
+(\eg \verb|\o()|).
+
+In some languages,
+comments often get used to produce API documentation,
+using tools like \href{https://www.oracle.com/java/technologies/javase/javadoc-tool.html}{Javadoc}
+or \href{https://pkg.go.dev/golang.org/x/tools/cmd/godoc}{godoc}.
+In such cases,
+it may be useful to interpret escape sequences such as those above
+while auto-generating documentation from source code,
+so that a documentation comment like `\verb|// Parse a \o()|'
+becomes `Parse a (' in the formatted output generated from the code.
+
+
+\subsection{SGML-derived languages}
+
+Considerations similar to those above for string literals
+apply when we wish to embed \ml-language markup
+into other languages as matchertext.
+The most common reason unmatched matchers appear in markup
+is when needed in literal text being marked up:
+\eg human-readable text \emph{about} the matcher characters
+or syntactic constructs built from them,
+or code examples that contain unmatched matchers.
+
+As with C-style string literals,
+\ml languages already offer a workaround:
+simply use character references,
+either named (like \verb|&lpar;|)
+or numeric (\verb|&#x0028;|).
+For the same reasons as above,
+we may like to have extensions
+offering more visually-obvious alternatives for writing matchertext:
+\eg \verb|&o();| and \verb|&c();|
+for open and close parentheses, 
+respectively.
 
 
 \subsection{Uniform resource identifiers}
 \label{sec:embed:uri}
 
+Since uniform resource identifier (URI) syntax represents
+a special-purpose ``little language'' just for expressing identifiers,
+a primary use of URIs is to be embedded in other contexts --
+software source code, documentation markup, configuration files, etc.
+Especially since URIs are intended to be human-readable,
+it would thus seems useful if URIs
+could be maximally ``friendly'' for embedding.
 
-\subsection{Matchertext resource identifiers}
+\subsubsection{The near-matchertext-compliance of URI syntax}
+
+Conventional URI syntax~\cite{rfc3986}
+already ``nearly'' complies with the ``matchers must match'' rule
+and is thus, usually, embeddable verbatim in a matchertext context.
+Curly braces are formally disallowed in URIs.
+Square brackets are allowed \emph{only} to surround IPv6 addresses
+in the authority field,
+in properly-matched fashion.
+Thus, the only unmatched matchers that \emph{can} exist
+in a strictly-valid URI are parentheses.
+Even these, when appearing in URIs,
+often still come in matched pairs anyway.\footnote{\begin{tiny}
+	For example:
+	\texttt{https://en.wikipedia.org/wiki/URI\_(disambiguation)}
+	\end{tiny}}
+
+In the rare cases when unmatched parentheses are ``needed'' in a URI,
+they may always be percent-escaped as \verb|%28| or \verb|%29|.
+We could always consider escaping extensions
+such as \verb|%o()| and \verb|%c()|,
+but it is far from clear that their likely-marginal need
+would justify the syntactic complexity in this case.
+Even if URI syntax is liberalized further to allow
+square brackets and/or curly braces in components,
+it is unclear how commonly unmatched matchers would be needed,
+since it is not particularly common to write parsing or scanning code
+within a URI for example.
+
+
+\subsubsection{The URI end-finding problem}
+
+Nevertheless, 
+URI syntax does suffer from at least one significant usability flaw
+arising from its frequent use as an embedded syntax.
+URIs can and often do appear almost ``anywhere''
+in freeform human-readable text --
+\eg typed or copied into E-mails, notes, documents, etc.
+Smart text editors often try to detect URIs on entry
+and automatically turn them into hyperlinks --
+but these heuristics can easily break because
+there is no unambiguous syntactic separation between the URI
+and surrounding (particularly following) text.
+Suppose for example that I type or copy this text into an E-mail:
+
+\begin{footnotesize}
+\begin{quote}
+\verb|My site is https://bford.info/index.html.|
+\end{quote}
+\end{footnotesize}
+
+The trailing period (\verb|.|) \emph{could} be part of the URI,
+but in this case was probably intended to terminate my English sentence.
+I could try to ``armor'' the URI, like this:
+
+\begin{footnotesize}
+\begin{quote}
+\verb|See my site (https://bford.info/index.html).|
+\end{quote}
+\end{footnotesize}
+
+But the close parenthesis, as well, \emph{could} be part of the URI
+and be sucked into the link by a ``greedy'' URI auto-recognizer,
+resulting in a broken link.
+A careful reader of Appendix C of the URI specification~\cite{rfc3986}
+might find the recommendation to delimit URIs
+with angle brackets \verb|<>| --
+but rather few people seem to be aware of this recommendation in practice,
+let alone are following it.
+
+
+\subsubsection{Matchertext resource identifiers}
 \label{sec:embed:mri}
 
+Given how commonly URIs are embedded in both freeform human-readable text
+as well as other machine-readable syntaxes of all kinds,
+we suggest that a more useful and ambitious potential evolution
+would make URI syntax \emph{self-delimiting}.
+In particular,
+let us consider an alternative potential URI syntax
+in which we surround the URI's body -- everything after the scheme name --
+with square brackets instead of separating it from the body with a colon.
+Thus, \verb|http://my.site/| becomes \verb|http[//my.site/]|.
+This alternate syntax uses only characters
+that are already used (and reserved) in current URI syntax,
+and it remains readily recognizable in freeform embedded contexts,
+but now the end can always be found unambiguously with no heuristic guessing.
+
+Let's call this new syntax
+a \emph{matchertext resource identifier} or MRI.
+Since MRI syntax is distinct and not readily confused with traditional URIs,
+it could enforce the rule that all URI body content within the brackets
+must be matchertext --
+\ie that unmatched matchers in the body must be percent-encoded --
+for verbatim embedding of other syntaxes (or other MRIs) in the body.
+Just as IRIs~\cite{rfc3987} liberalized URI syntax
+while preserving backward compatibility
+by defining automatic conversions in both directions,
+MRI syntax could similarly be converted automatically
+to or from traditional URI and IRI syntax.
+
+Assume that MRI syntax includes the extensions
+discussed earlier in \cref{sec:host:uri} --
+in particular the rule that a square bracket sequence \verb|[|$m$\verb|]|
+nested within the URI body protects the embedded matchertext $m$
+from percent-encoding in the outer context.
+With this syntax, MRIs cleanly nest with no escaping needed,
+not even to introduce a matchertext embedding context.
+An embedded MRI appearing in a path or query string component
+of a host MRI never need be escaped, for example,
+as illustrated by the examples in \cref{fig:search-query}.
+
+Moreover, MRI syntax could potentially be \emph{simpler}
+than traditional URI syntax,
+because complex and rarely-used sub-syntaxes such as IPv4 and IPv6 addresses
+could be ``broken out'' of the main MRI syntax
+and handled instead as embedded MRIs in the host MRI's authority field.
+For example,
+the URI `\verb|http://1.2.3.4:80/|' would become
+the MRI `\verb|http[//ip4[1.2.3.4]:80/|', and
+the URI `\verb|http://[1234::abcd]:80/|' would become
+the MRI `\verb|http://ip6[1234::abcd]:80/|'.
+%IPv6 addresses with scoped identifiers
+%could avoid obfuscation in URIs~\cite{rfc6874}:
+%the URI `\verb|http://[1234::abcd%25eth0]/' becomes
+%the MRI `\verb|http://ip6[1234::abcd%eth0]/'.
+The MRI host field syntax knows only about domain names or nested MRIs,
+not about IP addresses.
+
+
+
+
+\subsubsection{How liberal to liberalize?}
+\label{sec:embed:mri:liberal}
+
+spaces, control codes.
+
+
+
+\subsubsection{Matchertext-violating language constructs}
+
+Half-open range/set notation.
+
+
+
+\xxx{ JSON? }
