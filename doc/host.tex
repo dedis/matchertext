@@ -27,6 +27,66 @@ to embed matchertext strings verbatim within the host language.
 This form of backward compatibility will be essential
 to the incremental adoption of matchertext.
 
+\begin{table*}
+\begin{center}
+\begin{footnotesize}
+\begin{tabular}{l|l|l|l|c}
+Class	& Description
+	& Syntax
+	& Example
+	& See \\
+\hline
+	& & & & \\
+C-like	& String escape
+	& \verb|"|$\dots$\verb|\[|$m$\verb|]|$\dots$\verb|"|
+	& \verb|"now \[quoting's "easy"]"|
+	& \ref{sec:host:c} \\
+	& & & & \\
+\ml	& Element
+	& \verb|<|\textit{tag attrs}\verb| [|$m$\verb|]>|
+	& \verb|<code [if (a<b) { printf("some <markup>\n"); }]>|
+	& \ref{sec:host:ml:element} \\
+	& Attribute
+	& \verb|<|\textit{tag attr}\verb|=[|$m$\verb|]>|
+	& \verb|<button onclick=[show("it's done!")]>OK</button>|
+	& \ref{sec:host:ml:attr} \\
+	& Section
+	& \verb|<![MDATA[|$m$\verb|]]>|
+	& \verb|<![MDATA[some example <b>bold</b> markup]]>|
+	& \ref{sec:host:ml:section} \\
+	& & & & \\
+URI	& Bracket quote
+	& \verb|[|$m$\verb|]|
+	& \verb|http://trans.late/?page=[http://my.site/]&lang=en|
+	& \ref{sec:host:uri} \\
+	& Percent escape
+	& \verb|%[|$m$\verb|]|
+	& \verb|http://social.net/user/%[joe@email.net]/index.html|
+	& \ref{sec:host:uri} \\
+\end{tabular}
+\end{footnotesize}
+\end{center}
+\caption{Summary of proposed matchertext hosting extensions.}
+\label{tab:host:summary}
+\end{table*}
+
+
+We first examine languages with C-like string literal syntax
+in \cref{sec:host:c},
+then address SGML-derived languages such as HTML and XML
+in \cref{sec:host:ml},
+and finally in \cref{sec:host:uri}
+we focus on uniform resource identifiers
+in their role as a meta-syntax frequently ``hosting''
+embedded identifiers derived from other syntaxes.
+
+\Cref{tab:host:summary} summarizes the syntax extensions
+for different language classes proposed in this section.
+We emphasize that these are merely proposals for discussion.
+Different language communities should and will make their own decisions,
+and need not agree across languages on specific extension syntax
+in order for matchertext to be useful.
+
 
 \subsection{C-like host languages}
 \label{sec:host:c}
@@ -143,6 +203,7 @@ ASCII matchers must match.
 
 
 \subsection{SGML-style markup host languages}
+\label{sec:host:ml}
 
 While the venerable
 Standard General Markup Languages (SGML)~\cite{iso8879sgml}
@@ -225,6 +286,7 @@ that these embedding contexts can create.
 
 
 \subsubsection{Strings embedded as element content}
+\label{sec:host:ml:element}
 
 One common form of embedding into \ml 
 is marked-up text serving as the content of an element:
@@ -303,6 +365,7 @@ neither example is problematic and both are more concise.
 
 
 \subsubsection{Strings embedded as attribute values}
+\label{sec:host:ml:attr}
 
 Besides element content,
 scripting language code is often embedded in the attribute values
@@ -348,6 +411,7 @@ of using one quote character to quote a verbatim instance of the other.
 
 
 \subsubsection{Strings embedded in CDATA sections}
+\label{sec:host:ml:section}
 
 A third syntactic context in which strings are embedded in SGML and XML
 (but not HTML)
@@ -415,6 +479,27 @@ to host matchertext within URIs,
 which are potentially complementary
 and could be adopted either together or individually.
 
+\begin{figure*}
+\begin{center}
+\begin{footnotesize}
+\begin{tabular}{lrl}
+%\multicolumn{3}{l}{\textbf{URI examples without and with
+%	matchertext percent-escape extension}} \\
+%& URI	& \verb|http://social.net/user/joe%40email.net/index.html| \\
+%& +M	& \verb|http://social.net/user/%[joe@email.net]/index.html| \\
+& URI	& \verb|http://dev.site/myLibrary/doc/genericContainer%3CT%3E/api/| \\
+& +M	& \verb|http://dev.site/myLibrary/doc/%[genericContainer<T>]/api/| \\
+& URI	& \verb|http://search.engine/linksto?site=http%3A%2F%2Fmy.site%2F&results=50| \\
+& +M	& \verb|http://search.engine/linksto?site=%[http://my.site/]&results=50| \\
+& URI	& \verb|http://calculator.site/?expr=(1%2B2)*3%5E4%2F5| \\
+& +M	& \verb|http://calculator.site/?expr=%[(1+2)*3^4/5]| \\
+\end{tabular}
+\end{footnotesize}
+\end{center}
+\caption{Examples of URIs without and with matchertext hosting extensions (+M).}
+\label{fig:host:uri-examples}
+\end{figure*}
+
 First, extending the existing ``percent-encoding'' scheme
 for escaping special characters
 (\eg \verb|%20| to represent an ASCII space),
@@ -425,8 +510,8 @@ suggested in \cref{sec:host:c} for C-like languages,
 the matchertext $m$ is uninterpreted by the URI processor
 other than to verify that matchers match
 and find the terminating close bracket.
-For example, \verb|file:///%[a<b>c@d]| becomes
-a valid URI usable to access a local file named \verb|a<b>c@d|,
+For example, \verb|file:///%[a<b>c`d]| becomes
+a valid URI usable to access a local file named \verb|a<b>c`d|,
 containing characters typically allowed in Unix-derived file systems
 but traditionally forbidden in URIs.
 Since percent-encoding by the host URI processor
@@ -435,24 +520,31 @@ is disabled within the embedded matchertext $m$,
 In effect, this matchertext escape syntax offers
 a more concise, less obfuscated way to express arbitrary portions of URIs
 in which several characters
-would otherwise have to be individual percent-encoded.
+would otherwise have to be individually percent-encoded.
+\Cref{fig:host:uri-examples} shows a few examples of URIs
+using conventional and matchertext percent-escapes for comparison.
 
-A second potential syntactic extension is to allow
+Another potential syntactic extension is to allow
 square-bracketed sequences \verb|[|$m$\verb|]|
 to appear verbatim within the URI body,
 where $m$ is otherwise-uninterpreted matchertext.
-This is not an escape sequence,
-in that the square brackets are \emph{not} eliminated in URI processing:
-\eg \verb|[@]| is equivalent to \verb|%5B%40%5D|.
+This is \emph{not} an escape sequence:
+the square brackets are not eliminated in URI processing,
+so \verb|[@]| is equivalent to \verb|%5B%40%5D|.
 This extension essentially serves as a matchertext-friendly quoting syntax
-that may be used in specific URI syntaxes,
+that may be used in specific URI schemes,
 or within pathname components or query strings,
-to embed substrings in other identifier syntaxes (or even other URIs)
+to embed substrings in other identifier syntaxes (even other URIs)
 without obfuscation.
-\xxx{examples}
-This extension does not conflict with existing (valid) URI syntax
-because current syntax permits brackets to be used \emph{only}
-for special-purpose IPv6 address syntax within the authority field.
+We will explore the usefulness of this extension further
+when we consider \emph{matchertext resource identifier} syntax
+later in \cref{sec:embed:mri}.
+This extension is backwards-compatible with existing (valid) URIs
+because current syntax permits brackets \emph{only}
+in special-purpose IPv6 address syntax as part of the authority field.
+
+
+\xxx{discuss issue of spaces? maybe later with MRIs}
 
 
 \subsubsection{Precedents for URI syntax extensions}
@@ -464,12 +556,12 @@ Non-graphical characters,
 or those deemed ``unsafe'' for various reasons,
 must be escaped via percent-encoding.
 The set of allowed characters, and their purposes,
-has been ``liberalized'' multiple times, however.
+has been ``liberalized'' multiple times historically, however.
 
 IP version 6 introduced colon-separated hexadecimal addresses
 (\eg \verb|1234::abcd|~\cite{rfc2373}),
 which conflicted with the URI's use of the colon to separate
-an IP address from a port number (\eg, \verb|http://1.2.3.4:80/|).
+an IP address from a port number (\eg \verb|http://1.2.3.4:80/|).
 The square brackets \verb|[]| were therefore shifted
 from forbidden to ``reserved'' characters in URIs,
 for use \emph{only} in embedding IPv6 addresses
@@ -504,7 +596,7 @@ or human-readable (international languages).
 Adopting matchertext hosting extensions such as those above,
 permitting URIs to host other syntaxes more cleanly
 without the traditional  syntactic hacks and percent-encoding obfuscation,
-could be a key step in allowing URIs to fulfill their ambition
+could be a useful step in allowing URIs to fulfill their ambition
 of being a uniform ``meta-syntax'' framework
 accommodating an unlimited variety of specific identifier syntaxes.
 
