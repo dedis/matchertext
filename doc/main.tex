@@ -17,9 +17,8 @@
 \long\def\com#1{{\bf \sc comment: }{\small [#1]}{\bf \sc\ endcomment}\newline}
 \long\def\XXX#1{{\color{red} {\bf XXX }{\small [#1]}}}
 
-\long\def\xxx#1{{\color{red} {\bf XXX }{\small [#1]}}}
-%\long\def\xxx#1{}
-\long\def\red#1{{\color{red}#1}}
+\newcommand{\xxx}[1]{{\color{red} {\bf XXX }{\small [#1]}}}
+%\newcommand{\xxx}[1]{}
 
 % Choose regular version or version hacked for arXiv preprint submission
 \long\def\arxiv#1#2{#1}			% real version
@@ -64,7 +63,6 @@
 \input{intro}
 \input{bg}
 \input{design}
-\input{langs}
 \input{host}
 \input{embed}
 % ...

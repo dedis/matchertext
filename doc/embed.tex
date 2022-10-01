@@ -100,9 +100,11 @@ to denote a Unicode character with name or decimal value $n$.
 Many of these existing uses are technically not in conflict syntactically,
 provided the existing use requires a non-empty string between the matchers --
 as Raku does in the above cases, for example.
+% see raku/escapes.raku for a trivial script with which to verify this.
 In any case, different languages need not agree
 on specific escapes sequences for unmatched matchers
 and are free to make their own stylistic choices.
+
 
 \xxx{relationship: triple-quoted/multiline literals}
 
@@ -306,8 +308,6 @@ The MRI host field syntax knows only about domain names or nested MRIs,
 not about IP addresses.
 
 
-
-
 \subsubsection{How liberal to liberalize?}
 \label{sec:embed:mri:liberal}
 
@@ -315,10 +315,48 @@ spaces, control codes.
 
 
 
-\subsubsection{Matchertext-violating language constructs}
+\subsection{Regular expressions}
 
-Half-open range/set notation.
+\xxx{
+Character classes: no matchers unless both present.
+But character escapes instead...
+}
+
+Regular expressions in
+\href{https://www.tcl.tk/man/tcl8.4/TclCmd/re_syntax.html#M32}{Tcl}
+and
+\href{https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions/Character_Classes#types}{JavaScript}
+use \texttt{\\c}$X$ as an escape sequence for control code characters.
+Using this syntax with an opener as the character $X$
+appears to be illegal in JavaScript regular expressions,
+and perhaps legal but unlikely to be used in Tcl regular expressions.
+
+\xxx{
+Question: how often are these escape sequences used,
+and how often are the equivalent sequences for introducing control codes used
+(\eg single-letter sequences, or octal or hex numeric sequences)?
+Which specific escape sequences does this escape sequence get used for
+and with which characters $X$?
+
+Relevant: \href{https://www.tcl.tk/man/tcl8.5/tutorial/Tcl21.html}{More Quoting Hell - Regular Expressions 102}.
+Also \href{https://wiki.tcl-lang.org/page/Quoting+hell}{Quoting hell}
+}
 
 
 
-\xxx{ JSON? }
+\subsection{Trouble spots in syntax tradition}
+
+\xxx{ When are unmatched matchers traditionally used
+in actual language syntax, not just as literal text embedded within syntax?
+Mathematical half-open range/set notation.
+How problematic is this?
+Other examples?
+}
+
+\subsection{Future: other oft-embedded languages}
+
+\xxx{	Other often-embedded languages to consider, potentially:
+		SQL
+		JSON
+}
+

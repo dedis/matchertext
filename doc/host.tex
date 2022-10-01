@@ -208,7 +208,7 @@ ASCII matchers must match.
 \label{sec:host:ml}
 
 While the venerable
-Standard General Markup Languages (SGML)~\cite{iso8879sgml}
+Standard General Markup Languages (SGML)~\cite{iso8879sgml,goossens95sgml}
 itself has waned in popularity,
 its derivatives HTML~\cite{whatwg22html} and XML~\cite{w3c08xml}
 are now ubuiquitous in Web content and programming.
@@ -421,7 +421,7 @@ is via CDATA sections of the form \verb|<![CDATA[|\emph{text}\verb|]]>|,
 where \emph{text} is mostly-uninterpreted character data.
 CDATA \emph{sections} are distinct from
 CDATA-typed \emph{entities} or \emph{attributes}
-as declared in an SGML document type definition (DTD).
+as declared in an SGML document type definition (DTD)~\cite{english97cdata}.
 CDATA sections offer the ``greatest protection''
 from typical \ml escaping requirements,
 in that \emph{only} the section-terminator sequence \verb|]]>|
@@ -454,6 +454,10 @@ when attempting to write in \ml markup a visual example
 of the single-embedding problem and its typical ``preferred'' solution
 of replacing \verb|]]>| sequences with \verb|]]]]><![CDATA[>| sequences
 to ``close and reopen'' the outer CDATA section.
+
+\xxx{ relevant:
+\href{http://www.flightlab.com/~joe/sgml/cdata.html}{CDATA Confusion}
+}
 
 
 \subsection{Uniform Resource Identifiers}
