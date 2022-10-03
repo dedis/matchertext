@@ -21,7 +21,8 @@ or vice versa.
 
 Suppose a host language $L_h$ wishes
 to allow embedding a matchertext string $m$
-from an arbitrary language $L_e$ (which may be unknown to the host language).
+from an arbitrary language $L_e$,
+whose syntax is likely unknown to the host language.
 In contexts where matchertext strings $m \in L_e$ are allowed,
 $L_h$ must impose \emph{no} constraints on characters allowed in that context
 other than the matchertext discipline (matchers must match).
@@ -249,9 +250,9 @@ Beyond merely marking up verbatim text in other languages, however,
 HTML in particular has evolved to include special-purpose support
 for embedding several other languages within HTML:
 namely scripting languages such as JavaScript or Tcl,
-cascading style sheets (CSS)~\cite{XXX},
-MathML~\cite{XXX},
-and SVG~\cite{XXX}.
+cascading style sheets (CSS)~\cite{w3c21css},
+MathML~\cite{w3c14mathml},
+and SVG~\cite{w3c18svg}.
 
 The \ml languages are surprisingly complex syntactically,
 especially given their simple-sounding purpose
@@ -629,4 +630,113 @@ accommodating an unlimited variety of specific identifier syntaxes.
 \xxx{ There are probably many, many other examples
 in RFCs and elsewhere on ugly syntactic hacks to embed
 random syntax X into URIs.  Make a list and summarize it briefly.}
+
+
+\subsubsection{How liberal to liberalize?}
+\label{sec:host:uri:liberal}
+
+The above considerations, however,
+raise the obvious question:
+\emph{how far should liberalization of URI syntax go?}
+Beyond the square brackets,
+which \emph{other} characters that were previously disallowed in URIs and IRIs
+eventually be permitted, and in what contexts?
+
+In terms of our current focus on hosting embedded matchertext,
+the ideal would clearly be to allow \emph{any} UCS characters in URIs --
+at least within a matchertext escape \verb|%[|$m$\verb|]|
+or a matchertext quote \verb|[|$m$\verb|]|.
+This approach would clearly provide the maximum latitude
+for embedding other syntaxes into URIs cleanly in the future.
+Further, only this ``extreme liberalization''
+would guarantee that \emph{any} matchertext
+may be embedded verbatim into a URI
+from any language conforming to the standard matchertext configuration
+(\cref{sec:design:concrete}).
+
+As briefly discussed earlier in \cref{sec:design:concrete:variations},
+however,
+this arguably might be ``going too far'' in the case of URIs.
+We first consider the graphical ASCII characters
+that are currently disallowed in URIs,
+then the non-graphical characters such as spaces and control codes.
+
+\paragraph{Graphical characters:}
+
+URIs traditionally forbid
+``angle brackets'' \verb|<>| and double quotes \verb|"|
+from use within URIs,
+because these characters are sometimes
+used to delimit URIs in surrounding freeform text:
+\eg \verb|<http://my.site/>| or \verb|"http://my.site/"|.
+In any ``legacy'' URI parsing context unaware of matchertext extensions,
+the appearance of these characters within a URI might indeed
+prematurely terminate the recognized URI,
+an issue we will return to later in \cref{sec:embed:uri:end}.
+In a context aware of the matchertext extensions, however,
+there is no syntactic ambiguity between angle-brackets or double-quotes
+used to surround a whole URI
+and any that may appear within embedded matchertext.
+The matchers delimiting the embedded matchertext
+unambiguously serve to differentiate "inside" from "outside":
+\eg as in \verb|<http://my.site/%[>"<]>|.
+
+The original URL standard in 1994~\cite{rfc1738}
+additionally declared all the following characters 
+to be ``unsafe'' in URIs 
+``because gateways and other transport agents are known to sometimes modify
+such characters'':
+
+\begin{center}
+\verb|{ } |\texttt{|}\verb| \ ^ ~ [ ] `|
+\end{center}
+
+Nearly 30 years later,
+the ``gateways and other transport agents'' that text containing URIs
+tend to pass through have no doubt evolved drastically
+(or been replaced entirely).
+It is far from clear, therefore,
+that URIs today face the same modification perils as those of 1994.
+The text justifying the exclusion of these characters
+was dropped from the latest URI standard~\cite{rfc3986},
+though the characters themselves remain forbidden
+apart from the square brackets.
+IRIs introduced thousands of other new characters into the allowed set
+without dire consequences.
+With adequate care taken for backwards compatibility (as was done with IRIs),
+it may be high time to consider allowing
+the rest of the ASCII printing characters above into URIs --
+\emph{at least} within embedded matchertext hosted within URIs.
+
+\paragraph{Non-graphical characters:}
+
+URIs also traditionally disallow non-graphical characters such as spaces,
+as well as control characters such as newlines and tabs,
+for a different purpose: the goal of \emph{transcribability}.
+It was difficult in 1994 to transcribe by hand
+a string containing spaces, newlines, tabs, or other control codes,
+and it is probably just as difficult to do so today.
+In an era of proliferating QR codes,
+the only question might be to what extent manual transcribability
+is still a crucial goal for URIs.
+
+Nevertheless, manual transcription remains a not-uncommon use of URIs,
+and compromising the transcribability goal
+would arguably represent a much more fundamental shift
+in the principles underlying URIs
+than decisions about allowing or disallowing particular printing characters.
+This consideration therefore suggests that we
+cease the liberalization of URIs short of
+allowing non-graphical characters.
+
+Further, the transcribability goal is served
+only if the \emph{entire} URI is readily transcribable,
+including any embedded matchertext substrings it may contain.
+Thus,
+as briefly mentioned earlier in \cref{sec:design:concrete:variations:tight},
+the URI context may justify a \emph{tightened} matchertext configuration
+whose alphabet $\Sigma$ is reduced to exclude non-graphical characters.
+The cost is that arbitrary matchertext is not necessarily copyable verbatim
+from C-like languages into URIs,
+but this compatibility cost may be justified in this case.
 

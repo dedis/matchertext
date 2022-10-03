@@ -38,7 +38,7 @@ We now define the language $L$ of \emph{matchertext strings}
 inductively (\ie generatively) as follows:
 \begin{itemize}
 \item	Any string $n$ consisting exclusively of nonmatcher characters in $N$,
-	(including the empty string),
+	including the empty string,
 	is a matchertext string in $L$.
 \item	For any matchertext strings $m_1,m_2,m_3$ in $L$,
 	and for any pair $(o,c) \in P$,
@@ -135,6 +135,7 @@ although encoding is not a primary concern for matchertext
 since it operates below the character set abstraction.
 
 \subsubsection{Standardizing on matcher pairs}
+\label{sec:design:concrete:standard}
 
 A particular choice of the matcher pairs $P$ is less obvious, however,
 and hence demands more careful justification.
@@ -237,6 +238,7 @@ in defining the syntax of matchertext embeddings
 
 
 \subsection{Matchertext configuration variations}
+\label{sec:design:concrete:variations}
 
 Even if well-justified,
 we cannot expect the standard matchertext configuration
@@ -255,6 +257,7 @@ can be either \emph{tightening} (more restrictive),
 \emph{loosening} (less restrictive), or a combination.
 
 \subsubsection{Tightening variations}
+\label{sec:design:concrete:variations:tight}
 
 A matchertext configuration $(\Sigma',P')$
 is a \emph{tightening} of
@@ -272,11 +275,11 @@ only graphical characters -- and no spaces or control codes for example --
 in order to make them manually transcribable.
 To serve this transcribability purpose,
 significant spaces and control codes must not appear \emph{anywhere} in a URI,
-even in an embedded matchertrext substring.
+even in an embedded matchertext substring.
 Thus, URIs may represent a justifiable use-case
 for an alternate matchertext configuration that removes
-the non-graphical characters from the alphabet,
-although this necessarily means that a string cannot in general
+the non-graphical characters from the alphabet.
+This would unfortunately mean that a string cannot, in general,
 be copied from a standard matchertext language into a matchertext URI
 without transformation (\ie escaping spaces and control codes).
 
@@ -295,7 +298,7 @@ but not necessarily in the other direction.
 A loosened matchertext configuration might potentially justified,
 for example, if it is deemed critical to embed strings in some language $L_e$
 that frequently makes unmatched uses of some ASCII matchers,
-and the pain of escaping or otherwise adapting that syntax is deemed to great.
+and the pain of escaping or otherwise adapting that syntax is deemed too great.
 Mathematical notation sometimes uses
 ``mismatched'' parentheses and square brackets
 to represent half-open/half-closed intervals, for example:
@@ -312,87 +315,13 @@ as extremely few machine-readable languages
 appear to support this mathematical
 half-open/half-closed interval notation anyway.
 Languages that do support some form of half-open/half-closed syntax
-often do so with other, more matchertext-friendly syntax.
+often do so with other, more matchertext-friendly notation.
 Swift~\cite{apple22swift}, for example,
-supports \emph{half-open range syntax} like \verb|1..<4|
+supports \emph{half-open range} syntax like \verb|1..<4|
 for the sequence of integers starting from and including 1,
 up to but not including 4.
 This syntax is perfectly compatible with the standard matchertext configuration
 because it uses the mathematical inequality operators,
 rather than unmatched matchers,
 to express the range's open upper endpoint.
-
-
-\subsection{Writing matchertext in existing languages}
-
-\xxx{old}
-
-In most popular langguages whose input is normally plaintext,
-it is already \emph{possible} -- using existing escaping mechanisms --
-to write a matchertext version
-(either manually or automatically)
-that is at least semantically equivalent
-to any given valid plaintext string in that language.
-
-Consider URIs, for example,
-which have a standard percent-escape code mechanism
-to replace potentially-sensitive ASCII characters with hexadecimal escape codes.
-By RFC XXX, URIs are normally not supposed to contain square brackets anyway
-except in matched pairs as part of IPv6 address syntax.
-But URIs may contain parentheses and curly braces (XXX ?),
-which might be unmatched in an arbitrary URI.
-Such an URI can always be rewritten
-into a semantically-equivalent matchertext URI
-(i.e., one that evaluates to the same canonical form XXX)
-by replacing all unmatched matcher characters with their
-equivalent percent-escape codes.
-For example, the URI `\verb|scheme://site/open(|'
-would become `\verb|scheme://site/open%28|',
-`\verb|scheme://site/close)|'
-becomes `\verb|scheme://site/close%29|'
-and `\verb|scheme://site/close)open(|' becomes
-`\verb|scheme://site/close%29open%28|'.
-The URI `\verb|scheme://site/open(close)|'
-need not be rewritten at all,
-since all the matchers it contains already (happen to) match.
-
-In SGML-derived languages such as HTML and XML, similarly,
-any valid plaintext string in the language
-can generally be converted to an equivalent matchertext string
-simply by replacing all unmatched ASCII matchers
-with the decimal escape codes
-`\verb|&#40;|', `\verb|&#41;|' or
-`\verb|&lpar;|', `\verb|&rpar;|' for parentheses,
-`\verb|&#91;|', `\verb|&#93;|' or
-`\verb|&lbrack;|', `\verb|&rbrack;|' for square brackets, and
-`\verb|&#123;|', `\verb|&#125;|' or
-`\verb|&lbrace;|', \verb|&rbrace;|' for curly braces.
-
-This does not mean that rewriting unmatched matchers into moderately-obscure
-(especially numeric) escape codes
-is particularly convenient or enjoyable to do manually, of course.
-Fortunately, given the prevalence with which ASCII matchers
-tend to be used in properly-matched fashion anyway --
-both in programming languages and in free-form human-language text strings --
-there is at least hope that we need not worry about escaping unmatched matchers
-\emph{all the time}.
-(XXX we will explore this question of frequency in the evaluation.)
-But \emph{sometimes} we will still need to express
-unmatched matcher characters in many languages --
-when we are trying to ``talk about'' those matchers
-as \emph{literal characters}, for example,
-whether in code or human-readable text.
-
-\subsection{Matchers in character and string literals}
-
-It is near-ubiquitous practice in mainstream programming languages 
-to use the ASCII single- and/or double-quote characters (\verb|'|, \verb|"|)
-to delimit literal characters or strings.
-
-\subsection{Gracefully evolving towards matchertext-friendly languages}
-
-We can envison backwards-compatible extensions to most popular languages
-that could 
-
-
 

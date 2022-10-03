@@ -198,6 +198,16 @@ often still come in matched pairs anyway.\footnote{\begin{tiny}
 
 In the rare cases when unmatched parentheses are ``needed'' in a URI,
 they may always be percent-escaped as \verb|%28| or \verb|%29|.
+For example, the string `\verb|open(|'
+becomes `\verb|open%28|' in a matchertext URI,
+`\verb|close)|'
+becomes `\verb|close%29|',
+and `\verb|close)open(|' becomes
+`\verb|close%29open%28|'.
+The string `\verb|open(close)|'
+need not be rewritten at all in a matchertext URI,
+since the matchers it contains already happen to match.
+
 We could always consider escaping extensions
 such as \verb|%o()| and \verb|%c()|,
 but it is far from clear that their likely-marginal need
@@ -210,6 +220,7 @@ within a URI for example.
 
 
 \subsubsection{The URI end-finding problem}
+\label{sec:embed:uri:end}
 
 Nevertheless, 
 URI syntax does suffer from at least one significant usability flaw
@@ -307,12 +318,6 @@ the MRI `\verb|http://ip6[1234::abcd]:80/|'.
 %the MRI `\verb|http://ip6[1234::abcd%eth0]/'.
 The MRI host field syntax knows only about domain names or nested MRIs,
 not about IP addresses.
-
-
-\subsubsection{How liberal to liberalize?}
-\label{sec:embed:mri:liberal}
-
-spaces, control codes.
 
 
 
