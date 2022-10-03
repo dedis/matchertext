@@ -16,15 +16,35 @@ in order to emphasize their conceptual orthogonality:
 a language could readily adopt hosting extensions but not embedding extensions,
 or vice versa.
 
-One important observation is that
-languages need not \emph{be} matchertext-compliant in their syntax
+
+\subsection{General hosting considerations}
+
+Suppose a host language $L_h$ wishes
+to allow embedding a matchertext string $m$
+from an arbitrary language $L_e$ (which may be unknown to the host language).
+In contexts where matchertext strings $m \in L_e$ are allowed,
+$L_h$ must impose \emph{no} constraints on characters allowed in that context
+other than the matchertext discipline (matchers must match).
+Further, $L_h$ must not transform the embedded strings $m$ in any way
+while extracting it from the host-language text.
+Specifically, any escaping mechanisms or other transformations
+that might normally apply to text in $L_h$
+must be disabled in the context of the embedded string.
+If any escaping mechanisms or other transformations
+are active within the embedded string,
+they must be those of $L_e$, not $L_h$.
+We will see examples of this principle applied
+in several specific contexts below.
+
+Languages need not \emph{be} matchertext-compliant in their own syntax,
+however,
 just in order to \emph{host} embedded matchertext.
 Existing languages can preserve full compatibility
 with all their existing (non-embedded, non-matchertext) code --
-continuing to allow unmatched matchers in string constants for example --
+continuing to allow unmatched matchers in string literals for example --
 while incrementally adding extensions that make it easy
 to embed matchertext strings verbatim within the host language.
-This form of backward compatibility will be essential
+This form of backward compatibility will likely be essential
 to the incremental adoption of matchertext.
 
 \begin{table*}
@@ -71,7 +91,7 @@ URI	& Bracket quote
 \end{table*}
 
 
-We first examine languages with C-like string literal syntax
+We next examine languages with C-like string literal syntax
 in \cref{sec:host:c},
 then address SGML-derived languages such as HTML and XML
 in \cref{sec:host:ml},
