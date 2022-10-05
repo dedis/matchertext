@@ -1,47 +1,203 @@
 \section{Background: needs and pitfalls of interlanguage embedding}
 \label{sec:bg}
 
-\subsection{Needs for embedding}
+The practice of
+embedding strings from one language into another
+is ubiquitous --
+as is the pain of having to ``escape'' embedded strings
+to protect them from misinterpretation by the host language processor.
+This section briefly explores a few of these common existing practices
+and the syntactic composition problems they create.
 
-special-purpose ``little languages'' that are usually embedded.
-URIs. regexps. JSON. SQL.
+\subsection{Special-purpose languages}
+
+Many special-purpose language syntaxes exist
+almost solely for embedded use in other syntactic contexts.
+A few particularly common examples of such ``little languages''
+include regular expressions (REs),
+uniform resource identifiers (URIs),
+JavaScript Object Notation (JSON),
+and Structured Query Language (SQL).
+
+Perhaps the most classic ``little language'' is regular expression (RE) syntax,
+commonly used for pattern-based searches and replacements in freeform text.
+RE syntax traditionally uses many punctuation characters for special purposes,
+but must also allow arbitrary embedded text to be matched literally.
+RE syntax therefore makes heavy use of ``backslash-escaping'' in literal text:
+\eg the RE \verb|.*|
+matches any number of arbitrary characters other than newlines,
+while one must write \verb|\.\*| to match the literal string `\verb|.*|'.
+Because REs themselves are often embedded in another language --
+frequently a C-inspired language that \emph{also} uses backslash-escaping
+in string literals --
+we must further backslash-escape the backslashes in RE syntax.
+A C string literal containing the latter RE above
+is written \verb|"\\.\\*"|,
+for example.
+To match the double-backslash \verb|\\| that begins
+a \href{https://en.wikipedia.org/wiki/Path_(computing)#Universal_Naming_Convention}{UNC name} (as in \verb|\\host\path\file|),
+the backslashes must be doubled to become \verb|\\\\| as an RE,
+then doubled again to become \verb|"\\\\\\\\"| as a C sring literal
+containing that RE.
+This confusing multi-level explosion of backslash escapes
+has been aptly dubbed
+\href{https://en.wikipedia.org/wiki/Leaning_toothpick_syndrome}{\emph{leaning toothpick syndrome}}.
+
+\subsection{The complexity of multi-level escaping}
+
+As \cref{fig:territorial-integrity} illustrates,
+each additional level of embedding in traditional syntax
+adds a set of escaping requirements that the writer (or reader) of code
+must carefully consider and apply correctly --
+\emph{in the correct order} --
+in order to ``guide'' the embedded text carefully
+through the levels of host syntax that the text is embedded in.
+REs and C string literals each require
+a \emph{different} set of punctuation characters to be backslash-escaped,
+further increasing the cognitive load when embedding.
+\href{https://www.pcre.org/original/doc/html/pcrepattern.html}{PCRE syntax}
+helpfully promises that a backslash followed by any non-letter
+always ``takes away any special meaning that character may have'',
+so one may fall back on just \emph{escaping all punctuation}
+instead of remembering which characters must actually be escaped.
+But this practice feels like a band-aid at best,
+and yields even more ``leaning toothpicks.''
+
+The above examples also illustrate how each level of embedding
+can multiply the length of embedded strings by a factor of 2 or more,
+yielding in the worst case
+an exponential string-length explosion with the number of embedding levels.
+While more than two levels of embedding may not be that common,
+they do occur.
+
+\xxx{
+Convenience challenges.
+Error-proneness issues.
+Destructive interaction of inner and outer escaping mechanisms.
 
 Shells, scripts, and command-line escaping.
 Log files.
 
 Larger languages.  JavaScriopt/TypeScript within HTML/XHTML.
 Template-driven authoring languages (e.g., Hugo).
+}
+
+\subsection{A proliferation of quoting conventions}
+
+Escaping issues such as those above have in part led many languages
+to support multiple different types of quotes with different rules.
+Many languages allow string literals
+to be either single-quoted or double-quoted,
+so that quote characters of one type can be used literally
+within string literals of the other,
+as in \verb|"'"| or \verb|'"'|.
+
+Some languages disable escape sequences in one form of string literal
+so that backslashes may appear literally without multiplying in number:
+\eg single-quoted Bourne shell strings (\verb|'\'| is the same as \verb|"\\"|)
+or ``backtick-quoted'' raw string literals
+in Go (\verb|`\`| is like \verb|"\\"|).
+But without escapes it becomes more difficult to include
+the forbidden terminating quote literally in the string:
+typically one must compose multiple strings,
+like \verb|"it's "+'"quoted"'|.
+Some languages such as Python allow triple-quoted multiline strings
+to make it less likely that the terminating sequence is needed in the literal:
+\eg \verb|'''|$\dots$\verb|'''| or \verb|"""|$\dots$\verb|"""|.
+But such a sequence may still need to appear, of course --
+especially in written examples of exactly this syntax for example.
+
+Some languages further mitigate this problem
+by offering an effectively-unlimited number of delimiter pairs.
+Raw string literals in Swift, for example,
+surround a quoted sequence with a balanced number of \verb|#| signs:
+\eg \verb|#"$\dots$"#|, \verb|##"$\dots$"##|, etc.
+Lua similarly offers \emph{long bracket} quotations
+like \verb|[=[|$\dots$\verb|]=]|, \verb|[==[|$\dots$\verb|]==]|, etc.
+This approach has the appeal that for any string to be delimited,
+there always \emph{exists} some delimiter pair
+that can quote it unambiguously.
+But the delimiters must still be carefully matched to the quoted string,
+or vice versa.
+It is still not possible to embed \emph{any} string of a broad class
+verbatim into \emph{any} ``hole'' or template in a host language
+without thinking about, and potentially adapting,
+either the choice of delimiters or the embedded string.
+Further, the worst-case ``cost'' of embedding in terms of string expansion
+still increases with each level of nesting --
+at least only linearly rather than exponentially in the number of levels --
+but we would prefer if embedding
+required \emph{no} expansion with increased depth.
+
 
 \xxx{ explore: PHP-generated HTML with inline JavaScript.
 See for example \href{http://www.zedwood.com/article/how-to-properly-escape-inline-javascript}{How to properly escape inline javascript} }
 
-\href{https://en.wikipedia.org/wiki/Leaning_toothpick_syndrome}{"leaning toothpick syndrome"}
-
-\subsection{What often goes wrong}
-
-Convenience challenges.
-
-Error-proneness issues.
-
-Destructive interaction of inner and outer escaping mechanisms.
-
-Multiple levels of embedding: exploding complexity of manual escaping;
-potentially-exponential expansions with automatic escaping.
-(e.g., C-like escaping: `\verb|\|' becomes `\verb|\\|'
-and `\verb|"|' becomes `\verb|\"|',
-so $2^l$ size with $l$ levels of escaping.)
-
-
-Long quotes.  
-triple-quotatins might indeed be less likely to appear
-in a big text cut-and-pasted into a file,
-but it still \emph{may} unexpectely appear.
-The same goes with long-inclusion ...
-
 \subsection{When security goes wrong}
 
-armoring of untrusted inputs,
-and what happens when that isn't done [correctly].
+The syntactic complexity of correctly embedding strings into code
+has created several broad classes of security vulnerabilities,
+where untrusted (typically user-entered) strings intended to be embedded
+can maliciously ``trick'' an application into interpreting parts of the string
+in the host language context.
 
-TODO: Review the security literature for this kind of security bug.
+SQL injection attacks~\cite{clarke12sql}, for example,
+typically arise from the common practice
+of embedding user-entered strings into string literals
+within SQL query templates.
+If a server composes an SQL query containing a clause like
+\verb|"WHERE name='"+userName+"'"|, 
+and the untrusted \verb|userName| can be maliciously crafted
+to contain an unescaped single quote,
+then the attacker can prematurely terminate the SQL string literal
+and add other SQL clauses, like \verb|OR '1'='1'|
+to make the clause unconditionally true regardless of \verb|userName|.
+
+Cross-site scripting (XSS) attacks~\cite{fogie07xss}
+similarly exploit errors in the ubiquitous practice
+of embedding content from an untrusted source --
+such as fields from an HTML form --
+into HTML or other markup without sufficient ``sanitation'' via escaping.
+For example, if one user of a Web-based discussion forum
+can post a message containing an HTML \verb|<script>| tag --
+which the discussion server then inserts into corresponding pages
+viewed by \emph{other} users of the forum,
+then the injected JavaScript code can potentially steal
+authentication cookies or other information available on that site
+from all other users who read the maliciously-crafted message.
+
+These and other broad classes of syntactic confusion attacks
+have led to the security-critical practice
+of \emph{sanitizing} all potentially-untrusted user input
+before embedding it into code of any kind --
+whether SQL queries, HTML markup, or other host languages.
+The forms of sanitization needed in a particular context
+unfortunately tend to be complex and intricately dependent on
+the syntax and semantics of the host language
+that the untrusted content is to be embedded in.
+
+We do not expect any syntactic discipline, including matchertext,
+to eliminate the need to sanitize untrusted inputs.
+If a future SQL query or Web form is designed to accept
+embedded matchertext from an untrusted source, for example,
+then it will probably still be security-critical to check
+that the untrusted content \emph{is indeed valid matchertext},
+and reject it if not.
+However, a passive \emph{verification} like this
+can be much simpler and hence less bug-prone
+than a content-modifying \emph{transformation},
+to escape all characters or sequences that can be ``sensitive''
+in the host language.
+Further, this security-critical check
+could also be more uniform across host languages --
+\ie checking only that the three ASCII matcher pairs are matched corrrectly
+throughout the untrusted content,
+rather than deeply verifying and/or transforming
+based on the complex syntax of a particular host language.
+Thus, while matchertext will not eliminate the need for sanitization,
+it might tighten and simplify
+the function of the most security-critical ``checkpoint'' --
+namely checking that embedding content from an untrusted source
+preserves the structural integrity
+of the host language it is embedded in.
 
