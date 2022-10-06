@@ -1,20 +1,53 @@
 \section{Related Work}
 \label{sec:rel}
 
+The theory of syntactic structures,
+such as regular and
+context-free languages~\cite{chomsky59algebraic}
+or parsing expression grammars~\cite{ford04popl},
+has already been richly developed.
+Nothing about the matchertext discipline
+is particularly new or technically challenging
+from a formal language perspective.
+However, surprisingly little prior work has focused on
+the ubiquitous practice of synactically embedding
+strings of one language into those of another,
+or addressing the practical challenges this embedding creates.
 
-Work related to embedded languages:
+Some recent work has focused on developing better tooling
+to support string-embedding practices as they currently stand:
+\eg parsing regular approximations
+of string-embedded languages~\cite{verbitskaia15relaxed},
+and support in
+integrated development environments~\cite{grigorev14string}
+and static analysis tools~\cite{khabibullin15development}.
+This work does not attempt to explore syntax design practices
+that could make languages more cleanly embeddable in the first place, however.
 
-\href{https://dl.acm.org/doi/pdf/10.1145/2855667.2855672?casa_token=erRwxy24RiYAAAAA:IPNd7QcsHKt-yA2yMALounX32-OLWC8ocOKdquHcb1gQx0C5S76G0mEBU7Vky2m1KHLf9u9tOG0vig}{On Development of Static Analysis Tools for String-Embedded Languages}
+Significantly more work has focused on
+\emph{domain specific embedded langauges}
+or DSELs~\cite{hudak98modular},
+particularly in the funcational programming community.
+DSELs build upon the syntax and semantics
+of a general-purpose programming language such as Haskell,
+and thus benefit from --
+but also become dependent upon and specialized to --
+the syntax, semantics, and tooling of the host language.
+DSELs are thus unsuitable for embedded languages
+that wish to remain agnostic to, or usable across a variety of,
+host languages.
+Asking an embedded language to conform only to the matchertext discipline --
+that ASCII matchers must match --
+is a much more lightweight proposition than
+asking the embedded language to adopt, and become usable \emph{only} with,
+the entirety of Haskell or another general-purpose programming language.
 
-\href{https://dl.acm.org/doi/pdf/10.1145/2687233.2687247?casa_token=pTKni3IkgdcAAAAA:ODg5tbpzZVuzrV0Hu61-wXaCzxpoCMV7eFPTnDRJ3IyRxVz7vVydjgfWHx06N0EVoLnba2C4jkQCBQ}{String-Embedded Language Support in Integrated Development Environment}
-
-\href{https://www.researchgate.net/profile/Semyon-Grigorev/publication/304480369_Relaxed_Parsing_of_Regular_Approximations_of_String-Embedded_Languages/links/5c74f641299bf1268d25c111/Relaxed-Parsing-of-Regular-Approximations-of-String-Embedded-Languages.pdf}{Relaxed Parsing of Regular Approximations of String-Embedded Languages}
-
-
-
-Functional, rather than string-based syntactic, embedded languages:
-
+\xxx{ in this space, not sure if we should go into more detail:
 \href{https://www.cambridge.org/core/services/aop-cambridge-core/content/view/4B0A7526CC16907F445CCF27277E9B9B/S0956796802004574a.pdf/div-class-title-compiling-embedded-languages-div.pdf}{Compiling embedded languages},
 \href{https://ieeexplore.ieee.org/document/685738}{Modular domain specific languages and tools}
 \href{https://scg.unibe.ch/archive/papers/Reng10aEmbeddingLanguages.pdf}{Embedding Languages Without Breaking Tools}
+}
+
+This related work is preliminary and no doubt incomplete;
+proposals for relevant additions are welcome.
 
