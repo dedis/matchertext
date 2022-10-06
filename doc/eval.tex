@@ -1,8 +1,15 @@
 \section{Evaluation}
 \label{sec:eval}
 
-Some key questions to evaluate:
+This section is largely a placeholder at present,
+pending more implementation and evaluation experience to report.
+
+Some key questions we wish to evaluate include:
 \begin{itemize}
+\item	What are the most common kinds of embeddings
+	that appear in large repositories of real source code,
+	in what host and embedded language combinations,
+	and for what purposes?
 \item	For a set of popular (big or little) languages,
 	how common are natural violations of matchertext discipline?
 	Of what kinds are most common (e.g., in string constants, comments)?
@@ -15,10 +22,13 @@ Some key questions to evaluate:
 	inadequate escape armoring when embedding automatically?
 \item	How common and what kinds of needs are there for
 	multiple levels of embedding?
+\item	What are the syntactic ``horror stories'' of cross-language embedding,
+	akin to leaning toothpick syndrome,
+	but perhaps in other combinations of languages with other symptoms?
 \end{itemize}
 
 
-\subsection{Prevalence of embedding versus unmatched matchers}
+\xxx{Prevalence of embedding versus unmatched matchers:
 
 The key advantage of matchertext is to simplify embedding,
 but it has the cost of making it more cumbersome
@@ -48,4 +58,6 @@ C, C++, Java, Go, Swift, Perl, Raku, PHP.
 It would probably be worth trying to
 make the heuristic embedded string recognizer portable across languages
 or find an existing one that is in some way.
+
+}
 
