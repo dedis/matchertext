@@ -129,7 +129,7 @@ they represent a natural starting point for considering matchertext extensions.
 Given the ubiquity of backslash-escaped string literals,
 we suggest that one reasonable extension for hosting matchertext
 in C-like languages is via a new escape sequence,
-such as \verb|\[|m\verb|]|,
+such as \verb|\[|$m$\verb|]|,
 where $m$ is arbitrary matchertext.
 The embedded matchertext $m$ is uninterpreted by the host language processor
 except to verify that ASCII matchers match
@@ -149,7 +149,7 @@ whatever embedded language $m$ might be written in.
 The above proposal is only one of many possible alternatives of course,
 which may be worth considering --
 especially in the context of specific programming languages.
-We briefly discuss a few ``obvious'' alternatives, however,
+We now briefly discuss a few ``obvious'' alternatives
 that seem less preferable for various pragmatic reasons.
 
 The tradition of using quotes to delimit string literals
@@ -746,7 +746,7 @@ but this compatibility cost may be justified in this case.
 
 Despite being a ``small'' synax for the special purpose
 of matching patterns in strings,
-regular expressions and their use are complex enough in practice
+regular expressions (REs) and their use are complex enough in practice
 that multiple entire books have been written
 about them~\cite{fitzgerald12introducing,friedl06mastering,goyvaerts12regular}.
 Two regular expression syntaxes were standardized
@@ -757,5 +757,45 @@ it inspired
 define advanced syntax that has become popular
 in numerous other languages and applications.
 
-...
+In filling their basic role of matching patterns in text,
+REs must inherently must embedd strings
+comprising the patterns to be matched --
+and those embedded strings can be in any syntax.
+Thus, being able to host embedded strings of any language
+with minimal obfuscation
+in principle facilitates an RE's basic pattern-matching role.
+
+Since the most common RE syntax uses backslash escapes
+similar to those in C-like languages,
+the same matchertext escape extensions,
+such as \verb|\[|$m$\verb|]|, could work for REs.
+Because of the large number of punctuation characters
+that are sensitive in REs, however,
+some popular RE syntaxes such as
+\href{https://www.pcre.org/original/doc/html/pcrepattern.html}{PCRE}
+guarantee the rule that if a backslash
+``is followed by a character that is not a number or a letter,
+it takes away any special meaning that character may have.''
+This way, a user can just conservatively
+escape \emph{all} literal punctuation appearing in an RE, 
+instead of remembering which punctuation \emph{must} be escaped.
+Preserving this rule may suggest a longer ``letter-based''
+matchertext escape sequence
+such as \verb|\m[|$m$\verb|]|.
+
+Another alternative would be to use some non-backslash-escape syntax,
+such as \verb|{{|$m$\verb|}}|.
+This alternative syntax uses the same curly braces
+that REs already commonly use
+for repetition quantifiers like $c$\verb|{1,3}|,
+but in a syntactically non-conflicting fashion
+since the inner braces cannot be mistaken for repetition quantifiers.
+With this alternative syntax,
+the pathological ``\href{https://en.wikipedia.org/wiki/Leaning_toothpick_syndrome}{leaning toothpick syndrome}'' example RE
+matching the double-backslash \verb|\\| in a UNC name (see \cref{sec:bg})
+becomes the more readable RE \verb|{{\\}}|.
+Embedding this RE in a C-like string literal with matchertext extensions
+in turn becomes \verb|"\[{{\\}}]"|,
+for a more manageable three leaning toothpicks total,
+in contrast with the traditionally-required eight (\verb|"\\\\\\\\"|).
 

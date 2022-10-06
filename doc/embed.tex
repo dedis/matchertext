@@ -7,7 +7,7 @@ to \emph{be embedded} as matchertext.
 The languages of interest for embedding
 overlaps heavily with those of interest as host languages;
 we separate these discussions mainly to emphasize the orthogonality
-of host- and embedded-language issues.
+of host- and embedded-language issues and cleanly separate them.
 
 It is already readily feasible to write valid matchertext
 in most of the languages we will consider for embedding.
@@ -21,6 +21,7 @@ by increasing convenience and visual clarity,
 and are by no means essential.
 
 \subsection{String literals in C-like languages}
+\label{sec:embed:c}
 
 Almost certainly the most common context in which unmatched matchers
 appear in most today's existing source code is within string literals.
@@ -323,19 +324,75 @@ not about IP addresses.
 
 \subsection{Regular expressions}
 
-\xxx{
-Character classes: no matchers unless both present.
-But character escapes instead...
-}
+Typical regular expression (RE) syntax is C-like
+in terms of using backslashes to escape sensitive punctuation characters
+within text to be matched.
+Similar escape sequences like \verb|\o| and \verb|c| for unmatched matchers
+could therefore be introduced as discussed above in \cref{sec:embed:c}.
 
+One complication is that the popular
+\href{https://www.pcre.org/original/doc/html/pcrepattern.html}{PCRE syntax}
+already uses \verb|\o{|$n$\verb|}|
+for character escapes with octal numeric value $n$.
+This octal-escape usage of \verb|\o|
+technically does not conflict syntactically
+with \verb|\o{}|, however,
+since the $n$ in an octal escape cannot be the empty string.
+
+PCRE syntax also offers \verb|\c|$x$ as a way to enter control characters,
+by flipping bit 6 of ASCII character $x$.
+This is a syntactic conflict with the proposed matchertext escapes,
+but perhaps a tolerable one.
+The sequence \verb|\c(| would constitue
+a bizarre and unlikely way to express a simple literal letter `\verb|h|',
+and \verb|\c{| would be a strange synonym for a semicolon `\verb|;|' --
+neither of which need escaping at all.
+The sequence \verb|\c[| might be slightly more likely to see use
+to express the ASCII escape (ESC) control code (hex 1B) --
+but PCRE already provides the more-concise and obvious sequence \verb|\e|
+to express this control code.
+
+\subsubsection{Character classes}
+
+Backslash escapes are normally disabled in
+bracketed RE character class notation like \verb|[a-z0-9]|.
+The matchertext discipline does not present a problem
+when expressing a character class containing \emph{both} matchers of a pair.
+For example,
+the character class \verb|[()[]{}]| matches any matcher character,
+while \verb|[^[]]| matches anything but a square bracket.
+Including just one unmatched matcher in a character class
+becomes less convenient, however.
+A slightly-cumbersome workaround
+is simply to shift unmatched matchers outside the character class:
+\eg \verb|[a-z{]| might be rewritten as \verb=([a-z]|\o{})=.
+
+A more-appealing syntactic extension might be to introduce the rule
+that a less-chan character \verb|<| in a character class,
+when immediately surrounded by a pair of matchers,
+``selects'' only the open matcher for literal inclusion.
+The example above therefore becomes \verb|[a-z{<}]|.
+A greater-than character \verb|>| between a matcher pair
+similarly selects only the close matcher:
+\verb|[^[>]]| matches anything but a close bracket.
+One might view the \verb|<| or \verb|>| character either
+as a matchertext-insensitive angle-bracket
+``standing in'' for the desired sensitive matcher,
+or as an arrow ``pointing'' left or right to the desired matcher.
+
+
+
+\xxx{
 Regular expressions in
-\href{https://www.tcl.tk/man/tcl8.4/TclCmd/re_syntax.html#M32}{Tcl}
+XXX %\href{https://www.tcl.tk/man/tcl8.4/TclCmd/re_syntax.html#M32}{Tcl}
 and
-\href{https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions/Character_Classes#types}{JavaScript}
-use \texttt{\\c}$X$ as an escape sequence for control code characters.
+XXX %\href{https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions/Character_Classes#types}{JavaScript}
+also use \texttt{\\c}$X$ as an escape sequence for control code characters,
+though with different precise rules.
 Using this syntax with an opener as the character $X$
 appears to be illegal in JavaScript regular expressions,
 and perhaps legal but unlikely to be used in Tcl regular expressions.
+}
 
 \xxx{
 Question: how often are these escape sequences used,
@@ -350,19 +407,16 @@ Also \href{https://wiki.tcl-lang.org/page/Quoting+hell}{Quoting hell}
 
 
 
-\subsection{Trouble spots in syntax tradition}
-
-\xxx{ When are unmatched matchers traditionally used
+\xxx{Trouble spots in syntax tradition.
+When are unmatched matchers traditionally used
 in actual language syntax, not just as literal text embedded within syntax?
 Mathematical half-open range/set notation.
 How problematic is this?
 Other examples?
 }
 
-\subsection{Future: other oft-embedded languages}
-
-\xxx{	Other often-embedded languages to consider, potentially:
-		SQL
-		JSON
+\xxx{Future: other oft-embedded languages to look at.  For example:
+	SQL
+	JSON
 }
 

@@ -50,7 +50,7 @@ each additional level of embedding in traditional syntax
 adds a set of escaping requirements that the writer (or reader) of code
 must carefully consider and apply correctly --
 \emph{in the correct order} --
-in order to ``guide'' the embedded text carefully
+in order to ``guide'' the embedded text
 through the levels of host syntax that the text is embedded in.
 REs and C string literals each require
 a \emph{different} set of punctuation characters to be backslash-escaped,
@@ -109,10 +109,11 @@ especially in written examples of exactly this syntax for example.
 
 Some languages further mitigate this problem
 by offering an effectively-unlimited number of delimiter pairs.
-Raw string literals in Swift, for example,
+\href{https://docs.swift.org/swift-book/LanguageGuide/StringsAndCharacters.html#ID286}{Extended string literals in Swift}, for example,
 surround a quoted sequence with a balanced number of \verb|#| signs:
-\eg \verb|#"$\dots$"#|, \verb|##"$\dots$"##|, etc.
-Lua similarly offers \emph{long bracket} quotations
+\eg \verb|#"|$\dots$\verb|"#|, \verb|##"|$\dots$\verb|"##|, etc.
+\href{https://www.lua.org/manual/5.1/manual.html}{Lua}
+similarly offers \emph{long bracket} quotations
 like \verb|[=[|$\dots$\verb|]=]|, \verb|[==[|$\dots$\verb|]==]|, etc.
 This approach has the appeal that for any string to be delimited,
 there always \emph{exists} some delimiter pair
@@ -125,8 +126,9 @@ without thinking about, and potentially adapting,
 either the choice of delimiters or the embedded string.
 Further, the worst-case ``cost'' of embedding in terms of string expansion
 still increases with each level of nesting --
-at least only linearly rather than exponentially in the number of levels --
-but we would prefer if embedding
+in this case
+at least only linearly, rather than exponentially, in the number of levels.
+We would prefer, however, if embedding
 required \emph{no} expansion with increased depth.
 
 
@@ -145,7 +147,7 @@ SQL injection attacks~\cite{clarke12sql}, for example,
 typically arise from the common practice
 of embedding user-entered strings into string literals
 within SQL query templates.
-If a server composes an SQL query containing a clause like
+If a server composes an SQL query with a clause like
 \verb|"WHERE name='"+userName+"'"|, 
 and the untrusted \verb|userName| can be maliciously crafted
 to contain an unescaped single quote,
@@ -158,23 +160,29 @@ similarly exploit errors in the ubiquitous practice
 of embedding content from an untrusted source --
 such as fields from an HTML form --
 into HTML or other markup without sufficient ``sanitation'' via escaping.
-For example, if one user of a Web-based discussion forum
+Suppose, for example, that one user of a Web-based discussion forum
 can post a message containing an HTML \verb|<script>| tag --
 which the discussion server then inserts into corresponding pages
-viewed by \emph{other} users of the forum,
-then the injected JavaScript code can potentially steal
-authentication cookies or other information available on that site
-from all other users who read the maliciously-crafted message.
+viewed by \emph{other} users of the forum.
+The injected JavaScript code can then potentially steal
+authentication cookies or other private information
+from \emph{all} users on the site
+who might unwittingly read the maliciously-crafted message.
 
 These and other broad classes of syntactic confusion attacks
 have led to the security-critical practice
 of \emph{sanitizing} all potentially-untrusted user input
-before embedding it into code of any kind --
+before embedding it into security-sensitive code of any kind --
 whether SQL queries, HTML markup, or other host languages.
 The forms of sanitization needed in a particular context
 unfortunately tend to be complex and intricately dependent on
 the syntax and semantics of the host language
 that the untrusted content is to be embedded in.
+Version updates in the host language or associated libraries,
+which the application might not always track immediately,
+can easily introduce new syntactic attack vectors
+that the application
+has not yet countered with appropriate sanitization logic.
 
 We do not expect any syntactic discipline, including matchertext,
 to eliminate the need to sanitize untrusted inputs.

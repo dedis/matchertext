@@ -17,22 +17,23 @@ in order to achieve the goal of escapeless interlanguage embedding.
 We first define \emph{abstract matchertext}
 in order to ensure that the basic concept is clear and precise.
 
-\xxx{ Use $\Pi$ instead of $P$?}
-
 We assume at the outset we are given some arbitrary alphabet $\Sigma$,
-along with some finite set $P$ of character pairs 
+along with some finite set $\Pi$ of character pairs 
 $\{(o_1,c_1),\dots,(o_k,c_k)\}$,
 such that $\{o_i, c_i\} \subseteq \Sigma$ for all $1 \le i \le k$.
-We define the \emph{openers} $O$ as the set of characters $o_i$
-such that some pair $(o_i, c_i) \in P$.
-Similarly, the \emph{closers} $C$ are the characters $c_i$
-such that some pair $(o_i, c_i) \in P$.
-We require that $O \cap C = \emptyset$.
-We define the \emph{matchers} $M$ as the set $O \cup C$,
-and the \emph{nonmatchers} $N$ as the set $\Sigma \setminus M$
-(\ie all characters that are not matchers).
+We define the \emph{openers} $O$ as the set of characters $o$
+such that some pair $(o, c) \in \Pi$.
+Similarly, the \emph{closers} $C$ are the characters $c$
+such that some pair $(o, c) \in \Pi$.
+We assume and require that the sets of openers and closers do not overlap:
+\ie $O \cap C = \emptyset$.
+We define the \emph{matchers} $M$ as the set of all openers and closers
+(\ie $M = O \cup C$).
+We define the \emph{nonmatchers} $N$ as
+all characters that are not matchers
+(\ie $N = \Sigma \setminus M$)
 A \emph{matchertext configuration}
-is a pair $(\Sigma, P)$ following the above rules.
+is a pair $(\Sigma, \Pi)$ following the above rules.
 
 We now define the language $L$ of \emph{matchertext strings}
 inductively (\ie generatively) as follows:
@@ -41,7 +42,7 @@ inductively (\ie generatively) as follows:
 	including the empty string,
 	is a matchertext string in $L$.
 \item	For any matchertext strings $m_1,m_2,m_3$ in $L$,
-	and for any pair $(o,c) \in P$,
+	and for any pair $(o,c) \in \Pi$,
 	the concatenation $m_1||o||m_2||c||m_3$
 	is also a matchertext string in $L$.
 \end{itemize}
@@ -52,17 +53,17 @@ Openers can be introduced into valid matchertext
 only when paired with a matching closer, and vice versa,
 but nonmatchers may be interspersed throughout with no constraints.
 
-We consider matchertext to be a purely syntactic language
+We consider matchertext to constitute a purely syntactic rule
 with no associated semantic meaning.
 While we can formally define it as a syntactic language,
 in practice we will refer to it as a \emph{syntactic discipline}
 rather than a language
 because it assigns no specific meaning or purpose to the strings in $L$,
-and no structure apart from the rule that matchers must match.
+and no structure apart from the basic rule that matchers must match.
 The meanings and structural purposes of all characters --
 both matchers and nonmatchers --
 are deliberately left entirely open
-for particular ``matchertext-compliant'' languages to define.
+for any particular ``matchertext-compliant'' language to define.
 
 \xxx{ formally prove
 Always-embeddability property given that embedded string is valid matchertext.
@@ -72,7 +73,7 @@ Always-embeddability property given that embedded string is valid matchertext.
 \label{sec:design:abstract:embed}
 
 Suppose there is a set of languages $\mathcal{L} = \{L_1,\dots,L_k\}$
-whose members all agree on a common  matchertext configuration $(\Sigma,P)$.
+whose members all agree on a common  matchertext configuration $(\Sigma,\Pi)$.
 Any language $L_h \in \mathcal{L}$ can \emph{host}
 embedded strings in any other language $L_e \in \mathcal{L}$
 without escaping or other transformations to the strings from $L_e$,
@@ -99,7 +100,24 @@ because the matchers they contain must match within $m$.
 The host language processor can unambiguously recognize
 the closer string $s_c$ that terminates the embedding
 because it contains at least one close matcher
-that would be unmatched, and thus illegal, if it was part of $m$.
+that would be unmatched, and thus illegal, if it were part of $m$.
+
+In order to guarantee that verbatim embedding always works reliably,
+a host language not only can but \emph{must} refrain
+from applying either transformations (\eg escapes)
+or restrictions (\eg disallowing certain characters or sequences)
+within the embedded matchertext it is hosting.
+We can view embedded matchertext as analogous to a diplomatic embassy,
+whose host country is required by international law to respect and protect
+the ``involability'' of the embassy's ``premises''
+and not enter or otherwise meddle in
+the embassy's internal affairs~\cite[Article 22]{un61vienna}.
+Beyond the matchertext rule that ASCII matchers must match,
+an embedded language's syntactic affairs are exclusively its own,
+not to be meddled in by a host language.
+While exceptions to this rule may sometimes be justified
+as we discuss below in \cref{sec:design:concrete:variations},
+any exceptions inevitably reduce verbatim embedding compatibility.
 
 
 \subsection{Concrete matchertext in practice}
@@ -107,9 +125,9 @@ that would be unmatched, and thus illegal, if it was part of $m$.
 
 The abstract definition of matchertext above
 and its basic structural rule apply in principle
-to any matchertext configuration $(\Sigma,P)$.
+to any matchertext configuration $(\Sigma,\Pi)$.
 In practice, however,
-we must standardize on particular choices of $\Sigma$ and $P$
+we must standardize on particular choices of $\Sigma$ and $\Pi$
 across a set of languages of interest
 in order to achieve escapeless embedding among them.
 We wish to identify a particular, concrete matchertext configuration
@@ -119,7 +137,7 @@ minimally-adapted variants of today's popular machine-readable languages.
 
 We therefore propose a \emph{standard matchertext configuration}
 whose alphabet $\Sigma$ is the Unicode/UCS character set~\cite{iso10646ucs},
-and whose matcher pairs $P$ consist of
+and whose matcher pairs $\Pi$ consist of
 the ASCII parentheses \verb|()|,
 square brackets \verb|[]|,
 and curly braces \verb|{}|.
@@ -137,7 +155,7 @@ since it operates below the character set abstraction.
 \subsubsection{Standardizing on matcher pairs}
 \label{sec:design:concrete:standard}
 
-A particular choice of the matcher pairs $P$ is less obvious, however,
+A particular choice of the matcher pairs $\Pi$ is less obvious, however,
 and hence demands more careful justification.
 We start by ``deferring to authority'':
 namely the authority embodied in
@@ -171,7 +189,7 @@ but would make it extremely cumbersome to express
 standard mathematical inequalities
 (\eg \verb|a < b| in \verb|if| expressions and the like)
 in almost all programming languages.
-Omitting \verb|<>| from the matched pairs $P$
+Omitting \verb|<>| from the matched pairs $\Pi$
 of the standard matchertext configuration does not
 conflict with or prevent their use in pairs in specific languages --
 as we will see when we focus on SGML-derived languages later
@@ -205,22 +223,22 @@ that potentially match with the right double-quote character (code 201D),
 depending on linguistic culture and typographical style.
 Thus, deciding \emph{which} character pairs should or should not match
 would become much more complex.
-Thus, while specific languages are free to use any UCS punctuation
+While specific languages are free to use any UCS punctuation
 for their own language-specific structural or stylistic purposes,
-it seems simplest and safest to restrict the matchertext set $P$ of
+it seems simplest and safest to restrict the matchertext set $\Pi$ of
 \emph{strictly-matching} pairs to the ASCII matchers alone.
 
 \paragraph{Why all three ASCII matcher pairs?}
 
 We could of course be even more selective
-in choosing the set of matcher pairs $P$.
+in choosing the set of matcher pairs $\Pi$.
 We could take only one matcher pair, for example:
 either parentheses \emph{or} square brackets \emph{or} curly braces.
 However, all of these matcher pairs are used quite pervasively,
 in a variety of different structural roles in different languages,
 and it is not readily apparent what principle would justify
 choosing one of these matcher pairs over the others
-to play the special globally-enforced matching role in matchertext.
+to play a distinguished, globally-enforced matching role in matchertext.
 Moreover, interspersing multiple distinct matcher pairs in structured text
 in practice provides useful redundancy
 that helps detect errors more quickly and localize them more precisely.
@@ -228,13 +246,13 @@ For example, it is much clearer where the missing close bracket is
 in the string \verb|[{}([){}]|
 than in the similar but more homogeneous string \verb|[[][[][]]|.
 Finally,
-any host language must use some matcher pair
+any host language must use \emph{some} matcher pair
 to delimit embedded matchertext strings,
 as discussed above in \cref{sec:design:abstract:embed}.
-Including all three ASCII matcher pairs in $P$
+Including all three ASCII matcher pairs in $\Pi$
 thus gives languages maximum syntactic freedom
 in defining the syntax of matchertext embeddings
-(\ie a choice of three pairs rather than a prescribed single one).
+(\ie a choice of three matcher pairs rather than a single prescribed pair).
 
 
 \subsection{Matchertext configuration variations}
@@ -244,10 +262,10 @@ Even if well-justified,
 we cannot expect the standard matchertext configuration
 as defined above to be a perfect or painless fit
 for all situations in which string embedding is useful.
-Including any matcher pair in $P$ has the cost
+Including any matcher pair in $\Pi$ has the cost
 of requiring those matchers to be escaped
 in string literals and comments, for example,
-as discussed later in \cref{sec:embed}.
+as we detail later in \cref{sec:embed}.
 There may be legitimate or even unavoidable reasons
 to use other matchertext configurations in some cases,
 keeping in mind that doing so reduces interlanguage embedding compatibility.
@@ -259,11 +277,11 @@ can be either \emph{tightening} (more restrictive),
 \subsubsection{Tightening variations}
 \label{sec:design:concrete:variations:tight}
 
-A matchertext configuration $(\Sigma',P')$
+A matchertext configuration $(\Sigma',\Pi')$
 is a \emph{tightening} of
-the standard matchertext configuration $(\Sigma,P)$ defined earlier
+the standard matchertext configuration $(\Sigma,\Pi)$ defined earlier
 if it only removes characters from the alphabet ($\Sigma' \subseteq \Sigma$)
-and/or makes additional matcher pairs sensitive ($P' \supseteq P$).
+and/or makes additional matcher pairs sensitive ($\Pi' \supseteq \Pi$).
 A string in the tightened matchertext configuration
 may be copied verbatim to an embedding context
 expecting the standard matchertext configuration,
@@ -285,24 +303,27 @@ without transformation (\ie escaping spaces and control codes).
 
 \subsubsection{Loosening variations}
 
-A matchertext configuration $(\Sigma',P')$
+A matchertext configuration $(\Sigma',\Pi')$
 is a \emph{loosening} of
-the standard matchertext configuration $(\Sigma,P)$
+the standard matchertext configuration $(\Sigma,\Pi)$
 if it only adds characters to the alphabet ($\Sigma' \supseteq \Sigma$)
-and/or removes sensitive matcher pairs ($P' \subseteq P$).
+and/or removes sensitive matcher pairs ($\Pi' \subseteq \Pi$).
 A string in the standard matchertext configuration
 may be copied verbatim to an embedding context
 supporting the loosened matchertext configuration,
 but not necessarily in the other direction.
 
-A loosened matchertext configuration might potentially justified,
+A loosened matchertext configuration might be justified,
 for example, if it is deemed critical to embed strings in some language $L_e$
 that frequently makes unmatched uses of some ASCII matchers,
 and the pain of escaping or otherwise adapting that syntax is deemed too great.
-Mathematical notation sometimes uses
+
+Mathematical notation, for example,
+sometimes uses
 ``mismatched'' parentheses and square brackets
-to represent half-open/half-closed intervals, for example:
-\eg $[0,1)$ typically means any real number $r$ greater than or equal to zero
+to represent half-open/half-closed intervals.
+That is,
+$[0,1)$ typically means any real number $r$ greater than or equal to zero
 but strictly less than one ($0 \le r < 1$).
 A machine-readable language making frequent use of this mathematical notation
 might be considered too painful to embed
@@ -317,7 +338,7 @@ half-open/half-closed interval notation anyway.
 Languages that do support some form of half-open/half-closed syntax
 often do so with other, more matchertext-friendly notation.
 Swift~\cite{apple22swift}, for example,
-supports \emph{half-open range} syntax like \verb|1..<4|
+supports \href{https://docs.swift.org/swift-book/LanguageGuide/BasicOperators.html#ID73}{\emph{half-open range} syntax} like \verb|1..<4|
 for the sequence of integers starting from and including 1,
 up to but not including 4.
 This syntax is perfectly compatible with the standard matchertext configuration

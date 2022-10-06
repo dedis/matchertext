@@ -6,6 +6,7 @@ is commonplace throughout programming practice.
 Just a few examples include embedding
 regular expressions, URIs, SQL queries, or HTML markup
 within string constants in general-purpose programming languages;
+embedding user-entered web form data or JavaScript variables into SQL queries;
 JavaScript code embedded in HTML via the \verb|<script>| element;
 and URIs embedded as query strings within other URIs,
 such as in a query to a service like the
@@ -31,7 +32,8 @@ and embedding it into HTML via a scripting language like PHP.
 With automated embedding,
 forgetting to escape embedded strings properly
 has become an endless source of critical security bugs
-such as SQL injection attacks~\cite{clarke12sql}.
+such as SQL injection~\cite{clarke12sql}.
+or cross-site scripting attacks~\cite{fogie07xss}.
 
 In some future evolution
 of today's standard programming languages and practices,
@@ -77,11 +79,11 @@ are plain text but are not valid matchertext.
 \begin{center}
 \begin{small}
 \begin{tabular}{ll}
-MRI syntax:	& \verb|http[//search.engine/linksto?site=http[//my.site/]&results=50]| \\
 URI syntax:	& \verb|http://search.engine/linksto?site=http%3A%2F%2Fmy.site%2F&results=50| \\
+MRI syntax:	& \verb|http[//search.engine/linksto?site=http[//my.site/]&results=50]| \\
 \\
-MRI syntax:	& \verb|http[//historical.archive/get?site=http[//my.site/]&year=1998]| \\
 URI syntax:	& \verb|http://historical.archive/get?site=http%3A%2F%2Fmy.site%2F&year=1998| \\
+MRI syntax:	& \verb|http[//historical.archive/get?site=http[//my.site/]&year=1998]| \\
 \end{tabular}
 \end{small}
 \end{center}
@@ -98,7 +100,7 @@ A URI like \verb|http://my.site/path/|
 may always be transformed to or from
 equivalent MRI syntax like \verb|http[//my.site/path]|.
 An MRI is embeddable verbatim, with no transformation,
-into another MRI or another matchertext-aware language.
+into another MRI or into another matchertext-aware language.
 Figure~\ref{fig:search-query} shows two example search queries
 containing embedded resource identifiers,
 contrasting ``copy-and-paste'' embeddable MRI syntax
@@ -137,7 +139,7 @@ including the use of escape codes in both languages.
 Existing languages could be adapted incrementally
 to support and leverage matchertext.
 C-like languages, for example,
-might adopt a new escape sequence `\verb|\[|$m$\verb|]|'
+might adopt a new escape sequence like \verb|\[|$m$\verb|]|
 to embed an arbitrary matchertext $m$
 into a quoted string or character literal.
 All characters including quotes and newlines
@@ -149,7 +151,7 @@ the earlier string-matching regular expression
 \verb|"[^"]*"|
 could be embedded into a string literal
 like \verb|re.match("\["[^"]*"]")|.
-We now use an escape sequence
+With this extension, we use an escape sequence
 to delimit the entire embedded matchertext,
 but we no longer need to add escape sequences
 \emph{within} the embedded regular expression.
