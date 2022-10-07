@@ -1,0 +1,40 @@
+\section{Implementations of matchertext}
+\label{sec:impl}
+
+This section is mainly a placeholder at the present.
+Some preliminary work is underway
+implementing experimental matchertext extensions
+for several languages and embedding-oriented syntaxes.
+This section is intended to be expanded
+as we gain experience
+implementing and using matchertext extensions.
+
+For those wishing to help with implementation and experimentation,
+the following are some of the key work items
+enabling us to start experimenting with matchertext in the context
+of any particular language of interest:
+\begin{itemize}
+\item	A brief specification of proposed
+	syntactic extensions for hosting matchertext
+	and/or conveniently writing embedded matchertext,
+	adapted to the specific language of interest,
+	with clearly-defined rationale for the particular syntax choices.
+\item	An implementation of those extensions for hosting and/or embedding,
+	selectively enabled via configuration parameters
+	for backward compatibility,
+	in some mature processor for the language of interest
+	(\eg a compiler, interpreter, or library implementation).
+\item	A configurable extension to the language processor
+	that optionally causes it
+	to check and enforce the matchertext discipline
+	in processed text:
+	\ie to verify that matchers match in source files or strings.
+\item	Purely for experimentation purposes,
+	an extension of some processor for the language
+	that can analyze ``legacy'' source files in the language
+	to detect and categorize matchertext violations
+	(\eg whether in string literals, comments, or elsewhere).
+	We will use this to help estimate the likely ``pain''
+	of adopting the matchertext discipline in the language
+	and how commonly this pain would affect typical code today.
+\end{itemize}
