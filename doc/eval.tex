@@ -1,7 +1,7 @@
 \section{Evaluation}
 \label{sec:eval}
 
-This section is largely a placeholder at present,
+This section is a placeholder at present,
 pending more implementation and evaluation experience to report.
 
 Some key questions we wish to evaluate include:
@@ -13,7 +13,7 @@ Some key questions we wish to evaluate include:
 \item	For a set of popular (big or little) languages,
 	how common are natural violations of matchertext discipline?
 	Of what kinds are most common (e.g., in string constants, comments)?
-	How painful is it to fix these violations?
+	How painful would it be to fix these violations?
 \item	How common and painful are needs to escape embedded strings
 	when manually embedding into surrounding language strings?
 	For example, how commonly do actual URIs embedded into
@@ -22,6 +22,9 @@ Some key questions we wish to evaluate include:
 	inadequate escape armoring when embedding automatically?
 \item	How common and what kinds of needs are there for
 	multiple levels of embedding?
+\item	What is the security-critical ``attack surface''
+	(\eg code size and complexity)
+	of typical string sanitizing code for embedding of untrusted content?
 \item	What are the syntactic ``horror stories'' of cross-language embedding,
 	akin to leaning toothpick syndrome,
 	but perhaps in other combinations of languages with other symptoms?
