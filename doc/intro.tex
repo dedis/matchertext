@@ -143,7 +143,7 @@ might adopt a new escape sequence like \verb|\[|$m$\verb|]|
 to embed an arbitrary matchertext $m$
 into a quoted string or character literal.
 All characters including quotes and newlines
-would be allowed verbatim within $m$,
+are allowed within $m$,
 provided only that matchers match.
 Thus,
 %\verb|'\[']'| would be equivalent to \verb|'\''|, and
@@ -155,6 +155,20 @@ With this extension, we use an escape sequence
 to delimit the entire embedded matchertext,
 but we no longer need to add escape sequences
 \emph{within} the embedded regular expression.
+
+Many languages already support \emph{raw string literals}
+in which escape sequences are disabled:
+\eg backtick strings like \verb|`\`| in Go.
+A particular terminating character or sequence
+must still be forbidden throughout the embedded text,
+however -- in this case the backtick (\verb|`|).
+Verbatim copy-and-paste embedding remains unsafe
+without carefully checking the embedding text
+for the forbidden host-language delimeters,
+and changing the delimeters or awkwardly rewriting the embedded text
+(\eg by concatenating multiple strings in different quoting styles).
+Matchertext, in contrast, forbids \emph{no} characters or sequences
+in embedded strings provided only that matchers match.
 
 It is already feasible to write code in existing languages
 that is also valid matchertext,
@@ -214,20 +228,19 @@ Curly braces	& \verb|{}|
 	to escape unmatched matchers in matchertext.}
 \end{table*}
 
-One habit we must awkwardly unlearn to write matchertext,
+One traditional habit we must awkwardly unlearn in matchertext,
 unfortunately,
 is using unmatched matchers in quoted strings
 to parse or print structured text.
 Clauses like \verb|printf("{")| or \verb|case "]"|
-are not valid matchertext --
-at least not within the string literals.
-We must therefore escape these unmatched matchers,
+are not valid matchertext.
+We must therefore escape such unmatched matchers in literals,
 as in \verb|printf("\x7B")| or \verb|case "\x5D"| for example.
 Backward-compatible language extensions might ease this pain,
 however, 
 with new escape sequences that include \emph{both} matchers of a pair
 but select only the opener or closer.
-The new escape \verb|\o()| represents a literal open parenthesis,
+The proposed new escape \verb|\o()| represents a literal open parenthesis,
 for example,
 while \verb|\c[]| represents a close bracket.
 Table~\ref{tab:unmatched-matchers} summarizes a few existing and proposed
@@ -287,7 +300,7 @@ is welcome to contribute to this research project,
 and potentially become a co-author upon making a substantial contribution.
 (Smaller contributions will receive acknowledgments in the final paper.)
 To propose a contribution, please use Pull Requests (PRs)
-on the project's GitHub repository.
+on the project's \href{https://github.com/dedis/matchertext}{GitHub repository}.
 We do not have time and cannot promise to answer all E-mails,
 or provide detailed guidance,
 before an interested potential contributor has proactively

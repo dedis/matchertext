@@ -85,7 +85,7 @@ Template-driven authoring languages (e.g., Hugo).
 \subsection{A proliferation of quoting conventions}
 
 Escaping issues such as those above have in part led many languages
-to support multiple different types of quotes with different rules.
+to support multiple different types of quotes with different escaping rules.
 Many languages allow string literals
 to be either single-quoted or double-quoted,
 so that quote characters of one type can be used literally
@@ -95,7 +95,7 @@ as in \verb|"'"| or \verb|'"'|.
 Some languages disable escape sequences in one form of string literal
 so that backslashes may appear literally without multiplying in number:
 \eg single-quoted Bourne shell strings (\verb|'\'| is the same as \verb|"\\"|)
-or ``backtick-quoted'' raw string literals
+or backtick-quoted raw string literals
 in Go (\verb|`\`| is like \verb|"\\"|).
 But without escapes it becomes more difficult to include
 the forbidden terminating quote literally in the string:
@@ -159,7 +159,7 @@ Cross-site scripting (XSS) attacks~\cite{fogie07xss}
 similarly exploit errors in the ubiquitous practice
 of embedding content from an untrusted source --
 such as fields from an HTML form --
-into HTML or other markup without sufficient ``sanitation'' via escaping.
+into HTML or other markup without proper ``sanitization'' via escaping.
 Suppose, for example, that one user of a Web-based discussion forum
 can post a message containing an HTML \verb|<script>| tag --
 which the discussion server then inserts into corresponding pages
@@ -171,7 +171,7 @@ who might unwittingly read the maliciously-crafted message.
 
 These and other broad classes of syntactic confusion attacks
 have led to the security-critical practice
-of \emph{sanitizing} all potentially-untrusted user input
+of sanitizing all potentially-untrusted user input
 before embedding it into security-sensitive code of any kind --
 whether SQL queries, HTML markup, or other host languages.
 The forms of sanitization needed in a particular context
@@ -188,13 +188,13 @@ We do not expect any syntactic discipline, including matchertext,
 to eliminate the need to sanitize untrusted inputs.
 If a future SQL query or Web form is designed to accept
 embedded matchertext from an untrusted source, for example,
-then it will probably still be security-critical to check
+then it will likely still be security-critical to check
 that the untrusted content \emph{is indeed valid matchertext},
 and reject it if not.
 However, a passive \emph{verification} like this
-can be much simpler and hence less bug-prone
+can be much simpler, and hence less bug-prone,
 than a content-modifying \emph{transformation},
-to escape all characters or sequences that can be ``sensitive''
+to escape all characters or sequences that might be ``sensitive''
 in the host language.
 Further, this security-critical check
 could also be more uniform across host languages --

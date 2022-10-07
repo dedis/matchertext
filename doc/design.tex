@@ -9,7 +9,7 @@ pragmatically inspired by predominant practices.
 These definitions represent the ``core'' of the matchertext concept,
 and are the \emph{only} rules
 that different languages must ``agree on''
-in order to achieve the goal of escapeless interlanguage embedding.
+in order to achieve the main goal of escapeless interlanguage embedding.
 
 \subsection{Abstract definition of matchertext}
 \label{sec:design:abstract}
@@ -63,7 +63,7 @@ and no structure apart from the basic rule that matchers must match.
 The meanings and structural purposes of all characters --
 both matchers and nonmatchers --
 are deliberately left entirely open
-for any particular ``matchertext-compliant'' language to define.
+for any particular ``matchertext-aware'' language to define.
 
 \xxx{ formally prove
 Always-embeddability property given that embedded string is valid matchertext.
@@ -187,14 +187,15 @@ would not only conflict with their primary standardized purposes
 (\ie would ``defy the authority'' of UCS),
 but would make it extremely cumbersome to express
 standard mathematical inequalities
-(\eg \verb|a < b| in \verb|if| expressions and the like)
+(\eg \verb|a < b| in \verb|if| expressions)
 in almost all programming languages.
 Omitting \verb|<>| from the matched pairs $\Pi$
 of the standard matchertext configuration does not
-conflict with or prevent their use in pairs in specific languages --
+conflict with or prevent their paired use in specific languages --
 as we will see when we focus on SGML-derived languages later
 in \cref{sec:host:ml} and \cref{sec:embed:ml}.
-This means only that we do not impose a ``universal'' rule
+Omitting them from $\Pi$
+means only that we do not impose a ``universal'' rule
 that they \emph{must} be used \emph{strictly} as matchers,
 without exception, throughout all valid matchertext.
 
@@ -222,7 +223,7 @@ there are three different left double-quote characters
 that potentially match with the right double-quote character (code 201D),
 depending on linguistic culture and typographical style.
 Thus, deciding \emph{which} character pairs should or should not match
-would become much more complex.
+would become a much more complex question.
 While specific languages are free to use any UCS punctuation
 for their own language-specific structural or stylistic purposes,
 it seems simplest and safest to restrict the matchertext set $\Pi$ of
@@ -252,13 +253,13 @@ as discussed above in \cref{sec:design:abstract:embed}.
 Including all three ASCII matcher pairs in $\Pi$
 thus gives languages maximum syntactic freedom
 in defining the syntax of matchertext embeddings
-(\ie a choice of three matcher pairs rather than a single prescribed pair).
+(\ie a choice among three matcher pairs rather than a single prescribed pair).
 
 
 \subsection{Matchertext configuration variations}
 \label{sec:design:concrete:variations}
 
-Even if well-justified,
+Even if adequately well-justified,
 we cannot expect the standard matchertext configuration
 as defined above to be a perfect or painless fit
 for all situations in which string embedding is useful.

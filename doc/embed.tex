@@ -26,7 +26,7 @@ and are by no means essential.
 Almost certainly the most common context in which unmatched matchers
 appear in most today's existing source code is within string literals.
 This is especially true of code to print, or parse,
-machine-readable code in most any syntax.
+machine-readable code in almost any syntax.
 Structured pretty-printing code frequently includes code sequences like this:
 
 \begin{quote}
@@ -51,7 +51,7 @@ Printing and scanning code like this generally violates the matchertext rule,
 and adapting such code most likely represents the biggest ``pain point''
 in any venture to write readily-embeddable matchertext.
 
-Almost all programming language already offer a workable
+Almost all programming languages already offer a workable
 if slightly cumbersome solution:
 simply replace unmatched matchers in string literals
 with suitable numeric character escapes.
@@ -70,8 +70,8 @@ This traditional solution does not work for unmatched matchers in matchertext,
 however,
 because the matchertext rule is deliberately language-independent
 and oblivious to language-specific syntax such as that of string literals.
-So an ``escaped'' unmatched bracket \verb|\[|
-is just as much a matchertext violation as the bracket alone.
+So a backslash-escaped unmatched bracket \verb|\[|
+remains just as much a matchertext violation as the bracket alone.
 
 There is a solution that avoids the need for ASCII tables, however.
 Because literal matchers are a problem in matchertext only when unmatched,
@@ -174,7 +174,7 @@ respectively.
 
 Since uniform resource identifier (URI) syntax represents
 a special-purpose ``little language'' just for expressing identifiers,
-a primary use of URIs is to be embedded in other contexts --
+URIs are predominately embedded in other contexts --
 software source code, documentation markup, configuration files, etc.
 Especially since URIs are intended to be human-readable,
 it would thus seems useful if URIs
@@ -233,7 +233,7 @@ Smart text editors often try to detect URIs on entry
 and automatically turn them into hyperlinks --
 but these heuristics can easily break because
 there is no unambiguous syntactic separation between the URI
-and surrounding (particularly following) text.
+from surrounding (particularly following) text.
 Suppose for example that I type or copy this text into an E-mail:
 
 \begin{footnotesize}
@@ -262,7 +262,7 @@ but rather few people seem to be aware of this recommendation in practice,
 let alone are following it.
 
 
-\subsubsection{Matchertext resource identifiers}
+\subsubsection{Matchertext resource identifiers (MRIs)}
 \label{sec:embed:mri}
 
 Given how commonly URIs are embedded in both freeform human-readable text
@@ -310,15 +310,15 @@ could be ``broken out'' of the main MRI syntax
 and handled instead as embedded MRIs in the host MRI's authority field.
 For example,
 the URI `\verb|http://1.2.3.4:80/|' would become
-the MRI `\verb|http[//ip4[1.2.3.4]:80/|', and
+the 2-level MRI `\verb|http[//ip4[1.2.3.4]:80/|', and
 the URI `\verb|http://[1234::abcd]:80/|' would become
 the MRI `\verb|http://ip6[1234::abcd]:80/|'.
 %IPv6 addresses with scoped identifiers
 %could avoid obfuscation in URIs~\cite{rfc6874}:
 %the URI `\verb|http://[1234::abcd%25eth0]/' becomes
 %the MRI `\verb|http://ip6[1234::abcd%eth0]/'.
-The MRI host field syntax knows only about domain names or nested MRIs,
-not about IP addresses.
+The MRI host field syntax thus knows only about domain names or nested MRIs,
+and not about IP address syntax.
 
 
 

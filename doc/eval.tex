@@ -10,24 +10,27 @@ Some key questions we wish to evaluate include:
 	that appear in large repositories of real source code,
 	in what host and embedded language combinations,
 	and for what purposes?
+\item	How common and what kinds of needs are there for
+	multiple levels of embedding in practice?
 \item	For a set of popular (big or little) languages,
 	how common are natural violations of matchertext discipline?
 	Of what kinds are most common (e.g., in string constants, comments)?
-	How painful would it be to fix these violations?
+	How painful would it be to fix these violations in typical code?
 \item	How common and painful are needs to escape embedded strings
 	when manually embedding into surrounding language strings?
 	For example, how commonly do actual URIs embedded into
 	actual program code need or use manual escaping?
 \item	How common have security bugs been related to
-	inadequate escape armoring when embedding automatically?
-\item	How common and what kinds of needs are there for
-	multiple levels of embedding?
+	inadequate or incorrect escape armoring
+	when embedding untrusted content automatically?
 \item	What is the security-critical ``attack surface''
 	(\eg code size and complexity)
-	of typical string sanitizing code for embedding of untrusted content?
+	of typical string sanitizing mechanisms
+	for embedding of untrusted content?
 \item	What are the syntactic ``horror stories'' of cross-language embedding,
 	akin to leaning toothpick syndrome,
-	but perhaps in other combinations of languages with other symptoms?
+	but perhaps in other combinations of languages
+	and/or resulting in other symptoms?
 \end{itemize}
 
 

@@ -341,7 +341,7 @@ unescaped \verb|<| and \verb|&| characters --
 and \emph{cannot} use HTML character entity references for escaping.
 In HTML4, this uninterpreted content is terminated
 by the first instance of a \verb|</| character sequence,
-whether or it is part of the corresponding end tag
+whether or not it is part of the corresponding end tag
 (\verb|</script>| or \verb|</style>|).
 HTML5 in contrast terminates the content with a sequence \verb|</|
 followed by the appropriate end tag name.
@@ -563,7 +563,7 @@ or within pathname components or query strings,
 to embed substrings in other identifier syntaxes (even other URIs)
 without obfuscation.
 We will explore the usefulness of this extension further
-when we consider \emph{matchertext resource identifier} syntax
+when we consider \emph{matchertext resource identifier} or MRI syntax
 later in \cref{sec:embed:mri}.
 This extension is backwards-compatible with existing (valid) URIs
 because current syntax permits brackets \emph{only}
@@ -648,10 +648,10 @@ or a matchertext quote \verb|[|$m$\verb|]|.
 This approach would clearly provide the maximum latitude
 for embedding other syntaxes into URIs cleanly in the future.
 Further, only this ``extreme liberalization''
-would guarantee that \emph{any} matchertext
-may be embedded verbatim into a URI
+would guarantee that \emph{any} matchertext,
 from any language conforming to the standard matchertext configuration
-(\cref{sec:design:concrete}).
+(\cref{sec:design:concrete}),
+may be embedded verbatim into a URI without escaping.
 
 As briefly discussed earlier in \cref{sec:design:concrete:variations},
 however,
@@ -705,7 +705,7 @@ without dire consequences.
 With adequate care taken for backwards compatibility (as was done with IRIs),
 it may be high time to consider allowing
 the rest of the ASCII printing characters above into URIs --
-\emph{at least} within embedded matchertext hosted within URIs.
+\emph{at least} in embedded matchertext hosted within URIs.
 
 \paragraph{Non-graphical characters:}
 
@@ -719,13 +719,14 @@ In an era of proliferating QR codes,
 the only question might be to what extent manual transcribability
 is still a crucial goal for URIs.
 
-Nevertheless, manual transcription remains a not-uncommon use of URIs,
+Nevertheless,
+manual transcription remains an important and not-uncommon use of URIs,
 and compromising the transcribability goal
 would arguably represent a much more fundamental shift
 in the principles underlying URIs
 than decisions about allowing or disallowing particular printing characters.
 This consideration therefore suggests that we
-cease the liberalization of URIs short of
+cease the liberalization of URIs just short of
 allowing non-graphical characters.
 
 Further, the transcribability goal is served
@@ -778,7 +779,7 @@ it takes away any special meaning that character may have.''
 This way, a user can just conservatively
 escape \emph{all} literal punctuation appearing in an RE, 
 instead of remembering which punctuation \emph{must} be escaped.
-Preserving this rule may suggest a longer ``letter-based''
+Preserving this rule may suggest a longer, letter-based
 matchertext escape sequence
 such as \verb|\m[|$m$\verb|]|.
 
@@ -790,8 +791,8 @@ for repetition quantifiers like $c$\verb|{1,3}|,
 but in a syntactically non-conflicting fashion
 since the inner braces cannot be mistaken for repetition quantifiers.
 With this alternative syntax,
-the pathological ``\href{https://en.wikipedia.org/wiki/Leaning_toothpick_syndrome}{leaning toothpick syndrome}'' example RE
-matching the double-backslash \verb|\\| in a UNC name (see \cref{sec:bg})
+the pathological ``\href{https://en.wikipedia.org/wiki/Leaning_toothpick_syndrome}{leaning toothpick syndrome}'' example RE,
+matching the double-backslash \verb|\\| in a UNC name (see \cref{sec:bg}),
 becomes the more readable RE \verb|{{\\}}|.
 Embedding this RE in a C-like string literal with matchertext extensions
 in turn becomes \verb|"\[{{\\}}]"|,
