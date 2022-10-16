@@ -6,21 +6,28 @@ import (
 	"io"
 )
 
+// Handler is an interface representing client logic to handle matchertext.
+//
+// The matchertext parser invokes Byte on each non-matcher byte encountered.
+// Byte is normally expected simply to consume the byte and return,
+// but it may recursively re-invoke the Parser if desired.
+//
+// On encountering an open parenthesis, square bracket, or curly brace,
+// the parser invokes Open with the open character o and matching closer c.
+// Open is expected to consume the opener, the content, and matching closer,
+// typically by invoking the parser's Pair method recursively.
+//
 type Handler interface {
-	Byte(c byte) error                // handle any non-matcher byte
-	Pair(o, c byte, p Callback) error // handle a matcher pair
+	Byte(c byte) error      // handle any non-matcher byte
+	Open(o, c byte) error	 // handle the opener of a matching pair
 }
-
-type Callback func(h Handler) error
 
 // Fast and simple streaming matchertext parser.
 type Parser struct {
 	r io.ByteReader
 
 	b int		// byte from ungetc witing to be re-getc'd
-	last byte	// last byte we read from r
-
-	c Callback
+	last int	// last byte we read from r
 
 	ofs int64	// byte offset in source starting from 0
 	line int	// line number starting from 1
@@ -48,12 +55,8 @@ func (p *Parser) SetReader(r io.Reader) *Parser {
 
 func (p *Parser) SetByteReader(r io.ByteReader) *Parser {
 	p.r = r
-	if p.c == nil {
-		p.c = func(h Handler) error {
-			_, e := p.parseText(h)
-			return e
-		}
-	}
+	p.b = -1
+	p.last = -1
 
 	// initialize logical position counters
 	p.ofs = 0
@@ -63,10 +66,17 @@ func (p *Parser) SetByteReader(r io.ByteReader) *Parser {
 	return p
 }
 
-// Parse a complete matchertext stream until the end.
+// XXX could add ReadByte(), PeekByte().
+// and rename All to ReadAll, etc.?
+
+// ReadAll parses a complete matchertext stream until the end,
+// invoking the client-provided Handler h to handle non-matcher bytes
+// and matcher-delimited substrings.
+// See ReadText for details on how the parser uses the Handler h.
 // Returns nil on successful parsing until end-of-file (EOF).
-func (p *Parser) Parse(h Handler) error {
-	c, e := p.parseText(h)
+//
+func (p *Parser) ReadAll(h Handler) error {
+	c, e := p.ReadText(h)
 	if e == io.EOF {
 		return nil // successful complete parse
 	}
@@ -77,23 +87,43 @@ func (p *Parser) Parse(h Handler) error {
 	return e // other error
 }
 
-// Parse text within a matchertext until an unmatched closer or EOF.
-// Returns the terminating closer character, or -1 on EOF or error.
-func (p *Parser) parseText(h Handler) (int, error) {
+// ReadText parses text from a matchertext stream until encountering
+// either an unmatched closer charcter or end-of-file (EOF).
+//
+// On encountering any non-matcher byte, Text invokes h.Byte to handle it.
+// The client's Byte handler may return a non-nil error to cease parsing text
+// without consuming the last offered byte.
+// 
+// On finding an open matcher (parenthesis, square bracket, or curly brace),
+// Text invokes h.Open to handle the matchertext substring.
+// The Open handler is normally expected to invoke the parser's Pair method
+// to parse the opener, contents, and matching closer.
+//
+// On finding an unmatched closer, returns the closer without consuming it.
+// Returns -1 on EOF or error.
+//
+func (p *Parser) ReadText(h Handler) (closer int, err error) {
 	for {
+		// Look ahead one byte in the stream
 		b, e := p.getc()
 		if e != nil {
 			return -1, e
 		}
+
 		switch b {
 
-		// When we see an opener, recursively parse the pair
+		// Handle any openers that we encounter.
+		// We expect the handler to invoke Pair
+		// to consume the entire delimited substring.
 		case '(':
-			e = p.pair(h, '(', ')')
+			p.ungetc(b)
+			e = h.Open('(', ')')
 		case '[':
-			e = p.pair(h, '[', ']')
+			p.ungetc(b)
+			e = h.Open('[', ']')
 		case '{':
-			e = p.pair(h, '{', '}')
+			p.ungetc(b)
+			e = h.Open('{', '}')
 
 		// When we see a closer, our current matchertext level is done
 		case ')', ']', '}':
@@ -103,6 +133,9 @@ func (p *Parser) parseText(h Handler) (int, error) {
 		// Handle normal nonmatcher bytes directly
 		default:
 			e = h.Byte(b)
+			if e != nil {
+				p.ungetc(b)
+			}
 		}
 		if e != nil {
 			return -1, e
@@ -110,15 +143,33 @@ func (p *Parser) parseText(h Handler) (int, error) {
 	}
 }
 
-// Parse a matched pair and everything in between.
-func (p *Parser) pair(h Handler, o, c byte) error {
+// Pair parses a matching pair of matchers and everything in between.
+// Pair expects to see the specific open matcher o first,
+// then it consumes arbitrary text including nested pairs,
+// and finally it consumes the matching closer c.
+// Returns nil if the whole matcher-delimited sequence was parsed successfully,
+// or a non-nil error if anything goes wrong.
+//
+func (p *Parser) ReadPair(h Handler, o, c byte) error {
 
-	// Invoke the matched-pair handler,
-	// which will in turn call us back to parse the content of the pair.
-	h.Pair(o, c, p.c)
+	// First consume the opener and make sure it is the expected one.
+	b, e := p.getc()
+	if e == io.EOF || (e == nil && b != c) {
+		return p.matcherError(fmt.Sprintf(
+			"expecting opener %v", string(o)))
+	}
+	if e != nil {
+		return e
+	}
+
+	// Parse the intervening text delimited by the matcher pair.
+	_, e = p.ReadText(h)
+	if e != nil {
+		return e
+	}
 
 	// Ensure that the content was closed by the correct matcher.
-	b, e := p.getc()
+	b, e = p.getc()
 	if e == io.EOF {
 		return p.matcherError(fmt.Sprintf(
 			"unmatched opener %v", string(b)))
@@ -144,16 +195,22 @@ func (p *Parser) getc() (b byte, e error) {
 	}
 
 	// advance our logical position based on last byte read
-	p.ofs++
-	p.col++
-	if p.last == '\n' {
-		p.line++
-		p.col = 1
+	if p.last >= 0 {
+		p.ofs++
+		p.col++
+		if p.last == '\n' {
+			p.line++
+			p.col = 1
+		}
 	}
 
 	// read the next byte from the input stream
 	b, e = p.r.ReadByte()
-	p.last = b
+	if e != nil {
+		return
+	}
+
+	p.last = int(b)
 	return
 }
 
@@ -165,21 +222,52 @@ func (p *Parser) matcherError(msg string) error {
 	return &MatcherError{msg, p.ofs, p.line, p.col}
 }
 
+// ReadByte reads and returns the next byte from the matchertext stream,
+// without any special handling of any matcher characters encountered.
+func (p *Parser) ReadByte() (b byte, err error) {
+	return p.getc()
+}
 
+// PeekByte returns the next byte from the underlying matchertext stream,
+// without consuming it.
+func (p *Parser) PeekByte() (b byte, err error) {
+	b, err = p.getc()
+	if err == nil {
+		p.ungetc(b)
+	}
+	return
+}
+
+// Offset returns the current byte offset within the matchertext being parsed.
+func (p *Parser) Offset() int64 {
+	return p.ofs
+}
+
+// Position returns the current line and column number
+// within the matchertext being parsed.
+func (p *Parser) Position() (line int, col int) {
+	return p.line, p.col
+}
+
+
+// MatcherError describes any syntax error the parser encounters.
 type MatcherError struct {
 	msg string
 	ofs int64
 	line, col int
 }
 
+// Error returns a human-readable description of the error.
 func (e *MatcherError) Error() string {
 	return e.msg
 }
 
+// Offset returns the byte position at which the error occurred.
 func (e *MatcherError) Offset() int64 {
 	return e.ofs
 }
 
+// Position returns the line and column number at which the error occurred.
 func (e *MatcherError) Position() (line int, column int) {
 	return e.line, e.col
 }
