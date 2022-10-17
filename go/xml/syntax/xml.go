@@ -27,9 +27,14 @@ func IsChar(r rune) (inrange bool) {
 		r >= 0x10000 && r <= 0x10FFFF
 }
 
+// Returns true if b is a valid whitespace character in XML.
+func IsSpace(b byte) bool {
+	return b == ' ' || b == '\r' || b == '\n' || b == '\t'
+}
+
 // Returns true if r is a NameStartChar that can begin an XML name.
 func IsNameStartChar(r rune) bool {
-	return unicode.Is(first, r) || unicode.Is(second, r)
+	return unicode.Is(first, r)
 }
 
 // Returns true if r is a NameChar that can be part of an XML name.
@@ -37,10 +42,33 @@ func IsNameChar(r rune) bool {
 	return unicode.Is(first, r) || unicode.Is(second, r)
 }
 
-// Returns true if s is a valid XML Name,
-// starting with a NameStartChar and continuing with
-// any number of NameChars.
-func IsName(s string) bool {
+// IsName returns true if byte slice b contains a valid XML Name.
+func IsName(b []byte) bool {
+	if len(b) == 0 {
+		return false
+	}
+	c, n := utf8.DecodeRune(b)
+	if c == utf8.RuneError && n == 1 {
+		return false
+	}
+	if !unicode.Is(first, c) {
+		return false
+	}
+	for n < len(b) {
+		b = b[n:]
+		c, n = utf8.DecodeRune(b)
+		if c == utf8.RuneError && n == 1 {
+			return false
+		}
+		if !unicode.Is(first, c) && !unicode.Is(second, c) {
+			return false
+		}
+	}
+	return true
+}
+
+// IsNameString returns true if string s contains a valid XML Name.
+func IsNameString(s string) bool {
 	if len(s) == 0 {
 		return false
 	}

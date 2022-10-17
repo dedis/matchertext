@@ -66,13 +66,18 @@ func (p *Parser) SetByteReader(r io.ByteReader) *Parser {
 	return p
 }
 
-// XXX could add ReadByte(), PeekByte().
-// and rename All to ReadAll, etc.?
-
-// ReadAll parses a complete matchertext stream until the end,
-// invoking the client-provided Handler h to handle non-matcher bytes
-// and matcher-delimited substrings.
-// See ReadText for details on how the parser uses the Handler h.
+// ReadText parses a matchertext stream until it encounters end-of-file (EOF)
+// or some other error.
+//
+// On encountering any non-matcher byte, ReadText invokes h.Byte to handle it.
+// The client's Byte handler may return a non-nil error to cease parsing text
+// without consuming the last offered byte.
+// 
+// On finding an open matcher (parenthesis, square bracket, or curly brace),
+// Text invokes h.Open to handle the matchertext substring.
+// The Open handler is normally expected to invoke the parser's Pair method
+// to parse the opener, contents, and matching closer.
+//
 // Returns nil on successful parsing until end-of-file (EOF).
 //
 func (p *Parser) ReadAll(h Handler) error {
@@ -87,18 +92,8 @@ func (p *Parser) ReadAll(h Handler) error {
 	return e // other error
 }
 
-// ReadText parses text from a matchertext stream until encountering
-// either an unmatched closer charcter or end-of-file (EOF).
-//
-// On encountering any non-matcher byte, Text invokes h.Byte to handle it.
-// The client's Byte handler may return a non-nil error to cease parsing text
-// without consuming the last offered byte.
-// 
-// On finding an open matcher (parenthesis, square bracket, or curly brace),
-// Text invokes h.Open to handle the matchertext substring.
-// The Open handler is normally expected to invoke the parser's Pair method
-// to parse the opener, contents, and matching closer.
-//
+// Parse text from a matchertext stream until encountering
+// either an unmatched closer character or end-of-file (EOF).
 // On finding an unmatched closer, returns the closer without consuming it.
 // Returns -1 on EOF or error.
 //
@@ -133,9 +128,6 @@ func (p *Parser) ReadText(h Handler) (closer int, err error) {
 		// Handle normal nonmatcher bytes directly
 		default:
 			e = h.Byte(b)
-			if e != nil {
-				p.ungetc(b)
-			}
 		}
 		if e != nil {
 			return -1, e

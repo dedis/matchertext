@@ -203,6 +203,10 @@ type Decoder struct {
 	// the attribute xmlns="DefaultSpace".
 	DefaultSpace string
 
+	// If MinML is true, selects the concise MinML syntax
+	// instead of traditional XML syntax.
+	MinML bool
+
 	r              io.ByteReader
 	t              TokenReader
 	buf            bytes.Buffer
@@ -283,6 +287,8 @@ func (d *Decoder) Token() (Token, error) {
 	if d.nextToken != nil {
 		t = d.nextToken
 		d.nextToken = nil
+	} else if d.MinML {
+		return d.mToken()
 	} else {
 		if t, err = d.rawToken(); t == nil && err != nil {
 			if err == io.EOF && d.stk != nil && d.stk.kind != stkEOF {
@@ -391,6 +397,7 @@ const (
 	stkStart = iota
 	stkNs
 	stkEOF
+	stkMatcher	// literal matchertext pair; name is the pair
 )
 
 func (d *Decoder) push(kind int) *stack {
@@ -549,6 +556,9 @@ func (d *Decoder) RawToken() (Token, error) {
 func (d *Decoder) rawToken() (Token, error) {
 	if d.t != nil {
 		return d.t.Token()
+	}
+	if d.MinML {
+		return d.minmlRawToken()
 	}
 	if d.err != nil {
 		return nil, d.err
