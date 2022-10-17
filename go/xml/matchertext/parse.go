@@ -86,7 +86,7 @@ func (p *Parser) ReadAll(h Handler) error {
 		return nil // successful complete parse
 	}
 	if e == nil {
-		return p.matcherError(fmt.Sprintf(
+		return p.SyntaxError(fmt.Sprintf(
 			"unmatched closer %v", string(byte(c))))
 	}
 	return e // other error
@@ -147,7 +147,7 @@ func (p *Parser) ReadPair(h Handler, o, c byte) error {
 	// First consume the opener and make sure it is the expected one.
 	b, e := p.getc()
 	if e == io.EOF || (e == nil && b != c) {
-		return p.matcherError(fmt.Sprintf(
+		return p.SyntaxError(fmt.Sprintf(
 			"expecting opener %v", string(o)))
 	}
 	if e != nil {
@@ -163,14 +163,14 @@ func (p *Parser) ReadPair(h Handler, o, c byte) error {
 	// Ensure that the content was closed by the correct matcher.
 	b, e = p.getc()
 	if e == io.EOF {
-		return p.matcherError(fmt.Sprintf(
+		return p.SyntaxError(fmt.Sprintf(
 			"unmatched opener %v", string(b)))
 	}
 	if e != nil {
 		return e
 	}
 	if b != c {
-		return p.matcherError(fmt.Sprintf(
+		return p.SyntaxError(fmt.Sprintf(
 			"opener %v closed with mismatched %v",
 			string(o), string(b)))
 	}
@@ -210,8 +210,11 @@ func (p *Parser) ungetc(b byte) {
 	p.b = int(b)
 }
 
-func (p *Parser) matcherError(msg string) error {
-	return &MatcherError{msg, p.ofs, p.line, p.col}
+// Create an object describing a syntax error while parsing matchertext.
+// The matchertext parser only creates errors due to unmatched matchers,
+// but clients can use this method to report language-specific syntax errors.
+func (p *Parser) SyntaxError(msg string) *SyntaxError {
+	return &SyntaxError{msg, p.ofs, p.line, p.col}
 }
 
 // ReadByte reads and returns the next byte from the matchertext stream,
@@ -242,25 +245,25 @@ func (p *Parser) Position() (line int, col int) {
 }
 
 
-// MatcherError describes any syntax error the parser encounters.
-type MatcherError struct {
+// SyntaxError describes any syntax error the parser encounters.
+type SyntaxError struct {
 	msg string
 	ofs int64
 	line, col int
 }
 
 // Error returns a human-readable description of the error.
-func (e *MatcherError) Error() string {
+func (e *SyntaxError) Error() string {
 	return e.msg
 }
 
 // Offset returns the byte position at which the error occurred.
-func (e *MatcherError) Offset() int64 {
+func (e *SyntaxError) Offset() int64 {
 	return e.ofs
 }
 
 // Position returns the line and column number at which the error occurred.
-func (e *MatcherError) Position() (line int, column int) {
+func (e *SyntaxError) Position() (line int, column int) {
 	return e.line, e.col
 }
 
