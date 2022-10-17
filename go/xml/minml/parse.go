@@ -599,8 +599,6 @@ func scanPostSpace(b []byte) int {
 //	return
 //}
 
-
 func (p *Parser) syntaxError(msg string) *matchertext.SyntaxError {
 	return p.mp.SyntaxError(msg)
 }
-
