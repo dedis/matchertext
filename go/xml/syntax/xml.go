@@ -42,21 +42,21 @@ func IsNameChar(r rune) bool {
 	return unicode.Is(first, r) || unicode.Is(second, r)
 }
 
-// IsName returns true if byte slice b contains a valid XML Name.
-func IsName(b []byte) bool {
-	if len(b) == 0 {
+// IsName returns true if byte slice s contains a valid XML Name.
+func IsName(s []byte) bool {
+	if len(s) == 0 {
 		return false
 	}
-	c, n := utf8.DecodeRune(b)
+	c, n := utf8.DecodeRune(s)
 	if c == utf8.RuneError && n == 1 {
 		return false
 	}
 	if !unicode.Is(first, c) {
 		return false
 	}
-	for n < len(b) {
-		b = b[n:]
-		c, n = utf8.DecodeRune(b)
+	for n < len(s) {
+		s = s[n:]
+		c, n = utf8.DecodeRune(s)
 		if c == utf8.RuneError && n == 1 {
 			return false
 		}
@@ -68,7 +68,8 @@ func IsName(b []byte) bool {
 }
 
 // IsNameString returns true if string s contains a valid XML Name.
-func IsNameString(s string) bool {
+// XXX need?
+func isNameString(s string) bool {
 	if len(s) == 0 {
 		return false
 	}
@@ -127,3 +128,39 @@ var second = &unicode.RangeTable{
 	},
 }
 
+// IsReference returns true if s is a valid character reference name or number:
+// i.e., either an XML name, or #[0-9]+, or #x[0-9a-fA-F]+.
+func IsReference(s []byte) bool {
+	l := len(s)
+
+	// If it doesn't start with #, then just see if it's a name.
+	if l == 0 || s[0] != '#' {
+		return IsName(s)
+	}
+
+	// Is it a hex name with at least one digit?
+	if l > 2 && s[1] == 'x' {
+		for i := 2; i < l; i++ {
+			b := s[i]
+			if (b < '0' || b > '9') &&
+				(b < 'a' || b > 'f') &&
+				(b < 'A' || b > 'F') {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Is it a decimal name with at least one digit?
+	if l > 1 {
+		for i := 1; i < l; i++ {
+			b := s[i]
+			if b < '0' || b > '9' {
+				return false
+			}
+		}
+		return true
+	}
+
+	return false
+}

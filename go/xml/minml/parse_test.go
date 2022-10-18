@@ -7,12 +7,18 @@ import (
 	"github.com/dedis/matchertext.git/go/xml/ast"
 )
 
+// The following are convenience constructor functions for AST nodes.
+
 func aText(s string) ast.Text {
 	return ast.Text{Text: s, Raw: false}
 }
 
 func aRawText(s string) ast.Text {
 	return ast.Text{Text: s, Raw: true}
+}
+
+func aComment(s string) ast.Comment {
+	return ast.Comment{Text: s}
 }
 
 func aRef(name string) ast.Reference {
@@ -37,10 +43,11 @@ func aElem(name string, ns ...ast.Node) ast.Element {
 }
 
 type testCase struct {
-	s string
-	n []ast.Node
+	s string     // MinML string to be parsed
+	n []ast.Node // AST that it should parse to
 }
 
+// Convenience function to construct a testCase.
 func tc(s string, ns ...ast.Node) testCase {
 	return testCase{s, ns}
 }
@@ -72,50 +79,56 @@ var parserTests = []testCase{
 	tc("a{)b"), // bad matchertext: mismatched matchers
 
 	// Character references
-	{"[amp]", []ast.Node{aRef("amp")}},
-	//XXX	{"[#123]", []ast.Node{aRef("#123")}},
-	//XXX	{"[#x12ab]", []ast.Node{aRef("#x12ab")}},
-	{" [amp]", []ast.Node{aText(" "), aRef("amp")}},
-	{"<[amp]", []ast.Node{aText("<"), aRef("amp")}},
-	{"x<[amp]", []ast.Node{aText("x<"), aRef("amp")}},
-	{"x <[amp]", []ast.Node{aText("x"), aRef("amp")}},
-	{"[amp] ", []ast.Node{aRef("amp"), aText(" ")}},
-	{"[amp]>", []ast.Node{aRef("amp"), aText(">")}},
-	{"[amp]>x", []ast.Node{aRef("amp"), aText(">x")}},
-	{"[amp]> x", []ast.Node{aRef("amp"), aText("x")}},
-	{"([amp])", []ast.Node{aText("("), aRef("amp"), aText(")")}},
-	{"[[amp]]", []ast.Node{aText("["), aRef("amp"), aText("]")}},
-	{"{[amp]}", []ast.Node{aText("{"), aRef("amp"), aText("}")}},
-	{"(\t<[amp]>\n)", []ast.Node{aText("("), aRef("amp"), aText(")")}},
-	{"[\r\n<[amp]>\n\r]", []ast.Node{aText("["), aRef("amp"), aText("]")}},
-	{"{ \t\n<[amp]>\n\t }", []ast.Node{aText("{"), aRef("amp"),
-		aText("}")}},
+	tc("[amp]", aRef("amp")),
+	tc("[#123]", aRef("#123")),
+	tc("[#x12ab]", aRef("#x12ab")),
+	tc(" [amp]", aText(" "), aRef("amp")),
+	tc("<[amp]", aText("<"), aRef("amp")),
+	tc("x<[amp]", aText("x<"), aRef("amp")),
+	tc("x <[amp]", aText("x"), aRef("amp")),
+	tc("[amp] ", aRef("amp"), aText(" ")),
+	tc("[amp]>", aRef("amp"), aText(">")),
+	tc("[amp]>x", aRef("amp"), aText(">x")),
+	tc("[amp]> x", aRef("amp"), aText("x")),
+	tc("([amp])", aText("("), aRef("amp"), aText(")")),
+	tc("[[amp]]", aText("["), aRef("amp"), aText("]")),
+	tc("{[amp]}", aText("{"), aRef("amp"), aText("}")),
+	tc("(\t<[amp]>\n)", aText("("), aRef("amp"), aText(")")),
+	tc("[\r\n<[amp]>\n\r]", aText("["), aRef("amp"), aText("]")),
+	tc("{ \t\n<[amp]>\n\t }", aText("{"), aRef("amp"), aText("}")),
+	tc("[]", aText("[]")),       // not a character reference
+	tc("[?]", aText("[?]")),     // not a character reference
+	tc("[#]", aText("[#]")),     // not a character reference
+	tc("[#a]", aText("[#a]")),   // not a character reference
+	tc("[#x]", aText("[#x]")),   // not a character reference
+	tc("[#x@]", aText("[#x@]")), // not a character reference
+	tc("[#xg]", aText("[#xg]")), // not a character reference
 
 	// Elements
-	{"p[]", []ast.Node{aElem("p")}},
-	{" p[]", []ast.Node{aText(" "), aElem("p")}},
-	{"p[] ", []ast.Node{aElem("p"), aText(" ")}},
-	{" <p[]", []ast.Node{aElem("p")}},
-	{"p[]> ", []ast.Node{aElem("p")}},
-	{"x<p[]", []ast.Node{aText("x<"), aElem("p")}},
-	{"x <p[]", []ast.Node{aText("x"), aElem("p")}},
-	{"p[]>x", []ast.Node{aElem("p"), aText(">x")}},
-	{"p[]> x", []ast.Node{aElem("p"), aText("x")}},
-	{"p[> ]", []ast.Node{aElem("p")}},
-	{"p[ <]", []ast.Node{aElem("p")}},
-	{"p[> <]", []ast.Node{aElem("p")}},
-	{" <p[> <]> ", []ast.Node{aElem("p")}},
-	{"p[> \t\r\n <]", []ast.Node{aElem("p")}},
-	{"p[x]", []ast.Node{aElem("p", aText("x"))}},
-	{"p[><]", []ast.Node{aElem("p", aText("><"))}},
-	{"p[> x]", []ast.Node{aElem("p", aText("x"))}},
-	{"p[> <x]", []ast.Node{aElem("p", aText("<x"))}},
-	{"p[x <]", []ast.Node{aElem("p", aText("x"))}},
-	{"p[x> <]", []ast.Node{aElem("p", aText("x>"))}},
-	{"p[>\t\n\r x \t\n\r<]", []ast.Node{aElem("p", aText("x"))}},
-	{"\t\n\r <p[> x <]> \t\n\r", []ast.Node{aElem("p", aText("x"))}},
-	{"x[y[]]", []ast.Node{aElem("x", aElem("y"))}},
-	{" <x[> <y[> <]> <]> ", []ast.Node{aElem("x", aElem("y"))}},
+	tc("p[]", aElem("p")),
+	tc(" p[]", aText(" "), aElem("p")),
+	tc("p[] ", aElem("p"), aText(" ")),
+	tc(" <p[]", aElem("p")),
+	tc("p[]> ", aElem("p")),
+	tc("x<p[]", aText("x<"), aElem("p")),
+	tc("x <p[]", aText("x"), aElem("p")),
+	tc("p[]>x", aElem("p"), aText(">x")),
+	tc("p[]> x", aElem("p"), aText("x")),
+	tc("p[> ]", aElem("p")),
+	tc("p[ <]", aElem("p")),
+	tc("p[> <]", aElem("p")),
+	tc(" <p[> <]> ", aElem("p")),
+	tc("p[> \t\r\n <]", aElem("p")),
+	tc("p[x]", aElem("p", aText("x"))),
+	tc("p[><]", aElem("p", aText("><"))),
+	tc("p[> x]", aElem("p", aText("x"))),
+	tc("p[> <x]", aElem("p", aText("<x"))),
+	tc("p[x <]", aElem("p", aText("x"))),
+	tc("p[x> <]", aElem("p", aText("x>"))),
+	tc("p[>\t\n\r x \t\n\r<]", aElem("p", aText("x"))),
+	tc("\t\n\r <p[> x <]> \t\n\r", aElem("p", aText("x"))),
+	tc("x[y[]]", aElem("x", aElem("y"))),
+	tc(" <x[> <y[> <]> <]> ", aElem("x", aElem("y"))),
 
 	// Elements with attributes
 	tc("p{}[]", aElem("p")),
@@ -127,35 +140,33 @@ var parserTests = []testCase{
 	tc("p{ <}"),    // error: name expected
 	tc("p{a}> []"), // error: expected value
 	tc("p{a} <[]"), // error: expected value
-	{"p{a=}[]", []ast.Node{aElem("p", aAttr("a"))}},
-	{"p{ a= }[]", []ast.Node{aElem("p", aAttr("a"))}},
-	{"p{a=x}[]", []ast.Node{aElem("p", aAttr("a", aText("x")))}},
-	{"p{a=x b=y}[]", []ast.Node{aElem("p",
-		aAttr("a", aText("x")), aAttr("b", aText("y")))}},
-	{"p{a=[]}[]", []ast.Node{aElem("p", aAttr("a"))}},
-	{"p{ a=[] }[]", []ast.Node{aElem("p", aAttr("a"))}},
-	{"p{ a= <[]}[]", nil}, // error: name expected
-	{"p{ a=[]> }[]", nil}, // error: garbage following value
-	{" <p{a=[>  <]}[> <]> ", []ast.Node{aElem("p", aAttr("a"))}},
-	{"p{a=[x]}[]", []ast.Node{aElem("p", aAttr("a", aText("x")))}},
-	{"p{a=[> x <]}[]", []ast.Node{aElem("p", aAttr("a", aText("x")))}},
-	{"p{a=[x] b=[y]}[]", []ast.Node{aElem("p",
-		aAttr("a", aText("x")), aAttr("b", aText("y")))}},
-	{"p{a=[[x]]}[]", []ast.Node{aElem("p", aAttr("a", aRef("x")))}},
-	{"p{a=[x[y]]}[]", []ast.Node{aElem("p",
-		aAttr("a", aText("x"), aRef("y")))}},
-	{"p{a=[x <[> y <]> ]}[]", []ast.Node{aElem("p",
-		aAttr("a", aText("x[y]")))}},
-	{"p{a=[x]y}[]", nil}, // error: garbage after quoted value
-	{"p{a=[ x ]}[]", []ast.Node{aElem("p", aAttr("a", aText(" x ")))}},
-	{"p{a=[> x <]}[]", []ast.Node{aElem("p", aAttr("a", aText("x")))}},
-	{"p{a=(x)}[]", []ast.Node{aElem("p", aAttr("a", aText("(x)")))}},
-	{"p{a={x}}[]", []ast.Node{aElem("p", aAttr("a", aText("{x}")))}},
-	{"p{a=[x y]}[]", []ast.Node{aElem("p", aAttr("a", aText("x y")))}},
-	{"p{a=(x y)}[]", []ast.Node{aElem("p", aAttr("a", aText("(x y)")))}},
-	{"p{a={x y}}[]", []ast.Node{aElem("p", aAttr("a", aText("{x y}")))}},
-	{"p{a= }[]", []ast.Node{aElem("p", aAttr("a"))}},
-	{"p{a=x }[]", []ast.Node{aElem("p", aAttr("a", aText("x")))}},
+	tc("p{a=}[]", aElem("p", aAttr("a"))),
+	tc("p{ a= }[]", aElem("p", aAttr("a"))),
+	tc("p{a=x}[]", aElem("p", aAttr("a", aText("x")))),
+	tc("p{a=x b=y}[]", aElem("p",
+		aAttr("a", aText("x")), aAttr("b", aText("y")))),
+	tc("p{a=[]}[]", aElem("p", aAttr("a"))),
+	tc("p{ a=[] }[]", aElem("p", aAttr("a"))),
+	tc("p{ a= <[]}[]"), // error: name expected
+	tc("p{ a=[]> }[]"), // error: garbage following value
+	tc(" <p{a=[>  <]}[> <]> ", aElem("p", aAttr("a"))),
+	tc("p{a=[x]}[]", aElem("p", aAttr("a", aText("x")))),
+	tc("p{a=[> x <]}[]", aElem("p", aAttr("a", aText("x")))),
+	tc("p{a=[x] b=[y]}[]", aElem("p",
+		aAttr("a", aText("x")), aAttr("b", aText("y")))),
+	tc("p{a=[[x]]}[]", aElem("p", aAttr("a", aRef("x")))),
+	tc("p{a=[x[y]]}[]", aElem("p", aAttr("a", aText("x"), aRef("y")))),
+	tc("p{a=[x <[> y <]> ]}[]", aElem("p", aAttr("a", aText("x[y]")))),
+	tc("p{a=[x]y}[]"), // error: garbage after quoted value
+	tc("p{a=[ x ]}[]", aElem("p", aAttr("a", aText(" x ")))),
+	tc("p{a=[> x <]}[]", aElem("p", aAttr("a", aText("x")))),
+	tc("p{a=(x)}[]", aElem("p", aAttr("a", aText("(x)")))),
+	tc("p{a={x}}[]", aElem("p", aAttr("a", aText("{x}")))),
+	tc("p{a=[x y]}[]", aElem("p", aAttr("a", aText("x y")))),
+	tc("p{a=(x y)}[]", aElem("p", aAttr("a", aText("(x y)")))),
+	tc("p{a={x y}}[]", aElem("p", aAttr("a", aText("{x y}")))),
+	tc("p{a= }[]", aElem("p", aAttr("a"))),
+	tc("p{a=x }[]", aElem("p", aAttr("a", aText("x")))),
 	tc("p{ a= }[]", aElem("p", aAttr("a"))),
 	tc("p{ a=x }[]", aElem("p", aAttr("a", aText("x")))),
 	tc("p{a=x b}[]"),   // error: missing value
@@ -173,6 +184,13 @@ var parserTests = []testCase{
 	tc("+[() <[> <]> {}]", aRawText("() <[> <]> {}")),
 	tc(" <+[x]> ", aRawText("x")),
 	tc("a <+[x]> b", aText("a"), aRawText("x"), aText("b")),
+
+	// Comments
+	{"-[]", []ast.Node{}},
+	tc("-[x]", aComment("x")),
+	tc(" <-[x]> ", aComment("x")),
+	tc("-[> abc <]", aComment("> abc <")),
+	tc("-[> ({[]}) <]", aComment("> ({[]}) <")),
 }
 
 func TestParser(t *testing.T) {

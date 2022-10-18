@@ -17,8 +17,8 @@ import (
 // The handler must invoke the provided parseElement function exactly once
 // when it is ready to parse the element's attributes and/or content.
 type HandlerMarkup interface {
-	HandlerText
-	Element(name []byte) error
+	HandlerText                // Handle plain text and references
+	Element(name []byte) error // Handle markup elements
 }
 
 // HandlerText represents client logic for handling text markup,
@@ -36,8 +36,16 @@ type HandlerText interface {
 // then the parser will invoke Content exactly once for this element
 // (unless a parse error occurs before getting to the element content).
 type HandlerElement interface {
-	Attribute(name []byte) error
-	Content() error
+	Attribute(name []byte) error // Handle attributes
+	Content() error              // Handle content markup
+}
+
+// HandlerComment is an interface that a client may optionally implement,
+// as an extension to HandlerText, to obtain and handle the text of comments.
+// If the client's HandlerText does not implement this extension,
+// the parser will just silently discard all comments.
+type HandlerComment interface {
+	Comment(text []byte) error // Handle the text comprising a comment
 }
 
 // The above three handler interfaces bundled into one struct
@@ -188,6 +196,9 @@ func (mh mHandler) Open(o, c byte) (e error) {
 			case '+': // raw matchertext
 				e = p.rawText()
 
+			case '-': // comment
+				e = p.comment()
+
 			default: // XML element
 				// Invoke client's handler to parse element
 				e = p.handleElement(b[pos:])
@@ -235,11 +246,11 @@ func (p *Parser) literalPair(o, c byte) (e error) {
 		if b[0] != '[' || b[l-1] != ']' {
 			panic("character reference not bracketed")
 		}
-		name := b[1 : l-1]
+		ref := b[1 : l-1]
 
 		// If the bracket pair contained nothing but an XML name,
 		// then handle it as a character reference.
-		if syntax.IsName(name) {
+		if syntax.IsReference(ref) {
 
 			// Handle normal text before the character reference
 			e = p.handleText(oPos, false)
@@ -252,10 +263,29 @@ func (p *Parser) literalPair(o, c byte) (e error) {
 			p.sawMatcher(c)
 
 			// Handle the character reference itself
-			e = p.handleReference(name)
+			e = p.handleReference(ref)
 		}
 	}
 	return
+}
+
+// Read a matching bracket pair with the markup handler, then flush the output.
+func (p *Parser) mPair(h matchertext.Handler) error {
+
+	p.sawMatcher('[')
+
+	// Read the contents of the bracket pair
+	if e := p.mp.ReadPair(h, '[', ']'); e != nil {
+		return e
+	}
+
+	// Flush any plain text at the end to the text handler
+	if e := p.mFlush(true); e != nil {
+		return e
+	}
+
+	p.sawMatcher(']')
+	return nil
 }
 
 // Flush any accumulated bytes to the text handler.
@@ -462,20 +492,11 @@ func (p *Parser) ReadAttribute(name []byte, ht HandlerText) error {
 		return e
 	}
 	if b == '[' {
-		p.sawMatcher('[')
-
 		// Parse the quoted bracket pair
-		e = p.mp.ReadPair(p.mh, '[', ']')
+		e = p.mPair(p.mh)
 		if e != nil {
 			return e
 		}
-
-		// Flush any plain text at the end to the text handler
-		if e := p.mFlush(true); e != nil {
-			return e
-		}
-
-		p.sawMatcher(']')
 
 		// Ensure that there's no garbage after the close bracket
 		b, e = p.mp.PeekByte()
@@ -540,20 +561,8 @@ func (p *Parser) ReadContent(hm HandlerMarkup) error {
 	// Stash the client's parsing handlers in our state
 	p.h = handlers{m: hm, t: hm}
 
-	p.sawMatcher('[')
-
 	// Parse the matchertext content of the bracket pair
-	if e := p.mp.ReadPair(p.mh, '[', ']'); e != nil {
-		return e
-	}
-
-	// Flush any plain text at the end to the text handler
-	if e := p.mFlush(true); e != nil {
-		return e
-	}
-
-	p.sawMatcher(']')
-	return nil
+	return p.mPair(p.mh)
 }
 
 // Read a raw matchertext construct +[...].
@@ -564,7 +573,7 @@ func (p *Parser) rawText() error {
 		return e
 	}
 
-	// Flush any plain text at the end to the text handler
+	// Send the collected matchertext to the (raw) text handler
 	if e := p.handleText(p.buf.Len(), true); e != nil {
 		return e
 	}
@@ -598,6 +607,46 @@ func (rh rHandler) Open(o, c byte) (e error) {
 	return
 }
 
+// Read a comment construct -[...]
+func (p *Parser) comment() error {
+
+	// Parse and buffer the raw matchertext content between the brackets
+	if e := p.mp.ReadPair(p.rh, '[', ']'); e != nil {
+		return e
+	}
+
+	// Send the comment text to the client's optional comment handler
+	if e := p.handleComment(); e != nil {
+		return e
+	}
+
+	p.sawMatcher(']')
+	return nil
+}
+
+// Invoke the client's HandlerText to handle the next n bytes of buffered text.
+func (p *Parser) handleComment() (e error) {
+
+	// Obtain the byte slice to pass to the client's handler.
+	// The slice's contents will be valid only until
+	// the next time the handler invokes the parser.
+	b := p.buf.Bytes()
+	if len(b) == 0 {
+		return nil
+	}
+	p.buf.Reset()
+
+	// Save and restore the handlers around the handler upcall,
+	// in case the handler recursively invokes parser methods.
+	h := p.h
+	if c, ok := h.t.(HandlerComment); ok {
+		e = c.Comment(b)
+	}
+	p.h = h
+
+	return
+}
+
 // Scan the buffered text for the start of an XML element name
 // or a punctuation-based special markup construct
 // leading up to an open bracket or curly brace.
@@ -606,8 +655,12 @@ func scanStarter(b []byte) int {
 
 	// First check for special punctuation-initiated constructs
 	l := len(b)
-	if l > 0 && (b[l-1] == '+') {
-		return l - 1
+	if l > 0 {
+		switch b[l-1] {
+		case '+', // raw matchertext
+			'-': // comment
+			return l - 1
+		}
 	}
 
 	// Scan for the first NameStartChar in a sequence of NameChars.

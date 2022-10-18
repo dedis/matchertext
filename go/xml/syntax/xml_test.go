@@ -22,4 +22,3 @@ func TestIsChar(t *testing.T) {
 		}
 	}
 }
-

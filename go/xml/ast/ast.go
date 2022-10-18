@@ -24,6 +24,10 @@ type Attribute struct {
 	Value []Node
 }
 
+type Comment struct {
+	Text string // the text content of the comment
+}
+
 // Compare AST nodes n1 and n2 and all their descendants for deep equality.
 func DeepEqual(n1, n2 []Node) bool {
 	if len(n1) != len(n2) {
@@ -74,6 +78,10 @@ func deepEqual(n1, n2 Node) bool {
 			if !deepEqual(n1.Value[i], n2.Value[i]) {
 				return false
 			}
+		}
+	case Comment:
+		if n2, ok := n2.(Comment); !ok || n1 != n2 {
+			return false
 		}
 	default:
 		return false

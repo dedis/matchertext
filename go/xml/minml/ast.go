@@ -67,3 +67,8 @@ func (ap *astParser) Content() error {
 	// Recursively parse the element content into slice ap.m
 	return ap.p.ReadContent(ap)
 }
+
+func (ap *astParser) Comment(text []byte) error {
+	ap.m = append(ap.m, ast.Comment{Text: string(text)})
+	return nil
+}
