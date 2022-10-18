@@ -5,17 +5,18 @@ type Node interface {
 }
 
 type Text struct {
-	Text string
+	Text string // the plain markup-free UTF-8 text
+	Raw  bool   // true if this text came from a raw CDATA section
 }
 
 type Reference struct {
-	Name string
+	Name string // XML name of character reference
 }
 
 type Element struct {
-	Name    string
-	Attribs []Attribute
-	Content []Node
+	Name    string      // XML name of element
+	Attribs []Attribute // Element attributes if any
+	Content []Node      // Element markup content if any
 }
 
 type Attribute struct {

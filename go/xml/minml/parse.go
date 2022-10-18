@@ -26,8 +26,8 @@ type HandlerMarkup interface {
 // The parser will invoke Text for each contiguous sequence of normal text,
 // and will invoke Reference on encountering a character reference.
 type HandlerText interface {
-	Text(text []byte) error      // Handle plain UTF-8 text
-	Reference(name []byte) error // Handle a character reference
+	Text(text []byte, raw bool) error // Handle plain UTF-8 text
+	Reference(name []byte) error      // Handle a character reference
 }
 
 // HandlerElement represents client logic for handling an XML element.
@@ -60,11 +60,12 @@ type Parser struct {
 	mh mHandler // matchertext callback for markup parsing
 	ah aHandler // matchertext callback for attribute parsing
 	vh vHandler // matchertext callback for unquoted value parsing
+	rh rHandler // matchertext callback for raw matchertext parsing
 
-	buf   bytes.Buffer // bytes read so far but not yet consumed
-	lmb byte	// last matcher seen for space sucking, 0 if none
-	lmp int         // position to suck space after last matcher
-	err   error
+	buf bytes.Buffer // bytes read so far but not yet consumed
+	lmb byte         // last matcher seen for space sucking, 0 if none
+	lmp int          // position to suck space after last matcher
+	err error
 
 	// markup handlers to use while parsing matchertext
 	h handlers
@@ -76,6 +77,7 @@ func (p *Parser) init() {
 	p.mh.p = p
 	p.ah.p = p
 	p.vh.p = p
+	p.rh.p = p
 
 	// Clear the parsing state
 	p.buf.Reset()
@@ -159,7 +161,7 @@ func (mh mHandler) Byte(b byte) error {
 
 // Handle a matching pair of openers/closers while parsing matchertext.
 // The non-matchers immediately preceding the opener is buffered in p.buf.
-func (mh mHandler) Open(o, c byte) error {
+func (mh mHandler) Open(o, c byte) (e error) {
 	p := mh.p
 
 	// Check for elements only when we see bracket or brace openers,
@@ -168,7 +170,7 @@ func (mh mHandler) Open(o, c byte) error {
 
 		// See if the opener is the start of a markup element.
 		b := p.buf.Bytes()
-		if pos := scanElementStart(b); pos >= 0 {
+		if pos := scanStarter(b); pos >= 0 {
 
 			// Truncate the buffer just before the element name
 			p.buf.Truncate(pos)
@@ -177,13 +179,20 @@ func (mh mHandler) Open(o, c byte) error {
 			p.suckSpace(true)
 
 			// Handle remaining character data before the element
-			if e := p.handleText(p.buf.Len()); e != nil {
+			if e := p.handleText(p.buf.Len(), false); e != nil {
 				return e
 			}
 
-			// Invoke the client's handler to parse the element
-			e := p.handleElement(b[pos:])
-			return e
+			// Handle special punctuation-initiated constructs
+			switch b[pos] {
+			case '+': // raw matchertext
+				e = p.rawText()
+
+			default: // XML element
+				// Invoke client's handler to parse element
+				e = p.handleElement(b[pos:])
+			}
+			return
 		}
 	}
 
@@ -233,7 +242,7 @@ func (p *Parser) literalPair(o, c byte) (e error) {
 		if syntax.IsName(name) {
 
 			// Handle normal text before the character reference
-			e = p.handleText(oPos)
+			e = p.handleText(oPos, false)
 			if e != nil {
 				return
 			}
@@ -259,7 +268,7 @@ func (p *Parser) mFlush(atEnd bool) error {
 	p.suckSpace(atEnd)
 
 	// Pass any remaining buffered bytes to the client
-	return p.handleText(p.buf.Len())
+	return p.handleText(p.buf.Len(), false)
 }
 
 // Set last matcher state appropriately after processing an opener or closer.
@@ -291,7 +300,7 @@ func (p *Parser) suckSpace(atEnd bool) (sucked bool) {
 			p.buf.Truncate(p.buf.Len() - n)
 			sucked = true
 
-		case n > 0:	// p.lmp == 0
+		case n > 0: // p.lmp == 0
 			// We can just advance past the sucked text.
 			p.buf.Next(n)
 			sucked = true
@@ -312,7 +321,7 @@ func (p *Parser) suckSpace(atEnd bool) (sucked bool) {
 }
 
 // Invoke the client's HandlerText to handle the next n bytes of buffered text.
-func (p *Parser) handleText(n int) (e error) {
+func (p *Parser) handleText(n int, raw bool) (e error) {
 
 	// Don't call the client's handler if there's no text to handle
 	if n == 0 {
@@ -327,7 +336,7 @@ func (p *Parser) handleText(n int) (e error) {
 	// Save and restore the handlers around the handler upcall,
 	// in case the handler recursively invokes parser methods.
 	h := p.h
-	e = h.t.Text(b)
+	e = h.t.Text(b, raw)
 	p.h = h
 
 	return
@@ -547,14 +556,63 @@ func (p *Parser) ReadContent(hm HandlerMarkup) error {
 	return nil
 }
 
-// Scan the buffered text for an XML element name
+// Read a raw matchertext construct +[...].
+func (p *Parser) rawText() error {
+
+	// Parse and buffer the raw matchertext content between the brackets
+	if e := p.mp.ReadPair(p.rh, '[', ']'); e != nil {
+		return e
+	}
+
+	// Flush any plain text at the end to the text handler
+	if e := p.handleText(p.buf.Len(), true); e != nil {
+		return e
+	}
+
+	p.sawMatcher(']')
+	return nil
+}
+
+type rHandler struct {
+	p *Parser
+}
+
+func (rh rHandler) Byte(b byte) error {
+	return rh.p.buf.WriteByte(b)
+}
+
+func (rh rHandler) Open(o, c byte) (e error) {
+	p := rh.p
+
+	// Write the literal opener
+	p.buf.WriteByte(o)
+
+	// Parse matchertext until we see the corresponding closer
+	e = p.mp.ReadPair(p.rh, o, c)
+	if e != nil {
+		return
+	}
+
+	// Write the literal closer
+	p.buf.WriteByte(c)
+	return
+}
+
+// Scan the buffered text for the start of an XML element name
+// or a punctuation-based special markup construct
 // leading up to an open bracket or curly brace.
 // Returns the position of the name, or -1 if none found.
-func scanElementStart(b []byte) int {
+func scanStarter(b []byte) int {
+
+	// First check for special punctuation-initiated constructs
+	l := len(b)
+	if l > 0 && (b[l-1] == '+') {
+		return l - 1
+	}
 
 	// Scan for the first NameStartChar in a sequence of NameChars.
 	n := -1
-	for l := len(b); l > 0; {
+	for l > 0 {
 		r, size := utf8.DecodeLastRune(b[:l])
 		if r == utf8.RuneError && size == 1 {
 			return n

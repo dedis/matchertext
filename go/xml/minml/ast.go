@@ -24,8 +24,8 @@ type astParser struct {
 	a []ast.Attribute
 }
 
-func (ap *astParser) Text(text []byte) error {
-	ap.m = append(ap.m, ast.Text{string(text)})
+func (ap *astParser) Text(text []byte, raw bool) error {
+	ap.m = append(ap.m, ast.Text{Text: string(text), Raw: raw})
 	return nil
 }
 
