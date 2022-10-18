@@ -146,7 +146,7 @@ func (p *Parser) ReadPair(h Handler, o, c byte) error {
 
 	// First consume the opener and make sure it is the expected one.
 	b, e := p.getc()
-	if e == io.EOF || (e == nil && b != c) {
+	if e == io.EOF || (e == nil && b != o) {
 		return p.SyntaxError(fmt.Sprintf(
 			"expecting opener %v", string(o)))
 	}
@@ -156,6 +156,10 @@ func (p *Parser) ReadPair(h Handler, o, c byte) error {
 
 	// Parse the intervening text delimited by the matcher pair.
 	_, e = p.ReadText(h)
+	if e == io.EOF {
+		return p.SyntaxError(fmt.Sprintf(
+			"unmatched opener %v", string(b)))
+	}
 	if e != nil {
 		return e
 	}

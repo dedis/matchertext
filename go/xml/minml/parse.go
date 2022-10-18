@@ -62,7 +62,8 @@ type Parser struct {
 	vh vHandler // matchertext callback for unquoted value parsing
 
 	buf   bytes.Buffer // bytes read so far but not yet consumed
-	state byte         // last markup matcher seen
+	lmb byte	// last matcher seen for space sucking, 0 if none
+	lmp int         // position to suck space after last matcher
 	err   error
 
 	// markup handlers to use while parsing matchertext
@@ -78,7 +79,7 @@ func (p *Parser) init() {
 
 	// Clear the parsing state
 	p.buf.Reset()
-	p.state = 0
+	p.lmb = 0
 	p.err = nil
 	p.h = handlers{}
 }
@@ -133,7 +134,7 @@ func (p *Parser) read(hm HandlerMarkup, ht HandlerText) error {
 	// Use the underlying matchertext parser to parse the structure
 	_, e := p.mp.ReadText(p.mh)
 	if e == io.EOF {
-		e = p.mFlush()	// Flush any remaining text at EOF
+		e = p.mFlush(0) // Flush any remaining text at EOF
 		if e != nil {
 			return e
 		}
@@ -143,7 +144,7 @@ func (p *Parser) read(hm HandlerMarkup, ht HandlerText) error {
 	}
 
 	// Flush any plain text at the end to the text handler
-	return p.mFlush()
+	return p.mFlush(0)
 }
 
 // Matchertext handler for markup parsing
@@ -161,33 +162,27 @@ func (mh mHandler) Byte(b byte) error {
 func (mh mHandler) Open(o, c byte) error {
 	p := mh.p
 
-	// If we just processed the attributes in an element start,
-	// make sure it's followed by bracketed content as required.
-	//	if p.state == '{' {
-	//		if o != '[' {
-	//			return syntaxError("open bracket expected")
-	//		}
-	//		return p.markupContent(hm, mp)
-	//	}
-
-	// First suck any space after the previous construct if appropriate
-	p.suckPostSpace()
-
 	// Check for elements only when we see bracket or brace openers,
 	// and only if we're parsing general rather than text-only markup.
 	if o != '(' && p.h.m != nil {
 
 		// See if the opener is the start of a markup element.
 		b := p.buf.Bytes()
-		if preLen, name := scanElementStart(b); name != nil {
+		if pos := scanElementStart(b); pos >= 0 {
 
-			// Handle any character data preceding the element
-			if e := p.handleText(preLen); e != nil {
+			// Truncate the buffer just before the element name
+			p.buf.Truncate(pos)
+
+			// Suck space leading up to element name
+			p.suckSpace('[')
+
+			// Handle remaining character data before the element
+			if e := p.handleText(p.buf.Len()); e != nil {
 				return e
 			}
 
 			// Invoke the client's handler to parse the element
-			e := p.handleElement(name)
+			e := p.handleElement(b[pos:])
 			return e
 		}
 	}
@@ -199,22 +194,13 @@ func (mh mHandler) Open(o, c byte) error {
 // Handle an opener/closer pair and its content as literal text.
 func (p *Parser) literalPair(o, c byte) (e error) {
 
-	// First suck any space after the previous construct if appropriate
-	p.suckPostSpace()
-
-	// Parentheses parsing doesn't do space sucking
-	oState, cState := o, c
-	if o == '(' {
-		oState, cState = 0, 0
-	}
-
-	// Suck space leading up to the opener
-	p.suckPreSpace(o)
+	// Suck space since the previous construct and leading up to the opener
+	p.suckSpace(o)
 
 	// Buffer the opener and enter the corresponding state
 	oPos := p.buf.Len()
 	p.buf.WriteByte(o)
-	p.state = oState
+	p.sawMatcher(o)
 
 	// Parse matchertext until we see the corresponding closer
 	e = p.mp.ReadPair(p.mh, o, c)
@@ -224,17 +210,14 @@ func (p *Parser) literalPair(o, c byte) (e error) {
 
 	// If the pair contained any nested matchertext,
 	// then our state will now be a closer instead of an open bracket.
-	maybeRef := p.state == '['
+	maybeRef := p.lmb == '['
 
-	// Suck any space after the previous construct if appropriate
-	maybeRef = !p.suckPostSpace() && maybeRef
-
-	// Suck space leading up to the closer
-	maybeRef = !p.suckPreSpace(o) && maybeRef
+	// Suck space since last construct and/or leading up to the closer
+	maybeRef = !p.suckSpace(o) && maybeRef
 
 	// Buffer the closer and enter the corresponding state
 	p.buf.WriteByte(c)
-	p.state = cState
+	p.sawMatcher(c)
 
 	// See if the pair represents a character reference.
 	if maybeRef {
@@ -255,6 +238,10 @@ func (p *Parser) literalPair(o, c byte) (e error) {
 				return
 			}
 
+			// Consume the character reference text
+			p.buf.Reset()
+			p.sawMatcher(c)
+
 			// Handle the character reference itself
 			e = p.handleReference(name)
 		}
@@ -262,37 +249,60 @@ func (p *Parser) literalPair(o, c byte) (e error) {
 	return
 }
 
-// Flush any accumulated bytes to the text handler
-func (p *Parser) mFlush() error {
+// Flush any accumulated bytes to the text handler.
+// Uses lookahead byte b to determine if space should be sucked
+// leading up to a subsequent matcher character.
+func (p *Parser) mFlush(b byte) error {
 
 	// XXX optionally (based on configuration) check all UTF-8 runes?
 
 	// Suck space after a previous markup construct if appropriate
-	p.suckPostSpace()
+	p.suckSpace(b)
 
 	// Pass any remaining buffered bytes to the client
 	return p.handleText(p.buf.Len())
 }
 
-// If the buffered bytes immediately follow a markup construct
-// (element or reference), scan for a following space sucker.
-// Returns true if any space was sucked.
-func (p *Parser) suckPostSpace() (sucked bool) {
-
-	// If state != 0, then the currently buffered text
-	// immediately follows an open or close bracket or brace.
-	if p.state != 0 {
-		n := scanPostSpace(p.buf.Bytes())
-		p.buf.Next(n)
-		sucked = n > 0
-		p.state = 0
+// Set last matcher state appropriately after processing an opener or closer.
+func (p *Parser) sawMatcher(b byte) {
+	if b != '(' && b != ')' {
+		p.lmb = b
+		p.lmp = p.buf.Len()
 	}
-	return
 }
 
-// Scan for a space sucker just before an open matcher.
-func (p *Parser) suckPreSpace(o byte) (sucked bool) {
-	if o != '(' {
+// Suck space after the last markup construct, if p.lmb != 0,
+// and/or leading up to a subsequent construct, if o is '[' or '{'.
+func (p *Parser) suckSpace(b byte) (sucked bool) {
+	oSuck := b == '[' || b == ']' || b == '{' || b == '}'
+
+	// First suck space after the last construct if appropriate
+	if p.lmb != 0 {
+		b := p.buf.Bytes()[p.lmp:]
+		l := len(b)
+		n := scanPostSpace(b)
+		switch {
+		case n > 0 && n == l-1 && oSuck && b[n] == '<':
+			// Special case: ">...space...<"
+			p.buf.Truncate(p.lmp)
+			sucked = true
+
+		case n > 0 && p.lmp > 0:
+			// Must shift un-sucked content left by n to fill gap
+			copy(b, b[n:])
+			p.buf.Truncate(p.buf.Len() - n)
+			sucked = true
+
+		case n > 0:	// p.lmp == 0
+			// We can just advance past the sucked text.
+			p.buf.Next(n)
+			sucked = true
+		}
+		p.lmb = 0
+	}
+
+	// Now suck space leading up to the next matcher if appropriate
+	if oSuck {
 		b := p.buf.Bytes()
 		l := scanPreSpace(b)
 		if l < len(b) {
@@ -355,12 +365,6 @@ func (p *Parser) handleElement(name []byte) (e error) {
 // The parser uses the provided hm to handle markup contained in this element.
 func (p *Parser) ReadElement(name []byte, he HandlerElement) error {
 
-	// Make sure we're actually at the start of a markup element.
-	//	preLen, name := scanElementStart(p.buf.Bytes())
-	//	if preLen != 0 || name == nil {
-	//		return p.syntaxError("markup element expected")
-	//	}
-
 	// Consume the buffered element name
 	p.buf.Reset()
 
@@ -377,7 +381,6 @@ func (p *Parser) ReadElement(name []byte, he HandlerElement) error {
 		// Parse the matchertext content of the delimited pair.
 		// only while parsing attributes.
 		e = p.mp.ReadPair(p.ah, '{', '}')
-		p.state = '{'
 		if e != nil {
 			return e
 		}
@@ -452,11 +455,20 @@ func (p *Parser) ReadAttribute(name []byte, ht HandlerText) error {
 		return e
 	}
 	if b == '[' {
+		p.sawMatcher('[')
+
 		// Parse the quoted bracket pair
 		e = p.mp.ReadPair(p.mh, '[', ']')
 		if e != nil {
 			return e
 		}
+
+		// Flush any plain text at the end to the text handler
+		if e := p.mFlush(']'); e != nil {
+			return e
+		}
+
+		p.sawMatcher(']')
 
 		// Ensure that there's no garbage after the close bracket
 		b, e = p.mp.PeekByte()
@@ -478,8 +490,8 @@ func (p *Parser) ReadAttribute(name []byte, ht HandlerText) error {
 		}
 	}
 
-	// Flush any plain text at the end to the text handler
-	return p.mFlush()
+	// Flush any plain text at the end to the text handler.
+	return p.mFlush(0)
 }
 
 // Matchertext handler for parsing unquoted attribute values
@@ -521,7 +533,7 @@ func (p *Parser) ReadContent(hm HandlerMarkup) error {
 	// Stash the client's parsing handlers in our state
 	p.h = handlers{m: hm, t: hm}
 
-	p.state = '['
+	p.sawMatcher('[')
 
 	// Parse the matchertext content of the bracket pair
 	if e := p.mp.ReadPair(p.mh, '[', ']'); e != nil {
@@ -529,55 +541,49 @@ func (p *Parser) ReadContent(hm HandlerMarkup) error {
 	}
 
 	// Flush any plain text at the end to the text handler
-	if e := p.mFlush(); e != nil {
+	if e := p.mFlush(']'); e != nil {
 		return e
 	}
 
-	// Suck space before the close bracket
-	p.suckPreSpace('[')
-
-	p.state = ']'
+	p.sawMatcher(']')
 	return nil
 }
 
-// Scan the buffered text, leading up to an open bracket or brace,
-// for an XML element name and optional sucked whitespace preceding it.
-// Returns the length of unconsumed text preceding the element name if any,
-// and the name if there is one or nil if none.
-func scanElementStart(b []byte) (preLen int, name []byte) {
+// Scan the buffered text for an XML element name
+// leading up to an open bracket or curly brace.
+// Returns the position of the name, or -1 if none found.
+func scanElementStart(b []byte) int {
 
 	// Scan for the first NameStartChar in a sequence of NameChars.
 	n := -1
 	for l := len(b); l > 0; {
 		r, size := utf8.DecodeLastRune(b[:l])
 		if r == utf8.RuneError && size == 1 {
-			break
+			return n
 		}
 		l -= size
 		if syntax.IsNameStartChar(r) {
 			n = l
 		}
 		if !syntax.IsNameChar(r) {
-			break
+			return n
 		}
 	}
-	if n < 0 {
-		return len(b), nil // no immediately-preceding name
-	}
-
-	// Return the name and preceding text before any sucked space
-	return scanPreSpace(b[:n]), b[n:]
+	return n
 }
 
 // Scan for an optional space-sucker '<' and whitespace
 // immediately preceding markup (an element or  reference).
 // Returns len(b) or the position at which sucked whitespace starts.
 func scanPreSpace(b []byte) int {
+
+	// Scan backwards to suck space
 	l := len(b)
-	if l > 0 && b[l-1] == '<' {
-		for l--; l > 0 && syntax.IsSpace(b[l-1]); l-- {
+	if l >= 2 && b[l-1] == '<' && syntax.IsSpace(b[l-2]) {
+		for l -= 2; l > 0 && syntax.IsSpace(b[l-1]); l-- {
 		}
 	}
+
 	return l
 }
 
@@ -586,25 +592,12 @@ func scanPreSpace(b []byte) int {
 // Returns the number of prefix bytes of b that should be dropped.
 func scanPostSpace(b []byte) int {
 	l := 0
-	if len(b) > 0 && b[0] == '>' {
-		for l++; l < len(b) && syntax.IsSpace(b[l]); l++ {
+	if len(b) >= 2 && b[0] == '>' && syntax.IsSpace(b[1]) {
+		for l += 2; l < len(b) && syntax.IsSpace(b[l]); l++ {
 		}
 	}
 	return l
 }
-
-// Returns true if b contains a valid XML name.
-//func isName(b []byte) bool {
-//	for i, r := range m {
-//		if i == 0 && !syntax.IsNameStartChar(r) {
-//			return "", m
-//		}
-//		if i > 0 && !syntax.IsNameChar(r) {
-//			break
-//		}
-//	}
-//	return
-//}
 
 func (p *Parser) syntaxError(msg string) *matchertext.SyntaxError {
 	return p.mp.SyntaxError(msg)
