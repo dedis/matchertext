@@ -131,7 +131,14 @@ func (p *Parser) read(hm HandlerMarkup, ht HandlerText) error {
 	p.h = handlers{m: hm, t: ht}
 
 	// Use the underlying matchertext parser to parse the structure
-	if _, e := p.mp.ReadText(p.mh); e != nil {
+	_, e := p.mp.ReadText(p.mh)
+	if e == io.EOF {
+		e = p.mFlush()	// Flush any remaining text at EOF
+		if e != nil {
+			return e
+		}
+		return io.EOF
+	} else if e != nil {
 		return e
 	}
 

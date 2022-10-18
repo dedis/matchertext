@@ -24,7 +24,19 @@ type Attribute struct {
 }
 
 // Compare AST nodes n1 and n2 and all their descendants for deep equality.
-func DeepEqual(n1, n2 Node) bool {
+func DeepEqual(n1, n2 []Node) bool {
+	if len(n1) != len(n2) {
+		return false
+	}
+	for i := range n1 {
+		if !deepEqual(n1[i], n2[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func deepEqual(n1, n2 Node) bool {
 	switch n1 := n1.(type) {
 	case Text:
 		if n2, ok := n2.(Text); !ok || n1 != n2 {
@@ -42,12 +54,12 @@ func DeepEqual(n1, n2 Node) bool {
 			return false
 		}
 		for i := 0; i < len(n1.Attribs); i++ {
-			if !DeepEqual(n1.Attribs[i], n2.Attribs[i]) {
+			if !deepEqual(n1.Attribs[i], n2.Attribs[i]) {
 				return false
 			}
 		}
 		for i := 0; i < len(n1.Content); i++ {
-			if !DeepEqual(n1.Content[i], n2.Content[i]) {
+			if !deepEqual(n1.Content[i], n2.Content[i]) {
 				return false
 			}
 		}
@@ -58,10 +70,12 @@ func DeepEqual(n1, n2 Node) bool {
 			return false
 		}
 		for i := 0; i < len(n1.Value); i++ {
-			if !DeepEqual(n1.Value[i], n2.Value[i]) {
+			if !deepEqual(n1.Value[i], n2.Value[i]) {
 				return false
 			}
 		}
+	default:
+		return false
 	}
 	return true
 }
