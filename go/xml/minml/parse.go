@@ -134,7 +134,7 @@ func (p *Parser) read(hm HandlerMarkup, ht HandlerText) error {
 	// Use the underlying matchertext parser to parse the structure
 	_, e := p.mp.ReadText(p.mh)
 	if e == io.EOF {
-		e = p.mFlush(0) // Flush any remaining text at EOF
+		e = p.mFlush(false) // Flush any remaining text at EOF
 		if e != nil {
 			return e
 		}
@@ -144,7 +144,7 @@ func (p *Parser) read(hm HandlerMarkup, ht HandlerText) error {
 	}
 
 	// Flush any plain text at the end to the text handler
-	return p.mFlush(0)
+	return p.mFlush(false)
 }
 
 // Matchertext handler for markup parsing
@@ -174,7 +174,7 @@ func (mh mHandler) Open(o, c byte) error {
 			p.buf.Truncate(pos)
 
 			// Suck space leading up to element name
-			p.suckSpace('[')
+			p.suckSpace(true)
 
 			// Handle remaining character data before the element
 			if e := p.handleText(p.buf.Len()); e != nil {
@@ -195,7 +195,7 @@ func (mh mHandler) Open(o, c byte) error {
 func (p *Parser) literalPair(o, c byte) (e error) {
 
 	// Suck space since the previous construct and leading up to the opener
-	p.suckSpace(o)
+	p.suckSpace(o == '[')
 
 	// Buffer the opener and enter the corresponding state
 	oPos := p.buf.Len()
@@ -213,7 +213,7 @@ func (p *Parser) literalPair(o, c byte) (e error) {
 	maybeRef := p.lmb == '['
 
 	// Suck space since last construct and/or leading up to the closer
-	maybeRef = !p.suckSpace(o) && maybeRef
+	maybeRef = !p.suckSpace(c == ']') && maybeRef
 
 	// Buffer the closer and enter the corresponding state
 	p.buf.WriteByte(c)
@@ -250,14 +250,13 @@ func (p *Parser) literalPair(o, c byte) (e error) {
 }
 
 // Flush any accumulated bytes to the text handler.
-// Uses lookahead byte b to determine if space should be sucked
-// leading up to a subsequent matcher character.
-func (p *Parser) mFlush(b byte) error {
+// Suck space leading up to the end of the buffer if atEnd is true.
+func (p *Parser) mFlush(atEnd bool) error {
 
 	// XXX optionally (based on configuration) check all UTF-8 runes?
 
 	// Suck space after a previous markup construct if appropriate
-	p.suckSpace(b)
+	p.suckSpace(atEnd)
 
 	// Pass any remaining buffered bytes to the client
 	return p.handleText(p.buf.Len())
@@ -265,16 +264,15 @@ func (p *Parser) mFlush(b byte) error {
 
 // Set last matcher state appropriately after processing an opener or closer.
 func (p *Parser) sawMatcher(b byte) {
-	if b != '(' && b != ')' {
+	if b == '[' || b == ']' {
 		p.lmb = b
 		p.lmp = p.buf.Len()
 	}
 }
 
 // Suck space after the last markup construct, if p.lmb != 0,
-// and/or leading up to a subsequent construct, if o is '[' or '{'.
-func (p *Parser) suckSpace(b byte) (sucked bool) {
-	oSuck := b == '[' || b == ']' || b == '{' || b == '}'
+// and/or leading up to a subsequent construct, if atEnd is true.
+func (p *Parser) suckSpace(atEnd bool) (sucked bool) {
 
 	// First suck space after the last construct if appropriate
 	if p.lmb != 0 {
@@ -282,7 +280,7 @@ func (p *Parser) suckSpace(b byte) (sucked bool) {
 		l := len(b)
 		n := scanPostSpace(b)
 		switch {
-		case n > 0 && n == l-1 && oSuck && b[n] == '<':
+		case n > 0 && n == l-1 && atEnd && b[n] == '<':
 			// Special case: ">...space...<"
 			p.buf.Truncate(p.lmp)
 			sucked = true
@@ -302,7 +300,7 @@ func (p *Parser) suckSpace(b byte) (sucked bool) {
 	}
 
 	// Now suck space leading up to the next matcher if appropriate
-	if oSuck {
+	if atEnd {
 		b := p.buf.Bytes()
 		l := scanPreSpace(b)
 		if l < len(b) {
@@ -464,7 +462,7 @@ func (p *Parser) ReadAttribute(name []byte, ht HandlerText) error {
 		}
 
 		// Flush any plain text at the end to the text handler
-		if e := p.mFlush(']'); e != nil {
+		if e := p.mFlush(true); e != nil {
 			return e
 		}
 
@@ -491,7 +489,7 @@ func (p *Parser) ReadAttribute(name []byte, ht HandlerText) error {
 	}
 
 	// Flush any plain text at the end to the text handler.
-	return p.mFlush(0)
+	return p.mFlush(false)
 }
 
 // Matchertext handler for parsing unquoted attribute values
@@ -541,7 +539,7 @@ func (p *Parser) ReadContent(hm HandlerMarkup) error {
 	}
 
 	// Flush any plain text at the end to the text handler
-	if e := p.mFlush(']'); e != nil {
+	if e := p.mFlush(true); e != nil {
 		return e
 	}
 

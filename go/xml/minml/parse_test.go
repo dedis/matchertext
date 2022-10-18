@@ -23,6 +23,9 @@ var parserTests = []struct {
 	{"[x <]", []ast.Node{ast.Text{"[x]"}}},
 	{"[> x <]", []ast.Node{ast.Text{"[x]"}}},
 	{"()[]{}", []ast.Node{ast.Text{"()[]{}"}}},
+	{"> <(> <)> <", []ast.Node{ast.Text{"> <(> <)> <"}}},
+	{"> <{> <}> <", []ast.Node{ast.Text{"> <{> <}> <"}}},
+	{"> <[> <]> <", []ast.Node{ast.Text{">[]<"}}},
 	{"([{x}])", []ast.Node{ast.Text{"([{x}])"}}},
 	{"a(b", nil},  // bad matchertext: unmatched opener
 	{"b)c", nil},  // bad matchertext: unmatched closer
@@ -68,7 +71,10 @@ var parserTests = []struct {
 	{"x <p[]", []ast.Node{ast.Text{"x"}, ast.Element{"p", nil, nil}}},
 	{"p[]>x", []ast.Node{ast.Element{"p", nil, nil}, ast.Text{">x"}}},
 	{"p[]> x", []ast.Node{ast.Element{"p", nil, nil}, ast.Text{"x"}}},
+	{"p[> ]", []ast.Node{ast.Element{"p", nil, nil}}},
+	{"p[ <]", []ast.Node{ast.Element{"p", nil, nil}}},
 	{"p[> <]", []ast.Node{ast.Element{"p", nil, nil}}},
+	{" <p[> <]> ", []ast.Node{ast.Element{"p", nil, nil}}},
 	{"p[> \t\r\n <]", []ast.Node{ast.Element{"p", nil, nil}}},
 	{"p[x]", []ast.Node{ast.Element{"p", nil,
 		[]ast.Node{ast.Text{"x"}}}}},
@@ -99,7 +105,11 @@ var parserTests = []struct {
 	{"p{a}[]", nil}, // error: missing value
 	{"p{> }", nil},   // error: name expected
 	{"p{ <}", nil},   // error: name expected
+	{"p{a}> []", nil}, // error: expected value
+	{"p{a} <[]", nil}, // error: expected value
 	{"p{a=}[]", []ast.Node{ast.Element{"p",
+		[]ast.Attribute{ast.Attribute{"a", nil}}, nil}}},
+	{"p{ a= }[]", []ast.Node{ast.Element{"p",
 		[]ast.Attribute{ast.Attribute{"a", nil}}, nil}}},
 	{"p{a=x}[]", []ast.Node{ast.Element{"p",
 		[]ast.Attribute{ast.Attribute{"a",
@@ -107,7 +117,18 @@ var parserTests = []struct {
 	{"p{a=x b=y}[]", []ast.Node{ast.Element{"p", []ast.Attribute{
 		ast.Attribute{"a", []ast.Node{ast.Text{"x"}}},
 		ast.Attribute{"b", []ast.Node{ast.Text{"y"}}}}, nil}}},
+	{"p{a=[]}[]", []ast.Node{ast.Element{"p",
+		[]ast.Attribute{ast.Attribute{"a", []ast.Node{}}}, nil}}},
+	{"p{ a=[] }[]", []ast.Node{ast.Element{"p",
+		[]ast.Attribute{ast.Attribute{"a", []ast.Node{}}}, nil}}},
+	{"p{ a= <[]}[]", nil}, // error: name expected
+	{"p{ a=[]> }[]", nil}, // error: garbage following value
+	{" <p{a=[>  <]}[> <]> ", []ast.Node{ast.Element{"p",
+		[]ast.Attribute{ast.Attribute{"a", []ast.Node{}}}, nil}}},
 	{"p{a=[x]}[]", []ast.Node{ast.Element{"p",
+		[]ast.Attribute{ast.Attribute{"a",
+			[]ast.Node{ast.Text{"x"}}}}, nil}}},
+	{"p{a=[> x <]}[]", []ast.Node{ast.Element{"p",
 		[]ast.Attribute{ast.Attribute{"a",
 			[]ast.Node{ast.Text{"x"}}}}, nil}}},
 	{"p{a=[x] b=[y]}[]", []ast.Node{ast.Element{"p", []ast.Attribute{
@@ -135,6 +156,15 @@ var parserTests = []struct {
 	{"p{a={x}}[]", []ast.Node{ast.Element{"p",
 		[]ast.Attribute{ast.Attribute{"a",
 			[]ast.Node{ast.Text{"{x}"}}}}, nil}}},
+	{"p{a=[x y]}[]", []ast.Node{ast.Element{"p",
+		[]ast.Attribute{ast.Attribute{"a",
+			[]ast.Node{ast.Text{"x y"}}}}, nil}}},
+	{"p{a=(x y)}[]", []ast.Node{ast.Element{"p",
+		[]ast.Attribute{ast.Attribute{"a",
+			[]ast.Node{ast.Text{"(x y)"}}}}, nil}}},
+	{"p{a={x y}}[]", []ast.Node{ast.Element{"p",
+		[]ast.Attribute{ast.Attribute{"a",
+			[]ast.Node{ast.Text{"{x y}"}}}}, nil}}},
 	{"p{a= }[]", []ast.Node{ast.Element{"p",
 		[]ast.Attribute{ast.Attribute{"a", nil}}, nil}}},
 	{"p{a=x }[]", []ast.Node{ast.Element{"p",
