@@ -253,7 +253,7 @@ type SyntaxError struct {
 
 // Error returns a human-readable description of the error.
 func (e *SyntaxError) Error() string {
-	return e.msg
+	return fmt.Sprintf("%v:%v %v", e.line, e.col, e.msg)
 }
 
 // Offset returns the byte position at which the error occurred.
