@@ -10,36 +10,27 @@ import (
 // The following are convenience constructor functions for AST nodes.
 
 func aText(s string) ast.Text {
-	return ast.Text{Text: s, Raw: false}
+	return ast.NewText(s, false)
 }
 
 func aRawText(s string) ast.Text {
-	return ast.Text{Text: s, Raw: true}
+	return ast.NewText(s, true)
 }
 
 func aComment(s string) ast.Comment {
-	return ast.Comment{Text: s}
+	return ast.NewComment(s)
 }
 
 func aRef(name string) ast.Reference {
-	return ast.Reference{Name: name}
+	return ast.NewReference(name)
 }
 
 func aAttr(name string, ns ...ast.Node) ast.Attribute {
-	return ast.Attribute{Name: name, Value: ns}
+	return ast.NewAttribute(name, ns...)
 }
 
 func aElem(name string, ns ...ast.Node) ast.Element {
-	var as []ast.Attribute
-	for len(ns) > 0 {
-		if a, ok := ns[0].(ast.Attribute); ok {
-			as = append(as, a)
-			ns = ns[1:]
-		} else {
-			break
-		}
-	}
-	return ast.Element{Name: name, Attribs: as, Content: ns}
+	return ast.NewElement(name, ns...)
 }
 
 type testCase struct {
