@@ -58,6 +58,7 @@ var parserTests = []testCase{
 	{"", []ast.Node{}},
 	tc("foo", aText("foo")),
 	tc("a(b)c", aText("a(b)c")),
+	tc("[]", aText("[]")),
 	tc("[ x ]", aText("[ x ]")),
 	tc("[xx ]", aText("[xx ]")),
 	tc("[ xx]", aText("[ xx]")),
@@ -65,6 +66,7 @@ var parserTests = []testCase{
 	tc("[x <]", aText("[x]")),
 	tc("[> x <]", aText("[x]")),
 	tc("()[]{}", aText("()[]{}")),
+	tc(" [ [ ] ] ", aText(" [ [ ] ] ")),
 	tc("> <(> <)> <", aText("> <(> <)> <")),
 	tc("> <{> <}> <", aText("> <{> <}> <")),
 	tc("> <[> <]> <", aText(">[]<")),
@@ -84,7 +86,6 @@ var parserTests = []testCase{
 	tc("[#x12ab]", aRef("#x12ab")),
 	tc(" [amp]", aText(" "), aRef("amp")),
 	tc("<[amp]", aText("<"), aRef("amp")),
-	tc("x<[amp]", aText("x<"), aRef("amp")),
 	tc("x <[amp]", aText("x"), aRef("amp")),
 	tc("[amp] ", aRef("amp"), aText(" ")),
 	tc("[amp]>", aRef("amp"), aText(">")),
@@ -96,22 +97,31 @@ var parserTests = []testCase{
 	tc("(\t<[amp]>\n)", aText("("), aRef("amp"), aText(")")),
 	tc("[\r\n<[amp]>\n\r]", aText("["), aRef("amp"), aText("]")),
 	tc("{ \t\n<[amp]>\n\t }", aText("{"), aRef("amp"), aText("}")),
-	tc("[]", aText("[]")),       // not a character reference
-	tc("[?]", aText("[?]")),     // not a character reference
-	tc("[#]", aText("[#]")),     // not a character reference
-	tc("[#a]", aText("[#a]")),   // not a character reference
-	tc("[#x]", aText("[#x]")),   // not a character reference
-	tc("[#x@]", aText("[#x@]")), // not a character reference
-	tc("[#xg]", aText("[#xg]")), // not a character reference
+	tc("[?]", aRef("?")),
+	tc("[#]", aRef("#")),
+	tc("[#123]", aRef("#123")),
+	tc("[#a]", aRef("#a")),
+	tc("[#x]", aRef("#x")),
+	tc("[#x12ab]", aRef("#x12ab")),
+	tc("[#x@]", aRef("#x@")),
+	tc("[#xg]", aRef("#xg")),
 
 	// Elements
 	tc("p[]", aElem("p")),
+	tc("p[q]", aElem("p", aText("q"))),
+	tc("*[]", aElem("*")),
+	tc("*[+]", aElem("*", aText("+"))),
 	tc(" p[]", aText(" "), aElem("p")),
 	tc("p[] ", aElem("p"), aText(" ")),
 	tc(" <p[]", aElem("p")),
+	tc(" <<[]", aElem("<")),
+	tc(" <>[]", aElem(">")),
+	tc(" <<<[]", aElem("<<")),
+	tc(" <<<>>[]", aElem("<<>>")),
 	tc("p[]> ", aElem("p")),
-	tc("x<p[]", aText("x<"), aElem("p")),
+	tc("x<p[]", aElem("x<p")),
 	tc("x <p[]", aText("x"), aElem("p")),
+	tc("< <p[]", aText("<"), aElem("p")),
 	tc("p[]>x", aElem("p"), aText(">x")),
 	tc("p[]> x", aElem("p"), aText("x")),
 	tc("p[> ]", aElem("p")),

@@ -3,7 +3,6 @@ package minml
 import (
 	"bytes"
 	"io"
-	"unicode/utf8"
 
 	"github.com/dedis/matchertext.git/go/xml/matchertext"
 	"github.com/dedis/matchertext.git/go/xml/syntax"
@@ -192,17 +191,18 @@ func (mh mHandler) Open(o, c byte) (e error) {
 			}
 
 			// Handle special punctuation-initiated constructs
-			switch b[pos] {
-			case '+': // raw matchertext
-				e = p.rawText()
+			if pos == len(b)-1 {
+				switch b[pos] {
+				case '+': // raw matchertext
+					return p.rawText()
 
-			case '-': // comment
-				e = p.comment()
-
-			default: // XML element
-				// Invoke client's handler to parse element
-				e = p.handleElement(b[pos:])
+				case '-': // comment
+					return p.comment()
+				}
 			}
+
+			// Invoke client's handler to parse element
+			e = p.handleElement(b[pos:])
 			return
 		}
 	}
@@ -248,9 +248,8 @@ func (p *Parser) literalPair(o, c byte) (e error) {
 		}
 		ref := b[1 : l-1]
 
-		// If the bracket pair contained nothing but an XML name,
-		// then handle it as a character reference.
-		if syntax.IsReference(ref) {
+		// See if the bracket pair contains a valid reference name.
+		if isName(ref) {
 
 			// Handle normal text before the character reference
 			e = p.handleText(oPos, false)
@@ -647,37 +646,29 @@ func (p *Parser) handleComment() (e error) {
 	return
 }
 
-// Scan the buffered text for the start of an XML element name
-// or a punctuation-based special markup construct
+func (p *Parser) syntaxError(msg string) *matchertext.SyntaxError {
+	return p.mp.SyntaxError(msg)
+}
+
+// Scan the buffered text for the start of an element name
 // leading up to an open bracket or curly brace.
 // Returns the position of the name, or -1 if none found.
 func scanStarter(b []byte) int {
 
-	// First check for special punctuation-initiated constructs
-	l := len(b)
-	if l > 0 {
-		switch b[l-1] {
-		case '+', // raw matchertext
-			'-': // comment
-			return l - 1
-		}
+	// Scan for the first space preceding the open matcher.
+	n := -1
+	for i := len(b) - 1; i >= 0 && isNameByte(b[i]); i-- {
+		n = i
 	}
 
-	// Scan for the first NameStartChar in a sequence of NameChars.
-	n := -1
-	for l > 0 {
-		r, size := utf8.DecodeLastRune(b[:l])
-		if r == utf8.RuneError && size == 1 {
-			return n
+	// Avoid pulling a left space sucker into the element name
+	if n >= 0 && b[n] == '<' {
+		if n == len(b)-1 {
+			return -1 // only a space sucker, no element name
 		}
-		l -= size
-		if syntax.IsNameStartChar(r) {
-			n = l
-		}
-		if !syntax.IsNameChar(r) {
-			return n
-		}
+		return n + 1 // element name starts after space sucker
 	}
+
 	return n
 }
 
@@ -708,6 +699,21 @@ func scanPostSpace(b []byte) int {
 	return l
 }
 
-func (p *Parser) syntaxError(msg string) *matchertext.SyntaxError {
-	return p.mp.SyntaxError(msg)
+// Return true if b can be within a (liberalized) element or reference name.
+// MinML allows punctuation: anything but XML whitespace and matchers.
+func isNameByte(b byte) bool {
+	return !syntax.IsSpace(b) && !matchertext.IsMatcher(b)
+}
+
+// Return true if slice b can be a liberalized MinML element or reference name.
+func isName(b []byte) bool {
+	if len(b) == 0 {
+		return false
+	}
+	for i := 0; i < len(b); i++ {
+		if !isNameByte(b[i]) {
+			return false
+		}
+	}
+	return true
 }
