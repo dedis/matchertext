@@ -4,7 +4,7 @@ package html
 
 // HTMLEntity is a map translating from standard HTML entity names
 // to corresponding UTF-8 character sequences.
-var HTMLEntity = map[string]string{
+var Entity = map[string]string{
 	"AElig":                           "\u00C6",
 	"AMP":                             "\u0026",
 	"Aacute":                          "\u00C1",

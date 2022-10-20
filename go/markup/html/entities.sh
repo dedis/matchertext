@@ -12,7 +12,7 @@ package html
 // HTMLEntity is a map translating from standard HTML entity names
 // to corresponding UTF-8 character sequences.
 //
-var HTMLEntity = map[string]string{
+var Entity = map[string]string{
 EOM
 
 # This script filters out the "compatibility" HTML character entities 

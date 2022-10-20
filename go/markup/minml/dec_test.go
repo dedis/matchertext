@@ -43,7 +43,7 @@ func tc(s string, ns ...ast.Node) testCase {
 	return testCase{s, ns}
 }
 
-var parserTests = []testCase{
+var decodeTests = []testCase{
 
 	// Literal text
 	{"", []ast.Node{}},
@@ -195,14 +195,15 @@ var parserTests = []testCase{
 }
 
 func TestParser(t *testing.T) {
-	for i, pt := range parserTests {
-		n, e := Parse(strings.NewReader(pt.s))
-		if e != nil && pt.n != nil {
-			t.Errorf("%v '%v': %v", i, pt.s, e.Error())
-		} else if e == nil && pt.n == nil {
-			t.Errorf("%v '%v': expected error, got %v", i, pt.s, n)
-		} else if e == nil && pt.n != nil && !ast.DeepEqual(n, pt.n) {
-			t.Errorf("%v '%v': wrong output %v", i, pt.s, n)
+	for i, dt := range decodeTests {
+		d := NewDecoder(strings.NewReader(dt.s))
+		n, e := d.Decode()
+		if e != nil && dt.n != nil {
+			t.Errorf("%v '%v': %v", i, dt.s, e.Error())
+		} else if e == nil && dt.n == nil {
+			t.Errorf("%v '%v': expected error, got %v", i, dt.s, n)
+		} else if e == nil && dt.n != nil && !ast.DeepEqual(n, dt.n) {
+			t.Errorf("%v '%v': wrong output %v", i, dt.s, n)
 		}
 	}
 }

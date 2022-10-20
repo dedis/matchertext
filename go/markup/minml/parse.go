@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/dedis/matchertext/go/matchertext"
 	"github.com/dedis/matchertext/go/markup/xml"
+	"github.com/dedis/matchertext/go/matchertext"
 )
 
 // HandlerMarkup represents client logic for handling general XML markup,
