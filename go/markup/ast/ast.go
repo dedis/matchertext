@@ -1,4 +1,4 @@
-// Package ast provides basic abstract syntax trees for XML
+// Package ast provides basic abstract syntax trees for *ML markup languages
 package ast
 
 // Node represents an arbitrary AST node defined by this package.

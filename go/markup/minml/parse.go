@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/dedis/matchertext/go/xml/matchertext"
-	"github.com/dedis/matchertext/go/xml/syntax"
+	"github.com/dedis/matchertext/go/matchertext"
+	"github.com/dedis/matchertext/go/markup/xml"
 )
 
 // HandlerMarkup represents client logic for handling general XML markup,
@@ -439,7 +439,7 @@ func (ah aHandler) Byte(b byte) error {
 	p := ah.p
 
 	// Flush any previous attribute whenever we encounter whitespace
-	if syntax.IsSpace(b) {
+	if xml.IsSpace(b) {
 		return p.aFlush()
 	}
 
@@ -450,7 +450,7 @@ func (ah aHandler) Byte(b byte) error {
 
 	// Ensure the attribute name is actually a valid XML name
 	name := p.buf.Bytes()
-	if !syntax.IsName(name) {
+	if !xml.IsName(name) {
 		return p.syntaxError("invalid attribute name")
 	}
 	p.buf.Reset() // consume the name
@@ -500,7 +500,7 @@ func (p *Parser) ReadAttribute(name []byte, ht HandlerText) error {
 		if e != nil {
 			return e
 		}
-		if b != '}' && !syntax.IsSpace(b) {
+		if b != '}' && !xml.IsSpace(b) {
 			return p.syntaxError("end of attribute value expected")
 		}
 	} else {
@@ -528,7 +528,7 @@ func (vh vHandler) Byte(b byte) error {
 	p := vh.p
 
 	// The unquoted value ends at the first space (not between matchers)
-	if syntax.IsSpace(b) {
+	if xml.IsSpace(b) {
 		return vDone{}
 	}
 

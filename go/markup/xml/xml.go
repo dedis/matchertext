@@ -4,7 +4,7 @@
 
 // Package xml implements a simple XML 1.0 parser that
 // understands XML name spaces.
-package syntax
+package xml
 
 // References:
 //    Annotated XML spec: https://www.xml.com/axml/testaxml.htm

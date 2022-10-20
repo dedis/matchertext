@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dedis/matchertext/go/xml/ast"
+	"github.com/dedis/matchertext/go/markup/ast"
 )
 
 // The following are convenience constructor functions for AST nodes.

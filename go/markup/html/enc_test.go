@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dedis/matchertext/go/xml/ast"
+	"github.com/dedis/matchertext/go/markup/ast"
 )
 
 type encTest struct {

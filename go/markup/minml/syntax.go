@@ -1,8 +1,8 @@
 package minml
 
 import (
-	"github.com/dedis/matchertext/go/xml/matchertext"
-	"github.com/dedis/matchertext/go/xml/syntax"
+	"github.com/dedis/matchertext/go/matchertext"
+	"github.com/dedis/matchertext/go/markup/xml"
 )
 
 // Scan the buffered text for the start of an element name
@@ -34,8 +34,8 @@ func scanPreSpace(b []byte) int {
 
 	// Scan backwards to suck space
 	l := len(b)
-	if l >= 2 && b[l-1] == '<' && syntax.IsSpace(b[l-2]) {
-		for l -= 2; l > 0 && syntax.IsSpace(b[l-1]); l-- {
+	if l >= 2 && b[l-1] == '<' && xml.IsSpace(b[l-2]) {
+		for l -= 2; l > 0 && xml.IsSpace(b[l-1]); l-- {
 		}
 	}
 
@@ -47,8 +47,8 @@ func scanPreSpace(b []byte) int {
 // Returns the number of prefix bytes of b that should be dropped.
 func scanPostSpace(b []byte) int {
 	l := 0
-	if len(b) >= 2 && b[0] == '>' && syntax.IsSpace(b[1]) {
-		for l += 2; l < len(b) && syntax.IsSpace(b[l]); l++ {
+	if len(b) >= 2 && b[0] == '>' && xml.IsSpace(b[1]) {
+		for l += 2; l < len(b) && xml.IsSpace(b[l]); l++ {
 		}
 	}
 	return l
@@ -57,7 +57,7 @@ func scanPostSpace(b []byte) int {
 // Return true if b can be within a (liberalized) element or reference name.
 // MinML allows punctuation: anything but XML whitespace and matchers.
 func isNameByte(b byte) bool {
-	return !syntax.IsSpace(b) && !matchertext.IsMatcher(b)
+	return !xml.IsSpace(b) && !matchertext.IsMatcher(b)
 }
 
 // Return true if slice b can be a liberalized MinML element or reference name.

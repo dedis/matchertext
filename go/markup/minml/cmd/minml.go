@@ -5,8 +5,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/dedis/matchertext/go/xml/ast"
-	"github.com/dedis/matchertext/go/xml/minml"
+	"github.com/dedis/matchertext/go/markup/ast"
+	"github.com/dedis/matchertext/go/markup/minml"
 )
 
 func main() {

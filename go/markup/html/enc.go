@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/dedis/matchertext/go/xml/ast"
+	"github.com/dedis/matchertext/go/markup/ast"
 )
 
 // This interface defines the writing utility classes we need.
