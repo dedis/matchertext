@@ -1,9 +1,11 @@
-package ast
+package html
 
 import (
 	"bufio"
 	"fmt"
 	"io"
+
+	"github.com/dedis/matchertext/go/xml/ast"
 )
 
 // This interface defines the writing utility classes we need.
@@ -39,25 +41,21 @@ func (e *Encoder) setWriter(w io.Writer) *Encoder {
 }
 
 // Encode writes a slice of markup AST nodes to the encoder's output.
-func (e *Encoder) Encode(ns []Node) (err error) {
+func (e *Encoder) Encode(ns []ast.Node) (err error) {
 
 	for i := range ns {
 		switch n := ns[i].(type) {
 
-		case Text: // Plain text sequence, raw or cooked
-			if n.Raw {
-				err = e.rawText(n.Text)
-			} else {
-				err = e.text(n.Text, escBasic)
-			}
+		case ast.Text: // Plain text sequence, raw or cooked
+			err = e.text(n.Text, escBasic)
 
-		case Reference:
+		case ast.Reference:
 			err = e.reference(n.Name)
 
-		case Element:
+		case ast.Element:
 			err = e.element(n.Name, n.Attribs, n.Content)
 
-		case Comment:
+		case ast.Comment:
 			err = e.comment(n.Text)
 
 		default:
@@ -208,50 +206,6 @@ func (e escaper) WriteStringTo(w io.StringWriter, s string) error {
 	return err
 }
 
-const rsRaw = "]]]]><![CDATA[>"
-
-// Write raw text as a CDATA section
-func (e *Encoder) rawText(s string) error {
-	if s == "" {
-		return nil
-	}
-
-	// Start a CDATA section
-	if _, err := e.w.WriteString("<![CDATA["); err != nil {
-		return err
-	}
-
-	// Write the section content, replacing ]]> terminator sequences
-	l := 0
-	for i := 0; i <= len(s)-3; {
-		if s[i] == ']' && s[i+1] == ']' && s[i+2] == '>' {
-
-			// Write unescaped text up to escaped character
-			if _, err := e.w.WriteString(s[l:i]); err != nil {
-				return err
-			}
-
-			// Write the disgusting replacement sequence
-			if _, err := e.w.WriteString(rsRaw); err != nil {
-				return err
-			}
-
-			i += 3
-			l = i
-		} else {
-			i++
-		}
-	}
-	_, err := e.w.WriteString(s[l:])
-
-	// End the CDATA section
-	if _, err := e.w.WriteString("]]>"); err != nil {
-		return err
-	}
-
-	return err
-}
-
 // Write a reference to XML output
 func (e *Encoder) reference(name string) error {
 
@@ -267,8 +221,26 @@ func (e *Encoder) reference(name string) error {
 	return nil
 }
 
-func (e *Encoder) element(name string, attr []Attribute,
-	content []Node) (err error) {
+// isVoid represents the set of void elements in HTML.
+// https://html.spec.whatwg.org/multipage/syntax.html#void-elements
+var isVoid = map[string]bool{
+	"area":   true,
+	"base":   true,
+	"br":     true,
+	"col":    true,
+	"embed":  true,
+	"hr":     true,
+	"img":    true,
+	"input":  true,
+	"link":   true,
+	"meta":   true,
+	"source": true,
+	"track":  true,
+	"wbr":    true,
+}
+
+func (e *Encoder) element(name string, attr []ast.Attribute,
+	content []ast.Node) (err error) {
 
 	// write the left-angle bracket and element name
 	if err := e.w.WriteByte('<'); err != nil {
@@ -294,10 +266,10 @@ func (e *Encoder) element(name string, attr []Attribute,
 		}
 		for _, n := range a.Value {
 			switch n := n.(type) {
-			case Text:
+			case ast.Text:
 				err = e.text(n.Text, escInQuot)
 
-			case Reference:
+			case ast.Reference:
 				err = e.reference(n.Name)
 
 			default:
@@ -313,8 +285,9 @@ func (e *Encoder) element(name string, attr []Attribute,
 		}
 	}
 
-	// make the start tag self-closing if it has no content
-	if len(content) == 0 {
+	// make the start tag self-closing if appropriate -
+	// HTML allows this for the specific list of void elements
+	if len(content) == 0 && isVoid[name] {
 		_, err := e.w.WriteString("/>")
 		return err
 	}
