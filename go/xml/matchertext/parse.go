@@ -40,19 +40,22 @@ type Parser struct {
 	HandleError func(err error) error
 }
 
+// NewParser creates and returns a new Parser that reads from stream r.
 func NewParser(r io.Reader) *Parser {
 	return (&Parser{}).SetReader(r)
 }
 
+// SetReader initializes parser p to read from stream r and returns p.
+// A single Parser object may be reused to parse successive streams.
 func (p *Parser) SetReader(r io.Reader) *Parser {
 	br, ok := r.(io.ByteReader)
 	if !ok {
 		br = bufio.NewReader(r)
 	}
-	return p.SetByteReader(br)
+	return p.init(br)
 }
 
-func (p *Parser) SetByteReader(r io.ByteReader) *Parser {
+func (p *Parser) init(r io.ByteReader) *Parser {
 	p.r = r
 	p.b = -1
 	p.last = -1

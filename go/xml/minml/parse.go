@@ -54,13 +54,14 @@ type handlers struct {
 	e HandlerElement
 }
 
-// Create a new Parser that reads MinML input from r.
+// NewParser creates and returns a new Parser that reads MinML input from r.
 func NewParser(r io.Reader) *Parser {
 	p := &Parser{}
 	p.SetReader(r)
 	return p
 }
 
+// Parser represents the state of a MinML parser.
 type Parser struct {
 	mp matchertext.Parser
 
@@ -93,14 +94,11 @@ func (p *Parser) init() {
 	p.h = handlers{}
 }
 
+// SetReader initializes the Parser to read from stream r.
+// A single Parser object may be reused to parse successive streams.
 func (p *Parser) SetReader(r io.Reader) {
 	p.init()
 	p.mp.SetReader(r)
-}
-
-func (p *Parser) SetByteReader(br io.ByteReader) {
-	p.init()
-	p.mp.SetByteReader(br)
 }
 
 // ReadAll reads an entire stream of MinML markup until end-of-file (EOF).
