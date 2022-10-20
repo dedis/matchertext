@@ -3,7 +3,7 @@ package minml
 import (
 	"io"
 
-	"github.com/dedis/matchertext.git/go/xml/ast"
+	"github.com/dedis/matchertext/go/xml/ast"
 )
 
 // Parse a MinML stream into an abstract syntax tree (AST) representation.

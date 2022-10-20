@@ -1,8 +1,8 @@
 package minml
 
 import (
-	"github.com/dedis/matchertext.git/go/xml/matchertext"
-	"github.com/dedis/matchertext.git/go/xml/syntax"
+	"github.com/dedis/matchertext/go/xml/matchertext"
+	"github.com/dedis/matchertext/go/xml/syntax"
 )
 
 // Scan the buffered text for the start of an element name
