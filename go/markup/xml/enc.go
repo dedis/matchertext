@@ -1,9 +1,11 @@
-package ast
+package xml
 
 import (
 	"bufio"
 	"fmt"
 	"io"
+
+	"github.com/dedis/matchertext/go/markup/ast"
 )
 
 // This interface defines the writing utility classes we need.
@@ -39,25 +41,25 @@ func (e *Encoder) setWriter(w io.Writer) *Encoder {
 }
 
 // Encode writes a slice of markup AST nodes to the encoder's output.
-func (e *Encoder) Encode(ns []Node) (err error) {
+func (e *Encoder) Encode(ns []ast.Node) (err error) {
 
 	for i := range ns {
 		switch n := ns[i].(type) {
 
-		case Text: // Plain text sequence, raw or cooked
+		case ast.Text: // Plain text sequence, raw or cooked
 			if n.Raw {
 				err = e.rawText(n.Text)
 			} else {
 				err = e.text(n.Text, escBasic)
 			}
 
-		case Reference:
+		case ast.Reference:
 			err = e.reference(n.Name)
 
-		case Element:
+		case ast.Element:
 			err = e.element(n.Name, n.Attribs, n.Content)
 
-		case Comment:
+		case ast.Comment:
 			err = e.comment(n.Text)
 
 		default:
@@ -267,8 +269,8 @@ func (e *Encoder) reference(name string) error {
 	return nil
 }
 
-func (e *Encoder) element(name string, attr []Attribute,
-	content []Node) (err error) {
+func (e *Encoder) element(name string, attr []ast.Attribute,
+	content []ast.Node) (err error) {
 
 	// write the left-angle bracket and element name
 	if err := e.w.WriteByte('<'); err != nil {
@@ -294,10 +296,10 @@ func (e *Encoder) element(name string, attr []Attribute,
 		}
 		for _, n := range a.Value {
 			switch n := n.(type) {
-			case Text:
+			case ast.Text:
 				err = e.text(n.Text, escInQuot)
 
-			case Reference:
+			case ast.Reference:
 				err = e.reference(n.Name)
 
 			default:

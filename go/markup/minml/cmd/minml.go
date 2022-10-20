@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/dedis/matchertext/go/markup/ast"
+	"github.com/dedis/matchertext/go/markup/html"
 	"github.com/dedis/matchertext/go/markup/minml"
 )
 
@@ -26,7 +26,7 @@ func main() {
 		log.Fatalf("Error parsing %v: %v", sourcefile, err.Error())
 	}
 
-	enc := ast.NewEncoder(os.Stdout)
+	enc := html.NewEncoder(os.Stdout)
 	if err := enc.Encode(ns); err != nil {
 		log.Fatalf("Error encoding %v: %v", sourcefile, err.Error())
 	}
