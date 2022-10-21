@@ -4,12 +4,12 @@ package minml
 var Entity = map[string]string{
 
 	// Matchertext convenience escapes
-	//	"o()": "(",
-	//	"c()": ")",
-	//	"o[]": "[",
-	//	"c[]": "]",
-	//	"o{}": "{",
-	//	"c{}": "}",
+	"(<)": "(",
+	"(>)": ")",
+	"[<]": "[",
+	"[>]": "]",
+	"{<}": "{",
+	"{>}": "}",
 
 	// Punctuation
 	//	"-":	"\u00AD",	// soft hyphen?

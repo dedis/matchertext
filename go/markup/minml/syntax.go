@@ -54,19 +54,20 @@ func scanPostSpace(b []byte) int {
 	return l
 }
 
-// Return true if b can be within a (liberalized) element or reference name.
+// Return true if b can be within a liberalized MinML element name.
 // MinML allows punctuation: anything but XML whitespace and matchers.
 func isNameByte(b byte) bool {
 	return !xml.IsSpace(b) && !matchertext.IsMatcher(b)
 }
 
-// Return true if slice b can be a liberalized MinML element or reference name.
-func isName(b []byte) bool {
+// Return true if slice b can be a liberalized MinML reference.
+// MinML allows punctuation: anything but XML whitespace, even matchers.
+func isReference(b []byte) bool {
 	if len(b) == 0 {
 		return false
 	}
 	for i := 0; i < len(b); i++ {
-		if !isNameByte(b[i]) {
+		if xml.IsSpace(b[i]) {
 			return false
 		}
 	}

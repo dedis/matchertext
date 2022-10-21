@@ -14,12 +14,19 @@ var transformTests = []testCase{
 		aText("\u2606"), aText("\u25CB"), aText("\u2190")),
 
 	// MinML symbolic entities
-	//	tc("[o()][c()][o[]][c[]]",
-	//		aText("("), aText(")"),
-	//		aText("["), aText("]"),
-	//		aText("{"), aText("}")),
+	tc("[(<)]", aText("(")),
+	tc("[(>)]", aText(")")),
+	tc("[[<]]", aText("[")),
+	tc("[[>]]", aText("]")),
+	tc("[{<}]", aText("{")),
+	tc("[{>}]", aText("}")),
+	tc("[(<)][(>)][[<]][[>]][{<}][{>}]",
+		aText("("), aText(")"),
+		aText("["), aText("]"),
+		aText("{"), aText("}")),
 	tc("[--][+-][-->]",
 		aText("\u2013"), aText("\u00B1"), aText("\u2192")),
+	tc("\t <[(<)]> \r <[::]> \n", aText("("), aText("\u2237")),
 
 	// Quoted strings
 	tc("'[quote]", aText("\u2018"), aText("quote"), aText("\u2019")),
