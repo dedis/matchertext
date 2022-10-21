@@ -205,27 +205,27 @@ Parentheses	& \verb|()|
 		& \verb|\o()|		& \verb|\c()|
 		& \verb|&lpar;|		& \verb|&rpar;|
 %		& \verb|&#x28;|		& \verb|&#x29;|
-		& \verb|&o();|		& \verb|&c();|	\\
+		& \verb|&(<);|		& \verb|&(>);|	\\
 Square brackets	& \verb|[]|
 		& \verb|\133|		& \verb|\135|
 		& \verb|\x5B|		& \verb|\x5D|
 		& \verb|\o[]|		& \verb|\c[]|
 		& \verb|&lbrack;|	& \verb|&rbrack;|
-		& \verb|&o[];|		& \verb|&c[];|	\\
+		& \verb|&[<];|		& \verb|&[>];|	\\
 		
 Curly braces	& \verb|{}|
 		& \verb|\173|		& \verb|\175|
 		& \verb|\x7B|		& \verb|\x7D|
 		& \verb|\o{}|		& \verb|\c{}|
 		& \verb|&lbrace;|	& \verb|&rbrace;|
-		& \verb|&o{};|		& \verb|&c{};|	\\
+		& \verb|&{<};|		& \verb|&{>};|	\\
 
 \end{tabular}
 \end{footnotesize}
 \end{center}
-\label{tab:unmatched-matchers}
 \caption{Potential alternatives in C- and SGML-derived languages
 	to escape unmatched matchers in matchertext.}
+\label{tab:unmatched-matchers}
 \end{table*}
 
 One traditional habit we must awkwardly unlearn in matchertext,
@@ -269,6 +269,22 @@ such as synthesizing or editing HTTP or SQL queries?
 How does matchertext affect the frequency of syntax-related bugs --
 especially those potentially leading to security vulnerabilities --
 in code from typical developers?
+
+One early pragmatic experiment with matchertext, however,
+is MinML~\cite{ford22minml},
+a concise but general-purpose alternative syntax
+for SGML-derived markup languages such as HTML and XML.
+MinML uses matcher characters for structure
+instead of matching pairs of start and end tags:
+\eg \verb|em[emphasis]| rather than \verb|<em>emphasis</em>|,
+and \verb|"[quotation]| instead of \verb|&ldquo;quotation&rdquo;|.
+MinML supports escapeless embedding of matchertext in other languages
+via a sequence like \verb|+[matchertext]|,
+as well as unmatched matcher escapes
+like those in \cref{tab:unmatched-matchers}.
+An \href{https://github.com/bford/hugo}{experimental extention}
+to the \href{https://gohugo.io}{Hugo} static website generator
+already allows web authoring in MinML.
 
 
 \xxx{

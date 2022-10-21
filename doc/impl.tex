@@ -38,3 +38,62 @@ of any particular language of interest:
 	of adopting the matchertext discipline in the language
 	and how commonly this pain would affect typical code today.
 \end{itemize}
+
+
+\subsection{MinML: minified matchertext markup}
+
+One early experiment in matchertext-friendly syntax design
+is MinML~\cite{ford22minml},
+an alternative syntax for SGML-derived markup languages like HTML and XML.
+
+Beyond merely adding matchertext hosting and embedding extensions
+as discussed in the sections above,
+MinML more ambitiously reformulates the basic \ml syntax
+to rely on matching brackets for basic structure
+rather than matching start/end tags as in SGML tradition.
+For example, \emph{emphasis} is written like
+\verb|em[emphasis]| rather than \verb|<em>emphasis</em>|.
+Character references are written like
+\verb|[star]| instead of \verb|&star;|.
+
+A ``quotation'' delimited by matching quote characters
+may be written like
+\verb|"[quotation]| in MinML instead of \verb|&ldquo;quotation&rdquo;|.
+A comment is \verb|-[comment]| instead of \verb|<!--comment-->|.
+A raw embedded text sequence
+is written \verb|+[verbatim]| instead of \verb|<![CDATA[verbatim]]>|.
+MinML's embedded sequences leverage matchertext
+to support arbitrary nesting,
+so a verbatim example of a raw matchertext sequence
+is simply \verb|+[+[example]]|, rather than in XML:
+
+\begin{footnotesize}
+\begin{center}
+\verb|<![CDATA[<![CDATA[example]]]]><![CDATA[>]]>|
+\end{center}
+\end{footnotesize}
+
+For escaping unmatched matchers,
+MinML supports both the traditional HTML named and numeric character references,
+and bracket-delimited versions of the ``visual'' matcher escapes
+suggested earlier in \cref{tab:unmatched-matchers}
+and \cref{sec:embed:re:class} discussing regular expressions:
+
+\begin{center}
+\begin{tabular}{lccc}
+Matchers	&		& Open		& Close		\\
+\hline
+Parentheses	& \verb|()|	& \verb|[(<)]|	& \verb|[(>)]|	\\
+Brackets	& \verb|[]|	& \verb|[[<]]|	& \verb|[[>]]|	\\
+Braces		& \verb|{}|	& \verb|[{<}]|	& \verb|[{>}]|	\\
+\end{tabular}
+\end{center}
+
+An experimental library and command-line tool
+to parse MinML and convert it to HTML or XML,
+written in Go,
+is available at \url{https://github.com/dedis/matchertext}.
+An \href{https://github.com/bford/hugo}{extention}
+to the \href{https://gohugo.io}{Hugo}
+static website generator supports web authoring in MinML.
+
