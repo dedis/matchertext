@@ -237,16 +237,22 @@ func (p *Parser) literalPair(o, c byte) (e error) {
 	p.buf.WriteByte(c)
 	p.sawMatcher(c)
 
-	// Check for special unmatched-matcher symbolic references
-	b := p.buf.Bytes()[oPos:]
-	l := len(b)
-	if l == 5 && matchertext.IsOpener(b[1]) &&
-		(b[2] == '<' || b[2] == '>') {
-		maybeRef = true
+	// Check for special unmatched-matcher symbolic references,
+	// which are slightly complicated because of the nested matcher pair.
+	l := p.buf.Len()
+	if l >= 5 {
+		b := p.buf.Bytes()[l-5:]
+		maybeRef = maybeRef || (b[0] == '[' &&
+			matchertext.IsOpener(b[1]) &&
+			(b[2] == '<' || b[2] == '>') &&
+			matchertext.IsCloser(b[3]) &&
+			b[4] == ']')
 	}
 
 	// See if the pair represents a character reference.
 	if maybeRef {
+		b := p.buf.Bytes()[oPos:]
+		l := len(b)
 		if b[0] != '[' || b[l-1] != ']' {
 			panic("character reference not bracketed")
 		}

@@ -1,7 +1,13 @@
+// Package minml is a command-line tool to convert MinML to XML.
+//
+// This tool is currently extremely "minimal"
+// and could be improved in many ways:
+// e.g., to convert to either HTML or XML or other output formats;
+// to convert in the other direction from other formats to MinML;
+// or merely to validate and display information about MinML code.
 package main
 
 import (
-	//	"fmt"
 	"log"
 	"os"
 
@@ -21,7 +27,8 @@ func main() {
 		log.Fatalf("Error opening %v: %v", sourcefile, err.Error())
 	}
 
-	ns, err := minml.Parse(file)
+	mp := minml.NewDecoder(file)
+	ns, err := mp.Decode()
 	if err != nil {
 		log.Fatalf("Error parsing %v: %v", sourcefile, err.Error())
 	}

@@ -6,6 +6,9 @@ import (
 	"github.com/dedis/matchertext/go/markup/ast"
 )
 
+// XXX rename this to TreeParser instead of Decoder, perhaps,
+// since a Decoder in Go traditionally decodees into Go objects?
+
 // A Decoder parses a MinML stream into an abstract syntax tree (AST).
 type Decoder struct {
 	ap astParser
