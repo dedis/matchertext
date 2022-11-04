@@ -42,6 +42,24 @@ is a much more lightweight proposition than
 asking the embedded language to adopt, and become usable \emph{only} with,
 the entirety of Haskell or another general-purpose programming language.
 
+Pragmatically,
+some existing languages come close to the matchertext approach to embedding.
+Strings in PostScript~\cite{adobe99postscript}
+are delimited by matching parentheses,
+and may contain unescaped literal parentheses provided they are balanced.
+The \verb|dc| calculator~\cite{howard21dc}
+similarly delimits strings with brackets,
+and allows balanced nested brackets.
+\href{https://spec.commonmark.org/0.30/#links}{Link syntax}
+in Markdown~\cite{macfarlane19commonmark},
+like \verb|[|\emph{text}\verb|](|\emph{url}\verb|)|,
+allows brackets within \emph{text}
+and parentheses within \emph{url} provided they are balanced.
+These languages use traditional backslash escapes to handle unbalanced matchers,
+however,
+and do not support general cross-language embedding
+in the way matchertext does.
+
 \xxx{ in this space, not sure if we should go into more detail:
 \href{https://www.cambridge.org/core/services/aop-cambridge-core/content/view/4B0A7526CC16907F445CCF27277E9B9B/S0956796802004574a.pdf/div-class-title-compiling-embedded-languages-div.pdf}{Compiling embedded languages},
 \href{https://ieeexplore.ieee.org/document/685738}{Modular domain specific languages and tools}
