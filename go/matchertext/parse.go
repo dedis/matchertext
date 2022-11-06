@@ -236,6 +236,16 @@ func (p *Parser) PeekByte() (b byte, err error) {
 	return
 }
 
+// Adjust position (line,col) to the position after reading byte b.
+func nextPos(line, col int, b byte) (nextLine, nextCol int) {
+	col++
+	if b == '\n' {
+		line++
+		col = 1
+	}
+	return line, col
+}
+
 // Offset returns the current byte offset within the matchertext being parsed.
 func (p *Parser) Offset() int64 {
 	return p.ofs
