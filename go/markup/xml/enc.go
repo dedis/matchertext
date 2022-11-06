@@ -1,43 +1,20 @@
 package xml
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 
 	"github.com/dedis/matchertext/go/markup/ast"
+	"github.com/dedis/matchertext/go/internal/util"
 )
 
-// This interface defines the writing utility classes we need.
-// We assume the interface passed to NewEncoder is efficient enough
-// if it supports this interface, otherwise we interpose a bufio.
-type writer interface {
-	io.ByteWriter
-	io.StringWriter
-}
-
-type flusher interface {
-	Flush() error
-}
-
 type Encoder struct {
-	w writer
+	w util.AtomWriter
 }
 
 // NewEncoder creates and returns a new encoder that writes output to w.
 func NewEncoder(w io.Writer) *Encoder {
-	e := &Encoder{}
-	return e.setWriter(w)
-}
-
-// SetWriter initializes encoder e to write output to w, and returns e.
-func (e *Encoder) setWriter(w io.Writer) *Encoder {
-	if bw, ok := w.(writer); ok {
-		e.w = bw
-	} else {
-		e.w = bufio.NewWriter(w)
-	}
-	return e
+	return &Encoder{w: util.ToAtomWriter(w)}
 }
 
 // Encode writes a slice of markup AST nodes to the encoder's output.
@@ -71,9 +48,7 @@ func (e *Encoder) Encode(ns []ast.Node) (err error) {
 	}
 
 	// Flush the output stream in case it's buffered
-	if f, ok := e.w.(flusher); ok {
-		err = f.Flush()
-	}
+	err = util.Flush(e.w)
 	return
 }
 
