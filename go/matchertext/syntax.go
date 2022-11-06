@@ -17,3 +17,10 @@ func IsOpener(b byte) bool {
 func IsCloser(b byte) bool {
 	return b == ')' || b == ']' || b == '}'
 }
+
+// IsMatched returns true if o is an opener and c is the matching closer
+func IsMatched(o, c byte) bool {
+	return (o == '(' && c == ')') ||
+		(o == '[' && c == ']') ||
+		(o == '{' && c == '}')
+}
