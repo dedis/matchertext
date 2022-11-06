@@ -4,21 +4,21 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/dedis/matchertext/go/markup/ast"
 	"github.com/dedis/matchertext/go/internal/util"
+	"github.com/dedis/matchertext/go/markup/ast"
 )
 
-type Encoder struct {
+type TreeWriter struct {
 	w util.AtomWriter
 }
 
-// NewEncoder creates and returns a new encoder that writes output to w.
-func NewEncoder(w io.Writer) *Encoder {
-	return &Encoder{w: util.ToAtomWriter(w)}
+// NewTreeWriter creates and returns a TreeWriter that writes output to w.
+func NewTreeWriter(w io.Writer) *TreeWriter {
+	return &TreeWriter{w: util.ToAtomWriter(w)}
 }
 
-// Encode writes a slice of markup AST nodes to the encoder's output.
-func (e *Encoder) Encode(ns []ast.Node) (err error) {
+// WriteAST writes a slice of markup AST nodes to the encoder's output.
+func (e *TreeWriter) WriteAST(ns []ast.Node) (err error) {
 
 	for i := range ns {
 		switch n := ns[i].(type) {
@@ -52,14 +52,14 @@ func (e *Encoder) Encode(ns []ast.Node) (err error) {
 	return
 }
 
-func (e *Encoder) text(s string, esc Escaper) error {
+func (e *TreeWriter) text(s string, esc Escaper) error {
 	return esc.WriteStringTo(e.w, s)
 }
 
 const rsRaw = "]]]]><![CDATA[>"
 
 // Write raw text as a CDATA section
-func (e *Encoder) rawText(s string) error {
+func (e *TreeWriter) rawText(s string) error {
 	if s == "" {
 		return nil
 	}
@@ -101,7 +101,7 @@ func (e *Encoder) rawText(s string) error {
 }
 
 // Write a reference to XML output
-func (e *Encoder) reference(name string) error {
+func (e *TreeWriter) reference(name string) error {
 
 	if err := e.w.WriteByte('&'); err != nil {
 		return err
@@ -115,7 +115,7 @@ func (e *Encoder) reference(name string) error {
 	return nil
 }
 
-func (e *Encoder) element(name string, attr []ast.Attribute,
+func (e *TreeWriter) element(name string, attr []ast.Attribute,
 	content []ast.Node) (err error) {
 
 	// write the left-angle bracket and element name
@@ -173,7 +173,7 @@ func (e *Encoder) element(name string, attr []ast.Attribute,
 	}
 
 	// recursively write the element content
-	if err := e.Encode(content); err != nil {
+	if err := e.WriteAST(content); err != nil {
 		return err
 	}
 
@@ -191,7 +191,7 @@ func (e *Encoder) element(name string, attr []ast.Attribute,
 	return nil
 }
 
-func (e *Encoder) comment(s string) error {
+func (e *TreeWriter) comment(s string) error {
 
 	// open the comment
 	if _, err := e.w.WriteString("<!--"); err != nil {

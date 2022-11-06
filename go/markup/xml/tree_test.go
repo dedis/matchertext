@@ -74,11 +74,11 @@ var encTests = []encTest{
 		aAttr("y", aText("&<>\"'", false)))),
 }
 
-func TestEncoder(t *testing.T) {
+func TestTreeWriter(t *testing.T) {
 	for i, et := range encTests {
 		sb := &strings.Builder{}
-		e := NewEncoder(sb)
-		if err := e.Encode(et.ast); err != nil {
+		e := NewTreeWriter(sb)
+		if err := e.WriteAST(et.ast); err != nil {
 			t.Error(err.Error())
 		}
 		s := sb.String()
