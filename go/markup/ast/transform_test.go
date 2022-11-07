@@ -12,44 +12,44 @@ var matcherTransformerTests = []matcherTransformerTest{
 	{[]Node{}, []Node{}},
 
 	{ // no matchers to transform
-		[]Node{NewText("abc", false)},
-		[]Node{NewText("abc", false)},
+		[]Node{NewText("abc")},
+		[]Node{NewText("abc")},
 	},
 
 	{ // already valid matchertext
-		[]Node{NewText("a(b)c{d}e[f]g", false)},
-		[]Node{NewText("a(b)c{d}e[f]g", false)},
+		[]Node{NewText("a(b)c{d}e[f]g")},
+		[]Node{NewText("a(b)c{d}e[f]g")},
 	},
 
 	{ // valid matchertext with non-Text nodes
-		[]Node{NewText("a(b[c{d", false), NewReference("foo"),
-			NewText("e}f]g)h", false)},
-		[]Node{NewText("a(b[c{d", false), NewReference("foo"),
-			NewText("e}f]g)h", false)},
+		[]Node{NewText("a(b[c{d"), NewReference("foo"),
+			NewText("e}f]g)h")},
+		[]Node{NewText("a(b[c{d"), NewReference("foo"),
+			NewText("e}f]g)h")},
 	},
 
 	{ // unmatched matchers interspersed with other text
-		[]Node{NewText("a)b]c}d{e[f(g", false)},
-		[]Node{NewText("a", false), NewReference("#41"),
-			NewText("b", false), NewReference("#93"),
-			NewText("c", false), NewReference("#125"),
-			NewText("d", false), NewReference("#123"),
-			NewText("e", false), NewReference("#91"),
-			NewText("f", false), NewReference("#40"),
-			NewText("g", false)},
+		[]Node{NewText("a)b]c}d{e[f(g")},
+		[]Node{NewText("a"), NewReference("#41"),
+			NewText("b"), NewReference("#93"),
+			NewText("c"), NewReference("#125"),
+			NewText("d"), NewReference("#123"),
+			NewText("e"), NewReference("#91"),
+			NewText("f"), NewReference("#40"),
+			NewText("g")},
 	},
 
 	{ // unmatched matchers with Text and non-Text nodes
-		[]Node{NewText("a)b]c}d", false), NewReference("foo"),
-			NewText("e{f[g(h", false)},
-		[]Node{NewText("a", false), NewReference("#41"),
-			NewText("b", false), NewReference("#93"),
-			NewText("c", false), NewReference("#125"),
-			NewText("d", false), NewReference("foo"),
-			NewText("e", false), NewReference("#123"),
-			NewText("f", false), NewReference("#91"),
-			NewText("g", false), NewReference("#40"),
-			NewText("h", false)},
+		[]Node{NewText("a)b]c}d"), NewReference("foo"),
+			NewText("e{f[g(h")},
+		[]Node{NewText("a"), NewReference("#41"),
+			NewText("b"), NewReference("#93"),
+			NewText("c"), NewReference("#125"),
+			NewText("d"), NewReference("foo"),
+			NewText("e"), NewReference("#123"),
+			NewText("f"), NewReference("#91"),
+			NewText("g"), NewReference("#40"),
+			NewText("h")},
 	},
 }
 
@@ -63,7 +63,7 @@ func TestMatcherTransformer(t *testing.T) {
 			t.Errorf("%v: %v", i, err.Error())
 			continue
 		}
-		if !DeepEqual(ons, mtt.ons) {
+		if !Equal(ons, mtt.ons) {
 			t.Errorf("%v: expected %v got %v", i, mtt.ons, ons)
 		}
 	}

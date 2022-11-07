@@ -62,7 +62,7 @@ func (mt *MatcherTransformer) Transform(ns []Node) ([]Node, error) {
 
 		if tn, ok := n.(Text); ok { // handle a Text node
 			i := 0
-			s := tn.Text
+			s := tn.Text()
 			l := len(s)
 
 			// escape any unmatched matchers in this Text node
@@ -71,7 +71,7 @@ func (mt *MatcherTransformer) Transform(ns []Node) ([]Node, error) {
 
 				// Copy text before the next unmatched matcher
 				if o > i {
-					nt := NewText(s[i:o], false)
+					nt := NewText(s[i:o])
 					nns = append(nns, nt)
 				}
 
@@ -85,7 +85,7 @@ func (mt *MatcherTransformer) Transform(ns []Node) ([]Node, error) {
 
 			// Copy text after the last unmatched matcher in it
 			if i < l {
-				nt := NewText(s[i:l], false)
+				nt := NewText(s[i:l])
 				nns = append(nns, nt)
 			}
 
@@ -143,7 +143,7 @@ func (tr *textReader) ReadByte() (byte, error) {
 		n := tr.ns[0]
 		tr.ns = tr.ns[1:]
 		if tn, ok := n.(Text); ok {
-			tr.s = tn.Text
+			tr.s = tn.Text()
 			if len(tr.s) > 0 {
 				tr.i = 1            // consume first byte
 				return tr.s[0], nil // return it

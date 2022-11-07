@@ -12,8 +12,12 @@ type encTest struct {
 	out string
 }
 
-func aText(s string, raw bool) ast.Text {
-	return ast.NewText(s, raw)
+func aText(s string) ast.Text {
+	return ast.NewText(s)
+}
+
+func aRawText(s string) ast.Text {
+	return ast.NewRawText(s)
 }
 
 func aComment(s string) ast.Comment {
@@ -40,18 +44,18 @@ var encTests = []encTest{
 
 	// Simple text
 	et(""),
-	et("abc", aText("abc", false)),
-	et("abcxyz", aText("abc", false), aText("xyz", false)),
-	et("x'\"\r\n\ty", aText("x'\"\r\n\ty", false)),
-	et("a&lt;b&gt;c&amp;d'e\"f", aText("a<b>c&d'e\"f", false)),
+	et("abc", aText("abc")),
+	et("abcxyz", aText("abc"), aText("xyz")),
+	et("x'\"\r\n\ty", aText("x'\"\r\n\ty")),
+	et("a&lt;b&gt;c&amp;d'e\"f", aText("a<b>c&d'e\"f")),
 
 	// Raw text
-	et("<![CDATA[abc]]>", aText("abc", true)),
-	et("<![CDATA[&foo;]]>", aText("&foo;", true)),
-	et("<![CDATA[<mark></up>]]>", aText("<mark></up>", true)),
-	et("<![CDATA[]]]]><![CDATA[>]]>", aText("]]>", true)),
+	et("<![CDATA[abc]]>", aRawText("abc")),
+	et("<![CDATA[&foo;]]>", aRawText("&foo;")),
+	et("<![CDATA[<mark></up>]]>", aRawText("<mark></up>")),
+	et("<![CDATA[]]]]><![CDATA[>]]>", aRawText("]]>")),
 	et("<![CDATA[example <![CDATA[character data]]]]><![CDATA[> section]]>",
-		aText("example <![CDATA[character data]]> section", true)),
+		aRawText("example <![CDATA[character data]]> section")),
 
 	// References
 	et("&hello;", aRef("hello")),
@@ -61,17 +65,17 @@ var encTests = []encTest{
 	// Elements
 	et("<p/>", aElem("p")),
 	et("<br/>", aElem("br")),
-	et("<em>emphasis</em>", aElem("em", aText("emphasis", false))),
+	et("<em>emphasis</em>", aElem("em", aText("emphasis"))),
 	et("<i><b>nested</b></i>",
-		aElem("i", aElem("b", aText("nested", false)))),
+		aElem("i", aElem("b", aText("nested")))),
 	et("<a href=\"foo\">link</a>", aElem("a",
-		aAttr("href", aText("foo", false)),
-		aText("link", false))),
+		aAttr("href", aText("foo")),
+		aText("link"))),
 	et("<img src=\"foo\" alt=\"bar\"/>", aElem("img",
-		aAttr("src", aText("foo", false)),
-		aAttr("alt", aText("bar", false)))),
+		aAttr("src", aText("foo")),
+		aAttr("alt", aText("bar")))),
 	et("<x y=\"&amp;&lt;&gt;&quot;'\"/>", aElem("x",
-		aAttr("y", aText("&<>\"'", false)))),
+		aAttr("y", aText("&<>\"'")))),
 }
 
 func TestTreeWriter(t *testing.T) {

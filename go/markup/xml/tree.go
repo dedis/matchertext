@@ -23,21 +23,20 @@ func (e *TreeWriter) WriteAST(ns []ast.Node) (err error) {
 	for i := range ns {
 		switch n := ns[i].(type) {
 
-		case ast.Text: // Plain text sequence, raw or cooked
-			if n.Raw {
-				err = e.rawText(n.Text)
-			} else {
-				err = e.text(n.Text, EscBasic)
-			}
+		case ast.RawText: // Plain text sequence, raw or cooked
+			e.text(n.Text(), n.IsRaw(), EscBasic)
+
+		case ast.Text: // Plain (cooked) text sequence
+			err = e.text(n.Text(), false, EscBasic)
 
 		case ast.Reference:
-			err = e.reference(n.Name)
+			err = e.reference(n.Reference())
 
 		case ast.Element:
-			err = e.element(n.Name, n.Attribs, n.Content)
+			err = e.element(n.Element())
 
 		case ast.Comment:
-			err = e.comment(n.Text)
+			err = e.comment(n.Comment())
 
 		default:
 			err = encError(fmt.Sprintf("unknown node %v", n))
@@ -52,7 +51,10 @@ func (e *TreeWriter) WriteAST(ns []ast.Node) (err error) {
 	return
 }
 
-func (e *TreeWriter) text(s string, esc Escaper) error {
+func (e *TreeWriter) text(s string, raw bool, esc Escaper) error {
+	if raw {
+		return e.rawText(s)
+	}
 	return esc.WriteStringTo(e.w, s)
 }
 
@@ -103,6 +105,8 @@ func (e *TreeWriter) rawText(s string) error {
 // Write a reference to XML output
 func (e *TreeWriter) reference(name string) error {
 
+	// XXX check that it's actually a valid XML reference string?
+
 	if err := e.w.WriteByte('&'); err != nil {
 		return err
 	}
@@ -118,6 +122,8 @@ func (e *TreeWriter) reference(name string) error {
 func (e *TreeWriter) element(name string, attr []ast.Attribute,
 	content []ast.Node) (err error) {
 
+	// XXX check that it's actually a valid XML name string?
+
 	// write the left-angle bracket and element name
 	if err := e.w.WriteByte('<'); err != nil {
 		return err
@@ -131,7 +137,8 @@ func (e *TreeWriter) element(name string, attr []ast.Attribute,
 		if err := e.w.WriteByte(' '); err != nil {
 			return err
 		}
-		if _, err := e.w.WriteString(a.Name); err != nil {
+		name, val := a.Attribute()
+		if _, err := e.w.WriteString(name); err != nil {
 			return err
 		}
 		if err := e.w.WriteByte('='); err != nil {
@@ -140,13 +147,16 @@ func (e *TreeWriter) element(name string, attr []ast.Attribute,
 		if err := e.w.WriteByte('"'); err != nil {
 			return err
 		}
-		for _, n := range a.Value {
+		for _, n := range val {
 			switch n := n.(type) {
+			case ast.RawText:
+				err = e.text(n.Text(), n.IsRaw(), EscInQuot)
+
 			case ast.Text:
-				err = e.text(n.Text, EscInQuot)
+				err = e.text(n.Text(), false, EscInQuot)
 
 			case ast.Reference:
-				err = e.reference(n.Name)
+				err = e.reference(n.Reference())
 
 			default:
 				err = encError(fmt.Sprintf(

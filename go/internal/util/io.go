@@ -5,6 +5,39 @@ import (
 	"io"
 )
 
+// ToByteScanner returns an AtomReader given an arbitrary io.Reader r.
+// If e already supports all the AtomReader methods, just returns r.
+// Otherwise, creates and returns a bufio.Reader on top of r.
+func ToByteScanner(r io.Reader) io.ByteScanner {
+	if br, ok := r.(io.ByteScanner); ok {
+		return br
+	}
+	return bufio.NewReader(r)
+}
+
+// Interface AtomScanner contains the standard Read and Unread methods
+// for the basic atomic types that buffered I/O steams in Go normally support:
+// namely bytes, runes, strings, and byte slices.
+type AtomScanner interface {
+	Read(p []byte) (n int, err error)
+	ReadByte() (byte, error)
+	ReadRune() (r rune, size int, err error)
+	UnreadByte() error
+	UnreadRune() error
+	ReadBytes(delim byte) (line []byte, err error)
+	ReadString(delim byte) (string, error)
+}
+
+// ToAtomReader returns an AtomReader given an arbitrary io.Reader r.
+// If e already supports all the AtomReader methods, just returns r.
+// Otherwise, creates and returns a bufio.Reader on top of r.
+func ToAtomScanner(r io.Reader) AtomScanner {
+	if br, ok := r.(AtomScanner); ok {
+		return br
+	}
+	return bufio.NewReader(r)
+}
+
 // Interface AtomWriter contains the standard Write methods
 // for the basic atomic types that buffered I/O steams in Go normally support:
 // namely bytes, runes, strings, and byte slices.
@@ -15,7 +48,7 @@ type AtomWriter interface {
 	WriteString(s string) (int, error)      // write a string
 }
 
-// Return a AtomWriter given an arbitrary io.Writer w.
+// ToAtomWriter returns an AtomWriter given an arbitrary io.Writer w.
 // If w already supports all the AtomWriter methods, just returns w.
 // Otherwise, creates and returns a bufio.Writer on top of w.
 // The returned AtomWriter may need to be flushed at end of output.
