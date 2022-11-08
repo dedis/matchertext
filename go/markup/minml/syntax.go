@@ -78,3 +78,18 @@ func isReference(b []byte) bool {
 func IsSpace(b byte) bool {
 	return xml.IsSpace(b) // MinML spaces are the same as in XML
 }
+
+// Returns true if b is a sensitive MinML opener that supports space-sucking.
+func ssOpener(b byte) bool {
+	return b == '[' || b == '{'
+}
+
+// Returns true if b is a sensitive MinML closer that supports space-sucking.
+func ssCloser(b byte) bool {
+	return b == ']' || b == '}'
+}
+
+// Returns true if b is a sensitive MinML matcher that supports space-sucking.
+func ssMatcher(b byte) bool {
+	return ssOpener(b) || ssCloser(b)
+}

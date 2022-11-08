@@ -213,7 +213,7 @@ func (mh mHandler) Open(o, c byte) (e error) {
 func (p *Parser) literalPair(o, c byte) (e error) {
 
 	// Suck space since the previous construct and leading up to the opener
-	p.suckSpace(o == '[')
+	p.suckSpace(ssOpener(o))
 
 	// Buffer the opener and enter the corresponding state
 	oPos := p.buf.Len()
@@ -231,7 +231,7 @@ func (p *Parser) literalPair(o, c byte) (e error) {
 	maybeRef := p.lmb == '['
 
 	// Suck space since last construct and/or leading up to the closer
-	maybeRef = !p.suckSpace(c == ']') && maybeRef
+	maybeRef = !p.suckSpace(ssCloser(c)) && maybeRef
 
 	// Buffer the closer and enter the corresponding state
 	p.buf.WriteByte(c)
@@ -317,7 +317,7 @@ func (p *Parser) mFlush(atEnd bool) error {
 
 // Set last matcher state appropriately after processing an opener or closer.
 func (p *Parser) sawMatcher(b byte) {
-	if b == '[' || b == ']' {
+	if ssMatcher(b) {
 		p.lmb = b
 		p.lmp = p.buf.Len()
 	}

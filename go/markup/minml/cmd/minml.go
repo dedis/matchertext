@@ -27,14 +27,14 @@ func main() {
 		log.Fatalf("Error opening %v: %v", sourcefile, err.Error())
 	}
 
-	mp := minml.NewDecoder(file)
-	ns, err := mp.Decode()
+	mp := minml.NewTreeParser(file)
+	ns, err := mp.ParseAST()
 	if err != nil {
 		log.Fatalf("Error parsing %v: %v", sourcefile, err.Error())
 	}
 
-	enc := html.NewEncoder(os.Stdout)
-	if err := enc.Encode(ns); err != nil {
+	enc := html.NewTreeWriter(os.Stdout)
+	if err := enc.WriteAST(ns); err != nil {
 		log.Fatalf("Error encoding %v: %v", sourcefile, err.Error())
 	}
 }

@@ -32,9 +32,15 @@ var decodeTests = []testCase{
 	tc("[> x <]", aText("[x]")),
 	tc("()[]{}", aText("()[]{}")),
 	tc(" [ [ ] ] ", aText(" [ [ ] ] ")),
-	tc("> <(> <)> <", aText("> <(> <)> <")),
-	tc("> <{> <}> <", aText("> <{> <}> <")),
-	tc("> <[> <]> <", aText(">[]<")),
+	tc("a <(x y)", aText("a <(x y)")),           // no space-sucking
+	tc("a <[x y]", aText("a[x y]")),             // space-sucking
+	tc("a <{x y}", aText("a{x y}")),             // space-sucking
+	tc("> <(> <)> <", aText("> <(> <)> <")),     // no space-sucking
+	tc("> <{> <}> <", aText(">{}<")),            // space-sucking
+	tc("> <[> <]> <", aText(">[]<")),            // space-sucking
+	tc("> <(> x <)> <", aText("> <(> x <)> <")), // no space-sucking
+	tc("> <{> x <}> <", aText(">{x}<")),         // space-sucking
+	tc("> <[> x <]> <", aText(">[x]<")),         // space-sucking
 	tc("([{x}])", aText("([{x}])")),
 	tc("a(b"),  // bad matchertext: unmatched opener
 	tc("b)c"),  // bad matchertext: unmatched closer
