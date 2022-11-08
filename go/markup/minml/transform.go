@@ -5,22 +5,9 @@ import (
 	"github.com/dedis/matchertext/go/markup/html"
 )
 
-// Transformer takes a slice of AST nodes from src,
-// performs some transformation on any or all of them,
-// and returns the resulting transformed slice of nodes.
-//
-// A particular Transformer typically recognizes and transforms
-// only certain selected nodes, leaving others unmodified.
-// A transformer may modify the existing slice in place,
-// may insert and remove nodes,
-// and may return either the existing slice or a new slice.
-//
-// A Transformer must transform Attribute nodes only into Attribute nodes.
-type Transformer interface {
-	Transform(ns []ast.Node) ([]ast.Node, error)
-}
+type Transformer = ast.Transformer
 
-// EntityTransformer is an optional Transformer
+// EntityTransformer is an optional ast.Transformer
 // that recognizes and converts both standard HTML named character entities,
 // and the MinML symbolic character entities, into UTF-8 characters.
 var EntityTransformer = eTransform{}
@@ -34,20 +21,20 @@ func (_ eTransform) Transform(ns []ast.Node) ([]ast.Node, error) {
 			// XXX handle numeric entities as well?
 
 			// Apply the standard HTML named entities
-			s, ok := html.Entity[ref.Name]
+			s, ok := html.Entity[ref.Reference()]
 			if !ok {
 				// Then apply the MinML symbolic entities
-				s, ok = Entity[ref.Name]
+				s, ok = Entity[ref.Reference()]
 			}
 			if ok {
-				ns[i] = ast.Text{s, false}
+				ns[i] = ast.NewText(s)
 			}
 		}
 	}
 	return ns, nil
 }
 
-// QuoteTransformer is an optional Transformer
+// QuoteTransformer is an optional ast.Transformer
 // that converts MinML single-quoted string elements '[...]
 // and double-quoted string elements "[...]
 // into normal character sequences delimited by
@@ -63,12 +50,13 @@ func (_ qTransform) Transform(ns []ast.Node) ([]ast.Node, error) {
 	var nsn []ast.Node
 	for i, n := range ns {
 		if elt, ok := n.(ast.Element); ok {
+			name, _, content := elt.Element()
 
 			// Recognize single or double quotation elements
 			var o, c string
-			if elt.Name == "'" {
+			if name == "'" {
 				o, c = "\u2018", "\u2019"
-			} else if elt.Name == "\"" {
+			} else if name == "\"" {
 				o, c = "\u201C", "\u201D"
 			}
 			if o != "" {
@@ -79,9 +67,9 @@ func (_ qTransform) Transform(ns []ast.Node) ([]ast.Node, error) {
 				}
 
 				// Append quote-delimited element content
-				nsn = append(nsn, ast.Text{o, false})
-				nsn = append(nsn, elt.Content...)
-				nsn = append(nsn, ast.Text{c, false})
+				nsn = append(nsn, ast.NewText(o))
+				nsn = append(nsn, content...)
+				nsn = append(nsn, ast.NewText(c))
 				continue
 			}
 		}
@@ -95,4 +83,28 @@ func (_ qTransform) Transform(ns []ast.Node) ([]ast.Node, error) {
 		return nsn, nil
 	}
 	return ns, nil
+}
+
+// MatcherTransformer is an optional ast.Transformer
+// that converts unmatched matchers in literal text
+// into MinML-style matcher character references.
+var MatcherTransformer = &ast.MatcherTransformer{Escaper: minmlEscaper}
+
+func minmlEscaper(b byte) string {
+	switch b {
+	case '(':
+		return "(<)"
+	case ')':
+		return "(>)"
+	case '[':
+		return "[<]"
+	case ']':
+		return "[>]"
+	case '{':
+		return "{<}"
+	case '}':
+		return "{>}"
+	default:
+		panic("Escaper argument must be a matcher")
+	}
 }

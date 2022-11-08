@@ -6,36 +6,33 @@ import (
 	"github.com/dedis/matchertext/go/markup/ast"
 )
 
-// XXX rename this to TreeParser instead of Decoder, perhaps,
-// since a Decoder in Go traditionally decodees into Go objects?
-
-// A Decoder parses a MinML stream into an abstract syntax tree (AST).
-type Decoder struct {
+// A TreeParser parses a MinML stream into an abstract syntax tree (AST).
+type TreeParser struct {
 	ap astParser
 }
 
-// NewDecoder creates a Decoder to parse input r.
-func NewDecoder(r io.Reader) *Decoder {
-	d := &Decoder{}
+// NewTreeParser creates a TreeParser to parse input r.
+func NewTreeParser(r io.Reader) *TreeParser {
+	d := &TreeParser{}
 	d.ap.p.SetReader(r)
 	return d
 }
 
 // Parse a MinML stream into an abstract syntax tree (AST) representation.
-func (d *Decoder) Decode() ([]ast.Node, error) {
+func (d *TreeParser) ParseAST() ([]ast.Node, error) {
 	return d.ap.decode()
 }
 
 // Add t to the list of transformers to be invoked
 // on every new AST node decoded from the input stream, and returns d.
 // Multiple transformers are applied in the order they were added.
-func (d *Decoder) WithTransformer(t Transformer) *Decoder {
+func (d *TreeParser) WithTransformer(t Transformer) *TreeParser {
 	d.ap.t = append(d.ap.t, t)
 	return d
 }
 
 // We use this private internal struct to avoid exposing
-// the parsing callbacks below in the public Decoder type.
+// the parsing callbacks below in the public TreeParser type.
 type astParser struct {
 	p Parser        // the underlying MinML parser
 	m []ast.Node    // slice of markup nodes being built
@@ -63,14 +60,18 @@ func (ap *astParser) decode() ([]ast.Node, error) {
 func (ap *astParser) Text(text []byte, raw bool) error {
 
 	// Create a new Text node
-	ap.m = append(ap.m, ast.Text{Text: string(text), Raw: raw})
+	if raw {
+		ap.m = append(ap.m, ast.NewRawText(string(text)))
+	} else {
+		ap.m = append(ap.m, ast.NewText(string(text)))
+	}
 	return nil
 }
 
 func (ap *astParser) Reference(name []byte) error {
 
 	// Create a new Reference node
-	ap.m = append(ap.m, ast.Reference{string(name)})
+	ap.m = append(ap.m, ast.NewReference(string(name)))
 	return nil
 }
 
@@ -87,17 +88,9 @@ func (ap *astParser) Element(name []byte) error {
 	}
 
 	// Transform the element's attributes as appropriate
-	ans, err := ap.xform(ap.a)
+	as, err := ap.xform(ap.a)
 	if err != nil {
 		return err
-	}
-	as := make([]ast.Attribute, len(ans))
-	for i, an := range ans {
-		a, ok := an.(ast.Attribute)
-		if !ok {
-			panic("transformed attribute into non-attribute")
-		}
-		as[i] = a
 	}
 
 	// Transform the element's content markup as appropriate
@@ -107,7 +100,7 @@ func (ap *astParser) Element(name []byte) error {
 	}
 
 	// Create the new resulting Element node
-	elt := ast.Element{Name: nameStr, Attribs: as, Content: ms}
+	elt := ast.NewElement(nameStr, append(as, ms...)...)
 	ap.m, ap.a = append(om, elt), oa
 	return nil
 }
@@ -122,7 +115,7 @@ func (ap *astParser) Attribute(name []byte) error {
 	if e := ap.p.ReadAttribute(name, ap); e != nil {
 		return e
 	}
-	attr := ast.Attribute{Name: nameStr, Value: ap.m}
+	attr := ast.NewAttribute(nameStr, ap.m...)
 
 	ap.m, ap.a = om, append(oa, attr)
 	return nil
@@ -137,7 +130,7 @@ func (ap *astParser) Content() error {
 func (ap *astParser) Comment(text []byte) error {
 
 	// Create a new Comment node
-	ap.m = append(ap.m, ast.Comment{Text: string(text)})
+	ap.m = append(ap.m, ast.NewComment(string(text)))
 	return nil
 }
 

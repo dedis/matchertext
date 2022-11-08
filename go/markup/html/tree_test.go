@@ -12,8 +12,12 @@ type encTest struct {
 	out string
 }
 
-func aText(s string, raw bool) ast.Text {
-	return ast.NewText(s, raw)
+func aText(s string) ast.Text {
+	return ast.NewText(s)
+}
+
+func aRawText(s string) ast.Text {
+	return ast.NewRawText(s)
 }
 
 func aComment(s string) ast.Comment {
@@ -40,16 +44,16 @@ var encTests = []encTest{
 
 	// Simple text
 	et(""),
-	et("abc", aText("abc", false)),
-	et("abcxyz", aText("abc", false), aText("xyz", false)),
-	et("x'\"\r\n\ty", aText("x'\"\r\n\ty", false)),
-	et("a&lt;b&gt;c&amp;d'e\"f", aText("a<b>c&d'e\"f", false)),
+	et("abc", aText("abc")),
+	et("abcxyz", aText("abc"), aText("xyz")),
+	et("x'\"\r\n\ty", aText("x'\"\r\n\ty")),
+	et("a&lt;b&gt;c&amp;d'e\"f", aText("a<b>c&d'e\"f")),
 
 	// Raw text - output normally because HTML has no CDATA sections
-	et("abc", aText("abc", true)),
-	et("&amp;foo;", aText("&foo;", true)),
-	et("&lt;mark&gt;&lt;/up&gt;", aText("<mark></up>", true)),
-	et("]]&gt;", aText("]]>", true)),
+	et("abc", aRawText("abc")),
+	et("&amp;foo;", aRawText("&foo;")),
+	et("&lt;mark&gt;&lt;/up&gt;", aRawText("<mark></up>")),
+	et("]]&gt;", aRawText("]]>")),
 
 	// References
 	et("&hello;", aRef("hello")),
@@ -58,26 +62,26 @@ var encTests = []encTest{
 
 	// Elements
 	et("<p></p>", aElem("p")),
-	et("<em>emphasis</em>", aElem("em", aText("emphasis", false))),
+	et("<em>emphasis</em>", aElem("em", aText("emphasis"))),
 	et("<i><b>nested</b></i>",
-		aElem("i", aElem("b", aText("nested", false)))),
+		aElem("i", aElem("b", aText("nested")))),
 	et("<hr width=\"100%\"/>",
-		aElem("hr", aAttr("width", aText("100%", false)))),
+		aElem("hr", aAttr("width", aText("100%")))),
 	et("<a href=\"foo\">link</a>", aElem("a",
-		aAttr("href", aText("foo", false)),
-		aText("link", false))),
+		aAttr("href", aText("foo")),
+		aText("link"))),
 	et("<img src=\"foo\" alt=\"bar\"/>", aElem("img",
-		aAttr("src", aText("foo", false)),
-		aAttr("alt", aText("bar", false)))),
+		aAttr("src", aText("foo")),
+		aAttr("alt", aText("bar")))),
 	et("<x y=\"&amp;&lt;&gt;&quot;'\"></x>", aElem("x",
-		aAttr("y", aText("&<>\"'", false)))),
+		aAttr("y", aText("&<>\"'")))),
 }
 
 func TestEncoder(t *testing.T) {
 	for i, et := range encTests {
 		sb := &strings.Builder{}
-		e := NewEncoder(sb)
-		if err := e.Encode(et.ast); err != nil {
+		e := NewTreeWriter(sb)
+		if err := e.WriteAST(et.ast); err != nil {
 			t.Error(err.Error())
 		}
 		s := sb.String()

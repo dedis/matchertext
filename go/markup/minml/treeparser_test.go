@@ -7,32 +7,6 @@ import (
 	"github.com/dedis/matchertext/go/markup/ast"
 )
 
-// The following are convenience constructor functions for AST nodes.
-
-func aText(s string) ast.Text {
-	return ast.NewText(s, false)
-}
-
-func aRawText(s string) ast.Text {
-	return ast.NewText(s, true)
-}
-
-func aComment(s string) ast.Comment {
-	return ast.NewComment(s)
-}
-
-func aRef(name string) ast.Reference {
-	return ast.NewReference(name)
-}
-
-func aAttr(name string, ns ...ast.Node) ast.Attribute {
-	return ast.NewAttribute(name, ns...)
-}
-
-func aElem(name string, ns ...ast.Node) ast.Element {
-	return ast.NewElement(name, ns...)
-}
-
 type testCase struct {
 	s string     // MinML string to be parsed
 	n []ast.Node // AST that it should parse to
@@ -196,13 +170,13 @@ var decodeTests = []testCase{
 
 func TestParser(t *testing.T) {
 	for i, dt := range decodeTests {
-		d := NewDecoder(strings.NewReader(dt.s))
-		n, e := d.Decode()
+		d := NewTreeParser(strings.NewReader(dt.s))
+		n, e := d.ParseAST()
 		if e != nil && dt.n != nil {
 			t.Errorf("%v '%v': %v", i, dt.s, e.Error())
 		} else if e == nil && dt.n == nil {
 			t.Errorf("%v '%v': expected error, got %v", i, dt.s, n)
-		} else if e == nil && dt.n != nil && !ast.DeepEqual(n, dt.n) {
+		} else if e == nil && dt.n != nil && !ast.Equal(n, dt.n) {
 			t.Errorf("%v '%v': wrong output %v", i, dt.s, n)
 		}
 	}

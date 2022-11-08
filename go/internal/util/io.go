@@ -5,14 +5,25 @@ import (
 	"io"
 )
 
-// ToByteScanner returns an AtomReader given an arbitrary io.Reader r.
-// If e already supports all the AtomReader methods, just returns r.
+// ToByteScanner returns a ByteScanner given an arbitrary io.Reader r.
+// If e already supports all the ByteScanner methods, just returns r.
 // Otherwise, creates and returns a bufio.Reader on top of r.
 func ToByteScanner(r io.Reader) io.ByteScanner {
 	if br, ok := r.(io.ByteScanner); ok {
 		return br
 	}
 	return bufio.NewReader(r)
+}
+
+// ToByteWriter returns a ByteWriter given an arbitrary io.Writer w.
+// If e already supports the ByteWriter interface, just returns w.
+// Otherwise, creates and returns a bufio.Writer on top of w.
+// The returned AtomWriter may need to be flushed at end of output.
+func ToByteWriter(w io.Writer) io.ByteWriter {
+	if bw, ok := w.(io.ByteWriter); ok {
+		return bw
+	}
+	return bufio.NewWriter(w)
 }
 
 // Interface AtomScanner contains the standard Read and Unread methods

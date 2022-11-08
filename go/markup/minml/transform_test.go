@@ -35,15 +35,15 @@ var transformTests = []testCase{
 
 func TestTransform(t *testing.T) {
 	for i, dt := range transformTests {
-		d := NewDecoder(strings.NewReader(dt.s)).
+		d := NewTreeParser(strings.NewReader(dt.s)).
 			WithTransformer(EntityTransformer).
 			WithTransformer(QuoteTransformer)
-		n, e := d.Decode()
+		n, e := d.ParseAST()
 		if e != nil && dt.n != nil {
 			t.Errorf("%v '%v': %v", i, dt.s, e.Error())
 		} else if e == nil && dt.n == nil {
 			t.Errorf("%v '%v': expected error, got %v", i, dt.s, n)
-		} else if e == nil && dt.n != nil && !ast.DeepEqual(n, dt.n) {
+		} else if e == nil && dt.n != nil && !ast.Equal(n, dt.n) {
 			t.Errorf("%v '%v': wrong output %v", i, dt.s, n)
 		}
 	}

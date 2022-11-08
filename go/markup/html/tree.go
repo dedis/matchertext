@@ -1,63 +1,40 @@
 package html
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 
+	"github.com/dedis/matchertext/go/internal/util"
 	"github.com/dedis/matchertext/go/markup/ast"
 	"github.com/dedis/matchertext/go/markup/xml"
 )
 
-// This interface defines the writing utility classes we need.
-// We assume the interface passed to NewEncoder is efficient enough
-// if it supports this interface, otherwise we interpose a bufio.
-type writer interface {
-	io.ByteWriter
-	io.StringWriter
+type TreeWriter struct {
+	w util.AtomWriter
 }
 
-type flusher interface {
-	Flush() error
+// NewTreeWriter creates and returns a new encoder that writes output to w.
+func NewTreeWriter(w io.Writer) *TreeWriter {
+	return &TreeWriter{w: util.ToAtomWriter(w)}
 }
 
-type Encoder struct {
-	w writer
-}
-
-// NewEncoder creates and returns a new encoder that writes output to w.
-func NewEncoder(w io.Writer) *Encoder {
-	e := &Encoder{}
-	return e.setWriter(w)
-}
-
-// SetWriter initializes encoder e to write output to w, and returns e.
-func (e *Encoder) setWriter(w io.Writer) *Encoder {
-	if bw, ok := w.(writer); ok {
-		e.w = bw
-	} else {
-		e.w = bufio.NewWriter(w)
-	}
-	return e
-}
-
-// Encode writes a slice of markup AST nodes to the encoder's output.
-func (e *Encoder) Encode(ns []ast.Node) (err error) {
+// WriteAST writes a slice of markup AST nodes to the encoder's output.
+func (e *TreeWriter) WriteAST(ns []ast.Node) (err error) {
 
 	for i := range ns {
 		switch n := ns[i].(type) {
 
 		case ast.Text: // Plain text sequence, raw or cooked
-			err = e.text(n.Text, xml.EscBasic)
+			err = e.text(n.Text(), xml.EscBasic)
 
 		case ast.Reference:
-			err = e.reference(n.Name)
+			err = e.reference(n.Reference())
 
 		case ast.Element:
-			err = e.element(n.Name, n.Attribs, n.Content)
+			err = e.element(n)
 
 		case ast.Comment:
-			err = e.comment(n.Text)
+			err = e.comment(n.Comment())
 
 		default:
 			err = encError(fmt.Sprintf("unknown node %v", n))
@@ -68,18 +45,15 @@ func (e *Encoder) Encode(ns []ast.Node) (err error) {
 	}
 
 	// Flush the output stream in case it's buffered
-	if f, ok := e.w.(flusher); ok {
-		err = f.Flush()
-	}
-	return
+	return util.Flush(e.w)
 }
 
-func (e *Encoder) text(s string, esc xml.Escaper) error {
+func (e *TreeWriter) text(s string, esc xml.Escaper) error {
 	return esc.WriteStringTo(e.w, s)
 }
 
 // Write a reference to XML output
-func (e *Encoder) reference(name string) error {
+func (e *TreeWriter) reference(name string) error {
 
 	if err := e.w.WriteByte('&'); err != nil {
 		return err
@@ -111,8 +85,8 @@ var isVoid = map[string]bool{
 	"wbr":    true,
 }
 
-func (e *Encoder) element(name string, attr []ast.Attribute,
-	content []ast.Node) (err error) {
+func (e *TreeWriter) element(elt ast.Element) (err error) {
+	name, attrs, content := elt.Element()
 
 	// write the left-angle bracket and element name
 	if err := e.w.WriteByte('<'); err != nil {
@@ -123,11 +97,12 @@ func (e *Encoder) element(name string, attr []ast.Attribute,
 	}
 
 	// write the element attributes
-	for _, a := range attr {
+	for _, a := range attrs {
+		name, value := a.Attribute()
 		if err := e.w.WriteByte(' '); err != nil {
 			return err
 		}
-		if _, err := e.w.WriteString(a.Name); err != nil {
+		if _, err := e.w.WriteString(name); err != nil {
 			return err
 		}
 		if err := e.w.WriteByte('='); err != nil {
@@ -136,13 +111,13 @@ func (e *Encoder) element(name string, attr []ast.Attribute,
 		if err := e.w.WriteByte('"'); err != nil {
 			return err
 		}
-		for _, n := range a.Value {
+		for _, n := range value {
 			switch n := n.(type) {
 			case ast.Text:
-				err = e.text(n.Text, xml.EscInQuot)
+				err = e.text(n.Text(), xml.EscInQuot)
 
 			case ast.Reference:
-				err = e.reference(n.Name)
+				err = e.reference(n.Reference())
 
 			default:
 				err = encError(fmt.Sprintf(
@@ -170,7 +145,7 @@ func (e *Encoder) element(name string, attr []ast.Attribute,
 	}
 
 	// recursively write the element content
-	if err := e.Encode(content); err != nil {
+	if err := e.WriteAST(content); err != nil {
 		return err
 	}
 
@@ -188,7 +163,7 @@ func (e *Encoder) element(name string, attr []ast.Attribute,
 	return nil
 }
 
-func (e *Encoder) comment(s string) error {
+func (e *TreeWriter) comment(s string) error {
 
 	// open the comment
 	if _, err := e.w.WriteString("<!--"); err != nil {

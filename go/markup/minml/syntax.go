@@ -34,8 +34,8 @@ func scanPreSpace(b []byte) int {
 
 	// Scan backwards to suck space
 	l := len(b)
-	if l >= 2 && b[l-1] == '<' && xml.IsSpace(b[l-2]) {
-		for l -= 2; l > 0 && xml.IsSpace(b[l-1]); l-- {
+	if l >= 2 && b[l-1] == '<' && IsSpace(b[l-2]) {
+		for l -= 2; l > 0 && IsSpace(b[l-1]); l-- {
 		}
 	}
 
@@ -47,8 +47,8 @@ func scanPreSpace(b []byte) int {
 // Returns the number of prefix bytes of b that should be dropped.
 func scanPostSpace(b []byte) int {
 	l := 0
-	if len(b) >= 2 && b[0] == '>' && xml.IsSpace(b[1]) {
-		for l += 2; l < len(b) && xml.IsSpace(b[l]); l++ {
+	if len(b) >= 2 && b[0] == '>' && IsSpace(b[1]) {
+		for l += 2; l < len(b) && IsSpace(b[l]); l++ {
 		}
 	}
 	return l
@@ -57,7 +57,7 @@ func scanPostSpace(b []byte) int {
 // Return true if b can be within a liberalized MinML element name.
 // MinML allows punctuation: anything but XML whitespace and matchers.
 func isNameByte(b byte) bool {
-	return !xml.IsSpace(b) && !matchertext.IsMatcher(b)
+	return !IsSpace(b) && !matchertext.IsMatcher(b)
 }
 
 // Return true if slice b can be a liberalized MinML reference.
@@ -67,9 +67,14 @@ func isReference(b []byte) bool {
 		return false
 	}
 	for i := 0; i < len(b); i++ {
-		if xml.IsSpace(b[i]) {
+		if IsSpace(b[i]) {
 			return false
 		}
 	}
 	return true
+}
+
+// Returns true if b is a valid whitespace character in MinML
+func IsSpace(b byte) bool {
+	return xml.IsSpace(b) // MinML spaces are the same as in XML
 }
