@@ -1,9 +1,10 @@
 \documentclass[fullpage,twocolumn]{article}
+\pdfoutput=1
 
 \usepackage{times}
 \usepackage{xspace}
 \usepackage{cite} % sort citation numbers
-\usepackage[breaklinks,colorlinks,
+\usepackage[hyperindex,breaklinks,colorlinks,
 	    linkcolor=blue,citecolor=blue,urlcolor=black]{hyperref}
 \usepackage{cleveref}
 \usepackage{graphicx}
@@ -53,17 +54,19 @@
 \begin{document}
 
 \title{Matchertext: Towards Verbatim Interlanguage Embedding \\
-	\Large{\texttt{preliminary draft - not yet for redistribution} \\
+	\Large{%\texttt{preliminary draft - not yet for redistribution} \\
 	~\\
-	Working project repository: \url{https://github.com/dedis/matchertext}}}
+	%Working project repository:
+	\url{https://github.com/dedis/matchertext}}}
 
 \author{Bryan Ford \\ EPFL}
 
 \maketitle
 
+\input{abs}
+
 \tableofcontents
 
-\input{abs}
 \input{intro}
 \input{bg}
 \input{design}
