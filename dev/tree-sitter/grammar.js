@@ -20,7 +20,7 @@ module.exports = grammar({
       field("content", $.content_block),
     )),
     word: $ => /[a-zA-Z][a-zA-Z0-9_:-]*/,
-    content_block: $ => seq("[", repeat1($._node), "]"),
+    content_block: $ => seq("[", repeat($._node), "]"),
     text: $ => /[^\[\]{}<>a-zA-Z]+/,
   }
 });
