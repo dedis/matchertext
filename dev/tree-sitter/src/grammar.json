@@ -10,12 +10,79 @@
       }
     },
     "_node": {
-      "type": "SYMBOL",
-      "name": "text"
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "element"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "word"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "text"
+        }
+      ]
+    },
+    "element": {
+      "type": "PREC",
+      "value": 1,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "FIELD",
+            "name": "tag",
+            "content": {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "word"
+              },
+              "named": true,
+              "value": "tag_name"
+            }
+          },
+          {
+            "type": "FIELD",
+            "name": "content",
+            "content": {
+              "type": "SYMBOL",
+              "name": "content_block"
+            }
+          }
+        ]
+      }
+    },
+    "word": {
+      "type": "PATTERN",
+      "value": "[a-zA-Z][a-zA-Z0-9_:-]*"
+    },
+    "content_block": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "["
+        },
+        {
+          "type": "REPEAT1",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_node"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "]"
+        }
+      ]
     },
     "text": {
       "type": "PATTERN",
-      "value": "[^\\[\\]{}<>]+"
+      "value": "[^\\[\\]{}<>a-zA-Z]+"
     }
   },
   "extras": [
