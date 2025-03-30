@@ -19,8 +19,8 @@ module.exports = grammar({
       field("tag", alias($.word, $.tag_name)),
       field("content", $.content_block),
     )),
-    word: $ => /[a-zA-Z][a-zA-Z0-9_:-]*/,
+    word: $ => /[a-zA-Z_][a-zA-Z0-9_:-]*/,
     content_block: $ => seq("[", repeat($._node), "]"),
-    text: $ => /[^\[\]{}<>a-zA-Z]+/,
+    text: $ => /[^\[\]{}<>a-zA-Z_]+/,
   }
 });
