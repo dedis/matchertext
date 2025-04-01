@@ -26,6 +26,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "raw_block"
+        },
+        {
+          "type": "SYMBOL",
           "name": "word"
         },
         {
@@ -246,6 +250,23 @@
         {
           "type": "STRING",
           "value": "\"["
+        },
+        {
+          "type": "PATTERN",
+          "value": "[^\\]]*"
+        },
+        {
+          "type": "STRING",
+          "value": "]"
+        }
+      ]
+    },
+    "raw_block": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "+["
         },
         {
           "type": "PATTERN",

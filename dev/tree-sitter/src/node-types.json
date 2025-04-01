@@ -111,6 +111,10 @@
           "named": true
         },
         {
+          "type": "raw_block",
+          "named": true
+        },
+        {
           "type": "text",
           "named": true
         },
@@ -163,6 +167,11 @@
     "fields": {}
   },
   {
+    "type": "raw_block",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "source_file",
     "named": true,
     "root": true,
@@ -184,6 +193,10 @@
           "named": true
         },
         {
+          "type": "raw_block",
+          "named": true
+        },
+        {
           "type": "text",
           "named": true
         },
@@ -196,6 +209,10 @@
   },
   {
     "type": "\"[",
+    "named": false
+  },
+  {
+    "type": "+[",
     "named": false
   },
   {
