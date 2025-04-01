@@ -22,6 +22,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "quoted_string"
+        },
+        {
+          "type": "SYMBOL",
           "name": "word"
         },
         {
@@ -229,6 +233,23 @@
               "value": "hex_ref"
             }
           ]
+        },
+        {
+          "type": "STRING",
+          "value": "]"
+        }
+      ]
+    },
+    "quoted_string": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "\"["
+        },
+        {
+          "type": "PATTERN",
+          "value": "[^\\]]*"
         },
         {
           "type": "STRING",

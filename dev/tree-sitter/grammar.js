@@ -13,7 +13,7 @@ module.exports = grammar({
 
   rules: {
     source_file: $ => repeat($._node),
-    _node: $ => choice($.element, $.char_ref, $.word, $.text),
+    _node: $ => choice($.element, $.char_ref, $.quoted_string, $.word, $.text),
 
     element: $ => prec(1, seq(
       field("tag", alias($.word, $.tag_name)),
@@ -45,6 +45,9 @@ module.exports = grammar({
       alias(/#[0-9]+/, $.decimal_ref),
       alias(/#x[0-9a-fA-F]+/, $.hex_ref),
     ), "]"),
+
+    // Quoted string: "[content] — the bracket inside is literal text
+    quoted_string: $ => seq('"[', /[^\]]*/, "]"),
 
     text: $ => /[^\[\]{}<>a-zA-Z_]+/,
   }
