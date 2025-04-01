@@ -18,6 +18,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "char_ref"
+        },
+        {
+          "type": "SYMBOL",
           "name": "word"
         },
         {
@@ -186,6 +190,51 @@
           }
         ]
       }
+    },
+    "char_ref": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "["
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "PATTERN",
+                "value": "[a-zA-Z][a-zA-Z0-9]*"
+              },
+              "named": true,
+              "value": "named_ref"
+            },
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "PATTERN",
+                "value": "#[0-9]+"
+              },
+              "named": true,
+              "value": "decimal_ref"
+            },
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "PATTERN",
+                "value": "#x[0-9a-fA-F]+"
+              },
+              "named": true,
+              "value": "hex_ref"
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": "]"
+        }
+      ]
     },
     "text": {
       "type": "PATTERN",

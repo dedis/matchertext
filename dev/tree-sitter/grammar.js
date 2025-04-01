@@ -13,7 +13,7 @@ module.exports = grammar({
 
   rules: {
     source_file: $ => repeat($._node),
-    _node: $ => choice($.element, $.word, $.text),
+    _node: $ => choice($.element, $.char_ref, $.word, $.text),
 
     element: $ => prec(1, seq(
       field("tag", alias($.word, $.tag_name)),
@@ -35,13 +35,16 @@ module.exports = grammar({
       $.plain_value,
       $.word,
     ),
-    // plain_value matches values containing non-identifier chars (e.g. cat.jpg)
-    // or starting with a non-letter (e.g. 123). Pure identifiers fall through to
-    // $.word so that "http[...]" is still parsed as an element-valued attribute.
     plain_value: $ => token(choice(
       /[a-zA-Z_][a-zA-Z0-9_:-]*[^ \t\n\r\f{}\[\]<>a-zA-Z0-9_:-][^ \t\n\r\f{}\[\]<>]*/,
       /[^ \t\n\r\f{}\[\]<>a-zA-Z_][^ \t\n\r\f{}\[\]<>]*/,
     )),
+
+    char_ref: $ => seq("[", choice(
+      alias(/[a-zA-Z][a-zA-Z0-9]*/, $.named_ref),
+      alias(/#[0-9]+/, $.decimal_ref),
+      alias(/#x[0-9a-fA-F]+/, $.hex_ref),
+    ), "]"),
 
     text: $ => /[^\[\]{}<>a-zA-Z_]+/,
   }
