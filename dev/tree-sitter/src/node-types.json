@@ -91,6 +91,11 @@
     }
   },
   {
+    "type": "comment",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "content_block",
     "named": true,
     "fields": {},
@@ -100,6 +105,10 @@
       "types": [
         {
           "type": "char_ref",
+          "named": true
+        },
+        {
+          "type": "comment",
           "named": true
         },
         {
@@ -185,6 +194,10 @@
           "named": true
         },
         {
+          "type": "comment",
+          "named": true
+        },
+        {
           "type": "element",
           "named": true
         },
@@ -213,6 +226,10 @@
   },
   {
     "type": "+[",
+    "named": false
+  },
+  {
+    "type": "-[",
     "named": false
   },
   {

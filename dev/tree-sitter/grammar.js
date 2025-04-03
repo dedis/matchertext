@@ -13,7 +13,7 @@ module.exports = grammar({
 
   rules: {
     source_file: $ => repeat($._node),
-    _node: $ => choice($.element, $.char_ref, $.quoted_string, $.raw_block, $.word, $.text),
+    _node: $ => choice($.element, $.char_ref, $.quoted_string, $.raw_block, $.comment, $.word, $.text),
 
     element: $ => prec(1, seq(
       field("tag", alias($.word, $.tag_name)),
@@ -47,9 +47,10 @@ module.exports = grammar({
     ), "]"),
 
     quoted_string: $ => seq('"[', /[^\]]*/, "]"),
-
-    // Raw block: +[content] — content is verbatim, not parsed as minml
     raw_block: $ => seq("+[", /[^\]]*/, "]"),
+
+    // Comment: -[text] — content is ignored
+    comment: $ => seq("-[", /[^\]]*/, "]"),
 
     text: $ => /[^\[\]{}<>a-zA-Z_]+/,
   }
