@@ -15,10 +15,13 @@ module.exports = grammar({
     source_file: $ => repeat($._node),
     _node: $ => choice($.element, $.char_ref, $.quoted_string, $.raw_block, $.comment, $.word, $.text),
 
+    // Elements may be preceded by < and/or followed by > as space-sucker markers
     element: $ => prec(1, seq(
+      optional("<"),
       field("tag", alias($.word, $.tag_name)),
       optional(field("attrs", $.attr_block)),
       field("content", $.content_block),
+      optional(">"),
     )),
     word: $ => /[a-zA-Z_][a-zA-Z0-9_:-]*/,
     content_block: $ => seq("[", repeat($._node), "]"),
@@ -48,8 +51,6 @@ module.exports = grammar({
 
     quoted_string: $ => seq('"[', /[^\]]*/, "]"),
     raw_block: $ => seq("+[", /[^\]]*/, "]"),
-
-    // Comment: -[text] — content is ignored
     comment: $ => seq("-[", /[^\]]*/, "]"),
 
     text: $ => /[^\[\]{}<>a-zA-Z_]+/,
