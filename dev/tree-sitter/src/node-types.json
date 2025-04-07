@@ -116,6 +116,10 @@
           "named": true
         },
         {
+          "type": "matcher_escape",
+          "named": true
+        },
+        {
           "type": "quoted_string",
           "named": true
         },
@@ -202,6 +206,10 @@
           "named": true
         },
         {
+          "type": "matcher_escape",
+          "named": true
+        },
+        {
           "type": "quoted_string",
           "named": true
         },
@@ -262,6 +270,10 @@
   },
   {
     "type": "hex_ref",
+    "named": true
+  },
+  {
+    "type": "matcher_escape",
     "named": true
   },
   {

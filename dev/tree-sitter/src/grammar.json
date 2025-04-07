@@ -34,6 +34,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "matcher_escape"
+        },
+        {
+          "type": "SYMBOL",
           "name": "word"
         },
         {
@@ -322,6 +326,30 @@
           "value": "]"
         }
       ]
+    },
+    "matcher_escape": {
+      "type": "TOKEN",
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "[[<]]"
+          },
+          {
+            "type": "STRING",
+            "value": "[[>]]"
+          },
+          {
+            "type": "STRING",
+            "value": "[(<)]"
+          },
+          {
+            "type": "STRING",
+            "value": "[(>)]"
+          }
+        ]
+      }
     },
     "text": {
       "type": "PATTERN",
