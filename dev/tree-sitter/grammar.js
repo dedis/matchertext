@@ -15,6 +15,7 @@ module.exports = grammar({
     source_file: $ => repeat($._node),
     _node: $ => choice(
       $.element,
+      $.processing_instruction,
       $.char_ref,
       $.quoted_string,
       $.raw_block,
@@ -46,6 +47,9 @@ module.exports = grammar({
       $.plain_value,
       $.word,
     ),
+    // plain_value matches values containing non-identifier chars (e.g. cat.jpg)
+    // or starting with a non-letter (e.g. 123). Pure identifiers fall through to
+    // $.word so that "http[...]" is still parsed as an element-valued attribute.
     plain_value: $ => token(choice(
       /[a-zA-Z_][a-zA-Z0-9_:-]*[^ \t\n\r\f{}\[\]<>a-zA-Z0-9_:-][^ \t\n\r\f{}\[\]<>]*/,
       /[^ \t\n\r\f{}\[\]<>a-zA-Z_][^ \t\n\r\f{}\[\]<>]*/,
@@ -61,13 +65,15 @@ module.exports = grammar({
     raw_block: $ => seq("+[", /[^\]]*/, "]"),
     comment: $ => seq("-[", /[^\]]*/, "]"),
 
-    // Escape sequences for literal bracket/paren characters
     matcher_escape: $ => token(choice(
       "[[<]]",
       "[[>]]",
       "[(<)]",
       "[(>)]",
     )),
+
+    // Processing instruction: ?[content]
+    processing_instruction: $ => seq("?[", /[^\]]*/, "]"),
 
     text: $ => /[^\[\]{}<>a-zA-Z_]+/,
   }

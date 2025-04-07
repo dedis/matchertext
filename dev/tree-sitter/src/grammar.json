@@ -18,6 +18,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "processing_instruction"
+        },
+        {
+          "type": "SYMBOL",
           "name": "char_ref"
         },
         {
@@ -350,6 +354,23 @@
           }
         ]
       }
+    },
+    "processing_instruction": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "?["
+        },
+        {
+          "type": "PATTERN",
+          "value": "[^\\]]*"
+        },
+        {
+          "type": "STRING",
+          "value": "]"
+        }
+      ]
     },
     "text": {
       "type": "PATTERN",
