@@ -153,8 +153,8 @@ func Server(path string, port string, noOpen bool) {
 
 	fi, err := os.Stat(path)
 	if err != nil {
+		_ = os.RemoveAll(dst)
 		log.Fatal(err)
-		return
 	}
 
 	// Copy all files from source to the __build dir
@@ -162,8 +162,8 @@ func Server(path string, port string, noOpen bool) {
 	case mode.IsDir():
 		err := os.CopyFS(dst, os.DirFS(path))
 		if err != nil {
+			_ = os.RemoveAll(dst)
 			log.Fatal(err)
-			return
 		}
 	case mode.IsRegular():
 		copyFile(path, dst)
@@ -172,12 +172,16 @@ func Server(path string, port string, noOpen bool) {
 	// Convert all .minml files to .html files
 	err = filepath.WalkDir(dst, convertFiles)
 	if err != nil {
+		_ = os.RemoveAll(dst)
 		log.Fatal(err)
-		return
 	}
 
 	events := make(chan fsnotify.Event)
-	go watchDir(path, events)
+	watchPath := path
+	if !fi.IsDir() {
+		watchPath = filepath.Dir(path)
+	}
+	go watchDir(watchPath, events)
 
 	// Set up HTTP routes
 	mux := http.NewServeMux()

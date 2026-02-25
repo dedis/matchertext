@@ -46,7 +46,7 @@ COMMANDS:
 
 OPTIONS (server):
     --port <port>    Port to listen on (default: 8080)
-    --no-open        Do not auto-open the browser
+    --no-open        Do not auto-open the index.html file in the browser
 
 DESCRIPTION:
     If no command is given, defaults to 'Convert'.

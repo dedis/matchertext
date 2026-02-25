@@ -11,3 +11,4 @@ The main contents of this repository are currently:
 * [doc](doc): the LaTeX source for the in-progress matchertext paper.
 * [go](go): experimental Go code for parsing and converting matchertext.
 
+Build command: `go build -o minml ./go/markup/minml/cmd/`
