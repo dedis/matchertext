@@ -40,9 +40,13 @@ ARGS:
     <input.minml>    MinML source file
 
 COMMANDS:
-    help                                      Print this help message
-    Convert <file.minml>                      Parse MinML and write HTML to stdout (default)
-    server  <file|directory> [--port 8080]    Start an HTTP server for MinML conversion
+    help                                  Print this help message
+    Convert <file.minml>                  Parse MinML and write HTML to stdout (default)
+    server  <file|directory> [OPTIONS]    Start an HTTP server for MinML conversion
+
+OPTIONS (server):
+    --port <port>    Port to listen on (default: 8080)
+    --no-open        Do not auto-open the browser
 
 DESCRIPTION:
     If no command is given, defaults to 'Convert'.
@@ -72,19 +76,23 @@ func main() {
 			log.Fatal(err)
 		}
 	case "server":
-		if len(rest) != 0 && len(rest) != 2 {
-			log.Fatal("'server' expects one optional argument")
-		}
-		if len(rest) > 0 && rest[0] != "--port" {
-			log.Fatal("unknown option for 'server': ", rest[0])
-		}
-
 		port := "8080"
-		if len(rest) > 0 {
-			port = rest[1]
+		noOpen := false
+		for i := 0; i < len(rest); i++ {
+			switch rest[i] {
+			case "--port":
+				if i+1 >= len(rest) {
+					log.Fatal("--port requires a value")
+				}
+				port = rest[i+1]
+				i++
+			case "--no-open":
+				noOpen = true
+			default:
+				log.Fatal("unknown option for 'server': ", rest[i])
+			}
 		}
-
-		Server(inputPath, port)
+		Server(inputPath, port, noOpen)
 	default:
 		log.Fatalf("Unknown command: %s", command)
 	}

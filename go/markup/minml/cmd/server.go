@@ -6,8 +6,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -26,6 +28,10 @@ const reloadScript = `<script>
     es.addEventListener("reload", function() {
       window.location.reload();
     });
+    es.addEventListener("shutdown", function() {
+      es.close();
+      showStopped();
+    });
     es.onerror = function() {
       es.close();
       setTimeout(function() {
@@ -35,6 +41,16 @@ const reloadScript = `<script>
     };
     es.onopen = function() { delay = 1000; };
   }
+  function showStopped() {
+    var overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;" +
+      "background:rgba(0,0,0,0.85);color:#fff;display:flex;align-items:center;" +
+      "justify-content:center;z-index:999999;font-family:system-ui,sans-serif";
+    overlay.innerHTML = '<div style="text-align:center">' +
+      '<h1 style="font-size:2rem;margin:0 0 0.5rem">Server stopped</h1>' +
+      '<p style="margin:0;opacity:0.7">The development server is no longer running.</p></div>';
+    document.body.appendChild(overlay);
+  }
   connect();
 })();
 </script>
@@ -43,20 +59,20 @@ const reloadScript = `<script>
 // sseClients tracks connected SSE clients for live reload notifications.
 type sseClients struct {
 	mu      sync.Mutex
-	clients []chan struct{}
+	clients []chan string
 }
 
 // add registers a new SSE client and returns its notification channel.
-func (s *sseClients) add() chan struct{} {
+func (s *sseClients) add() chan string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	ch := make(chan struct{}, 1)
+	ch := make(chan string, 1)
 	s.clients = append(s.clients, ch)
 	return ch
 }
 
 // remove unregisters an SSE client.
-func (s *sseClients) remove(ch chan struct{}) {
+func (s *sseClients) remove(ch chan string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i, c := range s.clients {
@@ -67,13 +83,13 @@ func (s *sseClients) remove(ch chan struct{}) {
 	}
 }
 
-// notifyAll signals all connected SSE clients to reload.
-func (s *sseClients) notifyAll() {
+// notify sends an event name to all connected SSE clients.
+func (s *sseClients) notify(event string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, ch := range s.clients {
 		select {
-		case ch <- struct{}{}:
+		case ch <- event:
 		default:
 		}
 	}
@@ -111,7 +127,7 @@ func (l *loggingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // converts all .minml files to .html with live-reload script injection,
 // then serves the result on the given port. Source files are watched for
 // changes and automatically re-converted, triggering browser reloads via SSE.
-func Server(path string, port string) {
+func Server(path string, port string, noOpen bool) {
 	// Create a temporary build folder
 	// The "__" prefix is to prevent potential clashing
 	dst := "__build"
@@ -121,11 +137,16 @@ func Server(path string, port string) {
 		return
 	}
 
-	// Delete the temp dir on ctrl+C
+	// SSE client tracker
+	clients := &sseClients{}
+
+	// On ctrl+C: notify browsers, clean up, exit
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-sigCh
+		clients.notify("shutdown")
+		time.Sleep(100 * time.Millisecond) // let SSE flush
 		os.RemoveAll(dst)
 		os.Exit(0)
 	}()
@@ -158,9 +179,6 @@ func Server(path string, port string) {
 	events := make(chan fsnotify.Event)
 	go watchDir(path, events)
 
-	// SSE client tracker
-	clients := &sseClients{}
-
 	// Set up HTTP routes
 	mux := http.NewServeMux()
 
@@ -181,8 +199,8 @@ func Server(path string, port string) {
 
 		for {
 			select {
-			case <-ch:
-				fmt.Fprint(w, "event: reload\ndata: ok\n\n")
+			case event := <-ch:
+				fmt.Fprintf(w, "event: %s\ndata: ok\n\n", event)
 				flusher.Flush()
 			case <-r.Context().Done():
 				return
@@ -200,6 +218,11 @@ func Server(path string, port string) {
 			log.Fatal(err)
 		}
 	}()
+
+	// Auto open the link in the browser
+	if !noOpen {
+		openBrowser("http://localhost:" + port)
+	}
 
 	// Debounce: collect events for 100ms before acting.
 	// Deduplicates rapid-fire events from editors.
@@ -233,7 +256,7 @@ func Server(path string, port string) {
 			}
 			pending = make(map[string]fsnotify.Op)
 			if rebuilt {
-				clients.notifyAll()
+				clients.notify("reload")
 			}
 		}
 	}
@@ -342,4 +365,19 @@ func copyFile(path, dst string) {
 		log.Fatal(err)
 		return
 	}
+}
+
+func openBrowser(url string) {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "linux":
+		cmd = exec.Command("xdg-open", url)
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", url)
+	default:
+		return
+	}
+	_ = cmd.Start()
 }
