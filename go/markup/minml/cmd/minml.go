@@ -140,7 +140,7 @@ func Convert(sourceFile string, w io.Writer) error {
 	}
 	defer file.Close()
 
-	mp := minml.NewTreeParser(file)
+	mp := minml.NewTreeParser(file).WithTransformer(minml.EntityTransformer).WithTransformer(minml.QuoteTransformer)
 	ns, err := mp.ParseAST()
 	if err != nil {
 		return fmt.Errorf("parsing %v: %w", sourceFile, err)
