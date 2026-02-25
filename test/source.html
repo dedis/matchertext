@@ -1,0 +1,775 @@
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta name="Author" content="Bryan Ford">
+
+    <title>
+        MinML: concise but general markup syntax – Bryan Ford's Home Page
+    </title>
+    <link rel="shortcut icon"
+          href="data:image/x-icon;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///8i////x////////////////////////////////////////////////////////////////////77///8W////oP////+JiYn/CAgI/xcXF/9ubm7/9vb2//7+/v9mZmb/Dg4O/wwMDP9ycnL//Pz8////////////////zf////D/////ERER/35+fv/m5ub/fHx8/2dnZ//e3t7/AAAA/7W1tf+6urr/AAAA/ysrK/9paWn/+vr6/////////////////wQEBP/T09P//////9TU1P8UFBT/9fX1/wsLC/9nZ2f/CAgI/wAAAP9DQ0P/ra2t//v7+/////////////////8bGxv/vLy8///////MzMz/BAQE//////+3t7f/XFxc/3t7e/8AAAD/hYWF////////////////////////////NDQ0/5ubm///////p6en/xgYGP////////////n5+f9HR0f/AgIC/9XV1f///////////P///67//////////01NTf99fX3//////3BwcP87Ozv/6enp/6+vr/8zMzP/AAAA/4ODg///////////+v///9X///9K//////////9nZ2f/b29v//////8vLy//JiYm/wwMDP8AAAD/Hh4e/6qqqv///////////f///9n///9Y////B///////////hISE/1ZWVv/p6en/AQEB/5KSkv/8/Pz/zc3N/ywsLP/ExMT///////////j///+l////EP///wD////w/////7m5uf8eHh7/rKys/wAAAP/Hx8f///////////+urq7/Pj4+///////////1////e////wn///8A////qv/////8/Pz/JCQk/zg4OP8BAQH/9PT0////////////0dHR/woKCv//////////9////2////8G////AP///1j//////////729vf8EBAT/FxcX/////////////////6ioqP8RERH///////////z///92////Av///wD///8j////8P//////////q6ur/xgYGP+zs7P/5+fn/8TExP8gICD/XFxc////////////////iP///wj///8A////Af///3P////u////+//////d3d3/X19f/xYWFv8JCQn/S0tL/+rq6v///////////////1P///8B////AP///wD///8R////jf///9H////w////+f///////////////////////////////////6n///8E////AP///wD///8A////Af///wn///9A////jP///9L////5////////////////////5f///2////8S////AP///wD///8AwAMAAIABAACAAAAAAAAAAAAAAAAAAwAAAAcAAAAPAAAADwAAgA8AAIAPAACADwAAwAcAAPAHAAD8DwAA/j8AAA=="
+          type="image/x-icon">
+
+
+    <style type="text/css" id="operaUserStyle">
+        video {
+            filter: -opera-shader(url(data:text/plain;base64,Ly8gaHR0cHM6Ly9naXRodWIuY29tL0dQVU9wZW4tRWZmZWN0cy9GaWRlbGl0eUZYLUNBUwovLyB2MwoKdW5pZm9ybSBzaGFkZXIgaUNodW5rOwp1bmlmb3JtIGZsb2F0MiBpTW91c2U7CnVuaWZvcm0gZmxvYXQ0IGlWaXNpYmxlUmVjdDsKdW5pZm9ybSBmbG9hdCBpQXJnc1sxXTsKCmNvbnN0IGZsb2F0IEVQU0lPTiA9IDAuMTsKY29uc3QgZmxvYXQgVl9NSU4gPSAwOwpjb25zdCBmbG9hdCBWX0xPVyA9IDAuMjU7CmNvbnN0IGZsb2F0IFZfTUVEID0gMC41Owpjb25zdCBmbG9hdCBWX0hJR0ggPSAwLjc1Owpjb25zdCBmbG9hdCBWX01BWCA9IDE7Cgpjb25zdCBmbG9hdCBUSFJFU0hPTERfQVJFQSA9IDgwMCAqIDYwMDsKY29uc3QgZmxvYXQgTUlOX0FSRUEgPSA0MDAgKiAxMDA7CmNvbnN0IGZsb2F0IE1JTl9TVFJJUCA9IDIwOwpjb25zdCBmbG9hdCBNQVJHSU4gPSAxOwoKaW5saW5lIGZsb2F0MyBwaXhlbChmbG9hdDIgeHksIGZsb2F0MiBvZmZzZXQpIHsKICAgIHJldHVybiBpQ2h1bmsuZXZhbCh4eSArIG9mZnNldCkucmdiOwp9CgppbmxpbmUgZmxvYXQzIHNoYXJwZW4oZmxvYXQyIHh5KSB7CiAgICBmbG9hdDMgZiA9CiAgICAgICAgcGl4ZWwoeHksIGZsb2F0MigtMSwgLTEpKSAqICAxICsKICAgICAgICBwaXhlbCh4eSwgZmxvYXQyKCAwLCAtMSkpICogLTEgKwogICAgICAgIHBpeGVsKHh5LCBmbG9hdDIoIDEsIC0xKSkgKiAgMSArCgogICAgICAgIHBpeGVsKHh5LCBmbG9hdDIoLTEsIDApKSAqIC0xICArCiAgICAgICAgcGl4ZWwoeHksIGZsb2F0MiggMCwgMCkpICogLTEgICsKICAgICAgICBwaXhlbCh4eSwgZmxvYXQyKCAxLCAwKSkgKiAtMSAgKwoKICAgICAgICBwaXhlbCh4eSwgZmxvYXQyKC0xLCAxKSkgKiAxICAgKwogICAgICAgIHBpeGVsKHh5LCBmbG9hdDIoIDAsIDEpKSAqIC0xICArCiAgICAgICAgcGl4ZWwoeHksIGZsb2F0MiggMSwgMSkpICogMTsKICAgIHJldHVybiBmIC8gLTE7Cn0KCmZsb2F0NCBSR1gyKGZsb2F0MiB4eSkgewogICAgZmxvYXQyIGNodW5rX3NpemUgPSBpVmlzaWJsZVJlY3Quenc7CiAgICBmbG9hdDQgY29sb3IgPSBpQ2h1bmsuZXZhbCh4eSk7CgogICAgaWYgKGNodW5rX3NpemUueCAqIGNodW5rX3NpemUueSA8IE1JTl9BUkVBKSB7CiAgICAgICAgcmV0dXJuIGNvbG9yOwogICAgfQoKICAgIGlmIChjaHVua19zaXplLnkgPCBNSU5fU1RSSVAgfHwgY2h1bmtfc2l6ZS54IDwgTUlOX1NUUklQKSB7CiAgICAgICAgcmV0dXJuIGNvbG9yOwogICAgfQoKICAgIGlmICh4eS54IDwgTUFSR0lOIHx8IHh5LnggPiAoY2h1bmtfc2l6ZS54IC0gTUFSR0lOKSB8fAogICAgICAgIHh5LnkgPCBNQVJHSU4gfHwgeHkueSA+IChjaHVua19zaXplLnkgLSBNQVJHSU4pKSB7CiAgICAgICAgcmV0dXJuIGNvbG9yOwogICAgfQoKICAgIHJldHVybiBmbG9hdDQoc2hhcnBlbih4eSksIDEpOwp9CgppbmxpbmUgZmxvYXQzIG1pbjN2KGZsb2F0MyB4LCBmbG9hdDMgeSwgZmxvYXQzIHopIHsKCXJldHVybiBtaW4oeCwgbWluKHksIHopKTsKfQoKaW5saW5lIGZsb2F0MyBtYXgzdihmbG9hdDMgeCwgZmxvYXQzIHksIGZsb2F0MyB6KSB7CglyZXR1cm4gbWF4KHgsIG1heCh5LCB6KSk7Cn0KCmZsb2F0MyBSR1gzKGZsb2F0MiB4eSwgZmxvYXQgc3RyZW5ndGgpIHsKICAgIGZsb2F0MyBhID0gcGl4ZWwoeHksIGZsb2F0MigtMSwgLTEpKTsKICAgIGZsb2F0MyBiID0gcGl4ZWwoeHksIGZsb2F0MiggMCwgLTEpKTsKICAgIGZsb2F0MyBjID0gcGl4ZWwoeHksIGZsb2F0MiggMSwgLTEpKTsKCiAgICBmbG9hdDMgZCA9IHBpeGVsKHh5LCBmbG9hdDIoLTEsIDApKTsKICAgIGZsb2F0MyBlID0gcGl4ZWwoeHksIGZsb2F0MiggMCwgMCkpOwogICAgZmxvYXQzIGYgPSBwaXhlbCh4eSwgZmxvYXQyKCAxLCAwKSk7CgogICAgZmxvYXQzIGcgPSBwaXhlbCh4eSwgZmxvYXQyKC0xLCAxKSk7CiAgICBmbG9hdDMgaCA9IHBpeGVsKHh5LCBmbG9hdDIoIDAsIDEpKTsKICAgIGZsb2F0MyBpID0gcGl4ZWwoeHksIGZsb2F0MiggMSwgMSkpOwoKICAgIGZsb2F0MyBtaW5fZGVmID0gbWluM3YoZCwgZSwgZik7CiAgICBmbG9hdDMgbWluX2JkZWZoID0gbWluM3YoYiwgbWluX2RlZiwgaCk7CiAgICBmbG9hdDMgbWluX2FiY2RmZ2hpID0gbWluM3YobWluM3YoYSwgbWluX2JkZWZoLCBjKSwgZywgaSk7CiAgICBmbG9hdDMgbWluM19mYWN0b3IgPSBtaW5fYmRlZmggKyBtaW5fYWJjZGZnaGk7CgogICAgZmxvYXQzIG1heF9kZWYgPSBtYXgzdihkLCBlLCBmKTsKICAgIGZsb2F0MyBtYXhfYmRlZmggPSBtYXgzdihiLCBtYXhfZGVmLCBoKTsKICAgIGZsb2F0MyBtYXhfYWJjZGZnaGkgPSBtYXgzdihtYXgzdihhLCBtaW5fYmRlZmgsIGMpLCBnLCBpKTsKICAgIGZsb2F0MyBtYXgzX2ZhY3RvciA9IG1heF9iZGVmaCArIG1heF9hYmNkZmdoaTsKCiAgICBmbG9hdDMgZmFjdG9yID0gMS4wIC8gbWF4M19mYWN0b3I7CgogICAgZmxvYXQzIGFtcCA9IHNhdHVyYXRlKG1pbihtaW4zX2ZhY3RvciwgMiAtIG1heDNfZmFjdG9yKSAqIGZhY3Rvcik7CiAgICBmbG9hdDMgYW1wX3NxcnQgPSBzcXJ0KGFtcCk7CgogICAgZmxvYXQgcGVhayA9IC0xLjAgLyAobWl4KDgsIDUsIHN0cmVuZ3RoKSk7CgogICAgZmxvYXQzIGNyb3NzX3dlaWdodHMgPSBhbXBfc3FydCAqIHBlYWs7CiAgICBmbG9hdDMgd2VpZ2h0cyA9IDEgLyAoMSArIDQgKiBjcm9zc193ZWlnaHRzKTsKCiAgICBmbG9hdDMgcmVzdWx0ID0gKChiICsgZCArIGYgKyBoKSAqIGNyb3NzX3dlaWdodHMgKyBlKSAqIHdlaWdodHM7CgogICAgcmV0dXJuIHNhdHVyYXRlKHJlc3VsdCk7Cn0KCmZsb2F0NCBtYWluKGZsb2F0MiB4eSkgewoKICAgIGZsb2F0NCBvcmlnaW5hbENvbG9yID0gaUNodW5rLmV2YWwoeHkpOwogICAgaWYgKG9yaWdpbmFsQ29sb3IuYSA8IDEpIHsKICAgICAgICByZXR1cm4gaUNodW5rLmV2YWwoeHkpOwogICAgfQoKICAgIGZsb2F0IGludGVuc2l0eSA9IGlBcmdzWzBdOwogICAgZmxvYXQgc3RyZW5ndGggPSAwOwogICAgZmxvYXQzIGNvbG9yOwoKICAgIGlmIChpbnRlbnNpdHkgPCBWX01JTiArIEVQU0lPTikgewogICAgICAgIHN0cmVuZ3RoID0gMC4xMDsKICAgICAgICBjb2xvciA9IFJHWDMoeHksIHN0cmVuZ3RoKTsKCiAgICB9IGVsc2UgaWYgKGludGVuc2l0eSA+IFZfTE9XIC0gRVBTSU9OICYmIGludGVuc2l0eSA8IFZfTE9XICsgRVBTSU9OKSB7CiAgICAgICAgc3RyZW5ndGggPSAwLjMzOwogICAgICAgIGNvbG9yID0gUkdYMyh4eSwgc3RyZW5ndGgpOwoKICAgIH0gZWxzZSBpZiAoaW50ZW5zaXR5ID4gVl9NRUQgLSBFUFNJT04gJiYgaW50ZW5zaXR5IDwgVl9NRUQgKyBFUFNJT04pIHsKICAgICAgICBzdHJlbmd0aCA9IDAuNTsKICAgICAgICBjb2xvciA9IFJHWDMoeHksIHN0cmVuZ3RoKTsKCiAgICB9IGVsc2UgaWYgKGludGVuc2l0eSA+IFZfSElHSCAtIEVQU0lPTiAmJiBpbnRlbnNpdHkgPCBWX0hJR0ggKyBFUFNJT04pIHsKICAgICAgICBzdHJlbmd0aCA9IDAuOTk7CiAgICAgICAgY29sb3IgPSBSR1gzKHh5LCBzdHJlbmd0aCk7CgogICAgfSBlbHNlIGlmIChpbnRlbnNpdHkgPiBWX01BWCAtIEVQU0lPTikgewogICAgICAgIHN0cmVuZ3RoID0gMTsKICAgICAgICBjb2xvciA9IFJHWDIoeHkpLnJnYjsKICAgIH0KCiAgICByZXR1cm4gZmxvYXQ0KGNvbG9yLCBvcmlnaW5hbENvbG9yLmEpOwp9) -opera-args(0.75 calc(env(-opera-accent-color-r, 255) / 255) calc(env(-opera-accent-color-g, 255) / 255) calc(env(-opera-accent-color-b, 255) / 255)));
+        }
+
+
+        img {
+            filter: -opera-shader(url(data:text/plain;base64,Ly8gaHR0cHM6Ly9naXRodWIuY29tL0dQVU9wZW4tRWZmZWN0cy9GaWRlbGl0eUZYLUNBUwovLyB2MwoKdW5pZm9ybSBzaGFkZXIgaUNodW5rOwp1bmlmb3JtIGZsb2F0MiBpTW91c2U7CnVuaWZvcm0gZmxvYXQ0IGlWaXNpYmxlUmVjdDsKdW5pZm9ybSBmbG9hdCBpQXJnc1sxXTsKCmNvbnN0IGZsb2F0IEVQU0lPTiA9IDAuMTsKY29uc3QgZmxvYXQgVl9NSU4gPSAwOwpjb25zdCBmbG9hdCBWX0xPVyA9IDAuMjU7CmNvbnN0IGZsb2F0IFZfTUVEID0gMC41Owpjb25zdCBmbG9hdCBWX0hJR0ggPSAwLjc1Owpjb25zdCBmbG9hdCBWX01BWCA9IDE7Cgpjb25zdCBmbG9hdCBUSFJFU0hPTERfQVJFQSA9IDgwMCAqIDYwMDsKY29uc3QgZmxvYXQgTUlOX0FSRUEgPSA0MDAgKiAxMDA7CmNvbnN0IGZsb2F0IE1JTl9TVFJJUCA9IDIwOwpjb25zdCBmbG9hdCBNQVJHSU4gPSAxOwoKaW5saW5lIGZsb2F0MyBwaXhlbChmbG9hdDIgeHksIGZsb2F0MiBvZmZzZXQpIHsKICAgIHJldHVybiBpQ2h1bmsuZXZhbCh4eSArIG9mZnNldCkucmdiOwp9CgppbmxpbmUgZmxvYXQzIHNoYXJwZW4oZmxvYXQyIHh5KSB7CiAgICBmbG9hdDMgZiA9CiAgICAgICAgcGl4ZWwoeHksIGZsb2F0MigtMSwgLTEpKSAqICAxICsKICAgICAgICBwaXhlbCh4eSwgZmxvYXQyKCAwLCAtMSkpICogLTEgKwogICAgICAgIHBpeGVsKHh5LCBmbG9hdDIoIDEsIC0xKSkgKiAgMSArCgogICAgICAgIHBpeGVsKHh5LCBmbG9hdDIoLTEsIDApKSAqIC0xICArCiAgICAgICAgcGl4ZWwoeHksIGZsb2F0MiggMCwgMCkpICogLTEgICsKICAgICAgICBwaXhlbCh4eSwgZmxvYXQyKCAxLCAwKSkgKiAtMSAgKwoKICAgICAgICBwaXhlbCh4eSwgZmxvYXQyKC0xLCAxKSkgKiAxICAgKwogICAgICAgIHBpeGVsKHh5LCBmbG9hdDIoIDAsIDEpKSAqIC0xICArCiAgICAgICAgcGl4ZWwoeHksIGZsb2F0MiggMSwgMSkpICogMTsKICAgIHJldHVybiBmIC8gLTE7Cn0KCmZsb2F0NCBSR1gyKGZsb2F0MiB4eSkgewogICAgZmxvYXQyIGNodW5rX3NpemUgPSBpVmlzaWJsZVJlY3Quenc7CiAgICBmbG9hdDQgY29sb3IgPSBpQ2h1bmsuZXZhbCh4eSk7CgogICAgaWYgKGNodW5rX3NpemUueCAqIGNodW5rX3NpemUueSA8IE1JTl9BUkVBKSB7CiAgICAgICAgcmV0dXJuIGNvbG9yOwogICAgfQoKICAgIGlmIChjaHVua19zaXplLnkgPCBNSU5fU1RSSVAgfHwgY2h1bmtfc2l6ZS54IDwgTUlOX1NUUklQKSB7CiAgICAgICAgcmV0dXJuIGNvbG9yOwogICAgfQoKICAgIGlmICh4eS54IDwgTUFSR0lOIHx8IHh5LnggPiAoY2h1bmtfc2l6ZS54IC0gTUFSR0lOKSB8fAogICAgICAgIHh5LnkgPCBNQVJHSU4gfHwgeHkueSA+IChjaHVua19zaXplLnkgLSBNQVJHSU4pKSB7CiAgICAgICAgcmV0dXJuIGNvbG9yOwogICAgfQoKICAgIHJldHVybiBmbG9hdDQoc2hhcnBlbih4eSksIDEpOwp9CgppbmxpbmUgZmxvYXQzIG1pbjN2KGZsb2F0MyB4LCBmbG9hdDMgeSwgZmxvYXQzIHopIHsKCXJldHVybiBtaW4oeCwgbWluKHksIHopKTsKfQoKaW5saW5lIGZsb2F0MyBtYXgzdihmbG9hdDMgeCwgZmxvYXQzIHksIGZsb2F0MyB6KSB7CglyZXR1cm4gbWF4KHgsIG1heCh5LCB6KSk7Cn0KCmZsb2F0MyBSR1gzKGZsb2F0MiB4eSwgZmxvYXQgc3RyZW5ndGgpIHsKICAgIGZsb2F0MyBhID0gcGl4ZWwoeHksIGZsb2F0MigtMSwgLTEpKTsKICAgIGZsb2F0MyBiID0gcGl4ZWwoeHksIGZsb2F0MiggMCwgLTEpKTsKICAgIGZsb2F0MyBjID0gcGl4ZWwoeHksIGZsb2F0MiggMSwgLTEpKTsKCiAgICBmbG9hdDMgZCA9IHBpeGVsKHh5LCBmbG9hdDIoLTEsIDApKTsKICAgIGZsb2F0MyBlID0gcGl4ZWwoeHksIGZsb2F0MiggMCwgMCkpOwogICAgZmxvYXQzIGYgPSBwaXhlbCh4eSwgZmxvYXQyKCAxLCAwKSk7CgogICAgZmxvYXQzIGcgPSBwaXhlbCh4eSwgZmxvYXQyKC0xLCAxKSk7CiAgICBmbG9hdDMgaCA9IHBpeGVsKHh5LCBmbG9hdDIoIDAsIDEpKTsKICAgIGZsb2F0MyBpID0gcGl4ZWwoeHksIGZsb2F0MiggMSwgMSkpOwoKICAgIGZsb2F0MyBtaW5fZGVmID0gbWluM3YoZCwgZSwgZik7CiAgICBmbG9hdDMgbWluX2JkZWZoID0gbWluM3YoYiwgbWluX2RlZiwgaCk7CiAgICBmbG9hdDMgbWluX2FiY2RmZ2hpID0gbWluM3YobWluM3YoYSwgbWluX2JkZWZoLCBjKSwgZywgaSk7CiAgICBmbG9hdDMgbWluM19mYWN0b3IgPSBtaW5fYmRlZmggKyBtaW5fYWJjZGZnaGk7CgogICAgZmxvYXQzIG1heF9kZWYgPSBtYXgzdihkLCBlLCBmKTsKICAgIGZsb2F0MyBtYXhfYmRlZmggPSBtYXgzdihiLCBtYXhfZGVmLCBoKTsKICAgIGZsb2F0MyBtYXhfYWJjZGZnaGkgPSBtYXgzdihtYXgzdihhLCBtaW5fYmRlZmgsIGMpLCBnLCBpKTsKICAgIGZsb2F0MyBtYXgzX2ZhY3RvciA9IG1heF9iZGVmaCArIG1heF9hYmNkZmdoaTsKCiAgICBmbG9hdDMgZmFjdG9yID0gMS4wIC8gbWF4M19mYWN0b3I7CgogICAgZmxvYXQzIGFtcCA9IHNhdHVyYXRlKG1pbihtaW4zX2ZhY3RvciwgMiAtIG1heDNfZmFjdG9yKSAqIGZhY3Rvcik7CiAgICBmbG9hdDMgYW1wX3NxcnQgPSBzcXJ0KGFtcCk7CgogICAgZmxvYXQgcGVhayA9IC0xLjAgLyAobWl4KDgsIDUsIHN0cmVuZ3RoKSk7CgogICAgZmxvYXQzIGNyb3NzX3dlaWdodHMgPSBhbXBfc3FydCAqIHBlYWs7CiAgICBmbG9hdDMgd2VpZ2h0cyA9IDEgLyAoMSArIDQgKiBjcm9zc193ZWlnaHRzKTsKCiAgICBmbG9hdDMgcmVzdWx0ID0gKChiICsgZCArIGYgKyBoKSAqIGNyb3NzX3dlaWdodHMgKyBlKSAqIHdlaWdodHM7CgogICAgcmV0dXJuIHNhdHVyYXRlKHJlc3VsdCk7Cn0KCmZsb2F0NCBtYWluKGZsb2F0MiB4eSkgewoKICAgIGZsb2F0NCBvcmlnaW5hbENvbG9yID0gaUNodW5rLmV2YWwoeHkpOwogICAgaWYgKG9yaWdpbmFsQ29sb3IuYSA8IDEpIHsKICAgICAgICByZXR1cm4gaUNodW5rLmV2YWwoeHkpOwogICAgfQoKICAgIGZsb2F0IGludGVuc2l0eSA9IGlBcmdzWzBdOwogICAgZmxvYXQgc3RyZW5ndGggPSAwOwogICAgZmxvYXQzIGNvbG9yOwoKICAgIGlmIChpbnRlbnNpdHkgPCBWX01JTiArIEVQU0lPTikgewogICAgICAgIHN0cmVuZ3RoID0gMC4xMDsKICAgICAgICBjb2xvciA9IFJHWDMoeHksIHN0cmVuZ3RoKTsKCiAgICB9IGVsc2UgaWYgKGludGVuc2l0eSA+IFZfTE9XIC0gRVBTSU9OICYmIGludGVuc2l0eSA8IFZfTE9XICsgRVBTSU9OKSB7CiAgICAgICAgc3RyZW5ndGggPSAwLjMzOwogICAgICAgIGNvbG9yID0gUkdYMyh4eSwgc3RyZW5ndGgpOwoKICAgIH0gZWxzZSBpZiAoaW50ZW5zaXR5ID4gVl9NRUQgLSBFUFNJT04gJiYgaW50ZW5zaXR5IDwgVl9NRUQgKyBFUFNJT04pIHsKICAgICAgICBzdHJlbmd0aCA9IDAuNTsKICAgICAgICBjb2xvciA9IFJHWDMoeHksIHN0cmVuZ3RoKTsKCiAgICB9IGVsc2UgaWYgKGludGVuc2l0eSA+IFZfSElHSCAtIEVQU0lPTiAmJiBpbnRlbnNpdHkgPCBWX0hJR0ggKyBFUFNJT04pIHsKICAgICAgICBzdHJlbmd0aCA9IDAuOTk7CiAgICAgICAgY29sb3IgPSBSR1gzKHh5LCBzdHJlbmd0aCk7CgogICAgfSBlbHNlIGlmIChpbnRlbnNpdHkgPiBWX01BWCAtIEVQU0lPTikgewogICAgICAgIHN0cmVuZ3RoID0gMTsKICAgICAgICBjb2xvciA9IFJHWDIoeHkpLnJnYjsKICAgIH0KCiAgICByZXR1cm4gZmxvYXQ0KGNvbG9yLCBvcmlnaW5hbENvbG9yLmEpOwp9) -opera-args(0.75 calc(env(-opera-accent-color-r, 255) / 255) calc(env(-opera-accent-color-g, 255) / 255) calc(env(-opera-accent-color-b, 255) / 255)));
+        }
+    </style>
+    <style type="text/css">:root img[width="728"][height="90"], :root [href="https://adstub.net/cina777/"], :root [href="https://adstub.net/arab777/"], :root [href="https://adstub.net/ratu89/"], :root [href="https://adstub.net/judi89/"], :root [href^="//mage98rquewz.com/"], :root [href^="//x4pollyxxpush.com/"], :root span[id^="ezoic-pub-ad-placeholder-"], :root ins.adsbygoogle[data-ad-slot], :root ins.adsbygoogle[data-ad-client], :root img[src^="https://s-img.adskeeper.com/"], :root guj-ad, :root gpt-ad, :root div[ow-ad-unit-wrapper], :root div[id^="zergnet-widget"], :root div[id^="vuukle-ad-"], :root div[id^="taboola-stream-"], :root div[id^="sticky_ad_"], :root div[id^="st"][style^="z-index: 999999999;"], :root div[id^="rc-widget-"], :root div[id^="mrec-leaderboard-"], :root div[id^="gpt_ad_"], :root div[id^="ezoic-pub-ad-"], :root div[id^="dfp-ad-"], :root div[id^="crt-"][style], :root div[id^="apn_native_ad_slot_"], :root div[id^="adspot-"], :root div[id^="adrotate_widgets-"], :root ps-connatix-module, :root div[id^="ad_position_"], :root div[id^="ad-div-"], :root div[id*="ScriptRoot"], :root div[id*="MarketGid"], :root [href="https://adstub.net/rusia777/"], :root div[data-id-advertdfpconf], :root div[data-dfp-id], :root hl-adsense, :root div[data-contentexchange-widget], :root div[data-alias="300x250 Ad 2"], :root div[data-adunit-path], :root div[data-adname], :root div[data-ad-placeholder], :root a[href^="https://osfultrbriolenai.info/"], :root div[class^="Adstyled__AdWrapper-"], :root a[href^="https://go.xlviiirdr.com"], :root div[class$="-adlabel"], :root display-ads, :root a[href^="https://go.grinsbest.com/"], :root citrus-ad-wrapper, :root a[href^="https://s.zlinkd.com/"], :root bottomadblock, :root amp-fx-flying-carpet, :root amp-embed[type="taboola"], :root amp-connatix-player, :root div[id^="google_dfp_"], :root ad-slot, :root a[href^="https://www.purevpn.com/"][href*="&utm_source=aff-"], :root a[href^="https://www.privateinternetaccess.com/"] > img, :root a[href^="https://www.onlineusershielder.com/"], :root a[href^="https://financeads.net/tc.php?"], :root a[href^="https://www.mrskin.com/tour"], :root a[href^="https://www.infowarsstore.com/"] > img, :root a[href^="https://ak.psaltauw.net/"], :root broadstreet-zone-container, :root a[href^="https://www.highperformancecpmgate.com/"], :root amp-ad, :root a[href^="https://www.highcpmrevenuenetwork.com/"], :root a[href^="https://www.get-express-vpn.com/offer/"], :root a[href^="https://lnkxt.bannerator.com/"], :root a[href^="https://www.geekbuying.com/dynamic-ads/"], :root [href^="https://groorsoa.net/"], :root a[href^="https://www.financeads.net/tc.php?"], :root a[href^="https://www.effectiveratecpm.com/"], :root [href^="https://www.herbanomic.com/"] > img, :root a[href^="https://www.dql2clk.com/"], :root a[href^="https://www.nutaku.net/signup/landing/"], :root a[href^="https://www.dating-finder.com/signup/?ai_d="], :root a[href^="https://explore-site.com/"], :root a[href^="https://www.brazzersnetwork.com/landing/"], :root [data-template-type="nativead"], :root a[href^="https://www.adultempire.com/"][href*="?partner_id="], :root a[href^="https://voluum.prom-xcams.com/"], :root a[href^="https://twinrdsyte.com/"], :root a[href^="https://twinrdsrv.com/"], :root a[href^="https://syndicate.contentsserved.com/"], :root div[data-alias="300x250 Ad 1"], :root a[href^="https://trk.nfl-online-streams.club/"], :root a[href^="https://tracking.avapartner.com/"], :root a[href^="https://track.wg-aff.com"], :root a[href^="https://track.ultravpn.com/"], :root a[href^="https://track.afcpatrk.com/"], :root a[href^="https://track.adform.net/"], :root a[href^="https://torguard.net/aff.php"] > img, :root [data-identity="adhesive-ad"], :root a[href^="https://tc.tradetracker.net/"] > img, :root a[href^="https://tatrck.com/"], :root [href^="https://zstacklife.com/"] img, :root a[href^="https://click.candyoffers.com/"], :root a[href^="https://t.aslnk.link/"], :root a[onmousedown^="this.href='https://paid.outbrain.com/network/redir?"], :root a[href^="https://t.ajump1.com/"], :root a[href^="https://t.adating.link/"], :root a[href^="https://go.trackitalltheway.com/"], :root [href^="https://track.fiverr.com/visit/"] > img, :root a[href^="https://syndication.exoclick.com/"], :root a[href^="https://syndication.dynsrvtbg.com/"], :root .gnt_em_vp_c[data-g-s="vp_dk"], :root div[data-ad-wrapper], :root a[href^="https://svb-analytics.trackerrr.com/"], :root a[onmousedown^="this.href='https://paid.outbrain.com/network/redir?"] + .ob_source, :root a[href^="http://www.iyalc.com/"], :root a[href^="https://claring-loccelkin.com/"], :root a[href^="https://stardomcoit.com/"], :root a[href^="https://track.aftrk5.com/"], :root a[href^="https://slkmis.com/"], :root a[href^="https://myclick-2.com/"], :root a[href^="https://sexynearme.com/"], :root [data-ad-manager-id], :root a[href^="https://s.zlinkr.com/"], :root [href="https://adstub.net/gaza88/"], :root a[href^="https://ad.doubleclick.net/"], :root a[href^="https://static.fleshlight.com/images/banners/"], :root a[href^="https://s.zlink7.com/"], :root a[href^="https://s.ma3ion.com/"], :root a[href^="https://s.eunow4u.com/"], :root a[href^="https://random-affiliate.atimaze.com/"], :root #kt_player > div[style$="display: block;"][style*="inset: 0px;"], :root [href$="/sexdating.php"], :root a[href^="https://quotationfirearmrevision.com/"], :root a[href^="https://pubads.g.doubleclick.net/"], :root a[href^="https://prf.hn/click/"][href*="/camref:"] > img, :root a[href^="https://serve.awmdelivery.com/"], :root a[href^="https://www.dating-finder.com/?ai_d="], :root a[href^="https://prf.hn/click/"][href*="/adref:"] > img, :root [href^="https://ap.octopuspop.com/click/"] > img, :root app-ad, :root a[href^="https://postback1win.com/"], :root a[href^="https://a.adtng.com/"], :root a[href^="https://playnano.online/offerwalls/?ref="], :root a[href^="https://mmwebhandler.aff-online.com/"], :root a[href^="https://www.bet365.com/"][href*="affiliate="], :root a[href^="https://pb-track.com/"], :root a[href^="https://pb-front.com/"], :root a[href^="https://paid.outbrain.com/network/redir?"], :root a[href^="https://streamate.com/landing/click/"], :root a[href^="https://upsups.click/"], :root a[href^="https://ndt5.net/"], :root a[href^="https://natour.naughtyamerica.com/track/"], :root a[href^="https://mediaserver.entainpartners.com/renderBanner.do?"], :root [data-ad-name], :root a[href^="https://loboclick.com/"], :root a[href^="https://lead1.pl/"], :root a[href^="https://landing.brazzersnetwork.com/"], :root a[href^="https://juicyads.in/"], :root a[href^="https://snowdayonline.xyz/"], :root a[href^="https://join.dreamsexworld.com/"], :root a[href^="https://join.bannedsextapes.com/track/"], :root a[href^="https://jaxofuna.com/"], :root a[href^="https://italarizege.xyz/"], :root a[href^="https://identicaldrench.com/"], :root ad-shield-ads, :root a[href^="https://hot-growngames.life/"], :root a[href^="https://helmethomicidal.com/"], :root display-ad-component, :root a[href^="https://golinks.work/"], :root a[href^="https://s.zlinkn.com/"], :root a[href^="https://go.xxxvjmp.com/"], :root a[href^="https://go.xxxjmp.com"], :root a[href^="https://zirdough.net/"], :root [class^="tile-picker__CitrusBannerContainer-sc-"], :root a[href^="https://go.xxxiijmp.com"], :root a[href^="https://go.xtbaffiliates.com/"], :root [data-role="tile-ads-module"], :root a[href^="https://go.xlviirdr.com"], :root a[href^="https://go.xlivrdr.com"], :root a[href^="https://ismlks.com/"], :root [href^="https://www.mypillow.com/"] > img, :root a[href^="https://go.xlirdr.com"], :root [data-css-class="dfp-inarticle"], :root a[href^="https://go.tmrjmp.com"], :root a[href^="https://go.markets.com/visit/?bta="], :root a[href^="https://billing.purevpn.com/aff.php"] > img, :root a[href^="https://go.hpyrdr.com/"], :root a[href^="https://lijavaxa.com/"], :root a[href^="https://go.goaserv.com/"], :root app-large-ad, :root [href^="https://turtlebids.irauctions.com/"] img, :root div[data-adunit], :root a[href^="https://go.etoro.com/"] > img, :root a[href^="https://go.dmzjmp.com"], :root a[href^="https://www.bang.com/?aff="], :root #mgb-container > #mgb, :root a[href^="https://go.admjmp.com"], :root a[href^="https://get.surfshark.net/aff_c?"][href*="&aff_id="] > img, :root a[href^="https://datewhisper.life/"], :root a[href^="https://click.linksynergy.com/fs-bin/"] > img, :root a[href^="https://get-link.xyz/"], :root a[href^="https://www.mrskin.com/account/"], :root a[href^="https://www.adskeeper.com"], :root a[data-redirect^="https://paid.outbrain.com/network/redir?"], :root [href^="https://clicks.affstrack.com/"] > img, :root a[href^="https://engine.phn.doublepimp.com/"], :root a[href^="https://dl-protect.net/"], :root a[href*=".foxqck.com/"], :root a[href^="https://ctosrd.com/"], :root a[href^="https://go.bushheel.com/"], :root a[href^="https://ctjdwm.com/"], :root [href="//sexcams.plus/"], :root a[href^="https://camfapr.com/landing/click/"], :root a[href^="https://prf.hn/click/"][href*="/creativeref:"] > img, :root a[href*="&maxads="], :root a[href^="http://www.adultempire.com/unlimited/promo?"][href*="&partner_id="], :root a[href^="https://1betandgonow.com/"], :root a[href^="https://chaturbate.com/in/?"], :root a[href^="https://t.ajrkm1.com/"], :root a[href^="https://bongacams10.com/track?"], :root a[href*=".g2afse.com/"], :root a[href^="https://bodelen.com/"], :root a[href^="//hoodingluster.com/"], :root a[href^="https://black77854.com/"], :root a[href^="https://getmatchedlocally.com/"], :root app-advertisement, :root a[href^="https://rixofa.com/"], :root a[href^="https://best-experience-cool.com/"], :root [data-taboola-options], :root a[href^="https://believessway.com/"], :root a[href^="https://Click.ggpickaff.com/"], :root a[href^="https://banners.livepartners.com/"], :root a[href^="http://revolvemockerycopper.com/"], :root a[href^="https://awptjmp.com/"], :root a[href^="https://join.sexworld3d.com/track/"], :root a[href^="https://aweptjmp.com/"], :root a[href^="https://ausoafab.net/"], :root a[href^="https://clicks.pipaffiliates.com/"], :root a[href^="https://aj1070.online/"], :root a[href^="https://a.bestcontentoperation.top/"], :root a[href^="https://adultfriendfinder.com/go/"], :root a[href^="https://ads.planetwin365affiliate.com/"], :root a[href^="https://ads.leovegas.com/"], :root a[href^="https://go.xlvirdr.com"], :root img[src^="https://images.purevpnaffiliates.com"], :root a[href^="https://porntubemate.com/"], :root a[href^="https://click.dtiserv2.com/"], :root a[href^="https://clickadilla.com/"], :root a[href^="https://a.medfoodhome.com/"], :root a[href^="https://cam4com.go2cloud.org/"], :root .nya-slot[style], :root a[href^="https://a.bestcontentweb.top/"], :root atf-ad-slot, :root a[href^="https://a2.adform.net/"], :root a[href^="https://a.candyai.love/"], :root .banner-img > .pbl, :root [data-m-ad-id], :root a[href^="https://a-ads.com/"], :root a[href^="https://1winpb.com/"], :root div[id^="optidigital-adslot"], :root [href^="https://wsup.ai/"], :root a[href^="https://123-stream.org/"], :root a[href^="https://in.rabbtrk.com/"], :root a[href^="http://www.h4trck.com/"], :root [href^="https://a.acebet.com/api/click?"], :root a[href^="http://www.friendlyduck.com/AF_"], :root a[href^="http://partners.etoro.com/"], :root [href="https://chaturbate.jjgirls.com/"] > img, :root a[href^="http://cam4com.go2cloud.org/aff_c?"], :root a[href^="https://ads.betfair.com/redirect.aspx?"], :root amp-ad-custom, :root a[href^="http://trk.globwo.online/"], :root a[onclick^="window.location.replace('https://random-affiliate.atimaze.com/"], :root a[href^="https://bongacams2.com/track?"], :root a-ad, :root a[href^="https://offhandpump.com/"], :root a[href^="http://stickingrepute.com/"], :root #slashboxes > .deals-rail, :root div[aria-label="Ads"], :root [href^="http://mypillow.com/"] > img, :root a[href^="http://bongacams.com/track?"], :root a[href^="//startgaming.net/tienda/" i], :root a[href^="https://a.medfoodsafety.com/"], :root a[href^="//go.eabids.com/"], :root a[href^=" https://www.friendlyduck.com/AF_"], :root [data-cl-spot-id], :root a[href*="/jump/next.php?r="], :root a[href^="https://go.nordvpn.net/aff"] > img, :root .\[\&_\.gdprAdTransparencyCogWheelButton\]\:\!pjra-z-\[5\], :root [href^="http://clicks.totemcash.com/"], :root a[href^="https://ad.zanox.com/ppc/"] > img, :root [data-d-ad-id], :root a[href*=".engine.adglare.net/"], :root div[id^="lazyad-"], :root a[href^="http://com-1.pro/"], :root [href^="https://www.profitablegatecpm.com/"], :root a[href*=".cfm?domain="][href*="&fp="], :root a[href^="https://ab.advertiserurl.com/aff/"], :root a[data-oburl^="https://paid.outbrain.com/network/redir?"], :root [id^="section-ad-banner"], :root [id^="ad_slider"], :root a[href^="https://www.goldenfrog.com/vyprvpn?offer_id="][href*="&aff_id="], :root a[href^="https://wmctjd.com/"], :root a[href*="//jjgirls.com/sex/Chaturbate"], :root [id^="ad-wrap-"], :root [href^="https://zone.gotrackier.com/"], :root a[href^="http://sarcasmadvisor.com/"], :root [href^="https://www.restoro.com/"], :root a[href^="https://track.totalav.com/"], :root a[href^="https://ctrdwm.com/"], :root [href^="https://www.targetingpartner.com/"], :root a[href^="https://join.virtuallust3d.com/"], :root .section-subheader > .section-hotel-prices-header, :root [href^="https://www.hostg.xyz/"] > img, :root a[href^="https://bngpt.com/"], :root a[href^="https://www.sheetmusicplus.com/"][href*="?aff_id="], :root a[href^="http://adultfriendfinder.com/go/"], :root a[href^="https://fastestvpn.com/lifetime-special-deal?a_aid="], :root a[href^="https://tour.mrskin.com/"], :root div[id^="ad-position-"], :root a[href^="https://www.toprevenuegate.com/"], :root a[href^="https://bc.game/"], :root a[href^="http://join.brokestraightboys.com/track/"], :root div[id^="div-ads-"], :root [href^="https://rapidgator.net/article/premium/ref/"], :root [href^="https://join.girlsoutwest.com/"], :root a[href^="https://activate-game.com/"], :root .scroll-fixable.rail-right > .deals-rail, :root [data-wpas-zoneid], :root a[href^="https://track.aftrk3.com/"], :root [href^="https://join3.bannedsextapes.com"], :root div[data-adzone], :root div[id^="adngin-"], :root [data-rc-widget], :root span[data-ez-ph-id], :root [href^="https://track.aftrk1.com/"], :root [href^="https://join.playboyplus.com/track/"], :root a[href^="https://go.xxxijmp.com"], :root [href^="https://istlnkcl.com/"], :root a[href^="https://trk.softonixs.xyz/"], :root a[href^="https://iqbroker.com/"][href*="?aff="], :root [href^="https://rpwmct.com/"], :root [href^="https://wct.link/click?"], :root a[href^="https://t.acam.link/"], :root a[href^="https://go.strpjmp.com/"], :root [href^="https://url.totaladblock.com/"], :root a[href^="https://go.rmishe.com/"], :root [href^="https://ilovemyfreedoms.com/landing-"], :root [href="https://adstub.net/indo666/"], :root [href^="https://glersakr.com/"], :root a[href^="https://tm-offers.gamingadult.com/"], :root [href^="https://charmingdatings.life/"], :root [data-id^="div-gpt-ad"], :root a[href^="https://tracker.loropartners.com/"], :root [href^="https://awbbjmp.com/"], :root a[href^="https://www.friendlyduck.com/AF_"], :root [href^="https://ad1.adfarm1.adition.com/"], :root a[href^="https://t.ajrkm3.com/"], :root [href^="https://aads.com/campaigns/"], :root a[href^="https://fc.lc/ref/"], :root a[href^="https://go.bbrdbr.com"], :root a[href^="http://tc.tradetracker.net/"] > img, :root a[href^="https://s.zlink3.com/"], :root a[href^="http://sneakyadministration.com/"], :root [href^="https://www.brighteonstore.com/products/"] img, :root a[href^="https://bngprm.com/"], :root [href^="https://shiftnetwork.infusionsoft.com/go/"] > img, :root [href^="http://www.mypillow.com/"] > img, :root .ob_container .item-container-obpd, :root [id^="div-gpt-ad"], :root [href="https://jdrucker.com/gold"] > img, :root a[href^="https://join.virtualtaboo.com/track/"], :root [id^="ad_sky"], :root [name^="google_ads_iframe"], :root aside[id^="adrotate_widgets-"], :root a[href^="https://www.liquidfire.mobi/"], :root DFP-AD, :root .grid > .container > #aside-promotion, :root [data-type="ad-vertical"], :root [href^="https://go.xlrdr.com"], :root a[href^="https://s.cant3am.com/"], :root [data-testid^="taboola-"], :root [data-testid^="section-AdRowBillboard"], :root a[href^="https://track.1234sd123.com/"], :root zeus-ad, :root [data-testid="prism-ad-wrapper"], :root [href^="https://ad.admitad.com/"], :root [href^="https://mypillow.com/"] > img, :root [data-testid="ad_testID"], :root [data-mobile-ad-id], :root [data-dynamic-ads], :root a[href^="https://gamingadlt.com/?offer="], :root [data-desktop-ad-id], :root a[href^="https://go.rmhfrtnd.com"], :root a[href^="https://pb-imc.com/"], :root a[href^="https://www8.smartadserver.com/"], :root topadblock, :root a[href^="//s.zlinkd.com/"], :root [href^="https://mypatriotsupply.com/"] > img, :root [data-testid="adBanner-wrapper"], :root [href^="https://mylead.global/stl/"] > img, :root a[href*=".adsrv.eacdn.com/"], :root [href^="https://antiagingbed.com/discount/"] > img, :root #teaser1[style^="width:autopx;"], :root [href^="https://www.cloudways.com/en/?id"], :root [data-asg-ins], :root [data-block-type="ad"], :root [data-ad-width], :root a[href^="https://clickins.slixa.com/"], :root [onclick*="content.ad/"], :root a[href^="https://go.cmtaffiliates.com/"], :root [href^="https://optimizedelite.com/"] > img, :root div[data-ad-region], :root AMP-AD, :root [data-ad-cls], :root a[href^="https://www.adxsrve.com/"], :root a[href^="https://click.Ggpickaff.com/"], :root [data-ez-name], :root a[href^="https://go.mnaspm.com/"], :root a[href^="https://service.bv-aff-trx.com/"], :root a[href^="https://6-partner.com/"], :root [class^="s2nPlayer"], :root [href^="https://affiliate.fastcomet.com/"] > img, :root [class^="adDisplay-module"], :root a[href^="https://adclick.g.doubleclick.net/"], :root [data-freestar-ad][id], :root AD-SLOT, :root a[href^="https://combodef.com/"], :root a[href^="https://click.hoolig.app/"], :root a[href^="https://www.googleadservices.com/pagead/aclk?"] > img, :root [data-ad-module], :root a[href^="https://a.bestcontentfood.top/"], :root #kt_player > a[target="_blank"], :root a[href^="https://go.skinstrip.net"][href*="?campaignId="], :root #teaser2[style^="width:autopx;"], :root [data-revive-zoneid], :root a[href^="https://losingoldfry.com/"], :root div[id^="div-gpt-"], :root a[href^="https://gml-grp.com/"], :root .ob_dual_right > .ob_ads_header ~ .odb_div, :root div[data-ad-targeting], :root a[style="width:100%;height:100%;z-index:10000000000000000;position:absolute;top:0;left:0;"], :root [href^="https://www.avantlink.com/click.php"] img, :root [data-testid="commercial-label-taboola"], :root [class^="div-gpt-ad"], :root a[href^="https://traffdaq.com/"], :root #teaser3[style^="width:autopx;"], :root a[href^="https://go.hpyjmp.com"], :root iframe[scrolling="no"][sandbox*="allow-popups allow-modals"][style^="width: 100%; height: 100%; border: none;"], :root [href^="https://mystore.com/"] > img, :root [class^="amp-ad-"], :root a[href^="https://clixtrac.com/"], :root a[href^="https://wittered-mainging.com/"], :root #teaser3[style="width: 100%;text-align: center;display: scroll;position:fixed;bottom: 0;margin: 0 auto;z-index: 103;"] {
+        display: none !important;
+    }</style>
+</head>
+
+<body>
+
+<center>
+    <table style="background:white;padding:1px;border-spacing:5px">
+        <tbody>
+        <tr>
+            <td style="text-align:center">
+                <font color="black">
+                    <a href="/"><font color="blue">Home</font></a> -
+                    <a href="/topics"><font color="blue">Topics</font></a> -
+                    <a href="/pub"><font color="blue">Papers</font></a> -
+                    <a href="/talk"><font color="blue">Talks</font></a> -
+                    <a href="/thesis"><font color="blue">Theses</font></a> -
+                    <a href="/post"><font color="blue">Blog</font></a> -
+                    <a href="/cv.pdf"><font color="blue">CV</font></a> -
+                    <a href="/album/"><font color="blue">Photos</font></a> -
+                    <a href="/funny/"><font color="blue">Funny</font></a>
+                </font>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+</center>
+<p>
+
+
+</p>
+<div style="display: flex">
+    <div style="flex: 2 5 20px">
+    </div>
+
+    <div style="flex: 1 1 500px">
+
+        <h2 align="right"><i>December 28, 2022</i></h2>
+
+        <h1>MinML: concise but general markup syntax</h1>
+
+
+        <style>
+            table {
+                width: 75%;
+                padding: 10pt;
+                margin-left: auto;
+                margin-right: auto
+            }
+
+            tr {
+                text-align: left
+            }
+        </style>
+
+        Could you use a markup syntax
+        that supports the full expressive power and richness of HTML or XML,
+        but is more terse, easier to type, and less frankly ugly?
+        To <em>emphasize</em> text, for example,
+        would it be nice just to write <code>em[emphasize]</code>
+        instead of <code>&lt;em&gt;emphasize&lt;/em&gt;</code>?
+        If so, pleae read on.
+
+
+        <h2>The tussle between generality and writer-friendliness</h2>
+
+        Markup languages derived from SGML, like HTML and XML,
+        are powerful and have many uses
+        but are verbose and often a pain to write or edit manually.
+        While XML was substantially a reaction to the complexity and bloat of SGML,
+        terseness was always considered of
+        <a href="https://www.schematron.com/document/467.html">minimal importance</a>
+        in XML.
+
+        <p></p>
+        Reactions to the verbosity and awkwardness of SGML-style markup
+        brought us formats like
+        <a href="https://www.json.org/json-en.html">JSON</a>
+        and
+        <a href="https://en.wikipedia.org/wiki/Markdown">Markdown</a>.
+        But while JSON is useful for automated data interchange,
+        it is not a markup language.
+        Its strict and minimal syntax demanded further extensions like
+        <a href="https://yaml.org">YAML</a>,
+        <a href="https://github.com/toml-lang/toml">TOML</a>, or
+        <a href="https://json5.org">JSON5</a>
+        even to get, say, a way to write comments.
+
+        <p></p>
+        Markdown <em>is</em> a markup language,
+        and vastly improves terseness and quick typeability
+        for the most common and simple markup constructs.
+        But its expressiveness is limited to a small subset of HTML.
+        Further,
+        the quirky special-case syntax it uses for each construct
+        makes its syntax difficult to “scale” to richer functionality
+        without getting into a mess of syntax conflicts and ambiguities.
+        It is not easy to standardize, or even to specify rigorously –
+        not to say that this
+        <a href="https://commonmark.org">hasn't been tried</a>.
+        To see just how fragile Markdown syntax is,
+        try to understand – or correctly implement –
+        <a href="https://spec.commonmark.org/0.30/#emphasis-and-strong-emphasis">the 17 rules for parsing emphasis
+            and the 131 associated examples</a> in Commonmark.
+
+        <p></p>
+        There are numerous extensions and alternative variants of Markdown-style syntax
+        to choose from, of course: e.g.,
+        <a href="https://github.github.com/gfm/">GitHub flavor</a>,
+        <a href="https://docutils.sourceforge.io/rst.html"><i>re</i>Structured<i>Text</i></a>,
+        <a href="https://perldoc.perl.org/perlpod">POD</a>,
+        <a href="https://orgmode.org">Org Mode</a>,
+        <a href="https://asciidoc.org">AsciiDoc</a>,
+        <a href="https://www.promptworks.com/textile">Textile</a>,
+        <a href="https://leanpub.com/markua/read">Markua</a>,
+        <a href="https://txt2tags.org">txt2tags</a>,
+        etc.
+        Each of these variants supports a <i>different</i> small subset of HTML,
+        each with its own syntactic quirks for the markup author to learn afresh.
+        Further, each flavor's limitations present expressiveness barriers
+        that an author may encounter at any moment:
+        “oh, but now can I do <i>that</i>?”
+        These barriers can lead the frustrated author
+        to seek escape routes –
+        back to HTML,
+        or to another existing Markdown flavor,
+        or to create <em>yet another</em> new flavor themselves
+        with ever-more-devilishly clever and brittle syntax
+        with another new and different set of limitations.
+
+        <p></p>
+        On <a href="/">my web site</a>,
+        I used to embed HTML tags in <code>.md</code> files
+        in order to escape Markdown's limitations.
+        But when an “upgrade”
+        to <a href="https://gohugo.io">Hugo</a>
+        silently corrupted the entire website
+        by suddenly disabling all markdown-embedded HTML,
+        I realized the essential fragility of this solution.
+        Even if markdown-embedded HTML
+        <a href="https://flaviocopes.com/hugo-embed-html-markdown/">can be re-enabled</a>,
+        I do not want all my past writing being silently corrupted on a regular basis
+        by the latest evolution in the markdown parser or its default configuration.
+        Markdown and <em>all</em> its flavors are risky dead-ends in the long term.
+        There <em>is</em> real value in relying on stable, highly-standardized,
+        general-purpose markup formats like HTML or XML.
+        But do I <em>really</em> have to keep typing all those stupid start and end tags?
+
+
+        <h2>Introducing MinML</h2>
+
+        MinML
+        (which I pronounce like “minimal”)
+        is a more concise or “minified” syntax
+        for markup languages like HTML and XML.
+        It is designed to be automatically cross-convertible
+        both to and from the base markup syntax,
+        and to preserve the full expressiveness of the underlying markup language.
+        Unlike Markdown, there is nothing you can write in HTML but not in MinML.
+
+        <p></p>
+        In effect,
+        MinML might be described as
+        merely a new “skin” for a general markup language like HTML or XML.
+        It changes <em>only</em> the way you write element tags,
+        attributes, or character references,
+        without generally affecting (or even knowing or caring about)
+        <em>which</em> element tags, attributes, or references you use.
+        MinML therefore not only supports the expressive richness of HTML now,
+        but its expressiveness will continue growing
+        as HTML evolves in the future.
+
+        <p></p>
+        Let us start with a brief tour of MinML syntax.
+
+
+        <h3>Basic markup elements</h3>
+
+        In place of start/end tag pairs,
+        MinML uses the basic syntax <code><var>tag</var>[<var>content</var>]</code>,
+        as illustrated in the following table:
+
+        <table>
+            <tbody>
+            <tr>
+                <th>HTML</th>
+                <th>MinML</th>
+                <th>Output</th>
+            </tr>
+            <tr>
+                <td><code>&lt;em&gt;emphasis&lt;/em&gt;</code></td>
+                <td><code>em[emphasis]</code></td>
+                <td><em>emphasis</em></td>
+            </tr>
+            <tr>
+                <td><code>&lt;kbd&gt;typewriter&lt;/kbd&gt;</code></td>
+                <td><code>kbd[typewriter]</code></td>
+                <td><kbd>typewriter</kbd></td>
+            </tr>
+            <tr>
+                <td><code>&lt;var&gt;x&lt;/var&gt;&lt;sup&gt;2&lt;/sup&gt;</code></td>
+                <td><code>var[x]sup[2]</code></td>
+                <td><var>x</var><sup>2</sup></td>
+            </tr>
+            </tbody>
+        </table>
+
+        An element with no content,
+        like <code>&lt;hr&gt;</code> in HRML or <code>&lt;hr/&gt;</code> in XML,
+        becomes <code>hr[]</code> in MinML.
+
+
+        <h3>Elements with attributes</h3>
+
+        In MinML, we attach attributes to elements
+        by inserting them in curly braces between the tag
+        and square-bracketed content, like this:
+
+        <table>
+            <tbody>
+            <tr>
+                <th>MinML</th>
+                <th>Output</th>
+            </tr>
+            <tr>
+                <td><code>hr{width=100%}[]</code></td>
+                <td>
+                    <hr width="100%">
+                </td>
+            </tr>
+            <tr>
+                <td><code>img{src=cat.jpg height=40}[]</code></td>
+                <td><img src="cat.jpg" height="40"></td>
+            </tr>
+            <tr>
+                <td><code>a{href=http://bford.info/}[my home page]</code></td>
+                <td><a href="http://bford.info/">my home page</a></td>
+            </tr>
+            </tbody>
+        </table>
+
+        If an attribute value in an element needs to contain spaces,
+        we quote the value with square brackets, like this:
+
+        <pre>	img{src=cat.jpg alt=[a cute cat photo]}[]
+</pre>
+
+
+        <h3>Character references</h3>
+
+        MinML uses square brackets
+        in place of SGML's bizarre <code>&amp;</code>…<code>;</code> syntax
+        to delimit character references.
+        Thus,
+        you write <code>[reg]</code> in MinML
+        instead of <code>&amp;reg;</code> in HTML
+        to get a registered trademark sign ®.
+
+        <p></p>
+        You can use numeric character references too,
+        of course.
+        For example,
+        <code>[#174]</code> in decimal or <code>[#x00AE]</code> in hexadecimal
+        are alternative representations for the character ®.
+
+
+        <h3>Quoted strings</h3>
+
+        You can still use the directed (left and right)
+        single- and double-quote character references
+        to typeset quoted strings properly.
+        Writing <code>[ldquo]quote[rdquo]</code> in MinML,
+        as opposed to <code>&amp;ldquo;quote&amp;rdquo;</code> in XML,
+        already seems like a slightly-improved way to express
+        a quoted “string”.
+
+        <p></p>
+        Because quoted strings are such an important common case, however,
+        MinML provides an even more concise alternative for matching quotes.
+        You can write <code>"[string]</code> to express
+        a “string” delimited by matching double quotes,
+        or <code>'[string]</code>
+        for a ‘string’ delimited by matching single quotes.
+        <!--
+        The leading code["] or code['] characters here are actually just element names,
+        which MinML liberalizes to allow punctuation and symbols.
+        -->
+
+
+        <h3>Comments in markup</h3>
+
+        You can include comments in MinML markup
+        with <code>-[<var>c</var>]</code>, like this:
+
+        <table style="width:75%;padding:10pt;margin-left:auto;margin-right:auto">
+            <tbody>
+            <tr>
+                <th>HTML</th>
+                <th>MinML</th>
+                <th>Output</th>
+            </tr>
+            <tr>
+                <td><code>&lt;!-- comment --&gt;</code></td>
+                <td><code>-[comment]</code></td>
+                <td><!--comment--></td>
+            </tr>
+            </tbody>
+        </table>
+
+
+        <h3>Managing whitespace</h3>
+
+        Because an element tag is outside (just before)
+        an open bracket or curly brace in MinML,
+        we often need whitespace to separate an element from preceding text:
+
+        <table>
+            <tbody>
+            <tr>
+                <td><code>bee em[yoo] tiful</code></td>
+                <td>bee <em>yoo</em> tiful</td>
+            </tr>
+            </tbody>
+        </table>
+
+        Without the whitespace before the <code>em</code> tag,
+        it would look like the incorrect tag <code>beeem</code>.
+        If you don't actually want whitespace around an element, however,
+        you can use less-than <code>&lt;</code> and greater-than <code>&gt;</code> signs
+        to consume or “suck” the surrounding whitespace:
+
+        <table>
+            <tbody>
+            <tr>
+                <td><code>bee &lt;em[yoo]&gt; tiful</code></td>
+                <td>bee<em>yoo</em>tiful</td>
+            </tr>
+            </tbody>
+        </table>
+
+        These space-sucking symbols are <em>not</em> delimiters as in SGML, however,
+        and need not appear in matched pairs.
+        You can use them to suck space on one side but not the other:
+
+        <table>
+            <tbody>
+            <tr>
+                <td><code>mark &lt;em[up] now</code></td>
+                <td>mark<em>up</em> now</td>
+            </tr>
+            <tr>
+                <td><code>now em[mark]&gt; up</code></td>
+                <td>now <em>mark</em>up</td>
+            </tr>
+            </tbody>
+        </table>
+
+        You can also use space-suckers <em>within</em> an element's content,
+        to suck space at the beginning and/or end of the content:
+
+        <table>
+            <tbody>
+            <tr>
+                <td><code>a &lt;b[&gt; b &lt;]&gt; c</code></td>
+                <td>a<b>b</b>c</td>
+            </tr>
+            </tbody>
+        </table>
+
+        If you need literal square brackets or curly braces
+        immediately after what could otherwise be an element name,
+        you can separate them with whitespace and a space-sucker:
+
+        <table>
+            <tbody>
+            <tr>
+                <td><code>b[1 &lt;[hellip]&gt; 10]</code></td>
+                <td><b>1…10</b></td>
+            </tr>
+            <tr>
+                <td><code>b &lt;[1 &lt;[hellip]&gt; 10]</code></td>
+                <td>b[1…10]</td>
+            </tr>
+            <tr>
+                <td><code>set &lt;{a,b,c}</code></td>
+                <td>set{a,b,c}</td>
+            </tr>
+            </tbody>
+        </table>
+
+        The same is true if you need a literal square-bracket pair
+        surrounding what could be mistaken for a character reference:
+
+        <table>
+            <tbody>
+            <tr>
+                <td><code>[star]</code></td>
+                <td>☆</td>
+            </tr>
+            <tr>
+                <td><code>[&gt; star &lt;]</code></td>
+                <td>[star]</td>
+            </tr>
+            </tbody>
+        </table>
+
+
+        <h3>Raw matchertext sequences</h3>
+
+        MinML builds on the
+        <a href="/pub/lang/matchertext/">matchertext</a>
+        syntactic discipline.
+        Matchertext makes it possible
+        to embed one text string into another unambiguously –
+        within a language or even across languages –
+        without having to “escape”
+        or otherwise transform the embedded text.
+        The cost of this syntactic discipline
+        is that the ASCII <dfn>matcher</dfn> characters –
+        namely the parentheses <code>()</code>,
+        square brackets <code>[]</code>,
+        and curly braces <code>{}</code> –
+        must appear <em>only</em> in properly-nesting matched pairs throughout matchertext.
+
+        <p></p>
+        Let's first look at one of the benefits of matchertext in MinML.
+        You can use the sequence <code>+[<var>m</var>]</code>
+        to include any matchertext string <var>m</var> into the markup
+        as raw literal text,
+        which is completely uninterpreted except to find its end.
+        No character sequences are disallowed in the embedded text
+        as long as matchers match.
+
+        <p></p>
+        You can use raw matchertext sequences
+        to include verbatim examples of markup or other code
+        in your text, for example.
+        A <code>+[<var>m</var>]</code> sequence
+        is thus a more concise analog to XML's clunky CDATA sections:
+
+        <table style="width:100%">
+            <tbody>
+            <tr>
+                <th>XML</th>
+                <th>MinML</th>
+                <th>Output</th>
+            </tr>
+            <tr>
+                <td><code>&lt;![CDATA[example &lt;b&gt;bold&lt;/b&gt; markup]]&gt;</code></td>
+                <td><code>+[example &lt;b&gt;bold&lt;/b&gt; in XML]</code></td>
+                <td>example &lt;b&gt;bold&lt;/b&gt; in XML</td>
+            </tr>
+            <tr>
+                <td><code>&lt;![CDATA[example b[bold] in MinML]]&gt;</code></td>
+                <td><code>+[example b[bold] in MinML]</code></td>
+                <td>example b[bold] in MinML</td>
+            </tr>
+            </tbody>
+        </table>
+
+        Unlike CDATA sections,
+        raw matchertext sequences nest cleanly.
+        Including a literal example of a CDATA section in XML markup,
+        for example,
+        is
+        <a href="https://en.wikipedia.org/wiki/CDATA#Nesting">mind-meltingly painful</a>:
+
+        <table style="width:100%">
+            <tbody>
+            <tr>
+                <th>XML:</th>
+                <td><code>&lt;![CDATA[example &lt;![CDATA[character data]]]]&gt;&lt;![CDATA[&gt; section]]&gt;</code>
+                </td>
+            </tr>
+            <tr>
+                <th>Output:</th>
+                <td>example &lt;![CDATA[character data]]&gt; section</td>
+            </tr>
+            </tbody>
+        </table>
+
+        Expressing a literal example
+        of a raw matchertext sequence <code>+[…]</code> in MinML
+        is straightforward in contrast:
+
+        <table style="width:100%">
+            <tbody>
+            <tr>
+                <th>MinML:</th>
+                <td><code>+[example +[matchertext] literal]</code></td>
+            </tr>
+            <tr>
+                <th>Output:</th>
+                <td>example +[matchertext] literal</td>
+            </tr>
+            </tbody>
+        </table>
+
+
+        <h3>Literal unmatched matchers</h3>
+
+        The matchertext discipline has a cost, of course.
+        If you want to include an <em>unmatched</em> literal
+        parenthesis, bracket, or curly brace in your MinML markup,
+        you must “escape” it with a character reference.
+        You can use standard named or numeric character references,
+        like <code>[lparen]</code> or <code>[#x28]</code>
+        for an unmatched left parentheses for example.
+
+        <p></p>
+        MinML also provides an alternative, more visual syntax for unmatched matchers:
+        <code>[(&lt;)]</code> and <code>[(&gt;)]</code> for an open and close parenthesis,
+        respectively,
+        <code>[[&lt;]]</code> and <code>[[&gt;]]</code> for a square bracket, and
+        <code>[{&lt;}]</code> and <code>[{&gt;}]</code> for a curly brace.
+        You might think of the <code>&lt;</code> or <code>&gt;</code> symbol in this context
+        as a stand-in for the unmatched matcher that “points” left or right
+        at the matcher you actually want.
+        The following table summarizes these various ways to express
+        literal unmatched matchers.
+
+        <table>
+            <tbody>
+            <tr>
+                <th></th>
+                <th colspan="3">Open</th>
+                <th colspan="3">Close</th>
+            </tr>
+            <tr>
+                <td>Parentheses <code>()</code></td>
+                <td><code>[lpar]</code></td>
+                <td><code>[#x28]</code></td>
+                <td><code>[(&lt;)]</code></td>
+                <td><code>[rpar]</code></td>
+                <td><code>[#x29]</code></td>
+                <td><code>[(&gt;)]</code></td>
+            </tr>
+            <tr>
+                <td>Square brackets <code>[]</code></td>
+                <td><code>[lbrack]</code></td>
+                <td><code>[#x5B]</code></td>
+                <td><code>[[&lt;]]</code></td>
+                <td><code>[rbrack]</code></td>
+                <td><code>[#x5D]</code></td>
+                <td><code>[[&gt;]]</code></td>
+            </tr>
+            <tr>
+                <td>Curly braces <code>{}</code></td>
+                <td><code>[lbrace]</code></td>
+                <td><code>[#x7B]</code></td>
+                <td><code>[{&lt;}]</code></td>
+                <td><code>[rbrace]</code></td>
+                <td><code>[#x7D]</code></td>
+                <td><code>[{&gt;}]</code></td>
+            </tr>
+            </tbody>
+        </table>
+
+        While having to replace unmatched matchers with character references
+        might seem cumbersome,
+        they tend not to be used often anyway in most text –
+        mainly just in text that is <em>talking about</em> such characters.
+
+        <p></p>
+        Independent of the text embedding benefits discussed above,
+        there is another compensation for this small bother.
+        While editing MinML, or any matchertext language,
+        you may find that your highlighting text editor
+        or integrated development environment (IDE)
+        no longer <em>ever</em> guesses wrong
+        about which parenthesis, bracket, or brace character
+        matches which other one in your source file.
+
+
+        <h3>Metasyntax and processing instructions</h3>
+
+        SGML-derived markup can contain metasyntactic <dfn>declarations</dfn>
+        of the form <code>&lt;!…&gt;</code>,
+        and <dfn>processing instructions</dfn>
+        of the form <code>&lt;?…?&gt;</code>.
+        MiniML provides the syntax
+        <code>![…]</code> and
+        <code>?[…]</code>, respectively,
+        for expressing these constructs if needed.
+
+        <p></p>
+        Since these constructs are typically used
+        in only a few lines at the beginning of most markup files,
+        if at all,
+        improving their syntax is not a high-priority goal for MinML.
+        Further,
+        the syntax of – and processing rules for –
+        document type definitions are frighteningly complex,
+        even in the “simplified” XML standard.
+
+        <p></p>
+        MiniML therefore leaves the legacy syntax of the underlying markup language
+        unmodified within the context of these directives.
+        Only the outermost “wrapper” syntax changes.
+        For example, a MiniML document based on XML
+        with a document type declaration might look like:
+
+        <pre>	?[xml version="1.0"]
+	![DOCTYPE greeting SYSTEM "hello.dtd"]
+	greeting[Hello, world!]
+</pre>
+
+
+        <h2>Give MinML a try</h2>
+
+        There is an
+        <a href="https://github.com/dedis/matchertext/tree/main/go/markup/minml">experimental implementation</a>
+        in <a href="https://go.dev">Go</a>
+        that supports parsing MinML into an abstract syntax tree (AST)
+        and conversion to classic HTML or XML syntax.
+        This repository also includes a simple
+        <a href="https://github.com/dedis/matchertext/tree/main/go/markup/minml/cmd">command-line tool</a>
+        to convert MinML to HTML or XML.
+
+        <p></p>
+        With
+        <a href="https://github.com/bford/hugo">this experimental fork</a>
+        of the
+        <a href="https://gohugo.io">Hugo</a> website builder,
+        you can use MinML source files
+        with extension <code>.minml</code> or <code>.m</code> in your website.
+        This blog post was written in MinML and published using Hugo this way.
+        Feel free to check out
+        <a href="index.m">the MinML source for this post</a>.
+
+        <p></p>
+        If you implement MinML in other languages or applications,
+        please let me know and I will collect and consolidate links.
+
+
+        <h2>Conclusion</h2>
+
+        MinML is a new “skin” or outer syntax
+        for SGML-derived markup languages such as HTML and XML.
+        MinML preserves all of the base language's power and expressiveness,
+        unlike the numerous flavors of Markdown.
+        MinML's syntax just makes markup a bit more concise
+        and – at least in this author's opinion –
+        less annoying to write, read, or edit.
+        Elements never need end tags,
+        only a final close bracket.
+        Enjoy!
+
+        <!--
+        Because MinML builds on the
+        a{href=/pub/lang/matchertext/}[matchertext],
+        all constructs including raw literals naturally nest,
+        and can contain verbatim embedded strings in any compliant language
+        without escaping or other syntactic contortions.
+        While this discipline requires unmatched matchers
+        to be replaced with character references,
+        ...
+        -->
+
+
+        <!--	Old notes:
+
+        SystemLiteral: a slight problem in principle, because in XML disallows
+        either single or double quotes and doesn't support markup.
+        But SystemLiteral is to be used to contain a URI,
+        which has much more restrictive syntax.
+        Uses URI escaping if escaping is needed.
+
+        PubidLiteral: same restricted ASCII-only character set as XML
+
+        CharData: removes stilly restriction of no '{c[]}{c[]}>' sequence
+
+        Comments: -[...]? or ![...]? or [- ... ]?
+        Drops the restriction that '-&#45;' must not appear within comments.
+        Allows character references to appear for escaping or doc-comment purposes.
+        When converting to XML, '-&#45;' gets escaped with character reference..
+        If comment text ends in '-', XML writer appends a space
+        to avoid producing an illegal '-&#45;->' terminator.
+
+        Processing instructions:
+        ?[...]
+        Same PITarget syntax.
+
+        PI containing '?>' cannot be converted to standard XML
+        (or would have to be escaped via unknown application escaping syntax).
+        Converting to MaML must escape unmatched matchers.
+        Or perhaps just cause a conversion error,
+        given that the embedded PITarget syntax is effectively unknown
+        but its constraints are the constraints of the host syntax.
+
+        Just disable DTDs entirely?
+        Protect against XXE attacks https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html
+        Billion Laughs attack https://en.wikipedia.org/wiki/Billion_laughs_attack
+
+        Another strictly-backward-compatible approach would be
+        to process all DTDs including internal/external entity references
+        strictly in legacy XML syntax,
+        even when used (referred to in) MinML syntax.
+        Thus, recursive entity expansion works, in XML syntax.
+        MinXML files are thus processed as if first converted to legacy XML
+        (without doing any entity expansion at all),
+        then processed as legacy XML source.
+
+        Some XML dataset sources for testing:
+        https://catalog.data.gov/dataset/?res_format=XML
+        http://aiweb.cs.washington.edu/research/projects/xmltk/xmldata/
+        https://data.world/datasets/xml
+
+        Conditional sections:
+        INCLUDE is only processed as part of the DTD.  Skip.
+        IGNORE is ignored.  Skip.
+
+        -->
+
+    </div>
+
+    <div style="flex: 2 5 20px">
+    </div>
+</div>
+
+
+<br clear="all">
+<hr>
+<table style="width:100%;padding:10pt">
+    <tbody>
+    <tr>
+
+        <td align="left">
+
+            Topics:
+
+            <a href="/topics/Syntax/">Syntax</a>
+
+            <a href="/topics/Programming-Languages/">Programming Languages</a>
+
+
+        </td>
+
+        <td align="right">
+            <a href="https://bford.info/">Bryan Ford</a>
+        </td>
+
+    </tr>
+    </tbody>
+</table>
+
+
+</body>
+</html>
