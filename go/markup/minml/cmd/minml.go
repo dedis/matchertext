@@ -23,6 +23,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 
@@ -65,11 +66,25 @@ func main() {
 	switch command {
 	case "Convert":
 		if len(rest) > 0 {
-			log.Fatalf("'Convert' takes no extra arguments")
+			log.Fatal("'convert' takes no extra arguments")
 		}
-		Convert(inputPath)
+		if err := Convert(inputPath, os.Stdout); err != nil {
+			log.Fatal(err)
+		}
 	case "server":
-		Server(inputPath, rest)
+		if len(rest) != 0 && len(rest) != 2 {
+			log.Fatal("'server' expects one optional argument")
+		}
+		if len(rest) > 0 && rest[0] != "--port" {
+			log.Fatal("unknown option for 'server': ", rest[0])
+		}
+
+		port := "8080"
+		if len(rest) > 0 {
+			port = rest[1]
+		}
+
+		Server(inputPath, port)
 	default:
 		log.Fatalf("Unknown command: %s", command)
 	}
@@ -109,22 +124,24 @@ func printUsage(program string) {
 	fmt.Fprintf(os.Stderr, usage, program)
 }
 
-// Convert parses a MinML source file and writes the HTML output to stdout.
-func Convert(sourceFile string) {
+// Convert parses a MinML source file and writes the HTML output to w.
+func Convert(sourceFile string, w io.Writer) error {
 	file, err := os.Open(sourceFile)
 	if err != nil {
-		log.Fatalf("Error opening %v: %v", sourceFile, err.Error())
+		return fmt.Errorf("opening %v: %w", sourceFile, err)
 	}
 	defer file.Close()
 
 	mp := minml.NewTreeParser(file)
 	ns, err := mp.ParseAST()
 	if err != nil {
-		log.Fatalf("Error parsing %v: %v", sourceFile, err.Error())
+		return fmt.Errorf("parsing %v: %w", sourceFile, err)
 	}
 
-	enc := html.NewTreeWriter(os.Stdout)
+	enc := html.NewTreeWriter(w)
 	if err := enc.WriteAST(ns); err != nil {
-		log.Fatalf("Error encoding %v: %v", sourceFile, err.Error())
+		return fmt.Errorf("encoding %v: %w", sourceFile, err)
 	}
+
+	return nil
 }

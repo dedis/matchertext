@@ -1,0 +1,249 @@
+html[
+head[
+  title[MinML: concise but general markup syntax]
+  meta{charset=utf-8}[]
+]
+body[
+
+article[
+
+p{class=date}[December 28, 2022]
+
+h1[MinML: concise but general markup syntax]
+
+p[Could you use a markup syntax that supports the full expressive power and richness of HTML or XML, but is more terse, easier to type, and less frankly ugly? To emphasize text, for example, would it be nice just to write +[em[emphasize]] instead of +[<em>emphasize</em>]? If so, pleae read on.]
+
+h2[The tussle between generality and writer-friendliness]
+
+p[Markup languages derived from SGML, like HTML and XML, are powerful and have many uses but are verbose and often a pain to write or edit manually. While XML was substantially a reaction to the complexity and bloat of SGML, terseness was always considered of minimal importance in XML.]
+
+p[Reactions to the verbosity and awkwardness of SGML-style markup brought us formats like JSON and Markdown. But while JSON is useful for automated data interchange, it is not a markup language. Its strict and minimal syntax demanded further extensions like YAML, TOML, or JSON5 even to get, say, a way to write comments.]
+
+p[Markdown is a markup language, and vastly improves terseness and quick typeability for the most common and simple markup constructs. But its expressiveness is limited to a small subset of HTML. Further, the quirky special-case syntax it uses for each construct makes its syntax difficult to "[scale] to richer functionality without getting into a mess of syntax conflicts and ambiguities. It is not easy to standardize, or even to specify rigorously [--] not to say that this hasn'[-->]t been tried. To see just how fragile Markdown syntax is, try to understand [--] or correctly implement [--] the 17 rules for parsing emphasis and the 131 associated examples in a{href=https://spec.commonmark.org/}[Commonmark].]
+
+p[There are numerous extensions and alternative variants of Markdown-style syntax to choose from, of course: e.g., GitHub flavor, reStructuredText, POD, Org Mode, AsciiDoc, Textile, Markua, txt2tags, etc. Each of these variants supports a different small subset of HTML, each with its own syntactic quirks for the markup author to learn afresh. Further, each flavor'[-->]s limitations present expressiveness barriers that an author may encounter at any moment: "[oh, but now can I do em[that]?] These barriers can lead the frustrated author to seek escape routes [--] back to HTML, or to another existing Markdown flavor, or to create yet another new flavor themselves with ever-more-devilishly clever and brittle syntax with another new and different set of limitations.]
+
+p[On my web site, I used to embed HTML tags in +[.md] files in order to escape Markdown'[-->]s limitations. But when an "[upgrade] to Hugo silently corrupted the entire website by suddenly disabling all markdown-embedded HTML, I realized the essential fragility of this solution. Even if markdown-embedded HTML can be re-enabled, I do not want all my past writing being silently corrupted on a regular basis by the latest evolution in the markdown parser or its default configuration. Markdown and all its flavors are risky dead-ends in the long term. There is real value in relying on stable, highly-standardized, general-purpose markup formats like HTML or XML. But do I really have to keep typing all those stupid start and end tags?]
+
+h2[Introducing MinML]
+
+p[MinML (which I pronounce like "[minimal]) is a more concise or "[minified] syntax for markup languages like HTML and XML. It is designed to be automatically cross-convertible both to and from the base markup syntax, and to preserve the full expressiveness of the underlying markup language. Unlike Markdown, there is nothing you can write in HTML but not in MinML.]
+
+p[In effect, MinML might be described as merely a new "[skin] for a general markup language like HTML or XML. It changes only the way you write element tags, attributes, or character references, without generally affecting (or even knowing or caring about) which element tags, attributes, or references you use. MinML therefore not only supports the expressive richness of HTML now, but its expressiveness will continue growing as HTML evolves in the future.]
+
+p[Let us start with a brief tour of MinML syntax.]
+
+h3[Basic markup elements]
+
+p[In place of start/end tag pairs, MinML uses the basic syntax +[tag[content]], as illustrated in the following table:]
+
+table[
+  thead[tr[
+    th[HTML] th[MinML] th[Output]
+  ]]
+  tbody[
+    tr[
+      td[+[<em>emphasis</em>]]
+      td[+[em[emphasis]]]
+      td[em[emphasis]]
+    ]
+    tr[
+      td[+[<kbd>typewriter</kbd>]]
+      td[+[kbd[typewriter]]]
+      td[kbd[typewriter]]
+    ]
+    tr[
+      td[+[<var>x</var><sup>2</sup>]]
+      td[+[var[x]sup[2]]]
+      td[var[x] <sup[2]]
+    ]
+  ]
+]
+
+p[An element with no content, like +[<hr>] in HTML or +[<hr/>] in XML, becomes +[hr[]] in MinML.]
+
+h3[Elements with attributes]
+
+p[In MinML, we attach attributes to elements by inserting them in curly braces between the tag and square-bracketed content, like this:]
+
+table[
+  thead[tr[
+    th[MinML] th[Output]
+  ]]
+  tbody[
+    tr[
+      td[+[hr{width=100%}[]]]
+      td[hr{width=100%}[]]
+    ]
+    tr[
+      td[+[img{src=cat.jpg height=40}[]]]
+      td[img{src=cat.jpg height=40}[]]
+    ]
+    tr[
+      td[+[a{href=http://bford.info/}[my home page]]]
+      td[a{href=http://bford.info/}[my home page]]
+    ]
+  ]
+]
+
+p[If an attribute value in an element needs to contain spaces, we quote the value with square brackets, like this:]
+
+pre[code[+[img{src=cat.jpg alt=[a cute cat photo]}[]]]]
+
+h3[Character references]
+
+p[MinML uses square brackets in place of SGML'[-->]s bizarre +[&…;] syntax to delimit character references. Thus, you write +[[reg]] in MinML instead of +[&reg;] in HTML to get a registered trademark sign [reg].]
+
+p[You can use numeric character references too, of course. For example, +[[#174]] in decimal or +[[#x00AE]] in hexadecimal are alternative representations for the character [reg].]
+
+h3[Quoted strings]
+
+p[You can still use the directed (left and right) single- and double-quote character references to typeset quoted strings properly. Writing +[[ldquo]quote[rdquo]] in MinML, as opposed to +[&ldquo;quote&rdquo;] in XML, already seems like a slightly-improved way to express a quoted "[string].]
+
+p[Because quoted strings are such an important common case, however, MinML provides an even more concise alternative for matching quotes. You can write +["[string]] to express a "[string] delimited by matching double quotes, or +['[string]] for a '[string] delimited by matching single quotes.]
+
+h3[Comments in markup]
+
+p[You can include comments in MinML markup with +[-[c]], like this:]
+
+table[
+  thead[tr[
+    th[HTML] th[MinML] th[Output]
+  ]]
+  tbody[
+    tr[
+      td[+[<!-- comment -->]]
+      td[+[-[comment]]]
+      td[-[comment]]
+    ]
+  ]
+]
+
+h3[Managing whitespace]
+
+p[Because an element tag is outside (just before) an open bracket or curly brace in MinML, we often need whitespace to separate an element from preceding text:]
+
+pre[code[+[bee em[yoo] tiful] [-->] bee em[yoo] tiful]]
+
+p[Without the whitespace before the +[em] tag, it would look like the incorrect tag +[beeem]. If you don'[-->]t actually want whitespace around an element, however, you can use less-than +[<] and greater-than +[>] signs to consume or "[suck] the surrounding whitespace:]
+
+pre[code[+[bee <em[yoo]> tiful] [-->] bee <em[yoo]> tiful]]
+
+p[These space-sucking symbols are not delimiters as in SGML, however, and need not appear in matched pairs. You can use them to suck space on one side but not the other:]
+
+pre[code[+[mark <em[up] now] [-->] mark <em[up] now
++[now em[mark]> up] [-->] now em[mark]> up]]
+
+p[You can also use space-suckers within an element'[-->]s content, to suck space at the beginning and/or end of the content:]
+
+pre[code[+[a <b[> b <]> c] [-->] a <b[> b <]> c]]
+
+p[If you need literal square brackets or curly braces immediately after what could otherwise be an element name, you can separate them with whitespace and a space-sucker:]
+
+pre[code[+[b[1 <[hellip]> 10]] [-->] b[1 [hellip] 10]
++[b <[1 <[hellip]> 10]] [-->] b [[<]]1 [hellip] 10 [[>]]
++[set <{a,b,c}] [-->] set [{<}]a,b,c [{>}]]]
+
+p[The same is true if you need a literal square-bracket pair surrounding what could be mistaken for a character reference:]
+
+pre[code[+[[star]] [-->] [star]
++[[> star <]] [-->] [[<]]star [[>]]]]
+
+h3[Raw matchertext sequences]
+
+p[MinML builds on the em[matchertext] syntactic discipline. Matchertext makes it possible to embed one text string into another unambiguously [--] within a language or even across languages [--] without having to "[escape] or otherwise transform the embedded text. The cost of this syntactic discipline is that the ASCII matcher characters [--] namely the parentheses +[()], square brackets +[[]], and curly braces +[{}] [--] must appear only in properly-nesting matched pairs throughout matchertext.]
+
+p[Let'[-->]s first look at one of the benefits of matchertext in MinML. You can use the sequence +[+[m]] to include any matchertext string em[m] into the markup as raw literal text, which is completely uninterpreted except to find its end. No character sequences are disallowed in the embedded text as long as matchers match.]
+
+p[You can use raw matchertext sequences to include verbatim examples of markup or other code in your text, for example. A +[+[m]] sequence is thus a more concise analog to XML'[-->]s clunky CDATA sections:]
+
+table[
+  thead[tr[
+    th[XML] th[MinML] th[Output]
+  ]]
+  tbody[
+    tr[
+      td[+[<![CDATA[example <b>bold</b> markup]]>]]
+      td[+[+[example <b>bold</b> in XML]]]
+      td[+[example <b>bold</b> in XML]]
+    ]
+    tr[
+      td[+[<![CDATA[example b[bold] in MinML]]>]]
+      td[+[+[example b[bold] in MinML]]]
+      td[+[example b[bold] in MinML]]
+    ]
+  ]
+]
+
+p[Unlike CDATA sections, raw matchertext sequences nest cleanly. Including a literal example of a CDATA section in XML markup, for example, is mind-meltingly painful:]
+
+pre[code[XML:    +[<![CDATA[example <![CDATA[character data]]]]><![CDATA[> section]]>]
+Output: example +[<![CDATA[character data]]>] section]]
+
+p[Expressing a literal example of a raw matchertext sequence +[+[[hellip]]] in MinML is straightforward in contrast:]
+
+pre[code[MinML:  +[+[example +[matchertext] literal]]
+Output: +[example +[matchertext] literal]]]
+
+h3[Literal unmatched matchers]
+
+p[The matchertext discipline has a cost, of course. If you want to include an unmatched literal parenthesis, bracket, or curly brace in your MinML markup, you must "[escape] it with a character reference. You can use standard named or numeric character references, like +[[lparen]] or +[[#x28]] for an unmatched left parenthesis for example.]
+
+p[MinML also provides an alternative, more visual syntax for unmatched matchers: +[[(<)]] and +[[(>)]] for an open and close parenthesis, respectively, +[[[<]]] and +[[[>]]] for a square bracket, and +[[{<}]] and +[[{>}]] for a curly brace. You might think of the +[<] or +[>] symbol in this context as a stand-in for the unmatched matcher that "[points] left or right at the matcher you actually want. The following table summarizes these various ways to express literal unmatched matchers.]
+
+table[
+  thead[tr[
+    th[] th{colspan=3}[Open] th{colspan=3}[Close]
+  ]]
+  tbody[
+    tr[
+      td[Parentheses ()]
+      td[+[[lpar]]] td[+[[#x28]]] td[+[[(<)]]]
+      td[+[[rpar]]] td[+[[#x29]]] td[+[[(>)]]]
+    ]
+    tr[
+      td[Square brackets [[<]] [[>]]]
+      td[+[[lbrack]]] td[+[[#x5B]]] td[+[[[<]]]]
+      td[+[[rbrack]]] td[+[[#x5D]]] td[+[[[>]]]]
+    ]
+    tr[
+      td[Curly braces [{<}] [{>}]]
+      td[+[[lbrace]]] td[+[[#x7B]]] td[+[[{<}]]]
+      td[+[[rbrace]]] td[+[[#x7D]]] td[+[[{>}]]]
+    ]
+  ]
+]
+
+p[While having to replace unmatched matchers with character references might seem cumbersome, they tend not to be used often anyway in most text [--] mainly just in text that is talking about such characters.]
+
+p[Independent of the text embedding benefits discussed above, there is another compensation for this small bother. While editing MinML, or any matchertext language, you may find that your highlighting text editor or integrated development environment (IDE) no longer ever guesses wrong about which parenthesis, bracket, or brace character matches which other one in your source file.]
+
+h3[Metasyntax and processing instructions]
+
+p[SGML-derived markup can contain metasyntactic declarations of the form +[<!…>], and processing instructions of the form +[<?…?>]. MinML provides the syntax +[![…]] and +[?[…]], respectively, for expressing these constructs if needed.]
+
+p[Since these constructs are typically used in only a few lines at the beginning of most markup files, if at all, improving their syntax is not a high-priority goal for MinML. Further, the syntax of [--] and processing rules for [--] document type definitions are frighteningly complex, even in the "[simplified] XML standard.]
+
+p[MinML therefore leaves the legacy syntax of the underlying markup language unmodified within the context of these directives. Only the outermost "[wrapper] syntax changes. For example, a MinML document based on XML with a document type declaration might look like:]
+
+pre[code[+[?[xml version="1.0"]
+![DOCTYPE greeting SYSTEM "hello.dtd"]
+greeting[Hello, world!]]]]
+
+h2[Give MinML a try]
+
+p[There is an experimental implementation in Go that supports parsing MinML into an abstract syntax tree (AST) and conversion to classic HTML or XML syntax. This repository also includes a simple command-line tool to convert MinML to HTML or XML.]
+
+p[With this experimental fork of the a{href=https://gohugo.io/}[Hugo] website builder, you can use MinML source files with extension +[.minml] or +[.m] in your website. This blog post was written in MinML and published using Hugo this way. Feel free to check out the MinML source for this post.]
+
+p[If you implement MinML in other languages or applications, please let me know and I will collect and consolidate links.]
+
+h2[Conclusion]
+
+p[MinML is a new "[skin] or outer syntax for SGML-derived markup languages such as HTML and XML. MinML preserves all of the base language'[-->]s power and expressiveness, unlike the numerous flavors of Markdown. MinML'[-->]s syntax just makes markup a bit more concise and [--] at least in this author'[-->]s opinion [--] less annoying to write, read, or edit. Elements never need end tags, only a final close bracket. Enjoy!]
+
+p{class=topics}[Topics: em[Syntax] em[Programming Languages] [mdash] em[Bryan Ford]]
+
+] -[article]
+] -[body]
+] -[html]
