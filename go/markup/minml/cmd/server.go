@@ -9,12 +9,108 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
 )
 
+// reloadScript is appended to every rendered HTML file.
+// It opens an SSE connection to /___reload and reloads the page on events.
+const reloadScript = `<script>
+(function() {
+  var delay = 1000;
+  function connect() {
+    var es = new EventSource("/___reload");
+    es.addEventListener("reload", function() {
+      window.location.reload();
+    });
+    es.onerror = function() {
+      es.close();
+      setTimeout(function() {
+        connect();
+        delay = Math.min(delay * 2, 10000);
+      }, delay);
+    };
+    es.onopen = function() { delay = 1000; };
+  }
+  connect();
+})();
+</script>
+`
+
+// sseClients tracks connected SSE clients for live reload notifications.
+type sseClients struct {
+	mu      sync.Mutex
+	clients []chan struct{}
+}
+
+// add registers a new SSE client and returns its notification channel.
+func (s *sseClients) add() chan struct{} {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ch := make(chan struct{}, 1)
+	s.clients = append(s.clients, ch)
+	return ch
+}
+
+// remove unregisters an SSE client.
+func (s *sseClients) remove(ch chan struct{}) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, c := range s.clients {
+		if c == ch {
+			s.clients = append(s.clients[:i], s.clients[i+1:]...)
+			return
+		}
+	}
+}
+
+// notifyAll signals all connected SSE clients to reload.
+func (s *sseClients) notifyAll() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, ch := range s.clients {
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
+	}
+}
+
+// loggingHandler wraps an http.Handler and logs each request to stderr.
+type loggingHandler struct {
+	handler http.Handler
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(code int) {
+	r.status = code
+	r.ResponseWriter.WriteHeader(code)
+}
+
+func (r *statusRecorder) Flush() {
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (l *loggingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	rec := &statusRecorder{ResponseWriter: w, status: 200}
+	l.handler.ServeHTTP(rec, r)
+	log.Printf("%s %s %d", r.Method, r.URL.Path, rec.status)
+}
+
+// Server starts a local HTTP server that serves converted MinML files.
+// It copies the source path (file or directory) into a temporary build directory,
+// converts all .minml files to .html with live-reload script injection,
+// then serves the result on the given port. Source files are watched for
+// changes and automatically re-converted, triggering browser reloads via SSE.
 func Server(path string, port string) {
 	// Create a temporary build folder
 	// The "__" prefix is to prevent potential clashing
@@ -40,7 +136,7 @@ func Server(path string, port string) {
 		return
 	}
 
-	// Copy all files from source dst to the new temp __build dst
+	// Copy all files from source to the __build dir
 	switch mode := fi.Mode(); {
 	case mode.IsDir():
 		err := os.CopyFS(dst, os.DirFS(path))
@@ -62,11 +158,45 @@ func Server(path string, port string) {
 	events := make(chan fsnotify.Event)
 	go watchDir(path, events)
 
-	// Serve the build directory
-	log.Printf("Serving %s on http://localhost:%s", dst, port)
-	http.Handle("/", http.FileServer(http.Dir(dst)))
+	// SSE client tracker
+	clients := &sseClients{}
+
+	// Set up HTTP routes
+	mux := http.NewServeMux()
+
+	// SSE endpoint for live reload
+	mux.HandleFunc("/___reload", func(w http.ResponseWriter, r *http.Request) {
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "streaming not supported", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		flusher.Flush()
+
+		ch := clients.add()
+		defer clients.remove(ch)
+
+		for {
+			select {
+			case <-ch:
+				fmt.Fprint(w, "event: reload\ndata: ok\n\n")
+				flusher.Flush()
+			case <-r.Context().Done():
+				return
+			}
+		}
+	})
+
+	// File server for everything else
+	mux.Handle("/", http.FileServer(http.Dir(dst)))
+
+	// Start HTTP server with request logging
+	log.Printf("Serving on http://localhost:%s", port)
 	go func() {
-		if err := http.ListenAndServe(":"+port, nil); err != nil {
+		if err := http.ListenAndServe(":"+port, &loggingHandler{handler: mux}); err != nil {
 			log.Fatal(err)
 		}
 	}()
@@ -83,14 +213,15 @@ func Server(path string, port string) {
 			pending[ev.Name] = ev.Op
 			debounce.Reset(100 * time.Millisecond)
 		case <-debounce.C:
+			rebuilt := false
 			for file, op := range pending {
 				dest := filepath.Join(dst, filepath.Base(file))
 				if op&(fsnotify.Remove|fsnotify.Rename) != 0 {
-					// Delete the output file
 					htmlPath := dest[:len(dest)-len(filepath.Ext(dest))] + ".html"
 					_ = os.Remove(dest)
 					_ = os.Remove(htmlPath)
 					log.Printf("Removed: %s", filepath.Base(file))
+					rebuilt = true
 					continue
 				}
 				log.Printf("Rebuilt: %s", filepath.Base(file))
@@ -98,12 +229,19 @@ func Server(path string, port string) {
 				if err := convertFile(dest); err != nil {
 					log.Println(err)
 				}
+				rebuilt = true
 			}
 			pending = make(map[string]fsnotify.Op)
+			if rebuilt {
+				clients.notifyAll()
+			}
 		}
 	}
 }
 
+// convertFile converts a single .minml file to .html with live-reload
+// script injection, then removes the source .minml file.
+// Non-.minml files are ignored.
 func convertFile(dest string) error {
 	if filepath.Ext(dest) != ".minml" {
 		return nil
@@ -117,10 +255,15 @@ func convertFile(dest string) error {
 	if err := Convert(dest, out); err != nil {
 		return fmt.Errorf("convert error: %w", err)
 	}
+	// Inject live-reload script
+	if _, err := out.WriteString(reloadScript); err != nil {
+		return fmt.Errorf("inject reload script: %w", err)
+	}
 	_ = os.Remove(dest)
 	return nil
 }
 
+// convertFiles is a filepath.WalkDirFunc that converts each .minml file to .html.
 func convertFiles(path string, entry fs.DirEntry, err error) error {
 	if err != nil {
 		return err
@@ -131,6 +274,9 @@ func convertFiles(path string, entry fs.DirEntry, err error) error {
 	return convertFile(path)
 }
 
+// watchDir recursively watches a directory for file changes and sends
+// events on the channel. Editor temp files are filtered out.
+// Handles atomic saves by re-watching after rename/create events.
 func watchDir(dir string, changed chan<- fsnotify.Event) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -184,6 +330,7 @@ func watchDir(dir string, changed chan<- fsnotify.Event) {
 	}
 }
 
+// copyFile copies a file into the destination directory, preserving its base name.
 func copyFile(path, dst string) {
 	data, err := os.ReadFile(path)
 	if err != nil {
