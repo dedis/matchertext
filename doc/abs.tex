@@ -5,14 +5,23 @@ but usually requires tedious and error-prone
 ``escaping'' transformations on the embedded string.
 We propose a simple cross-language syntactic discipline,
 \emph{matchertext},
-which enables the safe embedding a string in any compliant language
-into a string in any other language via simple ``copy-and-paste'' --
-in particular with no escaping, obfuscation, or expansion of embedded strings.
-We apply this syntactic discipline
+embodied in the single rule that \emph{matchers must match} --
+where \emph{matchers} are the ASCII character pairs
+\verb|()|, \verb|[]|, and \verb|{}|.
+This discipline
+enables the safe embedding any matchertext-compliant string
+into any matchertext-aware language via simple ``copy-and-paste'' --
+with no escaping, obfuscation, or expansion of embedded strings.
+Simple string-literal syntax extensions like \verb|M"(|$\dots$\verb|)"|,
+backward-compatible with a wide variety of languages,
+could enable the robust embedding of arbitrary matchertext strings
+consistently without escaping.
+We apply this syntactic discipline experimentally
 to several common and frequently-embedded
 language syntaxes such as URIs, HTML, and JavaScript,
 exploring the benefits, costs, and compatibility issues
 in adopting the proposed matchertext discipline.
-One early matchertext-based language is MinML,
-a concise but general alternative syntax for writing HTML or XML.
+We also bpresent MinML,
+an experimental markup syntax designed around matchertext,
+as a concise but general alternative syntax for writing HTML or XML.
 \end{abstract}

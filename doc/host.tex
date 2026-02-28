@@ -126,9 +126,68 @@ are the primary existing syntactic mechanism
 for embedding (non-matchertext) strings traditionally,
 they represent a natural starting point for considering matchertext extensions.
 
-Given the ubiquity of backslash-escaped string literals,
-we suggest that one reasonable extension for hosting matchertext
-in C-like languages is via a new escape sequence,
+We propose two potential extensions to C-like languages
+for hosting arbitrary matchertext:
+\emph{matchertext literals} and \emph{matchertext escapes}.
+Any language could adopt
+either or both of these extensions independently.
+
+\subsubsection{Matchertext literals}
+\label{sec:host:c:literals}
+
+A \emph{matchertext literal} is a string literal
+whose content is entirely matchertext.
+One syntax we suggest for matchertext literals
+is \verb|M"(|$\dots$\verb|)"|,
+inspired by C++ raw-string syntax \verb|R"(|$\dots$\verb|)"|.
+The content of such a matchertext literal
+must be valid matchertext (matchers must match),
+otherwise the language processor reports a syntax error.
+Any matchertext string may be embedded verbatim in such a literal
+without exceptions or escaping, however.
+
+The parentheses in this syntax could be replaced with brackets or braces,
+or a particular language could even allow any of the three matcher pairs.
+We suggest the use of parentheses as the standard
+partly for consistency with the C++ inspiration,
+and partly due to the traditional use of parentheses for grouping.
+The use of \emph{some} matcher pair in this syntax is necessary
+for hosting arbitrary matchertext strings without escaping, however:
+the sole use of double-quotes as in \verb|M"|$\dots$\verb|"|, for example,
+would not be fully robust or general
+because ASCII double quotes do not come in matched pairs,
+as further discussed below.
+
+If we establish \verb|M"(|$\dots$\verb|)"|
+as a cross-language syntactic standard for matchertext literals,
+then we might leave variants like the lower-case version \verb|m"|$\dots$\verb|"|
+for individual languages to decide the meaning of, if any.
+Some language-specific choices include:
+(a) no lower-case variant (syntax error);
+(b) \verb|m"(|$\dots$\verb|)"| is equivalent to \verb|M"(|$\dots$\verb|)"|;
+\ie the \verb|m| is simply case-insensitive;
+(c) \verb|m"|$\dots$\verb|"| without parentheses
+might be a constrained, shorthand syntax
+usable only for matchertext strings that contain no double-quotes
+outside of matcher pairs; or
+(d) \verb|m"|$\dots$\verb|"| is a ``hybrid'' syntax
+in which the host language's usual escaping mechanisms are active
+outside of matcher pairs within the embedded strings
+(hence allowing any matchertext string to be represented
+at the cost of allowing the host language's escaping to ``leak''
+into the outermost context of the embedded string).
+Options (a) and (b) obviously appear simpler and cleaner,
+with (c) and (d) suggested only as potential alternatives
+that might optimize different pragmatic tradeoffs.
+
+
+\subsubsection{Matchertext escapes in ordinary string literals}
+\label{sec:host:c:escapes}
+
+Given the ubiquity of backslash-escaped string literals in C-like languages,
+another potential extension for hosting matchertext in such languages
+is via a new escape sequence
+usable within \emph{ordinary} string literals,
 such as \verb|\[|$m$\verb|]|,
 where $m$ is arbitrary matchertext.
 The embedded matchertext $m$ is uninterpreted by the host language processor
@@ -138,14 +197,41 @@ Thus, quote characters, backslashes, whitespace, newlines,
 or other control codes cease being ``special'' within the matchertext $m$ --
 at least from the perspective of the host language.
 For example, the string literal \verb|"\["'\]"|
-becomes equivalent to \verb|"\"\'\\"|.
+becomes equivalent to \verb|"\"\'\\"| using conventional escaping.
 These and other characters might of course be ``special'' with respect to
 whatever embedded language $m$ might be written in.
 
+Embedding matchertext in a string literal via a new escape sequence
+has the advantage that the \emph{entire} literal need not be matchertext.
+Literals can mix matchertext with conventional literal text
+including host-language escape sequences:
+\eg \verb|"\t\[let's indent]\n\t\[a "quote"]"|.
 
-\subsubsection{Some syntactic alternatives}
+The choice of square brackets for the proposed matchertext escape sequence
+is somewhat arbitrary:
+we could instead use use parentheses or curly braces,
+or a longer sequence such as \verb|\m[|$m$\verb|]|.
+Any choice may conflict with existing syntax in \emph{some} language:
+\eg
+\verb|\(|$m$\verb|)| conflicts with
+\href{https://docs.swift.org/swift-book/LanguageGuide/StringsAndCharacters.html#ID292}{string interpolation in Swift},
+\verb|\[|$m$\verb|]| conflicts with
+\href{https://www.php.net/manual/en/language.types.string.php}{octal character escapes in PHP},
+and
+\verb|\{|$m$\verb|}| conflicts with
+\href{https://ceylon-lang.org/documentation/1.3/reference/literal/string/}{Unicode escapes in Ceylon}.
+Fortunately, different languages need not agree on
+the precise syntax for hosting matchertext strings,
+and can choose whatever syntax best suits that particular language.
+To fulfill matchertext's main objective,
+different languages need to agree \emph{only} on the basic rule
+that the embedded string itself is arbitrary except that
+ASCII matchers must match.
 
-The above proposal is only one of many possible alternatives of course,
+
+\subsubsection{Other syntactic alternatives}
+
+The above proposals are only two of many possible alternatives of course,
 which may be worth considering --
 especially in the context of specific programming languages.
 We now briefly discuss a few ``obvious'' alternatives
@@ -196,33 +282,6 @@ only pushes these syntactic conflicts deeper
 Considering the other ASCII matchers (parentheses or curly braces)
 does not improve the situation much.
 
-Embedding matchertext in a string literal via a new escape sequence
-also has the advantage that the \emph{entire} literal need not be matchertext.
-Literals can mix matchertext with conventional literal text
-including host-language escape sequences:
-\eg \verb|"\t\[let's indent]\n\t\[a "quote"]"|.
-
-The choice of square brackets for the proposed matchertext escape sequence
-is somewhat arbitrary:
-we could instead use use parentheses or curly braces,
-or a longer sequence such as \verb|\m[|$m$\verb|]|.
-Any choice may conflict with existing syntax in \emph{some} language:
-\eg
-\verb|\(|$m$\verb|)| conflicts with
-\href{https://docs.swift.org/swift-book/LanguageGuide/StringsAndCharacters.html#ID292}{string interpolation in Swift},
-\verb|\[|$m$\verb|]| conflicts with
-\href{https://www.php.net/manual/en/language.types.string.php}{octal character escapes in PHP},
-and
-\verb|\{|$m$\verb|}| conflicts with
-\href{https://ceylon-lang.org/documentation/1.3/reference/literal/string/}{Unicode escapes in Ceylon}.
-Fortunately, different languages need not agree on
-the precise syntax for hosting matchertext strings,
-and can choose whatever syntax best suits that particular language.
-To fulfill matchertext's main objective,
-different languages need to agree \emph{only} on the basic rule
-that the embedded string itself is arbitrary except that
-ASCII matchers must match.
-
 
 \subsection{SGML-style markup host languages}
 \label{sec:host:ml}
@@ -261,7 +320,7 @@ there are at least three different syntactic contexts
 in which strings in other languages are often embedded
 into \ml languages --
 and in which three different sets of quoting and escaping rules apply.
-Embedded strings are often embedded
+Strings are often embedded
 (1) as the content of an element,
 (2) as an attribute within an element's start tag, or
 (3) as verbatim text within a CDATA section.
@@ -795,7 +854,7 @@ the pathological ``\href{https://en.wikipedia.org/wiki/Leaning_toothpick_syndrom
 matching the double-backslash \verb|\\| in a UNC name (see \cref{sec:bg}),
 becomes the more readable RE \verb|{{\\}}|.
 Embedding this RE in a C-like string literal with matchertext extensions
-in turn becomes \verb|"\[{{\\}}]"|,
-for a more manageable three leaning toothpicks total,
-in contrast with the traditionally-required eight (\verb|"\\\\\\\\"|).
+in turn becomes \verb|M"({{\\}})"| or \verb|"\[{{\\}}]"|,
+for a more manageable two or three leaning toothpicks,
+in contrast with the traditionally-required eight in \verb|"\\\\\\\\"|.
 

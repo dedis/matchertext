@@ -9,7 +9,7 @@ overlaps heavily with those of interest as host languages;
 we separate these discussions mainly to emphasize the orthogonality
 of host- and embedded-language issues and cleanly separate them.
 
-It is already readily feasible to write valid matchertext
+It is already entirely feasible to write valid matchertext
 in most of the languages we will consider for embedding.
 This is because most popular machine-readable languages
 already largely conform to the ``matchers must match'' rule
@@ -25,7 +25,7 @@ and are by no means essential.
 
 Almost certainly the most common context in which unmatched matchers
 appear in most today's existing source code is within string literals.
-This is especially true of code to print, or parse,
+This is especially true of code designed to print, or parse,
 machine-readable code in almost any syntax.
 Structured pretty-printing code frequently includes code sequences like this:
 
@@ -233,7 +233,7 @@ Smart text editors often try to detect URIs on entry
 and automatically turn them into hyperlinks --
 but these heuristics can easily break because
 there is no unambiguous syntactic separation between the URI
-from surrounding (particularly following) text.
+and its surrounding (particularly following) text.
 Suppose for example that I type or copy this text into an E-mail:
 
 \begin{footnotesize}
@@ -317,7 +317,8 @@ the MRI `\verb|http://ip6[1234::abcd]:80/|'.
 %could avoid obfuscation in URIs~\cite{rfc6874}:
 %the URI `\verb|http://[1234::abcd%25eth0]/' becomes
 %the MRI `\verb|http://ip6[1234::abcd%eth0]/'.
-The MRI host field syntax thus knows only about domain names or nested MRIs,
+The MRI host field syntax thus needs to know
+only about domain names or nested MRIs,
 and not about IP address syntax.
 
 
