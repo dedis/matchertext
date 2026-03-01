@@ -137,48 +137,59 @@ either or both of these extensions independently.
 
 A \emph{matchertext literal} is a string literal
 whose content is entirely matchertext.
-One syntax we suggest for matchertext literals
-is \verb|M"(|$\dots$\verb|)"|,
-inspired by C++ raw-string syntax \verb|R"(|$\dots$\verb|)"|.
-The content of such a matchertext literal
-must be valid matchertext (matchers must match),
+We suggest that languages allow mtchertext literals of the form
+\verb|M"(|$m$\verb|)"|,
+\verb|M"[|$m$\verb|]"|, and
+\verb|M"{|$m$\verb|}"|,
+where the substring $m$ is arbitrary matchertext.
+The content $m$ of such a matchertext literal
+\emph{must} be valid matchertext (matchers must match),
 otherwise the language processor reports a syntax error.
 Any matchertext string may be embedded verbatim in such a literal
-without exceptions or escaping, however.
+without exceptions or escaping.
 
-The parentheses in this syntax could be replaced with brackets or braces,
-or a particular language could even allow any of the three matcher pairs.
-We suggest the use of parentheses as the standard
-partly for consistency with the C++ inspiration,
-and partly due to the traditional use of parentheses for grouping.
-The use of \emph{some} matcher pair in this syntax is necessary
-for hosting arbitrary matchertext strings without escaping, however:
-the sole use of double-quotes as in \verb|M"|$\dots$\verb|"|, for example,
+We could prescribe the use in this syntax
+of one particular matcher pair of the three,
+but doing so seems unnecessary,
+since the leading \verb|M| identifies the literal as hosting matchertext.
+The first alternative using parentheses is stylistically closest to,
+and inspired by,
+C++ raw-string syntax \verb|R"(|$\dots$\verb|)"|.
+The second alternative using square brackets
+is stylistically more consistent with other matchertext extensions we suggest
+such as the one below in \cref{sec:host:c:escapes}, however.
+We see no obvious reason not to leave the choice of matcher to the user
+in this case.
+
+The use of \emph{some} matcher pair in this syntax is necessary,
+in any event,
+for hosting arbitrary matchertext strings this way without escaping.
+The sole use of double-quotes as in \verb|M"|$m$\verb|"|, for example,
 would not be fully robust or general
 because ASCII double quotes do not come in matched pairs,
-as further discussed below.
+as further discussed below in \cref{sec:host:c:other}.
 
-If we establish \verb|M"(|$\dots$\verb|)"|
+If we try to establish the above
 as a cross-language syntactic standard for matchertext literals,
-then we might leave variants like the lower-case version \verb|m"|$\dots$\verb|"|
+then we leave variants like the lower-case version \verb|m"|$m$\verb|"|
 for individual languages to decide the meaning of, if any.
-Some language-specific choices include:
+Such language-specific choices include:
 (a) no lower-case variant (syntax error);
-(b) \verb|m"(|$\dots$\verb|)"| is equivalent to \verb|M"(|$\dots$\verb|)"|;
-\ie the \verb|m| is simply case-insensitive;
-(c) \verb|m"|$\dots$\verb|"| without parentheses
+(b) \verb|m"(|$m$\verb|)"| is equivalent to \verb|M"(|$m$\verb|)"|;
+\ie the \verb|M| is simply case-insensitive;
+(c) \verb|m"|$m$\verb|"| without a matcher pair around the content $m$
 might be a constrained, shorthand syntax
-usable only for matchertext strings that contain no double-quotes
+usable only for matchertext strings $m$ that contain no double-quotes
 outside of matcher pairs; or
-(d) \verb|m"|$\dots$\verb|"| is a ``hybrid'' syntax
+(d) \verb|m"|$m$\verb|"| might be a ``hybrid'' syntax
 in which the host language's usual escaping mechanisms are active
-outside of matcher pairs within the embedded strings
-(hence allowing any matchertext string to be represented
+outside of matcher pairs within the embedded string,
+hence allowing any matchertext string to be represented
 at the cost of allowing the host language's escaping to ``leak''
-into the outermost context of the embedded string).
-Options (a) and (b) obviously appear simpler and cleaner,
-with (c) and (d) suggested only as potential alternatives
-that might optimize different pragmatic tradeoffs.
+into the outermost context of the embedded string.
+Options (a) and (b) appear conceptually simpler and cleaner,
+with (c) and (d) mentioned mainly as potential alternatives
+that could optimize different pragmatic tradeoffs.
 
 
 \subsubsection{Matchertext escapes in ordinary string literals}
@@ -230,6 +241,7 @@ ASCII matchers must match.
 
 
 \subsubsection{Other syntactic alternatives}
+\label{sec:host:c:other}
 
 The above proposals are only two of many possible alternatives of course,
 which may be worth considering --
