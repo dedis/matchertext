@@ -25,6 +25,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -152,4 +154,19 @@ func parseArgs(args []string) (command string, inputPath string, rest []string) 
 // printUsage prints the help message to stderr.
 func printUsage(program string) {
 	fmt.Fprintf(os.Stderr, usage, program)
+}
+
+// IsMinmlFile checks if the file at the given path uses a supported minml extension.
+// If it does it also returns the file extension.
+func IsMinmlFile(path string, extensions []string) (bool, string) {
+	ext := filepath.Ext(path)
+	if ext == "" {
+		return false, ""
+	}
+	extension := ext[1:]
+	if !slices.Contains(extensions, extension) {
+		return false, ""
+	}
+
+	return true, extension
 }

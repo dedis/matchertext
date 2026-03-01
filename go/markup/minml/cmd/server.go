@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/fs"
 	"log"
@@ -10,12 +11,11 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
+	"github.com/dedis/matchertext/go/markup/minml/cmd/server_structs"
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -57,131 +57,69 @@ const reloadScript = `<script>
 </script>
 `
 
-// sseClients tracks connected SSE clients for live reload notifications.
-type sseClients struct {
-	mu      sync.Mutex
-	clients []chan string
-}
-
-// add registers a new SSE client and returns its notification channel.
-func (s *sseClients) add() chan string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	ch := make(chan string, 1)
-	s.clients = append(s.clients, ch)
-	return ch
-}
-
-// remove unregisters an SSE client.
-func (s *sseClients) remove(ch chan string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for i, c := range s.clients {
-		if c == ch {
-			s.clients = append(s.clients[:i], s.clients[i+1:]...)
-			return
-		}
-	}
-}
-
-// notify sends an event name to all connected SSE clients.
-func (s *sseClients) notify(event string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, ch := range s.clients {
-		select {
-		case ch <- event:
-		default:
-		}
-	}
-}
-
-// loggingHandler wraps an http.Handler and logs each request to stderr.
-type loggingHandler struct {
-	handler http.Handler
-}
-
-type statusRecorder struct {
-	http.ResponseWriter
-	status int
-}
-
-func (r *statusRecorder) WriteHeader(code int) {
-	r.status = code
-	r.ResponseWriter.WriteHeader(code)
-}
-
-func (r *statusRecorder) Flush() {
-	if f, ok := r.ResponseWriter.(http.Flusher); ok {
-		f.Flush()
-	}
-}
-
-func (l *loggingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	rec := &statusRecorder{ResponseWriter: w, status: 200}
-	l.handler.ServeHTTP(rec, r)
-	log.Printf("%s %s %d", r.Method, r.URL.Path, rec.status)
-}
-
 // Server starts a local HTTP server that serves converted MinML files.
-// It copies the source path (file or directory) into a temporary build directory,
-// converts all .minml files to .html with live-reload script injection,
-// then serves the result on the given port. Source files are watched for
-// changes and automatically re-converted, triggering browser reloads via SSE.
+// It copies the source path (file or directory) into a BuildTarget (in-memory
+// or on-disk), converts all .minml files to .html with live-reload script
+// injection, then serves the result on the given port. Source files are watched
+// for changes and automatically re-converted, triggering browser reloads via SSE.
 func Server(path string, port string, noOpen, diskBuild bool, extensions []string) {
-	// Create a temporary build folder
-	// The "__" prefix is to prevent potential clashing
-	dst := "__build"
-	err := os.Mkdir(dst, 0777)
-	if err != nil {
+	// Create the build target (in-memory or on-disk)
+	var target server_structs.BuildTarget
+	if diskBuild {
+		target = server_structs.NewDiskTarget("__build")
+	} else {
+		target = server_structs.NewMemoryTarget()
+	}
+	if err := target.Init(); err != nil {
 		log.Fatal(err)
-		return
 	}
 
 	// SSE client tracker
-	clients := &sseClients{}
+	clients := &server_structs.SseClients{}
 
 	// On ctrl+C: notify browsers, clean up, exit
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-sigCh
-		clients.notify("shutdown")
+		clients.Notify("shutdown")
 		time.Sleep(100 * time.Millisecond) // let SSE flush
-		os.RemoveAll(dst)
+		_ = target.Cleanup()
 		os.Exit(0)
 	}()
 
 	fi, err := os.Stat(path)
 	if err != nil {
-		_ = os.RemoveAll(dst)
+		_ = target.Cleanup()
 		log.Fatal(err)
 	}
 
-	// Copy all files from source to the __build dir
+	// Copy all source files into the build target
 	switch mode := fi.Mode(); {
 	case mode.IsDir():
-		err := os.CopyFS(dst, os.DirFS(path))
-		if err != nil {
-			_ = os.RemoveAll(dst)
+		if err := copyFSToTarget(path, target); err != nil {
+			_ = target.Cleanup()
 			log.Fatal(err)
 		}
 	case mode.IsRegular():
-		copyFile(path, dst)
+		if err := copyFileToTarget(path, filepath.Base(path), target); err != nil {
+			_ = target.Cleanup()
+			log.Fatal(err)
+		}
 	}
 
 	// Convert all minml files to html files
-	err = filepath.WalkDir(dst, func(path string, entry fs.DirEntry, err error) error {
+	err = fs.WalkDir(target.FS(), ".", func(p string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if entry.IsDir() {
 			return nil
 		}
-		return convertFile(path, extensions)
+		return convertFile(target, p, extensions)
 	})
 	if err != nil {
-		_ = os.RemoveAll(dst)
+		_ = target.Cleanup()
 		log.Fatal(err)
 	}
 
@@ -207,8 +145,8 @@ func Server(path string, port string, noOpen, diskBuild bool, extensions []strin
 		w.Header().Set("Connection", "keep-alive")
 		flusher.Flush()
 
-		ch := clients.add()
-		defer clients.remove(ch)
+		ch := clients.Add()
+		defer clients.Remove(ch)
 
 		for {
 			select {
@@ -222,12 +160,12 @@ func Server(path string, port string, noOpen, diskBuild bool, extensions []strin
 	})
 
 	// File server for everything else
-	mux.Handle("/", http.FileServer(http.Dir(dst)))
+	mux.Handle("/", http.FileServer(http.FS(target.FS())))
 
 	// Start HTTP server with request logging
 	log.Printf("Serving on http://localhost:%s", port)
 	go func() {
-		if err := http.ListenAndServe(":"+port, &loggingHandler{handler: mux}); err != nil {
+		if err := http.ListenAndServe(":"+port, &server_structs.LoggingHandler{Handler: mux}); err != nil {
 			log.Fatal(err)
 		}
 	}()
@@ -251,56 +189,86 @@ func Server(path string, port string, noOpen, diskBuild bool, extensions []strin
 		case <-debounce.C:
 			rebuilt := false
 			for file, op := range pending {
-				dest := filepath.Join(dst, filepath.Base(file))
+				relPath := filepath.Base(file)
 				if op&(fsnotify.Remove|fsnotify.Rename) != 0 {
-					htmlPath := dest[:len(dest)-len(filepath.Ext(dest))] + ".html"
-					_ = os.Remove(dest)
-					_ = os.Remove(htmlPath)
-					log.Printf("Removed: %s", filepath.Base(file))
+					htmlPath := relPath[:len(relPath)-len(filepath.Ext(relPath))] + ".html"
+					_ = target.RemoveFile(relPath)
+					_ = target.RemoveFile(htmlPath)
+					log.Printf("Removed: %s", relPath)
 					rebuilt = true
 					continue
 				}
-				log.Printf("Rebuilt: %s", filepath.Base(file))
-				copyFile(file, dst)
-				if err := convertFile(dest, extensions); err != nil {
+				log.Printf("Rebuilt: %s", relPath)
+				if err := copyFileToTarget(file, relPath, target); err != nil {
+					log.Println(err)
+					continue
+				}
+				if err := convertFile(target, relPath, extensions); err != nil {
 					log.Println(err)
 				}
 				rebuilt = true
 			}
 			pending = make(map[string]fsnotify.Op)
 			if rebuilt {
-				clients.notify("reload")
+				clients.Notify("reload")
 			}
 		}
 	}
 }
 
-// convertFile converts a single minml file to html with live-reload
-// script injection, then removes the source .minml file.
-// Non-.minml files are ignored.
-func convertFile(dest string, extensions []string) error {
-	extension := filepath.Ext(dest)[1:] // Remove the . from the extension
-	if !slices.Contains(extensions, extension) {
+// convertFile reads a file from the BuildTarget, converts it from MinML to
+// HTML with live-reload script injection, writes the result back, and removes
+// the source file. Non-matching extensions are ignored.
+func convertFile(target server_structs.BuildTarget, relPath string, extensions []string) error {
+	isMinml, extension := IsMinmlFile(relPath, extensions)
+	if !isMinml {
 		return nil
 	}
 
-	htmlPath := dest[:len(dest)-len(extension)] + "html"
-	out, err := os.Create(htmlPath)
+	// Read source from the build target
+	data, err := fs.ReadFile(target.FS(), relPath)
 	if err != nil {
-		return fmt.Errorf("convertToWriter error: %w", err)
+		return fmt.Errorf("reading %s: %w", relPath, err)
 	}
-	defer out.Close()
 
-	if err := Convert(dest, out, false, extensions); err != nil {
-		return fmt.Errorf("convertToWriter error: %w", err)
+	// Convert MinML to HTML
+	var buf bytes.Buffer
+	if err := convertFromReader(bytes.NewReader(data), &buf, relPath); err != nil {
+		return fmt.Errorf("converting %s: %w", relPath, err)
 	}
 
 	// Inject live-reload script
-	if _, err := out.WriteString(reloadScript); err != nil {
-		return fmt.Errorf("inject reload script: %w", err)
+	buf.WriteString(reloadScript)
+
+	// Write HTML output to the build target
+	htmlPath := relPath[:len(relPath)-len(extension)] + "html"
+	if err := target.WriteFile(htmlPath, buf.Bytes()); err != nil {
+		return fmt.Errorf("writing %s: %w", htmlPath, err)
 	}
-	_ = os.Remove(dest)
+
+	// Remove the source file
+	_ = target.RemoveFile(relPath)
 	return nil
+}
+
+// copyFSToTarget recursively copies all files from a directory into the BuildTarget.
+func copyFSToTarget(srcDir string, target server_structs.BuildTarget) error {
+	return fs.WalkDir(os.DirFS(srcDir), ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		return copyFileToTarget(filepath.Join(srcDir, p), p, target)
+	})
+}
+
+// copyFileToTarget reads a file from disk and writes it into the BuildTarget
+// at the given relative path.
+func copyFileToTarget(srcPath, relPath string, target server_structs.BuildTarget) error {
+	data, err := os.ReadFile(srcPath)
+	if err != nil {
+		return fmt.Errorf("reading %s: %w", srcPath, err)
+	}
+	return target.WriteFile(relPath, data)
 }
 
 // watchDir recursively watches a directory for file changes and sends
@@ -359,20 +327,7 @@ func watchDir(dir string, changed chan<- fsnotify.Event) {
 	}
 }
 
-// copyFile copies a file into the destination directory, preserving its base name.
-func copyFile(path, dst string) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-	dest := filepath.Join(dst, filepath.Base(path))
-	if err := os.WriteFile(dest, data, 0644); err != nil {
-		log.Fatal(err)
-		return
-	}
-}
-
+// openBrowser opens the launched web servers index.html webpage
 func openBrowser(url string) {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
