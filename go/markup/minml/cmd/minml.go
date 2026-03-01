@@ -23,12 +23,9 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"os"
-
-	"github.com/dedis/matchertext/go/markup/html"
-	"github.com/dedis/matchertext/go/markup/minml"
+	"strings"
 )
 
 const usage = `MinML Command-Line Tool
@@ -45,17 +42,22 @@ COMMANDS:
     server  <file|directory> [OPTIONS]    Start an HTTP server for MinML conversion
 
 OPTIONS (server):
-    --port <port>    Port to listen on (default: 8080)
-    --no-open        Do not auto-open the index.html file in the browser
+    --port <port>                         Port to listen on (default: 8080)
+    --no-open                             Prevents the browser from automatically opening the served file/directory
+	--disk                                Creates a disk build instead of a in-memory build
+	--extensions <ext1,ext2,...>          Comma separated list of additional minml file extensions
 
 DESCRIPTION:
     If no command is given, defaults to 'Convert'.
 
 EXAMPLES:
     %[1]s input.minml
-    %[1]s Convert input.minml
+    %[1]s convertToWriter input.minml
     %[1]s server input.minml
 `
+
+const CmdConvert = "convert"
+const CmdServer = "server"
 
 func main() {
 	args := os.Args
@@ -66,33 +68,53 @@ func main() {
 	}
 
 	command, inputPath, rest := parseArgs(args)
+	extensions := []string{"minml", "m"}
 
 	switch command {
-	case "Convert":
-		if len(rest) > 0 {
-			log.Fatal("'convert' takes no extra arguments")
+	case CmdConvert:
+		for i := 0; i < len(rest); i++ {
+			switch rest[i] {
+			case "--extensions":
+				i++
+				if i >= len(rest) {
+					log.Fatal("--extensions requires a value")
+				}
+				extensions = append(extensions, strings.Split(rest[i], ",")...)
+			default:
+				log.Fatal("unknown option for '", CmdConvert, "': ", rest[i])
+			}
 		}
-		if err := Convert(inputPath, os.Stdout); err != nil {
+
+		if err := Convert(inputPath, os.Stdout, true, extensions); err != nil {
 			log.Fatal(err)
 		}
-	case "server":
+	case CmdServer:
 		port := "8080"
 		noOpen := false
+		diskBuild := false
 		for i := 0; i < len(rest); i++ {
 			switch rest[i] {
 			case "--port":
-				if i+1 >= len(rest) {
+				i++
+				if i >= len(rest) {
 					log.Fatal("--port requires a value")
 				}
-				port = rest[i+1]
-				i++
+				port = rest[i]
 			case "--no-open":
 				noOpen = true
+			case "--disk":
+				diskBuild = true
+			case "--extensions":
+				i++
+				if i >= len(rest) {
+					log.Fatal("--extensions requires a value")
+				}
+				extensions = append(extensions, strings.Split(rest[i], ",")...)
 			default:
-				log.Fatal("unknown option for 'server': ", rest[i])
+				log.Fatal("unknown option for '", CmdServer, "': ", rest[i])
 			}
 		}
-		Server(inputPath, port, noOpen)
+		Server(inputPath, port, noOpen, diskBuild, extensions)
 	default:
 		log.Fatalf("Unknown command: %s", command)
 	}
@@ -101,13 +123,13 @@ func main() {
 // parseArgs parses CLI arguments into command, input path, and remaining args.
 //
 // Format: minml [COMMAND] <input.minml> [OPTIONS]
-// Defaults to "Convert" if the first argument is not a known command.
+// Defaults to CmdConvert if the first argument is not a known command.
 func parseArgs(args []string) (command string, inputPath string, rest []string) {
 	switch args[1] {
 	case "help":
 		printUsage(args[0])
 		os.Exit(0)
-	case "Convert", "server":
+	case CmdConvert, CmdServer:
 		if len(args) < 3 {
 			log.Fatalf("'%s' requires an input file", args[1])
 		}
@@ -115,7 +137,7 @@ func parseArgs(args []string) (command string, inputPath string, rest []string) 
 		inputPath = args[2]
 		rest = args[3:]
 	default:
-		command = "Convert"
+		command = CmdConvert
 		inputPath = args[1]
 		rest = args[2:]
 	}
@@ -130,26 +152,4 @@ func parseArgs(args []string) (command string, inputPath string, rest []string) 
 // printUsage prints the help message to stderr.
 func printUsage(program string) {
 	fmt.Fprintf(os.Stderr, usage, program)
-}
-
-// Convert parses a MinML source file and writes the HTML output to w.
-func Convert(sourceFile string, w io.Writer) error {
-	file, err := os.Open(sourceFile)
-	if err != nil {
-		return fmt.Errorf("opening %v: %w", sourceFile, err)
-	}
-	defer file.Close()
-
-	mp := minml.NewTreeParser(file).WithTransformer(minml.EntityTransformer).WithTransformer(minml.QuoteTransformer)
-	ns, err := mp.ParseAST()
-	if err != nil {
-		return fmt.Errorf("parsing %v: %w", sourceFile, err)
-	}
-
-	enc := html.NewTreeWriter(w)
-	if err := enc.WriteAST(ns); err != nil {
-		return fmt.Errorf("encoding %v: %w", sourceFile, err)
-	}
-
-	return nil
 }

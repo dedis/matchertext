@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -127,7 +128,7 @@ func (l *loggingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // converts all .minml files to .html with live-reload script injection,
 // then serves the result on the given port. Source files are watched for
 // changes and automatically re-converted, triggering browser reloads via SSE.
-func Server(path string, port string, noOpen bool) {
+func Server(path string, port string, noOpen, diskBuild bool, extensions []string) {
 	// Create a temporary build folder
 	// The "__" prefix is to prevent potential clashing
 	dst := "__build"
@@ -169,8 +170,16 @@ func Server(path string, port string, noOpen bool) {
 		copyFile(path, dst)
 	}
 
-	// Convert all .minml files to .html files
-	err = filepath.WalkDir(dst, convertFiles)
+	// Convert all minml files to html files
+	err = filepath.WalkDir(dst, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		return convertFile(path, extensions)
+	})
 	if err != nil {
 		_ = os.RemoveAll(dst)
 		log.Fatal(err)
@@ -253,7 +262,7 @@ func Server(path string, port string, noOpen bool) {
 				}
 				log.Printf("Rebuilt: %s", filepath.Base(file))
 				copyFile(file, dst)
-				if err := convertFile(dest); err != nil {
+				if err := convertFile(dest, extensions); err != nil {
 					log.Println(err)
 				}
 				rebuilt = true
@@ -266,39 +275,32 @@ func Server(path string, port string, noOpen bool) {
 	}
 }
 
-// convertFile converts a single .minml file to .html with live-reload
+// convertFile converts a single minml file to html with live-reload
 // script injection, then removes the source .minml file.
 // Non-.minml files are ignored.
-func convertFile(dest string) error {
-	if filepath.Ext(dest) != ".minml" {
+func convertFile(dest string, extensions []string) error {
+	extension := filepath.Ext(dest)[1:] // Remove the . from the extension
+	if !slices.Contains(extensions, extension) {
 		return nil
 	}
-	htmlPath := dest[:len(dest)-len(".minml")] + ".html"
+
+	htmlPath := dest[:len(dest)-len(extension)] + "html"
 	out, err := os.Create(htmlPath)
 	if err != nil {
-		return fmt.Errorf("convert error: %w", err)
+		return fmt.Errorf("convertToWriter error: %w", err)
 	}
 	defer out.Close()
-	if err := Convert(dest, out); err != nil {
-		return fmt.Errorf("convert error: %w", err)
+
+	if err := Convert(dest, out, false, extensions); err != nil {
+		return fmt.Errorf("convertToWriter error: %w", err)
 	}
+
 	// Inject live-reload script
 	if _, err := out.WriteString(reloadScript); err != nil {
 		return fmt.Errorf("inject reload script: %w", err)
 	}
 	_ = os.Remove(dest)
 	return nil
-}
-
-// convertFiles is a filepath.WalkDirFunc that converts each .minml file to .html.
-func convertFiles(path string, entry fs.DirEntry, err error) error {
-	if err != nil {
-		return err
-	}
-	if entry.IsDir() {
-		return nil
-	}
-	return convertFile(path)
 }
 
 // watchDir recursively watches a directory for file changes and sends
