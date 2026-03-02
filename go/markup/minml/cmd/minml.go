@@ -1,9 +1,9 @@
-// Package minml is a command-line tool to Convert MinML to XML.
+// Package minml is a command-line tool to convert MinML to XML.
 //
 // This tool is currently extremely "minimal"
 // and could be improved in many ways:
-// e.g., to Convert to either HTML or XML or other output formats;
-// to Convert in the other direction from other formats to MinML;
+// e.g., to convert to either HTML or XML or other output formats;
+// to convert in the other direction from other formats to MinML;
 // or merely to validate and display information about MinML code.
 //
 // Usage:
@@ -11,13 +11,13 @@
 //	minml [COMMAND] <input.minml> [OPTIONS]
 //
 // Commands:
-//   - Convert: Parse MinML and write HTML to stdout (default)
+//   - convert: Parse MinML and write HTML to stdout (default)
 //   - server:  Start an HTTP server for MinML conversion
 //
 // Examples:
 //
 //	minml input.minml
-//	minml Convert input.minml
+//	minml convert input.minml
 //	minml server input.minml
 package main
 
@@ -40,7 +40,7 @@ ARGS:
 
 COMMANDS:
     help                                  Print this help message
-    Convert <file.minml>                  Parse MinML and write HTML to stdout (default)
+    convert <file.minml>                  Parse MinML and write HTML to stdout (default)
     server  <file|directory> [OPTIONS]    Start an HTTP server for MinML conversion
 
 OPTIONS (server):
@@ -50,11 +50,11 @@ OPTIONS (server):
 	--extensions <ext1,ext2,...>          Comma separated list of additional minml file extensions
 
 DESCRIPTION:
-    If no command is given, defaults to 'Convert'.
+    If no command is given, defaults to 'convert'.
 
 EXAMPLES:
     %[1]s input.minml
-    %[1]s convertToWriter input.minml
+    %[1]s convert input.minml
     %[1]s server input.minml
 `
 
