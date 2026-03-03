@@ -870,3 +870,192 @@ in turn becomes \verb|M"({{\\}})"| or \verb|"\[{{\\}}]"|,
 for a more manageable two or three leaning toothpicks,
 in contrast with the traditionally-required eight in \verb|"\\\\\\\\"|.
 
+
+\subsection{Matchertext string interpolation}
+\label{sec:host:interp}
+
+All the above sections have focused on the problem of
+hosting arbitrary matchertext strings, \emph{verbatim},
+while eliminating the need for escaping.
+We have thus assumed so far that the desire is
+for the semantic value of a string literal
+(the ``output'' from scanning the literal)
+should ideally be identical to and unmodified from the literal's ``input''
+(the ``input'' character sequence between the literal's delimiters) --
+and the matchertext discipline indeed makes this goal achievable.
+
+The string-literal syntax in many programming and scripting languages,
+however,
+often and increasingly support \emph{string interpolation}:
+the substitution of strings residing in variables, function parameters,
+or even computed by arbitrary host-language expressions,
+to be substituted into explicit ``holes''
+in an otherwise-verbatim string literal.
+If \verb|name| is a variable containing the string `\verb|Bob|',
+for example,
+then to construct the string `\verb|Hi Bob|',
+instead of manual concatenation via an expression like
+\verb|"Hi "+name|,
+one may instead write
+\verb|f'Hi {name}'| in Python,
+\verb|'Hi ${name}'| in JavaScript,
+\verb|"Hi #{name}"| in Ruby,
+\verb|"Hi \(name)"| in Swift,
+or just
+\verb|"Hi $name"| in many shells and scripting languages
+such as Bash, Perl, and PHP.
+
+String interpolation extends the functional role of string literals
+from verbatim string \emph{expression}
+to template-based string \emph{processing}:
+automating the concatenation of verbatim and computed strings
+to form a result.
+It may at first appear that matchertext hosting and string interpolation
+are incompatible,
+since our matchertext goal has mostly been to \emph{avoid modifying}
+strings we wish to express verbatim,
+while string interpolation's goal is precisely to \emph{modify}
+a template string by filling holes in well-defined ways.
+Indeed, if we are to have any way to specify
+a hole to be filled in a template,
+allowing that hole to be \emph{anywhere} in the string,
+then it appears we \emph{must} make some character sequences in the template
+sensitive, and thus forbidden or escaped in verbatim text
+(\eg the `\verb|$|' that introduces interpolated variable names
+in many scripting languages).
+
+There is nevertheless a different role that matchertext might usefully play
+in conjunction with string interpolation:
+namely defining and enforcing a hierarchical notion of
+\emph{structural integrity} during interpolation.
+This alternative role could be especially important for security,
+where traditional string interpolation
+based on structure-oblivious concatenation
+has been at least partly responsible for an enormous number
+of critical security bugs historically,
+starting with the quintessential SQL injection attack~\cite{clarke12sql}.
+\xxx{specific example?}
+We therefore propose below potential matchertext-aware extensions
+that support string interpolation while ensuring structural integrity.
+
+\subsubsection{Interpolation in matchertext literals}
+\label{sec:host:interp:lit}
+
+We suggest a potential string-interpolation extension
+to the cross-language matchertext literal syntax
+described above in \cref{sec:host:c:literals}.
+An \emph{interpolating} matchertext literal has the form
+\verb|M|$d$\verb|"(|$m$\verb|)"|,
+\verb|M|$d$\verb|"[|$m$\verb|]"|, or
+\verb|M|$d$\verb|"{|$m$\verb|}"|,
+where $d$ is a \emph{delimiter string}
+consisting solely of one or more strictly-nested matcher pairs
+specifying the delimiters to be used to express holes or \emph{antiquotations}
+within the literal.
+In this syntax, for example,
+several equivalent ways to express the interpolation example above
+would be
+\verb|M{}"(Hi {name})"|,
+\verb|M[]"{Hi [name]}"|,
+\verb|M()"(Hi (name))"|,
+\verb|M{{}}"[Hi {{name}}]"|, or
+\verb|M([{}])"[Hi ([{name}])]"|.
+
+The intent of this string-interpolation syntax
+goes beyond merely ``filling in holes'' in a template, however.
+The expectation is that not just the template itself,
+but also all of the interpolated hole-filling strings,
+\emph{must} be matchertext-compliant:
+otherwise the interpolation processing yields
+some error whose reporting and handling is language-dependent.
+If the variable \verb|name| contains
+the non-matchertext string `\verb|Eve(|', for example,
+then the interpolation in the above example fails with an error,
+and in particular does \emph{not} just ``blindly'' use concatenation
+to produce the string `\verb|Hi Eve(|'.
+
+Enforcing matchertext discipline on both the template
+and the interpolated strings
+ensures that the result is valid matchertext,
+and more generally ensures that interpolated strings
+cannot compromise the hierarchical structure of the template.
+This property can be useful as a security measure,
+since a vast number of critical SQL injection attacks
+and other input-validation attacks, historically,
+have relied on violating the structure of an interpolated template.
+In many SQL injection attacks, for example,
+an insufficiently-constrained user-entered string
+interpolated into an SQL query between quotes
+might contain a quote mark that gets interpreted
+as an ``early'' close quote followed by arbitrary attack code
+that gets executed as SQL code on the server side.
+Using matchertext literals and interpolation
+instead of conventional literals
+could thus provide a layer of protection against such attacks
+below and independent of
+the complex language-dependent parsing and string-handling code.
+In essence, matchertext interpolation could be viewed
+as ``microsegmentation of text-based formats'',
+anologous to the already-accepted best practice
+of microsegmentation of networks.
+
+Error handling is necessarily language-dependent, of course,
+and we expect should match the conventions of a given language.
+Languages like Java that support exception handling
+might use those to handle matchertext interpolation errors,
+for example.
+We might envision future strongly-typed languages
+having a \verb|matchertext| type representing a string
+that is statically known to be valid matchertext,
+either as a result of how it was produced
+or by an explicit check for example.
+
+In some contexts it may be undesirable or impossible
+for a matchertext interpolation error to affect control flow.
+An alternative in such cases might be for matchertext interpolation
+to replace any non-matchertext strings with
+a single Unicode replacement character (U+FFFD),
+whose standardized purpose is to serve as an explicit placeholder
+for something invalid or non-representable.
+This approach makes interpolation errors ``silent'',
+while at least ensuring that the interpolated result
+is still valid matchertext,
+preserves the template's hierarchical structure,
+and that the interpolated replacement character
+is unlikely to be interpreted as useful ``code''
+an attacker might make use of in practically any conceivable language.
+
+\xxx{also talk about language-specific hybrid variants
+	such as m"..." in which the host language's
+	escaping and interpolation syntax apply within the template?
+}
+
+\subsubsection{Hybrid matchertext interpolation}
+\label{sec:host:interp:hybrid}
+
+The above matchertext interpolation syntax
+is suggest as one that appears likely backward-compatible
+with a large number of existing languages,
+and could help provide some cross-language consistency if adopted.
+Many languages already have their own well-defined
+interpolation syntax, however,
+sometimes related to the host language's normal escaping syntax
+as in Swift's interpolation escapes like \verb|\(name)| in string literals.
+Since a template for interpolation is intended for modification anyway,
+avoiding the need for escapes or other ``sensitive'' characters
+in such templates is unavoidable and hence arguably less important
+than when using literals for verbatim embedding.
+
+As a result, there may be a pragmatic argument
+for languages to offer \emph{hybrid} matchertext interpolation syntax,
+which enforces the matchertext structural discipline (\eg for security),
+but maintains the host language's normal escaping and interpolation syntax.
+In Python, for example,
+an extension might support syntax like \verb|m'Hi {name}'|,
+where exactly the same interpolation and escaping syntax
+apply within the quotes
+as with Python's existing \verb|f'Hi {name}'| syntax --
+except that the matchertext syntax ensures that
+the template, all interpolated strings,
+and the output are all valid matchertext.
+
