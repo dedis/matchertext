@@ -5,7 +5,7 @@ The practice of
 embedding strings from one language into another
 is ubiquitous --
 as is the pain of having to ``escape'' embedded strings
-to protect them from misinterpretation by the host language processor.
+to protect them from misinterpretation by the host-language processor.
 This section briefly explores a few of these common existing practices
 and the syntactic composition problems they create.
 
@@ -115,6 +115,10 @@ surround a quoted sequence with a balanced number of \verb|#| signs:
 \href{https://www.lua.org/manual/5.1/manual.html}{Lua}
 similarly offers \emph{long bracket} quotations
 like \verb|[=[|$\dots$\verb|]=]|, \verb|[==[|$\dots$\verb|]==]|, etc.
+C++ supports raw-string literals of the form
+\verb|R"|$d$\verb|(|$\dots$\verb|)|$d$\verb|"|,
+where $d$ is a nearly-arbitrary \emph{delimiter string}
+to make the opener and closer sequence as unique as may be needed.
 This approach has the appeal that for any string to be delimited,
 there always \emph{exists} some delimiter pair
 that can quote it unambiguously.
