@@ -16,6 +16,54 @@
 #include <clang/Lex/Lexer.h>
 
 #include "../include/Parser.hpp"
+#include "../include/MatcherText.hpp"
+
+template<typename T> static void AtomicAdd(std::atomic<T> &dst, T delta) {
+  T cur = dst.load(std::memory_order_relaxed);
+  while (!dst.compare_exchange_weak(cur, cur + delta, std::memory_order_relaxed, std::memory_order_relaxed)) {}
+}
+
+template<typename T> static void AtomicMax(std::atomic<T> &dst, T value) {
+  T cur = dst.load(std::memory_order_relaxed);
+  while (value > cur && !dst.compare_exchange_weak(cur, value, std::memory_order_relaxed, std::memory_order_relaxed)) {}
+}
+
+static bool IsStringToken(const clang::Token &tok) {
+  return tok.is(clang::tok::string_literal) ||
+         tok.is(clang::tok::wide_string_literal) ||
+         tok.is(clang::tok::utf8_string_literal) ||
+         tok.is(clang::tok::utf16_string_literal) ||
+         tok.is(clang::tok::utf32_string_literal);
+}
+
+// Returns the source-form body of one string token.
+// Normal strings keep escapes as written.
+// Raw strings return verbatim raw body.
+static std::string ExtractLiteralBody(std::string_view spelling) {
+  const size_t quote = spelling.find('"');
+  if (quote == std::string_view::npos)
+    return {};
+
+  if (const bool isRaw = quote > 0 && spelling[quote - 1] == 'R'; !isRaw) {
+    const size_t end = spelling.rfind('"');
+    if (end == std::string_view::npos || end <= quote)
+      return {};
+    return std::string(spelling.substr(quote + 1, end - quote - 1));
+  }
+
+  // Raw form: prefix R"delim(body)delim"
+  const size_t open = spelling.find('(', quote);
+  if (open == std::string_view::npos)
+    return {};
+
+  const std::string delim(spelling.substr(quote + 1, open - quote - 1));
+  const std::string suffix = ")" + delim + "\"";
+  const size_t close = spelling.rfind(suffix);
+  if (close == std::string_view::npos || close <= open)
+    return {};
+
+  return std::string(spelling.substr(open + 1, close - open - 1));
+}
 
 void Parser::ParseFile(const std::string &path) {
   /// Static compiler infrastructure reused across calls to avoid repeated setup cost.
@@ -67,42 +115,18 @@ void Parser::ParseFile(const std::string &path) {
       break;
 
     /// Handle string literal tokens.
-    if (tok.is(clang::tok::string_literal) ||
-        tok.is(clang::tok::wide_string_literal) ||
-        tok.is(clang::tok::utf8_string_literal) ||
-        tok.is(clang::tok::utf16_string_literal) ||
-        tok.is(clang::tok::utf32_string_literal)) {
-      std::string combined;
+    if (IsStringToken(tok)) {
+      std::string value;
       clang::Token current = tok;
 
       /// Concatenate adjacent string literals ("a" "b").
       do {
-        combined += clang::Lexer::getSpelling(current, srcMgr, langOpts);
+        const std::string spelling = clang::Lexer::getSpelling(current, srcMgr, langOpts);
+        value += ExtractLiteralBody(spelling);
         lexer.LexFromRawLexer(current);
-      } while (current.is(clang::tok::string_literal) ||
-               current.is(clang::tok::wide_string_literal) ||
-               current.is(clang::tok::utf8_string_literal) ||
-               current.is(clang::tok::utf16_string_literal) ||
-               current.is(clang::tok::utf32_string_literal));
+      } while (IsStringToken(current));
 
       tok = current;
-
-      /// Extract the literal contents from the token spelling.
-      std::string value;
-      if (size_t start = combined.find('"'); start != std::string::npos) {
-        if (start > 0 && combined[start - 1] == 'R') {
-          /// Raw string: R"delim(content)delim"
-          size_t open = combined.find('(', start);
-          if (size_t close = combined.rfind(')');
-            open != std::string::npos && close != std::string::npos && close > open)
-            value = combined.substr(open + 1, close - open - 1);
-        } else {
-          /// Normal quoted string.
-          if (size_t end = combined.rfind('"'); end > start)
-            value = combined.substr(start + 1, end - start - 1);
-        }
-      }
-
       process(std::move(value), STRING_STATS);
       continue;
     }
@@ -116,16 +140,29 @@ void Parser::ParseFile(const std::string &path) {
 }
 
 void Parser::process(std::string &&string, EmbeddedStats &stats) {
-  unsigned int toothpicks = 0;
-  for (const auto &c: string) {
-    if (c == '\\') toothpicks++;
+  uint64_t toothpicks = 0;
+  for (const unsigned char c: string) {
+    if (c == '\\')
+      ++toothpicks;
   }
 
-  stats.count += 1;
-  if (toothpicks > 0)
-    stats.withToothpicks += 1;
+  const auto [unmatched, maxDepth, rawChars] = AnalyzeMatcherText(string);
 
-  stats.toothpicks += toothpicks;
-  double current = stats.toothpicksMax.load();
-  while (toothpicks > current && !stats.toothpicksMax.compare_exchange_weak(current, toothpicks));
+  AtomicAdd(stats.count, 1.0);
+  AtomicAdd(stats.rawChars, static_cast<double>(rawChars));
+
+  if (toothpicks > 0)
+    AtomicAdd(stats.withToothpicks, 1.0);
+  AtomicAdd(stats.toothpicks, static_cast<double>(toothpicks));
+  AtomicMax(stats.toothpicksMax, static_cast<double>(toothpicks));
+
+  if (unmatched > 0)
+    AtomicAdd(stats.withNonCompliance, 1.0);
+  AtomicAdd(stats.nonComplianceCount, static_cast<double>(unmatched));
+  AtomicMax(stats.nonComplianceMax, static_cast<double>(unmatched));
+
+  if (maxDepth > 1)
+    AtomicAdd(stats.withNesting, 1.0);
+  AtomicAdd(stats.nestingDepthTotal, static_cast<double>(maxDepth));
+  AtomicMax(stats.nestingDepthMax, static_cast<double>(maxDepth));
 }

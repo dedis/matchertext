@@ -18,7 +18,20 @@
   X(withToothpicks, "With Toothpicks")                    \
   X(toothpicks, "Total Toothpicks")                       \
   X(toothpicksMax, "Maximum Toothpicks")                  \
-  X(toothpicksAvg, "Average Toothpicks")
+  X(toothpicksAvg, "Average Toothpicks")                  \
+                                                          \
+  X(withNonCompliance, "With Non-Compliance")             \
+  X(nonComplianceCount, "Non-Compliance Count")           \
+  X(nonComplianceMax, "Non-Compliance Max")               \
+  X(nonComplianceAvg, "Average Non-Compliance")           \
+  X(complianceRate, "Compliance Rate")                    \
+                                                          \
+  X(withNesting, "With Nested Embedding")                 \
+  X(nestingDepthTotal, "Total Max Nesting Depth")         \
+  X(nestingDepthMax, "Maximum Nesting Depth")             \
+  X(nestingDepthAvg, "Average Max Nesting Depth")         \
+                                                          \
+  X(rawChars, "Raw Character Count")
 
 /// Runtime stats (atomics for concurrent updates)
 struct EmbeddedStats {
