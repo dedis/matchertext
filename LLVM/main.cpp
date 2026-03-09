@@ -3,6 +3,7 @@
 #include <set>
 
 #include "include/Parser.hpp"
+#include "include/Stats.hpp"
 
 namespace fs = std::filesystem;
 
@@ -15,19 +16,13 @@ static std::string normalize_path(const std::string &in) {
 }
 
 /// Return true if the path has a C/C++ source or header extension.
-inline bool is_c_cpp_file(const std::string& path) {
+inline bool is_c_cpp_file(const std::string &path) {
   const auto pos = path.rfind('.');
   if (pos == std::string::npos)
     return false;
 
   const std::string ext = path.substr(pos + 1);
-  return ext == "c"   ||
-         ext == "h"   ||
-         ext == "cc"  ||
-         ext == "cpp" ||
-         ext == "cxx" ||
-         ext == "hpp" ||
-         ext == "hh"  ||
+  return ext == "c" || ext == "h" || ext == "cc" || ext == "cpp" || ext == "cxx" || ext == "hpp" || ext == "hh" ||
          ext == "hxx";
 }
 
@@ -49,7 +44,7 @@ int main(const int argc, char *argv[]) {
       filesToProcess.insert(normalize_path(p.string()));
     else if (fs::is_directory(p))
       for (const auto &entry: fs::recursive_directory_iterator(p))
-        if (fs::is_regular_file(entry) && is_c_cpp_file(p))
+        if (fs::is_regular_file(entry) && is_c_cpp_file(entry.path().string()))
           filesToProcess.insert(normalize_path(entry.path().string()));
   }
 
@@ -57,14 +52,24 @@ int main(const int argc, char *argv[]) {
     const std::vector files(filesToProcess.begin(), filesToProcess.end());
     const auto start = std::chrono::high_resolution_clock::now();
 
-    #pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(dynamic) default(none) shared(files)
     for (const auto &file: files) {
       Parser::ParseFile(file);
     }
 
+    Parser::STRING_STATS.DeriveStats();
+    Parser::DOCS_STATS.DeriveStats();
+
     const auto end = std::chrono::high_resolution_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    std::cout << "Parsing took " << duration << " ms\n";
+
+    PrintStatsTable(
+      {
+        {"Strings", SnapshotStats(Parser::STRING_STATS)},
+        {"Documentation", SnapshotStats(Parser::DOCS_STATS)},
+      }
+    );
+    std::cout << "\nParsing took " << duration << " ms\n";
   } catch (const std::exception &e) {
     std::cerr << "Parsing failed: " << e.what() << "\n";
     return -1;

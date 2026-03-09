@@ -9,6 +9,8 @@
 
 #include <string>
 
+#include "Stats.hpp"
+
 /**
  * Parser class that uses Clang's lexer to extract string literals from a C/C++ source file.
  */
@@ -43,8 +45,11 @@ class Parser final {
      * @param path Absolute or relative path to the source file to scan.
      */
     static void ParseFile(const std::string &path);
+
+    inline static EmbeddedStats STRING_STATS{};
+    inline static EmbeddedStats DOCS_STATS{};
   private:
-    static void processString(std::string &&string);
+    static void process(std::string &&string, EmbeddedStats &stats);
 };
 
 #endif // PARSER_HPP

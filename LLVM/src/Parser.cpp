@@ -103,18 +103,29 @@ void Parser::ParseFile(const std::string &path) {
         }
       }
 
-      processString(std::move(value));
+      process(std::move(value), STRING_STATS);
       continue;
     }
 
     /// Capture comment tokens.
     if (tok.is(clang::tok::comment)) {
       std::string comment = clang::Lexer::getSpelling(tok, srcMgr, langOpts);
-      processString(std::move(comment));
+      process(std::move(comment), DOCS_STATS);
     }
   }
 }
 
-void Parser::processString(std::string &&string) {
-  // Do something here
+void Parser::process(std::string &&string, EmbeddedStats &stats) {
+  unsigned int toothpicks = 0;
+  for (const auto &c: string) {
+    if (c == '\\') toothpicks++;
+  }
+
+  stats.count += 1;
+  if (toothpicks > 0)
+    stats.withToothpicks += 1;
+
+  stats.toothpicks += toothpicks;
+  double current = stats.toothpicksMax.load();
+  while (toothpicks > current && !stats.toothpicksMax.compare_exchange_weak(current, toothpicks));
 }

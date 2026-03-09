@@ -15,6 +15,8 @@ add_executable(${PROJECT_NAME}
     main.cpp
     src/Parser.cpp
     include/Parser.hpp
+    src/Stats.cpp
+    include/Stats.hpp
 )
 
 # === LLVM & Clang ===
