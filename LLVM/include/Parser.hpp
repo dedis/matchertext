@@ -46,10 +46,15 @@ class Parser final {
      */
     static void ParseFile(const std::string &path);
 
+    /// All the aggregated stats relating to parsed strings
     inline static EmbeddedStats STRING_STATS{};
+    /// All the aggregated stats relating to parsed docs
     inline static EmbeddedStats DOCS_STATS{};
+    /// All the aggregated stats relating to parsed docs with relaxed MatcherText
+    inline static EmbeddedStats DOCS_RELAXED_STATS{};
   private:
-    static void process(std::string &&string, EmbeddedStats &stats);
+    /// Processes a string/doc and updates the given stat
+    static void process(std::string &&string, EmbeddedStats &stats, bool relaxed = false);
 };
 
 #endif // PARSER_HPP

@@ -32,10 +32,16 @@ int main(const int argc, char *argv[]) {
     return -1;
   }
 
-  // Gather each file path recursively
+  // Parse arguments
+  bool logStrings = false;
   std::set<std::string> filesToProcess;
   for (int i = 1; i < argc; ++i) {
-    fs::path p(argv[i]);
+    std::string arg = argv[i];
+    if (arg == "--log-strings") {
+      logStrings = true;
+      continue;
+    }
+    fs::path p(arg);
     if (!fs::exists(p)) {
       std::cerr << "Path does not exist: " << p << "\n";
       continue;
@@ -59,6 +65,7 @@ int main(const int argc, char *argv[]) {
 
     Parser::STRING_STATS.DeriveStats();
     Parser::DOCS_STATS.DeriveStats();
+    Parser::DOCS_RELAXED_STATS.DeriveStats();
 
     const auto end = std::chrono::high_resolution_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -67,8 +74,15 @@ int main(const int argc, char *argv[]) {
       {
         {"Strings", SnapshotStats(Parser::STRING_STATS)},
         {"Documentation", SnapshotStats(Parser::DOCS_STATS)},
+        {"Documentation Relaxed", SnapshotStats(Parser::DOCS_RELAXED_STATS)},
       }
     );
+
+    if (logStrings) {
+      std::cout << "\n\n";
+      PrintStatsMaxString(Parser::STRING_STATS, Parser::DOCS_STATS);
+    }
+
     std::cout << "\nParsing took " << duration << " ms\n";
   } catch (const std::exception &e) {
     std::cerr << "Parsing failed: " << e.what() << "\n";

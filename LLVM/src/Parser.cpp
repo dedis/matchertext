@@ -18,14 +18,19 @@
 #include "../include/Parser.hpp"
 #include "../include/MatcherText.hpp"
 
-template<typename T> static void AtomicAdd(std::atomic<T> &dst, T delta) {
-  T cur = dst.load(std::memory_order_relaxed);
+void AtomicAdd(std::atomic<double> &dst, const double delta) {
+  double cur = dst.load(std::memory_order_relaxed);
   while (!dst.compare_exchange_weak(cur, cur + delta, std::memory_order_relaxed, std::memory_order_relaxed)) {}
 }
 
-template<typename T> static void AtomicMax(std::atomic<T> &dst, T value) {
-  T cur = dst.load(std::memory_order_relaxed);
-  while (value > cur && !dst.compare_exchange_weak(cur, value, std::memory_order_relaxed, std::memory_order_relaxed)) {}
+bool AtomicMax(std::atomic<double> &dst, const double value) {
+  double cur = dst.load(std::memory_order_relaxed);
+  while (value > cur) {
+    if (dst.compare_exchange_weak(cur, value, std::memory_order_relaxed, std::memory_order_relaxed))
+      return true;
+  }
+
+  return false;
 }
 
 static bool IsStringToken(const clang::Token &tok) {
@@ -135,18 +140,19 @@ void Parser::ParseFile(const std::string &path) {
     if (tok.is(clang::tok::comment)) {
       std::string comment = clang::Lexer::getSpelling(tok, srcMgr, langOpts);
       process(std::move(comment), DOCS_STATS);
+      process(std::move(comment), DOCS_RELAXED_STATS, true);
     }
   }
 }
 
-void Parser::process(std::string &&string, EmbeddedStats &stats) {
+void Parser::process(std::string &&string, EmbeddedStats &stats, const bool relaxed) {
   uint64_t toothpicks = 0;
   for (const unsigned char c: string) {
     if (c == '\\')
       ++toothpicks;
   }
 
-  const auto [unmatched, maxDepth, rawChars] = AnalyzeMatcherText(string);
+  const auto [unmatched, maxDepth, rawChars] = AnalyzeMatcherText(string, relaxed);
 
   AtomicAdd(stats.count, 1.0);
   AtomicAdd(stats.rawChars, static_cast<double>(rawChars));
@@ -154,15 +160,18 @@ void Parser::process(std::string &&string, EmbeddedStats &stats) {
   if (toothpicks > 0)
     AtomicAdd(stats.withToothpicks, 1.0);
   AtomicAdd(stats.toothpicks, static_cast<double>(toothpicks));
-  AtomicMax(stats.toothpicksMax, static_cast<double>(toothpicks));
+  if (AtomicMax(stats.toothpicksMax, static_cast<double>(toothpicks)))
+    stats.stringMaxToothpicks.set(string);
 
   if (unmatched > 0)
     AtomicAdd(stats.withNonCompliance, 1.0);
   AtomicAdd(stats.nonComplianceCount, static_cast<double>(unmatched));
-  AtomicMax(stats.nonComplianceMax, static_cast<double>(unmatched));
+  if (AtomicMax(stats.nonComplianceMax, static_cast<double>(unmatched)))
+    stats.stringMaxNonCompliance.set(string);
 
   if (maxDepth > 1)
     AtomicAdd(stats.withNesting, 1.0);
   AtomicAdd(stats.nestingDepthTotal, static_cast<double>(maxDepth));
-  AtomicMax(stats.nestingDepthMax, static_cast<double>(maxDepth));
+  if (AtomicMax(stats.nestingDepthMax, static_cast<double>(maxDepth)))
+    stats.stringMaxNested.set(string);
 }

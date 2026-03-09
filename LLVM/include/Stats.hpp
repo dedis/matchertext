@@ -12,6 +12,8 @@
 #include <utility>
 #include <vector>
 
+#include "AtomicString.hpp"
+
 /// Single source of truth for stats fields
 #define EMBEDDED_STATS_FIELDS(X)                          \
   X(count, "Sample Size")                                 \
@@ -19,6 +21,7 @@
   X(toothpicks, "Total Toothpicks")                       \
   X(toothpicksMax, "Maximum Toothpicks")                  \
   X(toothpicksAvg, "Average Toothpicks")                  \
+  X(toothpicksAvgWith, "Average With Toothpicks")         \
                                                           \
   X(withNonCompliance, "With Non-Compliance")             \
   X(nonComplianceCount, "Non-Compliance Count")           \
@@ -39,6 +42,10 @@ struct EmbeddedStats {
   EMBEDDED_STATS_FIELDS(DECLARE_FIELD)
   #undef DECLARE_FIELD
 
+  AtomicString stringMaxToothpicks;
+  AtomicString stringMaxNonCompliance;
+  AtomicString stringMaxNested;
+
   /// Some stats can't be set during parsing because they need to use global stats set by the parser.
   /// So this function runs after the global parsing pass and creates them, ex: toothpicksAvg
   void DeriveStats();
@@ -53,10 +60,9 @@ struct EmbeddedStatsSnapshot {
 
 EmbeddedStatsSnapshot SnapshotStats(const EmbeddedStats &stats);
 
+/// Logging methods to display the stats nicely
 std::vector<std::pair<std::string, double>> ToColumns(const EmbeddedStatsSnapshot &snapshot);
-
-void PrintStatsTable(
-  const std::vector<std::pair<std::string, EmbeddedStatsSnapshot>> &rows
-);
+void PrintStatsTable(const std::vector<std::pair<std::string, EmbeddedStatsSnapshot>> &rows);
+void PrintStatsMaxString(const EmbeddedStats &strings, const EmbeddedStats &docs);
 
 #endif //STATS_HPP

@@ -18,6 +18,7 @@ add_executable(${PROJECT_NAME}
     src/Stats.cpp
     include/Stats.hpp
     include/MatcherText.hpp
+    include/AtomicString.hpp
 )
 
 # === LLVM & Clang ===

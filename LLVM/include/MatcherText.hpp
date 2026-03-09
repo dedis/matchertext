@@ -9,15 +9,15 @@
 #include <cstdint>
 #include <string_view>
 
-static inline bool IsOpener(char c) {
+[[nodiscard]] inline bool IsOpener(const char c) {
   return c == '(' || c == '[' || c == '{';
 }
 
-static inline bool IsCloser(char c) {
+[[nodiscard]] inline bool IsCloser(const char c) {
   return c == ')' || c == ']' || c == '}';
 }
 
-static inline bool IsMatched(char o, char c) {
+[[nodiscard]] inline bool IsMatched(const char o, const char c) {
   return (o == '(' && c == ')') ||
          (o == '[' && c == ']') ||
          (o == '{' && c == '}');
@@ -32,7 +32,7 @@ struct MatcherScanResult {
 // Aggregate-only equivalent of the Go unmatched scanner.
 // Counts unmatched closers immediately; unmatched openers remain on the stack
 // and are added at end-of-sample.
-static MatcherScanResult AnalyzeMatcherText(std::string_view text) {
+static MatcherScanResult AnalyzeMatcherText(const std::string_view text, const bool relaxed) {
   MatcherScanResult r;
   std::vector<char> stack;
   stack.reserve(text.size());
@@ -48,8 +48,8 @@ static MatcherScanResult AnalyzeMatcherText(std::string_view text) {
     }
 
     if (IsCloser(c)) {
-      if (stack.empty() || !IsMatched(stack.back(), c)) {
-        ++r.unmatched; // unmatched or mismatched closer
+      if (stack.empty() || (!relaxed && !IsMatched(stack.back(), c))) {
+        ++r.unmatched;
       } else {
         stack.pop_back();
       }

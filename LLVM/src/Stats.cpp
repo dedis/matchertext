@@ -12,15 +12,17 @@
 
 void EmbeddedStats::DeriveStats() {
   const double n = count.load(std::memory_order_relaxed);
+  const double wn = withToothpicks.load(std::memory_order_relaxed);
   const double nc = nonComplianceCount.load(std::memory_order_relaxed);
   const double wnc = withNonCompliance.load(std::memory_order_relaxed);
   const double tp = toothpicks.load(std::memory_order_relaxed);
   const double nd = nestingDepthTotal.load(std::memory_order_relaxed);
 
-  toothpicksAvg.store(n > 0.0 ? tp / n : 0.0, std::memory_order_relaxed);
-  nonComplianceAvg.store(n > 0.0 ? nc / n : 0.0, std::memory_order_relaxed);
-  complianceRate.store(n > 0.0 ? (n - wnc) / n : 0.0, std::memory_order_relaxed);
-  nestingDepthAvg.store(n > 0.0 ? nd / n : 0.0, std::memory_order_relaxed);
+  toothpicksAvg.store(100.0 * (n > 0.0 ? tp / n : 0.0), std::memory_order_relaxed);
+  toothpicksAvgWith.store(100.0 * (wn > 0.0 ? tp / wn : 0.0), std::memory_order_relaxed);
+  nonComplianceAvg.store(100.0 * (n > 0.0 ? nc / n : 0.0), std::memory_order_relaxed);
+  complianceRate.store(100.0 * (n > 0.0 ? (n - wnc) / n : 0.0), std::memory_order_relaxed);
+  nestingDepthAvg.store(100.0 * (n > 0.0 ? nd / n : 0.0), std::memory_order_relaxed);
 }
 
 EmbeddedStatsSnapshot SnapshotStats(const EmbeddedStats &stats) {
@@ -57,10 +59,6 @@ void PrintStatsTable(
   for (const auto &name: rows | std::views::keys)
     headers.push_back(name);
 
-  std::vector<size_t> widths(headers.size());
-  for (size_t i = 0; i < headers.size(); ++i)
-    widths[i] = headers[i].size();
-
   std::vector<std::vector<double>> values(firstCols.size());
 
   for (size_t metric = 0; metric < firstCols.size(); ++metric) {
@@ -70,37 +68,53 @@ void PrintStatsTable(
     }
   }
 
-  for (size_t m = 0; m < firstCols.size(); ++m) {
-    widths[0] = std::max(widths[0], firstCols[m].first.size());
-
-    for (size_t c = 0; c < values[m].size(); ++c)
-      widths[c + 1] = std::max(
-        widths[c + 1],
-        std::to_string(values[m][c]).size()
-      );
-  }
-
-  std::cout << std::left << std::setw(static_cast<int>(widths[0]) + 2) << headers[0];
-
-  for (size_t i = 1; i < headers.size(); ++i)
-    std::cout << std::right << std::setw(static_cast<int>(widths[i]) + 2) << headers[i];
-
+  // Header
+  std::cout << "|";
+  for (const auto &h: headers)
+    std::cout << " " << h << " |";
   std::cout << '\n';
 
-  size_t totalWidth = 0;
-  for (const auto w: widths)
-    totalWidth += w + 2;
+  // Separator
+  std::cout << "|";
+  for (size_t i = 0; i < headers.size(); ++i)
+    std::cout << "---|";
+  std::cout << '\n';
 
-  std::cout << std::string(totalWidth, '-') << '\n';
-
+  // Rows
   for (size_t m = 0; m < firstCols.size(); ++m) {
-    std::cout << std::left << std::setw(static_cast<int>(widths[0]) + 2)
-        << firstCols[m].first;
+    std::cout << "| " << firstCols[m].first << " |";
 
-    for (size_t c = 0; c < values[m].size(); ++c)
-      std::cout << std::right << std::setw(static_cast<int>(widths[c + 1]) + 2)
-          << values[m][c];
+    for (const double c: values[m])
+      std::cout << " " << c << " |";
 
     std::cout << '\n';
   }
+}
+
+std::string EscapeForLog(const std::string &s) {
+  std::string out;
+  out.reserve(s.size());
+
+  for (const char c: s) {
+    if (c >= 32 && c <= 126) {
+      out += c;
+    } else {
+      char buf[5];
+      std::snprintf(buf, sizeof(buf), "\\x%02x", c);
+      out += buf;
+    }
+  }
+
+  return out;
+}
+
+void PrintStatsMaxString(const EmbeddedStats &strings, const EmbeddedStats &docs) {
+  std::cout << "String:\n"
+      << " - Max Toothpicks:     \n" << EscapeForLog(strings.stringMaxToothpicks.get()) << "\n\n\n"
+      << " - Max Non Compliance: \n" << EscapeForLog(strings.stringMaxNonCompliance.get()) << "\n\n\n"
+      << " - Max Nested:         \n" << EscapeForLog(strings.stringMaxNested.get()) << "\n\n\n"
+      << "Documentation:\n"
+      << " - Max Toothpicks:     \n" << EscapeForLog(docs.stringMaxToothpicks.get()) << "\n\n\n"
+      << " - Max Non Compliance: \n" << EscapeForLog(docs.stringMaxNonCompliance.get()) << "\n\n\n"
+      << " - Max Nested:         \n" << EscapeForLog(docs.stringMaxNested.get()) << "\n\n\n";
 }
