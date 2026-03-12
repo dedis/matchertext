@@ -18,11 +18,11 @@ void EmbeddedStats::DeriveStats() {
   const double tp = toothpicks.load(std::memory_order_relaxed);
   const double nd = nestingDepthTotal.load(std::memory_order_relaxed);
 
-  toothpicksAvg.store(100.0 * (n > 0.0 ? tp / n : 0.0), std::memory_order_relaxed);
-  toothpicksAvgWith.store(100.0 * (wn > 0.0 ? tp / wn : 0.0), std::memory_order_relaxed);
-  nonComplianceAvg.store(100.0 * (n > 0.0 ? nc / n : 0.0), std::memory_order_relaxed);
+  toothpicksAvg.store((n > 0.0 ? tp / n : 0.0), std::memory_order_relaxed);
+  toothpicksAvgWith.store((wn > 0.0 ? tp / wn : 0.0), std::memory_order_relaxed);
+  nonComplianceAvg.store((n > 0.0 ? nc / n : 0.0), std::memory_order_relaxed);
   complianceRate.store(100.0 * (n > 0.0 ? (n - wnc) / n : 0.0), std::memory_order_relaxed);
-  nestingDepthAvg.store(100.0 * (n > 0.0 ? nd / n : 0.0), std::memory_order_relaxed);
+  nestingDepthAvg.store((n > 0.0 ? nd / n : 0.0), std::memory_order_relaxed);
 }
 
 EmbeddedStatsSnapshot SnapshotStats(const EmbeddedStats &stats) {

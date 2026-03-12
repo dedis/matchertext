@@ -26,13 +26,13 @@
   X(withNonCompliance, "With Non-Compliance")             \
   X(nonComplianceCount, "Non-Compliance Count")           \
   X(nonComplianceMax, "Non-Compliance Max")               \
-  X(nonComplianceAvg, "Average Non-Compliance")           \
+  X(nonComplianceAvg, "Avg Unmatched Matchers Per Sample") \
   X(complianceRate, "Compliance Rate")                    \
                                                           \
   X(withNesting, "With Nested Embedding")                 \
-  X(nestingDepthTotal, "Total Max Nesting Depth")         \
-  X(nestingDepthMax, "Maximum Nesting Depth")             \
-  X(nestingDepthAvg, "Average Max Nesting Depth")         \
+  X(nestingDepthTotal, "Sum Of Per-Sample Max Depth")     \
+  X(nestingDepthMax, "Highest Per-Sample Max Depth")      \
+  X(nestingDepthAvg, "Avg Per-Sample Max Depth")          \
                                                           \
   X(rawChars, "Raw Character Count")
 
