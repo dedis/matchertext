@@ -19,7 +19,8 @@ func convertString(_ js.Value, args []js.Value) any {
 	output, err := minml.ConvertString(input)
 
 	if err != nil {
-		return fmt.Errorf("error converting input: %v", err)
+		fmt.Println(err.Error())
+		return "Invalid input"
 	}
 
 	return output

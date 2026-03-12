@@ -5,24 +5,6 @@ import * as vscode from "vscode";
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-  // Use the console to output diagnostic information (console.log) and errors (console.error)
-  // This line of code will only be executed once when your extension is activated
-  console.log('Congratulations, your extension "minml-preview" is now active!');
-
-  // The command has been defined in the package.json file
-  // Now provide the implementation of the command with registerCommand
-  // The commandId parameter must match the command field in package.json
-  // const disposable = vscode.commands.registerCommand(
-  //   "minml-preview.helloWorld",
-  //   () => {
-  //     // The code you place here will be executed every time your command is executed
-  //     // Display a message box to the user
-  //     vscode.window.showInformationMessage(
-  //       "Hello World from minml-livepreview!",
-  //     );
-  //   },
-  // );
-
   const openPanel = vscode.commands.registerCommand("minml-preview.showPreview", () => {
     LivePreviewPanel.createOrShow(context.extensionUri);
   });
@@ -54,12 +36,20 @@ class LivePreviewPanel {
 
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
+  private _document: vscode.TextDocument;
   private _disposables: vscode.Disposable[] = [];
 
   public static createOrShow(extensionUri: vscode.Uri) {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor || !this._isEditorValid(editor)) {
+      return;
+    }
+
     // If we already have a panel, show it.
     if (LivePreviewPanel.currentPanel) {
+      LivePreviewPanel.currentPanel._document = editor.document;
       LivePreviewPanel.currentPanel._panel.reveal(vscode.ViewColumn.Beside);
+      LivePreviewPanel.currentPanel._update();
       return;
     }
 
@@ -71,16 +61,25 @@ class LivePreviewPanel {
       getWebviewOptions(extensionUri),
     );
 
-    LivePreviewPanel.currentPanel = new LivePreviewPanel(panel, extensionUri);
+    LivePreviewPanel.currentPanel = new LivePreviewPanel(panel, extensionUri, editor.document);
   }
 
-  public static revive(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
-    LivePreviewPanel.currentPanel = new LivePreviewPanel(panel, extensionUri);
+  public static revive(
+    panel: vscode.WebviewPanel,
+    extensionUri: vscode.Uri,
+    document: vscode.TextDocument,
+  ) {
+    LivePreviewPanel.currentPanel = new LivePreviewPanel(panel, extensionUri, document);
   }
 
-  private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+  private constructor(
+    panel: vscode.WebviewPanel,
+    extensionUri: vscode.Uri,
+    document: vscode.TextDocument,
+  ) {
     this._panel = panel;
     this._extensionUri = extensionUri;
+    this._document = document;
 
     // Set the webview's initial html content
     this._update();
@@ -88,6 +87,26 @@ class LivePreviewPanel {
     // Listen for when the panel is disposed
     // This happens when the user closes the panel or when the panel is closed programmatically
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+
+    vscode.window.onDidChangeActiveTextEditor(
+      (e) => {
+        if (!e || !LivePreviewPanel._isEditorValid(e)) {
+          return;
+        }
+        this._document = e.document;
+        this._update();
+      },
+      null,
+      this._disposables,
+    );
+
+    vscode.workspace.onDidChangeTextDocument(
+      (_) => {
+        this._update();
+      },
+      null,
+      this._disposables,
+    );
 
     // Update the content based on view changes
     this._panel.onDidChangeViewState(
@@ -115,6 +134,7 @@ class LivePreviewPanel {
               command: "init",
               wasmUri: wasmUri.toString(),
             });
+            this._update();
             return;
         }
       },
@@ -137,28 +157,36 @@ class LivePreviewPanel {
     }
   }
 
+  private static _isEditorValid(editor: vscode.TextEditor) {
+    const currentFileExtension = editor?.document.fileName.split(".").pop();
+    return currentFileExtension === "minml" || currentFileExtension === "m";
+  }
+
   private _update() {
     const webview = this._panel.webview;
-
-    this._panel.title = "Test Panel";
+    const filename = this._document.fileName.split("/").pop();
+    this._panel.title = `Preview: ${filename}`;
     this._panel.webview.html = this._getHtmlForWebview(webview);
+
+    this._panel.webview.postMessage({
+      command: "update",
+      content: this._document.getText(),
+    });
   }
 
   private _getHtmlForWebview(webview: vscode.Webview) {
     // And the uri we use to load this script in the webview
-    const scriptUri = this._getMediaUri("main.js");
-    const wasmExecUri = this._getMediaUri("wasm_exec.js");
+    const scriptUri = this._getMediaUri("main.js", webview);
+    const wasmExecUri = this._getMediaUri("wasm_exec.js", webview);
 
     // Uri to load styles into webview
-    const stylesResetUri = this._getMediaUri("reset.css");
-    const stylesMainUri = this._getMediaUri("vscode.css");
+    const stylesMainUri = this._getMediaUri("vscode.css", webview);
 
     return `<!DOCTYPE html>
 			<html lang="en">
 			<head>
 				<meta charset="UTF-8">
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
-				<link href="${stylesResetUri}" rel="stylesheet">
 				<link href="${stylesMainUri}" rel="stylesheet">
 
 				<title>MinML Live Preview</title>
@@ -171,8 +199,7 @@ class LivePreviewPanel {
 			</html>`;
   }
 
-  private _getMediaUri(path: string) {
-    const webview = this._panel.webview;
+  private _getMediaUri(path: string, webview: vscode.Webview) {
     const pathOnDisk = vscode.Uri.joinPath(this._extensionUri, "media", path);
 
     return webview.asWebviewUri(pathOnDisk);
