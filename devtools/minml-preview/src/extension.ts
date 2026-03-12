@@ -13,12 +13,14 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 function getWebviewOptions(extensionUri: vscode.Uri): vscode.WebviewOptions {
+  const workspaceFolders = vscode.workspace.workspaceFolders?.map((folder) => folder.uri) || [];
+
   return {
     // Enable javascript in the webview
     enableScripts: true,
 
     // And restrict the webview to only loading content from our extension's `media` directory.
-    localResourceRoots: [vscode.Uri.joinPath(extensionUri, "media")],
+    localResourceRoots: [vscode.Uri.joinPath(extensionUri, "media"), ...workspaceFolders],
   };
 }
 
@@ -164,9 +166,15 @@ class LivePreviewPanel {
 
   private _update() {
     const webview = this._panel.webview;
-    const filename = this._document.fileName.split("/").pop();
+    const docFileName = this._document.fileName
+    const filename = docFileName.split("/").pop();
     this._panel.title = `Preview: ${filename}`;
-    this._panel.webview.html = this._getHtmlForWebview(webview);
+
+    const baseDir = vscode.Uri.file(docFileName).with({
+      path: docFileName.substring(0, docFileName.lastIndexOf("/")),
+    });
+
+    this._panel.webview.html = this._getHtmlForWebview(webview, webview.asWebviewUri(baseDir));
 
     this._panel.webview.postMessage({
       command: "update",
@@ -174,7 +182,7 @@ class LivePreviewPanel {
     });
   }
 
-  private _getHtmlForWebview(webview: vscode.Webview) {
+  private _getHtmlForWebview(webview: vscode.Webview, baseUri: vscode.Uri) {
     // And the uri we use to load this script in the webview
     const scriptUri = this._getMediaUri("main.js", webview);
     const wasmExecUri = this._getMediaUri("wasm_exec.js", webview);
@@ -187,6 +195,7 @@ class LivePreviewPanel {
 			<head>
 				<meta charset="UTF-8">
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
+				<base href="${baseUri}/">
 				<link href="${stylesMainUri}" rel="stylesheet">
 
 				<title>MinML Live Preview</title>
