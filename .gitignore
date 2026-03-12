@@ -2,3 +2,4 @@
 **/.idea
 **/minml
 **/minml.exe
+out/wasm/main.wasm
