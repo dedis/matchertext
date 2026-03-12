@@ -3,3 +3,4 @@
 **/minml
 **/minml.exe
 out/wasm/main.wasm
+out/wasm/wasm_exec.js
