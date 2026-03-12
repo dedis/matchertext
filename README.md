@@ -11,4 +11,11 @@ The main contents of this repository are currently:
 * [doc](doc): the LaTeX source for the in-progress matchertext paper.
 * [go](go): experimental Go code for parsing and converting matchertext.
 
-Build command: `go build -o minml ./go/markup/minml/cmd/`
+### Build
+
+In order to build the MinML cli tool, you can run Makefile. Below is an overview of the various build commands and what they do:
+
+| Command    | Description                                                                                        |
+|------------|----------------------------------------------------------------------------------------------------|
+| build      | Build the CLI tool with various options                                                            |
+| build-wasm | In order to use different functions in a browser environment, this command builds the wasm binary. |
