@@ -166,7 +166,7 @@ class LivePreviewPanel {
 
   private _update() {
     const webview = this._panel.webview;
-    const docFileName = this._document.fileName
+    const docFileName = this._document.fileName;
     const filename = docFileName.split("/").pop();
     this._panel.title = `Preview: ${filename}`;
 
