@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/dedis/matchertext/go/markup/minml"
 	"io/fs"
 	"log"
 	"net/http"
@@ -220,7 +221,7 @@ func Server(path string, port string, noOpen, diskBuild bool, extensions []strin
 // HTML with live-reload script injection, writes the result back, and removes
 // the source file. Non-matching extensions are ignored.
 func convertFile(target server_structs.BuildTarget, relPath string, extensions []string) error {
-	isMinml, extension := IsMinmlFile(relPath, extensions)
+	isMinml, extension := minml.IsMinmlFile(relPath, extensions)
 	if !isMinml {
 		return nil
 	}
@@ -233,7 +234,7 @@ func convertFile(target server_structs.BuildTarget, relPath string, extensions [
 
 	// Convert MinML to HTML
 	var buf bytes.Buffer
-	if err := convertFromReader(bytes.NewReader(data), &buf, relPath); err != nil {
+	if err := minml.ConvertFromReader(bytes.NewReader(data), &buf, relPath); err != nil {
 		return fmt.Errorf("converting %s: %w", relPath, err)
 	}
 
