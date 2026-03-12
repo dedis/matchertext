@@ -14,8 +14,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "minml-preview.helloWorld",
-        "title": "Hello World"
+        "command": "minml-preview.showPreview",
+        "title": "MinML: Show Live Preview"
       }
     ]
   },
