@@ -1,7 +1,11 @@
 (function () {
   const vscode = acquireVsCodeApi();
+  // @ts-ignore
   const go = new Go();
 
+  /**
+   * @param {string | URL} uri
+   */
   async function initWasm(uri) {
     try {
       const result = await WebAssembly.instantiateStreaming(fetch(uri), go.importObject);
@@ -13,18 +17,25 @@
                 ]
             `;
       try {
-        // Call the Go function registered in WASM
+        // @ts-ignore
         const html = minmlConvert(minmlTestString);
-        document.getElementById("content").innerHTML = html;
+        const contentElement = document.getElementById("content");
+        if (contentElement) {
+          contentElement.innerHTML = html;
+        }
       } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
         console.error("Conversion error", err);
-        vscode.postMessage({ command: "alert", message: err.message });
-        document.getElementById("content").innerHTML =
-          `<pre style="color: var(--vscode-errorForeground)">Error: ${err.message}</pre>`;
+        vscode.postMessage({ command: "alert", message: errorMessage });
+        const contentElement = document.getElementById("content");
+        if (contentElement) {
+          contentElement.innerHTML = `<pre style="color: var(--vscode-errorForeground)">Error: ${errorMessage}</pre>`;
+        }
       }
       console.log("MinML WASM initialized");
     } catch (err) {
-      vscode.postMessage({ command: "alert", message: err.message });
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      vscode.postMessage({ command: "alert", message: errorMessage });
       console.error("Failed to initialize WASM", err);
     }
   }
