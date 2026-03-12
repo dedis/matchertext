@@ -1,0 +1,14 @@
+# Standard build outputs
+out/
+dist/
+node_modules/
+
+# Third-party and generated Go WASM files
+media/wasm_exec.js
+media/main.wasm
+
+# Config files (already JSON)
+package.json
+package-lock.json
+tsconfig.json
+jsconfig.json
