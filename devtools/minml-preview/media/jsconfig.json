@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es2020",
+    "jsx": "preserve",
+    "checkJs": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "strictFunctionTypes": true,
+    "maxNodeModuleJsDepth": 0,
+    "baseUrl": "..",
+    "paths": {
+      "vscode-webview": ["node_modules/@types/vscode-webview"]
+    },
+    "lib": [
+      "dom",
+      "es2020"
+    ]
+  },
+  "exclude": [
+    "node_modules",
+    "**/node_modules/*"
+  ]
+}
