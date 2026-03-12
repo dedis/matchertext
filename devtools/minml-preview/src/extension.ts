@@ -108,10 +108,17 @@ class LivePreviewPanel {
       (message) => {
         switch (message.command) {
           case "alert":
-            vscode.window.showErrorMessage(message.text);
+            vscode.window.showErrorMessage(message.message);
             return;
           case "ready":
-            vscode.window.showInformationMessage("We are ready to go");
+            const wasmUri = this._panel.webview.asWebviewUri(
+              vscode.Uri.joinPath(this._extensionUri, "media", "main.wasm"),
+            );
+            this._panel.webview.postMessage({
+              command: "init",
+              wasmUri: wasmUri.toString(),
+            });
+            return;
         }
       },
       null,
@@ -141,38 +148,14 @@ class LivePreviewPanel {
   }
 
   private _getHtmlForWebview(webview: vscode.Webview) {
-    // Local path to main script run in the webview
-    const scriptPathOnDisk = vscode.Uri.joinPath(
-      this._extensionUri,
-      "media",
-      "main.js",
-    );
-    const wasmExecPathOnDisk = vscode.Uri.joinPath(
-      this._extensionUri,
-      "media",
-      "main.wasm",
-    );
-
     // And the uri we use to load this script in the webview
-    const scriptUri = webview.asWebviewUri(scriptPathOnDisk);
-    const wasmExecUri = webview.asWebviewUri(wasmExecPathOnDisk);
-
-    // Local path to css styles
-    const styleResetPath = vscode.Uri.joinPath(
-      this._extensionUri,
-      "media",
-      "reset.css",
-    );
-    const stylesPathMainPath = vscode.Uri.joinPath(
-      this._extensionUri,
-      "media",
-      "vscode.css",
-    );
+    const scriptUri = this._getMediaUri("main.js")
+    const wasmExecUri = this._getMediaUri("wasm_exec.js")
 
     // Uri to load styles into webview
-    const stylesResetUri = webview.asWebviewUri(styleResetPath);
-    const stylesMainUri = webview.asWebviewUri(stylesPathMainPath);
-    
+    const stylesResetUri = this._getMediaUri("reset.css");
+    const stylesMainUri = this._getMediaUri("vscode.css");
+
     return `<!DOCTYPE html>
 			<html lang="en">
 			<head>
@@ -185,11 +168,21 @@ class LivePreviewPanel {
 				<script src="${wasmExecUri}"></script>
 			</head>
 			<body>
-				<button onclick="vscode.window.showInformationMessage('hi')">Test me</button>
 				<div id="content"></div>
 				<script src="${scriptUri}"></script>
 			</body>
 			</html>`;
+  }
+
+  private _getMediaUri(path: string) {
+    const webview = this._panel.webview;
+    const pathOnDisk = vscode.Uri.joinPath(
+        this._extensionUri,
+        "media",
+        path,
+    );
+    
+    return webview.asWebviewUri(pathOnDisk);
   }
 }
 
