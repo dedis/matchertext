@@ -23,12 +23,9 @@ export function activate(context: vscode.ExtensionContext) {
   //   },
   // );
 
-  const openPanel = vscode.commands.registerCommand(
-    "minml-preview.showPreview",
-    () => {
-      LivePreviewPanel.createOrShow(context.extensionUri);
-    },
-  );
+  const openPanel = vscode.commands.registerCommand("minml-preview.showPreview", () => {
+    LivePreviewPanel.createOrShow(context.extensionUri);
+  });
 
   context.subscriptions.push(openPanel);
 }
@@ -149,8 +146,8 @@ class LivePreviewPanel {
 
   private _getHtmlForWebview(webview: vscode.Webview) {
     // And the uri we use to load this script in the webview
-    const scriptUri = this._getMediaUri("main.js")
-    const wasmExecUri = this._getMediaUri("wasm_exec.js")
+    const scriptUri = this._getMediaUri("main.js");
+    const wasmExecUri = this._getMediaUri("wasm_exec.js");
 
     // Uri to load styles into webview
     const stylesResetUri = this._getMediaUri("reset.css");
@@ -176,12 +173,8 @@ class LivePreviewPanel {
 
   private _getMediaUri(path: string) {
     const webview = this._panel.webview;
-    const pathOnDisk = vscode.Uri.joinPath(
-        this._extensionUri,
-        "media",
-        path,
-    );
-    
+    const pathOnDisk = vscode.Uri.joinPath(this._extensionUri, "media", path);
+
     return webview.asWebviewUri(pathOnDisk);
   }
 }
