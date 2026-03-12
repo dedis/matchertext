@@ -58,7 +58,9 @@ int main(const int argc, char *argv[]) {
     const std::vector files(filesToProcess.begin(), filesToProcess.end());
     const auto start = std::chrono::high_resolution_clock::now();
 
+    #if USE_OPENMP
     #pragma omp parallel for schedule(dynamic) default(none) shared(files)
+    #endif
     for (const auto &file: files) {
       Parser::ParseFile(file);
     }
