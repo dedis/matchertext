@@ -1,3 +1,24 @@
+## Statistics Description
+
+| Statistic                         | Description                                                    |
+|-----------------------------------|----------------------------------------------------------------|
+| Sample Size                       | Number of samples processed.                                   |
+| With Toothpicks                   | Number of samples containing at least one toothpick.           |
+| Total Toothpicks                  | Total toothpick count accumulated across all samples.          |
+| Maximum Toothpicks                | Highest toothpick count observed in a single sample.           |
+| Average Toothpicks                | Average toothpick count per sample.                            |
+| Average With Toothpicks           | Average toothpick count among samples that contain toothpicks. |
+| With Non-Compliance               | Number of samples with at least one non-compliance.            |
+| Non-Compliance Count              | Total number of non-compliance events across all samples.      |
+| Non-Compliance Max                | Highest non-compliance count observed in a single sample.      |
+| Avg Unmatched Matchers Per Sample | Average non-compliance count per sample.                       |
+| Compliance Rate                   | Percentage of samples without non-compliance.                  |
+| With Nested Embedding             | Number of samples containing nested embeddings.                |
+| Sum Of Per-Sample Max Depth       | Sum of each sample's maximum nesting depth.                    |
+| Highest Per-Sample Max Depth      | Greatest nesting depth observed in any single sample.          |
+| Avg Per-Sample Max Depth          | Average of the maximum nesting depth measured per sample.      |
+| Raw Character Count               | Total number of raw input characters processed.                |
+
 ## Test Directory
 
 | Metric                            | Strings   | Documentation   |  Documentation Relaxed |

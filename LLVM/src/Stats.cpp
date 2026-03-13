@@ -28,17 +28,17 @@ void EmbeddedStats::DeriveStats() {
 EmbeddedStatsSnapshot SnapshotStats(const EmbeddedStats &stats) {
   EmbeddedStatsSnapshot s{};
 
-  #define LOAD_FIELD(name, label) s.name = stats.name.load();
+  #define LOAD_FIELD(name, label, ...) s.name = stats.name.load();
   EMBEDDED_STATS_FIELDS(LOAD_FIELD)
   #undef LOAD_FIELD
 
   return s;
 }
 
-std::vector<std::pair<std::string, double>> ToColumns(const EmbeddedStatsSnapshot &s) {
-  std::vector<std::pair<std::string, double>> cols;
+std::vector<std::tuple<std::string, double, std::string>> ToColumns(const EmbeddedStatsSnapshot &s) {
+  std::vector<std::tuple<std::string, double, std::string>> cols;
 
-  #define PUSH_FIELD(name, label) cols.emplace_back(label, s.name);
+  #define PUSH_FIELD(name, label, desc) cols.emplace_back(label, s.name, desc);
   EMBEDDED_STATS_FIELDS(PUSH_FIELD)
   #undef PUSH_FIELD
 
@@ -64,7 +64,8 @@ void PrintStatsTable(
   for (size_t metric = 0; metric < firstCols.size(); ++metric) {
     for (const auto &snap: rows | std::views::values) {
       auto cols = ToColumns(snap);
-      values[metric].push_back(cols[metric].second);
+      auto [_0, value, _1] = cols.at(metric);
+      values[metric].push_back(value);
     }
   }
 
@@ -82,12 +83,21 @@ void PrintStatsTable(
 
   // Rows
   for (size_t m = 0; m < firstCols.size(); ++m) {
-    std::cout << "| " << firstCols[m].first << " |";
+    auto [name, _0, _1] = firstCols.at(m);
+    std::cout << "| " << name << " |";
 
     for (const double c: values[m])
       std::cout << " " << c << " |";
 
     std::cout << '\n';
+  }
+
+  std::cout << "\n\n\n";
+
+
+  std::cout << "| Statistic | Description |\n|---|---|\n";
+  for (auto &[name, _, desc] : firstCols) {
+    std::cout << "| " << name << " | " << desc << " |\n";
   }
 }
 
