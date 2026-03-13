@@ -80,6 +80,14 @@ int main(const int argc, char *argv[]) {
       }
     );
 
+    PrintNestedStatsTable(
+      {
+        {"Strings", SnapshotNestedStats(Parser::STRING_NESTED_STATS)},
+        {"Documentation", SnapshotNestedStats(Parser::DOCS_NESTED_STATS)},
+        {"Documentation Relaxed", SnapshotNestedStats(Parser::DOCS_RELAXED_NESTED_STATS)},
+      }
+    );
+
     if (logStrings) {
       std::cout << "\n\n";
       PrintStatsMaxString(Parser::STRING_STATS, Parser::DOCS_STATS);

@@ -8,6 +8,7 @@
 #define STATS_HPP
 
 #include <atomic>
+#include <mutex>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -64,11 +65,31 @@ struct EmbeddedStatsSnapshot {
   #undef DECLARE_FIELD
 };
 
+struct NestedStats {
+  void Record(uint64_t rawDepth, uint64_t validDepth);
+  private:
+    mutable std::mutex mutex_;
+    std::vector<uint64_t> rawLevels_;
+    std::vector<uint64_t> validLevels_;
+
+    static void RecordLevel(std::vector<uint64_t> &levels, uint64_t depth);
+
+    friend struct NestedStatsSnapshot;
+    friend NestedStatsSnapshot SnapshotNestedStats(const NestedStats &stats);
+};
+
+struct NestedStatsSnapshot {
+  std::vector<uint64_t> rawLevels;
+  std::vector<uint64_t> validLevels;
+};
+
 EmbeddedStatsSnapshot SnapshotStats(const EmbeddedStats &stats);
+NestedStatsSnapshot SnapshotNestedStats(const NestedStats &stats);
 
 /// Logging methods to display the stats nicely
 std::vector<std::tuple<std::string, double, std::string>> ToColumns(const EmbeddedStatsSnapshot &snapshot);
 void PrintStatsTable(const std::vector<std::pair<std::string, EmbeddedStatsSnapshot>> &rows);
+void PrintNestedStatsTable(const std::vector<std::pair<std::string, NestedStatsSnapshot>> &rows);
 void PrintStatsMaxString(const EmbeddedStats &strings, const EmbeddedStats &docs);
 
 #endif //STATS_HPP

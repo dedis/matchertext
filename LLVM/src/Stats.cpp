@@ -27,6 +27,22 @@ void EmbeddedStats::DeriveStats() {
   validNestingDepthAvg.store((n > 0.0 ? vnd / n : 0.0), std::memory_order_relaxed);
 }
 
+void NestedStats::RecordLevel(std::vector<uint64_t> &levels, const uint64_t depth) {
+  if (depth == 0)
+    return;
+
+  if (levels.size() <= depth)
+    levels.resize(depth + 1, 0);
+
+  ++levels[depth];
+}
+
+void NestedStats::Record(const uint64_t rawDepth, const uint64_t validDepth) {
+  std::lock_guard lock(mutex_); // Auto unlocked when out of scope with RAII
+  RecordLevel(rawLevels_, rawDepth);
+  RecordLevel(validLevels_, validDepth);
+}
+
 EmbeddedStatsSnapshot SnapshotStats(const EmbeddedStats &stats) {
   EmbeddedStatsSnapshot s{};
 
@@ -35,6 +51,14 @@ EmbeddedStatsSnapshot SnapshotStats(const EmbeddedStats &stats) {
   #undef LOAD_FIELD
 
   return s;
+}
+
+NestedStatsSnapshot SnapshotNestedStats(const NestedStats &stats) {
+  std::lock_guard lock(stats.mutex_);
+  return {
+    .rawLevels = stats.rawLevels_,
+    .validLevels = stats.validLevels_,
+  };
 }
 
 std::vector<std::tuple<std::string, double, std::string>> ToColumns(const EmbeddedStatsSnapshot &s) {
@@ -47,9 +71,7 @@ std::vector<std::tuple<std::string, double, std::string>> ToColumns(const Embedd
   return cols;
 }
 
-void PrintStatsTable(
-  const std::vector<std::pair<std::string, EmbeddedStatsSnapshot>> &rows
-) {
+void PrintStatsTable(const std::vector<std::pair<std::string, EmbeddedStatsSnapshot>> &rows) {
   if (rows.empty())
     return;
 
@@ -96,10 +118,57 @@ void PrintStatsTable(
 
   std::cout << "\n\n\n";
 
-
   std::cout << "| Statistic | Description |\n|---|---|\n";
-  for (auto &[name, _, desc] : firstCols) {
+  for (auto &[name, _, desc]: firstCols) {
     std::cout << "| " << name << " | " << desc << " |\n";
+  }
+}
+
+void PrintNestedStatsTable(const std::vector<std::pair<std::string, NestedStatsSnapshot>> &rows) {
+  if (rows.empty())
+    return;
+
+  size_t maxLevel = 0;
+  for (const auto &[rawLevels, validLevels]: rows | std::views::values) {
+    maxLevel = std::max(maxLevel, rawLevels.size());
+    maxLevel = std::max(maxLevel, validLevels.size());
+  }
+
+  if (maxLevel <= 1)
+    return;
+
+  std::cout << "\n\n";
+  std::cout << "| Level |";
+  for (const auto &name: rows | std::views::keys)
+    std::cout << " " << name << " Raw | " << name << " Valid |";
+  std::cout << '\n';
+
+  std::cout << "|---|";
+  for (size_t i = 0; i < rows.size(); ++i)
+    std::cout << "---|---|";
+  std::cout << '\n';
+
+  for (size_t level = 1; level < maxLevel; ++level) {
+    bool hasValues = false;
+    for (const auto &[rawLevels, validLevels]: rows | std::views::values) {
+      const uint64_t raw = level < rawLevels.size() ? rawLevels[level] : 0;
+      const uint64_t valid = level < validLevels.size() ? validLevels[level] : 0;
+      if (raw != 0 || valid != 0) {
+        hasValues = true;
+        break;
+      }
+    }
+
+    if (!hasValues)
+      continue;
+
+    std::cout << "| " << level << " |";
+    for (const auto &[rawLevels, validLevels]: rows | std::views::values) {
+      const uint64_t raw = level < rawLevels.size() ? rawLevels[level] : 0;
+      const uint64_t valid = level < validLevels.size() ? validLevels[level] : 0;
+      std::cout << " " << raw << " | " << valid << " |";
+    }
+    std::cout << '\n';
   }
 }
 

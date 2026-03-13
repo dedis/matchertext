@@ -132,31 +132,29 @@ void Parser::ParseFile(const std::string &path) {
       } while (IsStringToken(current));
 
       tok = current;
-      process(std::move(value), STRING_STATS);
+      process(std::move(value), STRING_STATS, STRING_NESTED_STATS);
       continue;
     }
 
     /// Capture comment tokens.
     if (tok.is(clang::tok::comment)) {
       std::string comment = clang::Lexer::getSpelling(tok, srcMgr, langOpts);
-      process(std::move(comment), DOCS_STATS);
-      process(std::move(comment), DOCS_RELAXED_STATS, true);
+      process(std::move(comment), DOCS_STATS, DOCS_NESTED_STATS);
+      process(std::move(comment), DOCS_RELAXED_STATS, DOCS_RELAXED_NESTED_STATS, true);
     }
   }
 }
 
-void Parser::process(std::string &&string, EmbeddedStats &stats, const bool relaxed) {
+void Parser::process(std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats, const bool relaxed) {
   uint64_t toothpicks = 0;
   for (const unsigned char c: string) {
     if (c == '\\')
       ++toothpicks;
   }
 
-  const auto scan = AnalyzeMatcherText(string, relaxed);
-  const auto unmatched = scan.unmatched;
-  const auto maxDepth = scan.maxDepth;
-  const auto maxValidDepth = scan.maxValidDepth;
-  const auto rawChars = scan.rawChars;
+  const auto [unmatched, maxDepth, maxValidDepth, rawChars] = AnalyzeMatcherText(string, relaxed);
+
+  nestedStats.Record(maxDepth, maxValidDepth);
 
   AtomicAdd(stats.count, 1.0);
   AtomicAdd(stats.rawChars, static_cast<double>(rawChars));
