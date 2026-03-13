@@ -1,0 +1,1 @@
+Build command: `cmake -B build -S . && cmake --build build`
