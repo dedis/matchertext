@@ -17,12 +17,14 @@ void EmbeddedStats::DeriveStats() {
   const double wnc = withNonCompliance.load(std::memory_order_relaxed);
   const double tp = toothpicks.load(std::memory_order_relaxed);
   const double nd = nestingDepthTotal.load(std::memory_order_relaxed);
+  const double vnd = validNestingDepthTotal.load(std::memory_order_relaxed);
 
   toothpicksAvg.store((n > 0.0 ? tp / n : 0.0), std::memory_order_relaxed);
   toothpicksAvgWith.store((wn > 0.0 ? tp / wn : 0.0), std::memory_order_relaxed);
   nonComplianceAvg.store((n > 0.0 ? nc / n : 0.0), std::memory_order_relaxed);
   complianceRate.store(100.0 * (n > 0.0 ? (n - wnc) / n : 0.0), std::memory_order_relaxed);
   nestingDepthAvg.store((n > 0.0 ? nd / n : 0.0), std::memory_order_relaxed);
+  validNestingDepthAvg.store((n > 0.0 ? vnd / n : 0.0), std::memory_order_relaxed);
 }
 
 EmbeddedStatsSnapshot SnapshotStats(const EmbeddedStats &stats) {
@@ -122,9 +124,11 @@ void PrintStatsMaxString(const EmbeddedStats &strings, const EmbeddedStats &docs
   std::cout << "String:\n"
       << " - Max Toothpicks:     \n" << EscapeForLog(strings.stringMaxToothpicks.get()) << "\n\n\n"
       << " - Max Non Compliance: \n" << EscapeForLog(strings.stringMaxNonCompliance.get()) << "\n\n\n"
-      << " - Max Nested:         \n" << EscapeForLog(strings.stringMaxNested.get()) << "\n\n\n"
+      << " - Max Raw Nested:     \n" << EscapeForLog(strings.stringMaxNested.get()) << "\n\n\n"
+      << " - Max Valid Nested:   \n" << EscapeForLog(strings.stringMaxValidNested.get()) << "\n\n\n"
       << "Documentation:\n"
       << " - Max Toothpicks:     \n" << EscapeForLog(docs.stringMaxToothpicks.get()) << "\n\n\n"
       << " - Max Non Compliance: \n" << EscapeForLog(docs.stringMaxNonCompliance.get()) << "\n\n\n"
-      << " - Max Nested:         \n" << EscapeForLog(docs.stringMaxNested.get()) << "\n\n\n";
+      << " - Max Raw Nested:     \n" << EscapeForLog(docs.stringMaxNested.get()) << "\n\n\n"
+      << " - Max Valid Nested:   \n" << EscapeForLog(docs.stringMaxValidNested.get()) << "\n\n\n";
 }

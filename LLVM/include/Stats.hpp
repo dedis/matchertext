@@ -30,10 +30,14 @@
   X(nonComplianceAvg, "Avg Unmatched Matchers Per Sample", "Average non-compliance count per sample.") \
   X(complianceRate, "Compliance Rate", "Percentage of samples without non-compliance.") \
   \
-  X(withNesting, "With Nested Embedding", "Number of samples containing nested embeddings.") \
-  X(nestingDepthTotal, "Sum Of Per-Sample Max Depth", "Sum of each sample's maximum nesting depth.") \
-  X(nestingDepthMax, "Highest Per-Sample Max Depth", "Greatest nesting depth observed in any single sample.") \
-  X(nestingDepthAvg, "Avg Per-Sample Max Depth", "Average of the maximum nesting depth measured per sample.") \
+  X(withNesting, "With Raw Nested Embedding", "Number of samples whose raw nesting depth exceeds 1, even if the nesting is never closed.") \
+  X(nestingDepthTotal, "Sum Of Per-Sample Raw Max Depth", "Sum of each sample's maximum raw nesting depth, counting unmatched openers such as '((('.") \
+  X(nestingDepthMax, "Highest Per-Sample Raw Max Depth", "Greatest raw nesting depth observed in any single sample, even if the nesting is left open.") \
+  X(nestingDepthAvg, "Avg Per-Sample Raw Max Depth", "Average of the maximum raw nesting depth measured per sample.") \
+  X(withValidNesting, "With Valid Nested Embedding", "Number of samples whose nesting depth exceeds 1 and is confirmed by matching closers, such as '((()))'.") \
+  X(validNestingDepthTotal, "Sum Of Per-Sample Valid Max Depth", "Sum of each sample's maximum valid nesting depth, counting only depths closed by matching closers.") \
+  X(validNestingDepthMax, "Highest Per-Sample Valid Max Depth", "Greatest valid nesting depth observed in any single sample, confirmed by matching closers.") \
+  X(validNestingDepthAvg, "Avg Per-Sample Valid Max Depth", "Average of the maximum valid nesting depth measured per sample.") \
   \
   X(rawChars, "Raw Character Count", "Total number of raw input characters processed.")
 
@@ -46,6 +50,7 @@ struct EmbeddedStats {
   AtomicString stringMaxToothpicks;
   AtomicString stringMaxNonCompliance;
   AtomicString stringMaxNested;
+  AtomicString stringMaxValidNested;
 
   /// Some stats can't be set during parsing because they need to use global stats set by the parser.
   /// So this function runs after the global parsing pass and creates them, ex: toothpicksAvg

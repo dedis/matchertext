@@ -152,7 +152,11 @@ void Parser::process(std::string &&string, EmbeddedStats &stats, const bool rela
       ++toothpicks;
   }
 
-  const auto [unmatched, maxDepth, rawChars] = AnalyzeMatcherText(string, relaxed);
+  const auto scan = AnalyzeMatcherText(string, relaxed);
+  const auto unmatched = scan.unmatched;
+  const auto maxDepth = scan.maxDepth;
+  const auto maxValidDepth = scan.maxValidDepth;
+  const auto rawChars = scan.rawChars;
 
   AtomicAdd(stats.count, 1.0);
   AtomicAdd(stats.rawChars, static_cast<double>(rawChars));
@@ -174,4 +178,10 @@ void Parser::process(std::string &&string, EmbeddedStats &stats, const bool rela
   AtomicAdd(stats.nestingDepthTotal, static_cast<double>(maxDepth));
   if (AtomicMax(stats.nestingDepthMax, static_cast<double>(maxDepth)))
     stats.stringMaxNested.set(string);
+
+  if (maxValidDepth > 1)
+    AtomicAdd(stats.withValidNesting, 1.0);
+  AtomicAdd(stats.validNestingDepthTotal, static_cast<double>(maxValidDepth));
+  if (AtomicMax(stats.validNestingDepthMax, static_cast<double>(maxValidDepth)))
+    stats.stringMaxValidNested.set(string);
 }

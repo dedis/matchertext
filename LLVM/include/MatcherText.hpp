@@ -25,7 +25,8 @@
 
 struct MatcherScanResult {
   uint64_t unmatched = 0; // total unmatched matchers in this sample
-  uint64_t maxDepth = 0; // max balanced nesting depth reached
+  uint64_t maxDepth = 0; // max raw nesting depth reached, even if never closed
+  uint64_t maxValidDepth = 0; // max nesting depth confirmed by a matching closer
   uint64_t rawChars = 0; // raw source characters in the extracted text
 };
 
@@ -51,6 +52,7 @@ static MatcherScanResult AnalyzeMatcherText(const std::string_view text, const b
       if (stack.empty() || (!relaxed && !IsMatched(stack.back(), c))) {
         ++r.unmatched;
       } else {
+        r.maxValidDepth = std::max<uint64_t>(r.maxValidDepth, stack.size());
         stack.pop_back();
       }
     }
