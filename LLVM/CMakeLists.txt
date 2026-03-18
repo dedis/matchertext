@@ -22,11 +22,18 @@ set(CMAKE_BUILD_TYPE "Release")
 add_executable(${PROJECT_NAME}
     main.cpp
     src/Parser.cpp
+    src/EmbeddedStats.cpp
+    src/NestedStats.cpp
     include/Parser.hpp
     src/Stats.cpp
+    include/EmbeddedStats.hpp
+    include/NestedStats.hpp
     include/Stats.hpp
     include/MatcherText.hpp
     include/AtomicString.hpp
+    src/FileStats.cpp
+    include/FileStats.hpp
+    include/StatsGenerator.hpp
 )
 
 # === LLVM & Clang ===

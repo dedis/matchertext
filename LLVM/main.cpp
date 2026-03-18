@@ -74,17 +74,17 @@ int main(const int argc, char *argv[]) {
 
     PrintStatsTable(
       {
-        {"Strings", SnapshotStats(Parser::STRING_STATS)},
-        {"Documentation", SnapshotStats(Parser::DOCS_STATS)},
-        {"Documentation Relaxed", SnapshotStats(Parser::DOCS_RELAXED_STATS)},
+        {"Strings", Parser::STRING_STATS.Snapshot()},
+        {"Documentation", Parser::DOCS_STATS.Snapshot()},
+        {"Documentation Relaxed", Parser::DOCS_RELAXED_STATS.Snapshot()},
       }
     );
 
     PrintNestedStatsTable(
       {
-        {"Strings", SnapshotNestedStats(Parser::STRING_NESTED_STATS)},
-        {"Documentation", SnapshotNestedStats(Parser::DOCS_NESTED_STATS)},
-        {"Documentation Relaxed", SnapshotNestedStats(Parser::DOCS_RELAXED_NESTED_STATS)},
+        {"Strings", Parser::STRING_NESTED_STATS.Snapshot()},
+        {"Documentation", Parser::DOCS_NESTED_STATS.Snapshot()},
+        {"Documentation Relaxed", Parser::DOCS_RELAXED_NESTED_STATS.Snapshot()},
       }
     );
 
@@ -101,3 +101,5 @@ int main(const int argc, char *argv[]) {
 
   return 0;
 }
+
+// Most common violation in files
