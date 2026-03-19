@@ -3,21 +3,56 @@
   "displayName": "minml-livepreview",
   "description": "",
   "version": "0.0.1",
+  "publisher": "local",
   "engines": {
     "vscode": "^1.110.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
+    "languages": [
+      {
+        "id": "minml",
+        "extensions": [
+          ".minml",
+          ".m"
+        ],
+        "aliases": [
+          "MinML",
+          "minml"
+        ]
+      }
+    ],
     "commands": [
       {
         "command": "minml-preview.showPreview",
-        "title": "MinML: Show Live Preview"
+        "title": "Open Preview",
+        "category": "MinML",
+        "icon": "$(book)"
+      },
+      {
+        "command": "minml-preview.showPreviewToSide",
+        "title": "Open Preview to the Side",
+        "category": "MinML",
+        "icon": "$(layout-sidebar-right)"
       }
-    ]
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "when": "resourceLangId == minml",
+          "command": "minml-preview.showPreviewToSide",
+          "group": "navigation"
+        },
+        {
+          "when": "resourceLangId == minml",
+          "command": "minml-preview.showPreview",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

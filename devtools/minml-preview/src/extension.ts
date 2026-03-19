@@ -5,11 +5,17 @@ import * as vscode from "vscode";
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-  const openPanel = vscode.commands.registerCommand("minml-preview.showPreview", () => {
-    LivePreviewPanel.createOrShow(context.extensionUri);
-  });
+  context.subscriptions.push(
+    vscode.commands.registerCommand("minml-preview.showPreview", () => {
+      LivePreviewPanel.createOrShow(context.extensionUri, vscode.ViewColumn.Active);
+    }),
+  );
 
-  context.subscriptions.push(openPanel);
+  context.subscriptions.push(
+    vscode.commands.registerCommand("minml-preview.showPreviewToSide", () => {
+      LivePreviewPanel.createOrShow(context.extensionUri, vscode.ViewColumn.Beside);
+    }),
+  );
 }
 
 function getWebviewOptions(extensionUri: vscode.Uri): vscode.WebviewOptions {
@@ -41,7 +47,7 @@ class LivePreviewPanel {
   private _document: vscode.TextDocument;
   private _disposables: vscode.Disposable[] = [];
 
-  public static createOrShow(extensionUri: vscode.Uri) {
+  public static createOrShow(extensionUri: vscode.Uri, viewColumn: vscode.ViewColumn) {
     const editor = vscode.window.activeTextEditor;
     if (!editor || !this._isEditorValid(editor)) {
       return;
@@ -50,7 +56,7 @@ class LivePreviewPanel {
     // If we already have a panel, show it.
     if (LivePreviewPanel.currentPanel) {
       LivePreviewPanel.currentPanel._document = editor.document;
-      LivePreviewPanel.currentPanel._panel.reveal(vscode.ViewColumn.Beside);
+      LivePreviewPanel.currentPanel._panel.reveal(viewColumn);
       LivePreviewPanel.currentPanel._update();
       return;
     }
@@ -59,7 +65,7 @@ class LivePreviewPanel {
     const panel = vscode.window.createWebviewPanel(
       LivePreviewPanel.viewType,
       "MinML Live Preview",
-      vscode.ViewColumn.Beside,
+      viewColumn,
       getWebviewOptions(extensionUri),
     );
 
@@ -160,8 +166,7 @@ class LivePreviewPanel {
   }
 
   private static _isEditorValid(editor: vscode.TextEditor) {
-    const currentFileExtension = editor?.document.fileName.split(".").pop();
-    return currentFileExtension === "minml" || currentFileExtension === "m";
+    return editor?.document.languageId === "minml";
   }
 
   private _update() {
