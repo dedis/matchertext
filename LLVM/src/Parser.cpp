@@ -112,6 +112,9 @@ void Parser::ParseFile(const std::string &path) {
   clang::Lexer lexer(srcMgr.getLocForStartOfFile(fileID), langOpts, bufStart, bufStart, bufEnd);
   lexer.SetCommentRetentionState(true);
 
+  uint64_t fileViolations = 0;
+  uint64_t fileViolationsRelaxed = 0;
+
   /// Tokenize the file until EOF.
   clang::Token tok{};
   while (true) {
@@ -132,20 +135,34 @@ void Parser::ParseFile(const std::string &path) {
       } while (IsStringToken(current));
 
       tok = current;
-      process(std::move(value), STRING_STATS, STRING_NESTED_STATS);
+      const uint64_t violations = process(std::move(value), STRING_STATS, STRING_NESTED_STATS);
+      fileViolations += violations;
+      fileViolationsRelaxed += violations;
       continue;
     }
 
     /// Capture comment tokens.
     if (tok.is(clang::tok::comment)) {
       std::string comment = clang::Lexer::getSpelling(tok, srcMgr, langOpts);
-      process(std::move(comment), DOCS_STATS, DOCS_NESTED_STATS);
-      process(std::move(comment), DOCS_RELAXED_STATS, DOCS_RELAXED_NESTED_STATS, true);
+      fileViolations += process(std::string(comment), DOCS_STATS, DOCS_NESTED_STATS);
+      fileViolationsRelaxed += process(std::move(comment), DOCS_RELAXED_STATS, DOCS_RELAXED_NESTED_STATS, true);
     }
   }
+
+  AtomicAdd(FILE_STATS.count, 1.0);
+
+  if (fileViolations > 0)
+    AtomicAdd(FILE_STATS.withViolation, 1.0);
+  AtomicAdd(FILE_STATS.violationCount, static_cast<double>(fileViolations));
+  AtomicMax(FILE_STATS.violationMax, static_cast<double>(fileViolations));
+
+  if (fileViolationsRelaxed > 0)
+    AtomicAdd(FILE_STATS.withViolationRelaxed, 1.0);
+  AtomicAdd(FILE_STATS.violationCountRelaxed, static_cast<double>(fileViolationsRelaxed));
+  AtomicMax(FILE_STATS.violationMaxRelaxed, static_cast<double>(fileViolationsRelaxed));
 }
 
-void Parser::process(std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats, const bool relaxed) {
+uint64_t Parser::process(std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats, const bool relaxed) {
   uint64_t toothpicks = 0;
   for (const unsigned char c: string) {
     if (c == '\\')
@@ -182,4 +199,6 @@ void Parser::process(std::string &&string, EmbeddedStats &stats, NestedStats &ne
   AtomicAdd(stats.validNestingDepthTotal, static_cast<double>(maxValidDepth));
   if (AtomicMax(stats.validNestingDepthMax, static_cast<double>(maxValidDepth)))
     stats.stringMaxValidNested.set(string);
+
+  return unmatched;
 }

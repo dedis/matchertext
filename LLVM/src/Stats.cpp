@@ -10,53 +10,64 @@
 #include <iostream>
 #include <ranges>
 
-void PrintStatsTable(const std::vector<std::pair<std::string, EmbeddedStatsSnapshot>> &rows) {
-  if (rows.empty())
-    return;
+namespace {
+  template<typename Snapshot>
+  void PrintScalarStatsTable(const std::vector<std::pair<std::string, Snapshot>> &rows) {
+    if (rows.empty())
+      return;
 
-  const auto firstCols = rows.front().second.ToColumns();
+    const auto firstCols = rows.front().second.ToColumns();
 
-  std::vector<std::string> headers;
-  headers.emplace_back("Metric");
+    std::vector<std::string> headers;
+    headers.emplace_back("Metric");
 
-  for (const auto &name: rows | std::views::keys)
-    headers.push_back(name);
+    for (const auto &name: rows | std::views::keys)
+      headers.push_back(name);
 
-  std::vector<std::vector<double>> values(firstCols.size());
+    std::vector<std::vector<double>> values(firstCols.size());
 
-  for (size_t metric = 0; metric < firstCols.size(); ++metric) {
-    for (const auto &snap: rows | std::views::values) {
-      auto cols = snap.ToColumns();
-      auto [_0, value, _1] = cols.at(metric);
-      values[metric].push_back(value);
+    for (size_t metric = 0; metric < firstCols.size(); ++metric) {
+      for (const auto &snap: rows | std::views::values) {
+        auto cols = snap.ToColumns();
+        auto [_0, value, _1] = cols.at(metric);
+        values[metric].push_back(value);
+      }
     }
-  }
 
-  std::cout << "|";
-  for (const auto &h: headers)
-    std::cout << " " << h << " |";
-  std::cout << '\n';
-
-  std::cout << "|";
-  for (size_t i = 0; i < headers.size(); ++i)
-    std::cout << "---|";
-  std::cout << '\n';
-
-  for (size_t m = 0; m < firstCols.size(); ++m) {
-    auto [name, _0, _1] = firstCols.at(m);
-    std::cout << "| " << name << " |";
-
-    for (const double c: values[m])
-      std::cout << " " << c << " |";
-
+    std::cout << "|";
+    for (const auto &h: headers)
+      std::cout << " " << h << " |";
     std::cout << '\n';
+
+    std::cout << "|";
+    for (size_t i = 0; i < headers.size(); ++i)
+      std::cout << "---|";
+    std::cout << '\n';
+
+    for (size_t m = 0; m < firstCols.size(); ++m) {
+      auto [name, _0, _1] = firstCols.at(m);
+      std::cout << "| " << name << " |";
+
+      for (const double c: values[m])
+        std::cout << " " << c << " |";
+
+      std::cout << '\n';
+    }
+
+    std::cout << "\n\n\n";
+
+    std::cout << "| Statistic | Description |\n|---|---|\n";
+    for (auto &[name, _, desc]: firstCols)
+      std::cout << "| " << name << " | " << desc << " |\n";
   }
+} // namespace
 
-  std::cout << "\n\n\n";
+void PrintStatsTable(const std::vector<std::pair<std::string, EmbeddedStatsSnapshot>> &rows) {
+  PrintScalarStatsTable(rows);
+}
 
-  std::cout << "| Statistic | Description |\n|---|---|\n";
-  for (auto &[name, _, desc]: firstCols)
-    std::cout << "| " << name << " | " << desc << " |\n";
+void PrintFileStatsTable(const FileStatsSnapshot &stats) {
+  PrintScalarStatsTable(std::vector{std::pair<std::string, FileStatsSnapshot>{"File Stats", stats}});
 }
 
 void PrintNestedStatsTable(const std::vector<std::pair<std::string, NestedStatsSnapshot>> &rows) {
@@ -107,7 +118,6 @@ void PrintNestedStatsTable(const std::vector<std::pair<std::string, NestedStatsS
   }
 }
 
-namespace {
 std::string EscapeForLog(const std::string &s) {
   std::string out;
   out.reserve(s.size());
@@ -124,7 +134,6 @@ std::string EscapeForLog(const std::string &s) {
 
   return out;
 }
-} // namespace
 
 void PrintStatsMaxString(const EmbeddedStats &strings, const EmbeddedStats &docs) {
   std::cout << "String:\n"

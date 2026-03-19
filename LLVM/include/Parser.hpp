@@ -9,6 +9,7 @@
 
 #include <string>
 
+#include "FileStats.hpp"
 #include "Stats.hpp"
 
 /**
@@ -55,9 +56,12 @@ class Parser final {
     /// All the aggregated stats relating to parsed docs with relaxed MatcherText
     inline static EmbeddedStats DOCS_RELAXED_STATS{};
     inline static NestedStats DOCS_RELAXED_NESTED_STATS{};
+    /// All the aggregated file level statistics
+    inline static FileStats FILE_STATS{};
   private:
     /// Processes a string/doc and updates the given stat
-    static void process(std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats, bool relaxed = false);
+    /// @returns the number of MatcherText violations found
+    static uint64_t process(std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats, bool relaxed = false);
 };
 
 #endif // PARSER_HPP

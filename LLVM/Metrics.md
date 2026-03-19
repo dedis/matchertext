@@ -1,4 +1,6 @@
-## Statistics Description
+# Statistics Descriptions
+
+## Embedded Statistics
 
 | Statistic                          | Description                                                                                             |
 |------------------------------------|---------------------------------------------------------------------------------------------------------|
@@ -23,7 +25,27 @@
 | Avg Per-Sample Valid Max Depth     | Average of the maximum valid nesting depth measured per sample.                                         |
 | Raw Character Count                | Total number of raw input characters processed.                                                         |
 
+## File Statistics
+
+| Statistic                  | Description                                                            |
+|----------------------------|------------------------------------------------------------------------|
+| Sample Size                | Number of files processed.                                             |
+| With Violation             | Number of files containing at least one MatcherText violation.         |
+| Total Violations           | Total violation count accumulated across all files.                    |
+| Maximum Violations         | Highest violation count observed in a single file.                     |
+| Average Violations         | Average violation count per file.                                      |
+| Compliance Rate            | Percentage of files without non-compliance.                            |
+| With Violation Relaxed     | Number of files containing at least one relaxed MatcherText violation. |
+| Total Relaxed Violations   | Total relaxed violation count accumulated across all files.            |
+| Maximum Relaxed Violations | Highest relaxed violation count observed in a single file.             |
+| Average Relaxed Violations | Average relaxed violation count per file.                              |
+| Compliance Rate Relaxed    | Percentage of files without relaxed non-compliance.                    |
+
+# Analysed Repositories
+
 ## Test Directory
+
+### 1. Embedded Statistics
 
 | Metric                             | Strings  | Documentation   | Documentation Relaxed   |
 |------------------------------------|----------|-----------------|-------------------------|
@@ -48,13 +70,33 @@
 | Avg Per-Sample Valid Max Depth     | 1.1      | 1.33333         | 1.33333                 |
 | Raw Character Count                | 180      | 285             | 285                     |
 
+### 2. Nesting Histogram
+
 | Level | Strings Raw | Strings Valid | Documentation Raw | Documentation Valid | Documentation Relaxed Raw | Documentation Relaxed Valid |
 |-------|-------------|---------------|-------------------|---------------------|---------------------------|-----------------------------|
 | 1     | 4           | 4             | 0                 | 0                   | 0                         | 0                           |
 | 2     | 2           | 2             | 1                 | 1                   | 1                         | 1                           |
 | 3     | 1           | 1             | 2                 | 2                   | 2                         | 2                           |
 
+### 3. File Level Statistics
+
+| Metric                     | File Stats  |
+|----------------------------|-------------|
+| Sample Size                | 3           |
+| With Violation             | 1           |
+| Total Violations           | 4           |
+| Maximum Violations         | 4           |
+| Average Violations         | 1.33333     |
+| Compliance Rate            | 66.6667     |
+| With Violation Relaxed     | 0           |
+| Total Relaxed Violations   | 0           |
+| Maximum Relaxed Violations | 0           |
+| Average Relaxed Violations | 0           |
+| Compliance Rate Relaxed    | 100         |
+
 ## Linux
+
+### 1. Embedded Statistics
 
 | Metric                             | Strings     | Documentation   | Documentation Relaxed   |
 |------------------------------------|-------------|-----------------|-------------------------|
@@ -79,6 +121,8 @@
 | Avg Per-Sample Valid Max Depth     | 0.0635104   | 0.125688        | 0.125735                |
 | Raw Character Count                | 2.76905e+07 | 1.74103e+08     | 1.74103e+08             |
 
+### 2. Nesting Histogram
+
 | Level  | Strings Raw   | Strings Valid  | Documentation Raw   | Documentation Valid  | Documentation Relaxed Raw  | Documentation Relaxed Valid |
 |--------|---------------|----------------|---------------------|----------------------|----------------------------|-----------------------------|
 | 1      | 87660         | 85704          | 276002              | 274482               | 276204                     | 274944                      |
@@ -94,9 +138,27 @@
 | 11     | 1             | 0              | 3                   | 2                    | 2                          | 1                           |
 | 12     | 1             | 0              | 0                   | 0                    | 0                          | 0                           |
 
+### 3. File Level Statistics
+
+| Metric                     | File Stats  |
+|----------------------------|-------------|
+| Sample Size                | 63071       |
+| With Violation             | 3859        |
+| Total Violations           | 15401       |
+| Maximum Violations         | 518         |
+| Average Violations         | 0.244185    |
+| Compliance Rate            | 93.8815     |
+| With Violation Relaxed     | 3652        |
+| Total Relaxed Violations   | 13761       |
+| Maximum Relaxed Violations | 518         |
+| Average Relaxed Violations | 0.218183    |
+| Compliance Rate Relaxed    | 94.2097     |
+
 Parsing takes around 1600-2300 ms
 
 ## Chromium
+
+### 1. Embedded Statistics
 
 | Metric                             | Strings     | Documentation   | Documentation Relaxed   |
 |------------------------------------|-------------|-----------------|-------------------------|
@@ -120,6 +182,8 @@ Parsing takes around 1600-2300 ms
 | Highest Per-Sample Valid Max Depth | 200         | 8               | 8                       |
 | Avg Per-Sample Valid Max Depth     | 0.0601997   | 0.0923705       | 0.0926199               |
 | Raw Character Count                | 8.25084e+07 | 2.06343e+08     | 2.06343e+08             |
+
+### 2. Nesting Histogram
 
 | Level  | Strings Raw   | Strings Valid  | Documentation Raw | Documentation Valid | Documentation Relaxed Raw | Documentation Relaxed Valid |
 |--------|---------------|----------------|-------------------|---------------------|---------------------------|-----------------------------|
@@ -145,5 +209,21 @@ Parsing takes around 1600-2300 ms
 | 168    | 1             | 0              | 0                 | 0                   | 0                         | 0                           |
 | 200    | 1             | 1              | 0                 | 0                   | 0                         | 0                           |
 | 256    | 1             | 0              | 0                 | 0                   | 0                         | 0                           |
+
+### 3. File Level Statistics
+
+| Metric                     | File Stats   |
+|----------------------------|--------------|
+| Sample Size                | 129383       |
+| With Violation             | 21925        |
+| Total Violations           | 159956       |
+| Maximum Violations         | 30795        |
+| Average Violations         | 1.2363       |
+| Compliance Rate            | 83.0542      |
+| With Violation Relaxed     | 21729        |
+| Total Relaxed Violations   | 156866       |
+| Maximum Relaxed Violations | 30795        |
+| Average Relaxed Violations | 1.21242      |
+| Compliance Rate Relaxed    | 83.2057      |
 
 Parsing takes around 2900-3200 ms

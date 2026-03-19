@@ -65,10 +65,6 @@ int main(const int argc, char *argv[]) {
       Parser::ParseFile(file);
     }
 
-    Parser::STRING_STATS.DeriveStats();
-    Parser::DOCS_STATS.DeriveStats();
-    Parser::DOCS_RELAXED_STATS.DeriveStats();
-
     const auto end = std::chrono::high_resolution_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
@@ -79,6 +75,9 @@ int main(const int argc, char *argv[]) {
         {"Documentation Relaxed", Parser::DOCS_RELAXED_STATS.Snapshot()},
       }
     );
+
+    std::cout << "\n\n\n";
+    PrintFileStatsTable(Parser::FILE_STATS.Snapshot());
 
     PrintNestedStatsTable(
       {

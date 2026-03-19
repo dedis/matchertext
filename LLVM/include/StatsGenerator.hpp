@@ -28,7 +28,7 @@
     DECLARATION(_declare_field_atomic)                                 \
     EXTRA_FIELDS                                                       \
     void DeriveStats();                                                \
-    Name##Snapshot Snapshot() const;                                   \
+    Name##Snapshot Snapshot();                                         \
   };
 #define CREATE_STATS_HPP_NO_EXTRA(Name, DECLARATION) CREATE_STATS_HPP(Name, DECLARATION, /**/)
 
