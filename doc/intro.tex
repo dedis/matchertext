@@ -168,7 +168,17 @@ for the forbidden host-language delimeters,
 and changing the delimeters or awkwardly rewriting the embedded text
 (\eg by concatenating multiple strings in different quoting styles).
 Matchertext, in contrast, forbids \emph{no} characters or sequences
-in embedded strings provided only that matchers match.
+in embedded strings,
+provided only that matchers match.
+Building on and adapting the raw-string tradition,
+another widely-backward-compatible approach to hosting matchertext
+is to add support for \emph{matchertext string literals}
+like \verb|M"(|$\dots$\verb|)"| to languages,
+stylistically similar to the raw-string syntax \verb|R"(|$\dots$\verb|)"| 
+already in C++.
+In this matchertext-literal syntax,
+the above regular-expression example
+would be \verb|re.match(M"("[^"]*")")|.
 
 It is already feasible to write code in existing languages
 that is also valid matchertext,
@@ -239,7 +249,7 @@ as in \verb|printf("\x7B")| or \verb|case "\x5D"| for example.
 Backward-compatible language extensions might ease this pain,
 however, 
 with new escape sequences that include \emph{both} matchers of a pair
-but select only the opener or closer.
+but select only the pair's opener or closer.
 The proposed new escape \verb|\o()| represents a literal open parenthesis,
 for example,
 while \verb|\c[]| represents a close bracket.
