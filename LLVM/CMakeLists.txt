@@ -3,16 +3,24 @@ cmake_minimum_required(VERSION 3.31)
 # Prefer Homebrew LLVM clang for OpenMP support and fall back to Apple clang.
 set(HOMEBREW_CLANG "/opt/homebrew/opt/llvm/bin/clang")
 set(HOMEBREW_CLANGXX "/opt/homebrew/opt/llvm/bin/clang++")
+set(HOMEBREW_LLVM_PREFIX "/opt/homebrew/opt/llvm")
+set(HOMEBREW_LIBOMP_PREFIX "/opt/homebrew/opt/libomp")
 
 if (EXISTS "${HOMEBREW_CLANG}" AND EXISTS "${HOMEBREW_CLANGXX}")
     set(CMAKE_C_COMPILER "${HOMEBREW_CLANG}")
     set(CMAKE_CXX_COMPILER "${HOMEBREW_CLANGXX}")
-    set(USE_OPENMP 1)
-else ()
-    set(USE_OPENMP 0)
 endif ()
 
 project(LLVM_MinML_Parser VERSION 1.0.0)
+
+if (APPLE)
+    if (EXISTS "${HOMEBREW_LLVM_PREFIX}")
+        list(APPEND CMAKE_PREFIX_PATH "${HOMEBREW_LLVM_PREFIX}")
+    endif ()
+    if (EXISTS "${HOMEBREW_LIBOMP_PREFIX}")
+        list(APPEND CMAKE_PREFIX_PATH "${HOMEBREW_LIBOMP_PREFIX}")
+    endif ()
+endif ()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -42,18 +50,15 @@ find_package(Clang REQUIRED CONFIG)
 
 include_directories(${LLVM_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} clangLex clangBasic)
-target_compile_definitions(${PROJECT_NAME} PRIVATE USE_OPENMP=${USE_OPENMP})
 
 # === OpenMP ===
-if (USE_OPENMP)
-    set(OpenMP_C_FLAGS "-fopenmp")
-    set(OpenMP_CXX_FLAGS "-fopenmp")
-    set(OpenMP_C_LIB_NAMES "omp")
-    set(OpenMP_CXX_LIB_NAMES "omp")
-    set(OpenMP_omp_LIBRARY "/opt/homebrew/opt/libomp/lib/libomp.dylib")
-    include_directories(/opt/homebrew/opt/libomp/include)
-    find_package(OpenMP REQUIRED)
+find_package(OpenMP QUIET)
+if (OpenMP_CXX_FOUND)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE USE_OPENMP=1)
     target_link_libraries(${PROJECT_NAME} OpenMP::OpenMP_CXX)
+else ()
+    target_compile_definitions(${PROJECT_NAME} PRIVATE USE_OPENMP=0)
+    message(STATUS "OpenMP not found, building without parallel parsing support")
 endif ()
 
 # --------------------------
