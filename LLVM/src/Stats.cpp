@@ -5,6 +5,7 @@
 //
 
 #include "../include/Stats.hpp"
+#include "../include/LanguageClassifier.hpp"
 
 #include <cstdio>
 #include <iostream>
@@ -133,6 +134,27 @@ std::string EscapeForLog(const std::string &s) {
   }
 
   return out;
+}
+
+void PrintLanguageStatsTable(const std::vector<std::pair<std::string, LanguageStatsSnapshot>> &rows) {
+  if (rows.empty())
+    return;
+
+  for (const auto &[category, snap] : rows) {
+    if (snap.entries.empty())
+      continue;
+
+    std::cout << "\n\n";
+    std::cout << "| " << category << " Language | Count | % | Violations | Toothpicks |\n";
+    std::cout << "|---|---|---|---|---|\n";
+
+    for (const auto &e : snap.entries) {
+      char pctBuf[16];
+      std::snprintf(pctBuf, sizeof(pctBuf), "%.2f%%", e.percentage);
+      std::cout << "| " << LanguageName(e.language) << " | " << e.count << " | "
+                << pctBuf << " | " << e.violations << " | " << e.toothpicks << " |\n";
+    }
+  }
 }
 
 void PrintStatsMaxString(const EmbeddedStats &strings, const EmbeddedStats &docs) {

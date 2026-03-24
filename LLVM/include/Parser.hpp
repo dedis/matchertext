@@ -10,6 +10,7 @@
 #include <string>
 
 #include "FileStats.hpp"
+#include "LanguageStats.hpp"
 #include "Stats.hpp"
 
 /**
@@ -58,10 +59,13 @@ class Parser final {
     inline static NestedStats DOCS_RELAXED_NESTED_STATS{};
     /// All the aggregated file level statistics
     inline static FileStats FILE_STATS{};
+    /// Per-language classification statistics for strings
+    inline static LanguageStats STRING_LANG_STATS{};
   private:
     /// Processes a string/doc and updates the given stat
     /// @returns the number of MatcherText violations found
-    static uint64_t process(std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats, bool relaxed = false);
+    static uint64_t process(std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats,
+                            LanguageStats *langStats = nullptr, bool relaxed = false);
 };
 
 #endif // PARSER_HPP

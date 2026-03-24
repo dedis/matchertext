@@ -16,6 +16,7 @@
 #include <clang/Lex/Lexer.h>
 
 #include "../include/Parser.hpp"
+#include "../include/LanguageClassifier.hpp"
 #include "../include/MatcherText.hpp"
 
 void AtomicAdd(std::atomic<double> &dst, const double delta) {
@@ -135,7 +136,8 @@ void Parser::ParseFile(const std::string &path) {
       } while (IsStringToken(current));
 
       tok = current;
-      const uint64_t violations = process(std::move(value), STRING_STATS, STRING_NESTED_STATS);
+      const uint64_t violations = process(std::move(value), STRING_STATS, STRING_NESTED_STATS,
+                                          &STRING_LANG_STATS);
       fileViolations += violations;
       fileViolationsRelaxed += violations;
       continue;
@@ -145,7 +147,8 @@ void Parser::ParseFile(const std::string &path) {
     if (tok.is(clang::tok::comment)) {
       std::string comment = clang::Lexer::getSpelling(tok, srcMgr, langOpts);
       fileViolations += process(std::string(comment), DOCS_STATS, DOCS_NESTED_STATS);
-      fileViolationsRelaxed += process(std::move(comment), DOCS_RELAXED_STATS, DOCS_RELAXED_NESTED_STATS, true);
+      fileViolationsRelaxed += process(std::move(comment), DOCS_RELAXED_STATS, DOCS_RELAXED_NESTED_STATS,
+                                       nullptr, true);
     }
   }
 
@@ -162,7 +165,8 @@ void Parser::ParseFile(const std::string &path) {
   AtomicMax(FILE_STATS.violationMaxRelaxed, static_cast<double>(fileViolationsRelaxed));
 }
 
-uint64_t Parser::process(std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats, const bool relaxed) {
+uint64_t Parser::process(std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats,
+                         LanguageStats *langStats, const bool relaxed) {
   uint64_t toothpicks = 0;
   for (const unsigned char c: string) {
     if (c == '\\')
@@ -170,6 +174,12 @@ uint64_t Parser::process(std::string &&string, EmbeddedStats &stats, NestedStats
   }
 
   const auto [unmatched, maxDepth, maxValidDepth, rawChars] = AnalyzeMatcherText(string, relaxed);
+
+  if (langStats != nullptr) {
+    /// Classify the embedded language and record per-language stats only for strings.
+    const auto [lang, confidence] = ClassifyString(string);
+    langStats->Record(lang, unmatched, toothpicks);
+  }
 
   nestedStats.Record(maxDepth, maxValidDepth);
 

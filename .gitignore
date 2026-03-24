@@ -2,3 +2,6 @@
 **/.idea
 **/minml
 **/minml.exe
+LLVM/ignore
+devtools
+out
