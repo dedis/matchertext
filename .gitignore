@@ -3,5 +3,6 @@
 **/minml
 **/minml.exe
 LLVM/ignore
+LLVM/include/LanguageModel.generated.hpp
 devtools
 out
