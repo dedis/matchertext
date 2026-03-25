@@ -3,3 +3,5 @@ parser
 build
 build-test
 ./ignore
+./include/LanguageModel.generated.hpp
+result/**

@@ -62,6 +62,7 @@ enum class Language : uint8_t {
   IdentifierLike,
   HexData,
   BinaryData,
+  InlineAsm,
   COUNT
 };
 

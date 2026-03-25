@@ -65,6 +65,13 @@ Only C and C++ files are processed when scanning directories:
 
 `--log-strings` prints the max-string diagnostics in addition to the metrics tables.
 
+```sh
+./parser --debug-languages <file-or-directory>...
+```
+
+`--debug-languages` writes up to 1,000 sampled string literals per detected
+language into `./result/<input-path>/<language>.txt`.
+
 ## Language Classification
 
 Embedded strings are classified through `ClassifyString` in
@@ -124,6 +131,10 @@ The tool prints three sections:
 1. Embedded statistics for `Strings`, `Documentation`, and `Documentation Relaxed`
 2. File-level violation statistics
 3. Nesting histograms
+4. String-language breakdowns
+
+When `--debug-languages` is enabled, the parser also writes per-language sample
+files under `./result/`.
 
 It finishes with the total parsing time in milliseconds.
 

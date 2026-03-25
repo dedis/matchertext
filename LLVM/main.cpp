@@ -1,6 +1,7 @@
 #include <filesystem>
 #include <iostream>
-#include <set>
+#include <map>
+#include <vector>
 
 #include "include/Parser.hpp"
 #include "include/Stats.hpp"
@@ -26,47 +27,74 @@ inline bool is_c_cpp_file(const std::string &path) {
          ext == "hxx";
 }
 
+struct WorkItem {
+  std::string filePath;
+  std::string inputPath;
+};
+
 int main(const int argc, char *argv[]) {
   if (argc < 2) {
-    std::cerr << "Usage: " << argv[0] << " <file|directory>...\n";
+    std::cerr << "Usage: " << argv[0]
+              << " [--log-strings] [--debug-languages] <file|directory>...\n";
     return -1;
   }
 
   // Parse arguments
   bool logStrings = false;
-  std::set<std::string> filesToProcess;
+  bool debugLanguages = false;
+  std::map<std::string, std::string> filesToProcess;
+  std::vector<std::string> inputPaths;
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
     if (arg == "--log-strings") {
       logStrings = true;
       continue;
     }
+    if (arg == "--debug-languages") {
+      debugLanguages = true;
+      continue;
+    }
+
     fs::path p(arg);
     if (!fs::exists(p)) {
       std::cerr << "Path does not exist: " << p << "\n";
       continue;
     }
+
+    const std::string inputPath = fs::path(arg).lexically_normal().string();
+    inputPaths.push_back(inputPath);
     if (fs::is_regular_file(p) && is_c_cpp_file(p))
-      filesToProcess.insert(normalize_path(p.string()));
-    else if (fs::is_directory(p))
+      filesToProcess.try_emplace(normalize_path(p.string()), inputPath);
+    else if (fs::is_directory(p)) {
       for (const auto &entry: fs::recursive_directory_iterator(p))
         if (fs::is_regular_file(entry) && is_c_cpp_file(entry.path().string()))
-          filesToProcess.insert(normalize_path(entry.path().string()));
+          filesToProcess.try_emplace(normalize_path(entry.path().string()), inputPath);
+    }
   }
 
   try {
-    const std::vector files(filesToProcess.begin(), filesToProcess.end());
+    std::vector<WorkItem> files;
+    files.reserve(filesToProcess.size());
+    for (const auto &[filePath, inputPath] : filesToProcess)
+      files.push_back({filePath, inputPath});
+
+    if (debugLanguages)
+      Parser::ConfigureDebugLanguages(inputPaths);
+
     const auto start = std::chrono::high_resolution_clock::now();
 
     #if USE_OPENMP
     #pragma omp parallel for schedule(dynamic) default(none) shared(files)
     #endif
     for (const auto &file: files) {
-      Parser::ParseFile(file);
+      Parser::ParseFile(file.filePath, file.inputPath);
     }
 
     const auto end = std::chrono::high_resolution_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    if (debugLanguages)
+      Parser::FlushDebugLanguageLogs();
 
     PrintStatsTable(
       {

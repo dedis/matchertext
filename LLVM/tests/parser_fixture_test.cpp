@@ -69,7 +69,8 @@ bool TestBasicLiterals() {
       stringNested.validLevels.size() > 1 ? stringNested.validLevels[1] : 0;
   ok &= CheckEq("basic.nesting.raw_level_1", static_cast<double>(rawLevel1), 4.0);
   ok &= CheckEq("basic.nesting.valid_level_1", static_cast<double>(validLevel1), 4.0);
-  ok &= CheckLanguageCount(lang, Language::Unknown, 6);
+  ok &= CheckLanguageCount(lang, Language::Unknown, 4);
+  ok &= CheckLanguageCount(lang, Language::PlainText, 2);
   ok &= CheckNoFileViolations();
   return ok;
 }

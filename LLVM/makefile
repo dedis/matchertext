@@ -9,7 +9,6 @@ train:
 	@if [ -z "$(PYTHON)" ]; then echo "Error: no Python interpreter found in PATH (need Python 3.8+)"; exit 1; fi
 	@"$(PYTHON)" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 8) else "Python 3.8+ is required for train/generate_model.py")'
 	@"$(PYTHON)" train/generate_model.py ignore/linguist/samples -o include/LanguageModel.generated.hpp
-	@$(MAKE) build
 
 build:
 	@cmake -B $(BUILD_DIR) -S .
@@ -17,5 +16,5 @@ build:
 
 test:
 	@cmake -B $(TEST_BUILD_DIR) -S .
-	@cmake --build $(TEST_BUILD_DIR) --target LanguageClassifierTests ParserFixtureTests
+	@cmake --build $(TEST_BUILD_DIR) --target LanguageClassifierTests ParserFixtureTests DebugLanguageOutputTests
 	@ctest --test-dir $(TEST_BUILD_DIR) --output-on-failure

@@ -99,6 +99,40 @@ add_test(NAME parser_fixture_prefixed_literals
 add_test(NAME parser_fixture_string_bucket_mix
     COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/string_bucket_mix.cpp)
 
+add_executable(DebugLanguageOutputTests
+    tests/debug_language_output_test.cpp
+    src/Parser.cpp
+    src/EmbeddedStats.cpp
+    src/NestedStats.cpp
+    src/Stats.cpp
+    src/FileStats.cpp
+    src/LanguageClassifier.cpp
+    src/LanguageStats.cpp
+    include/Parser.hpp
+    include/EmbeddedStats.hpp
+    include/NestedStats.hpp
+    include/Stats.hpp
+    include/MatcherText.hpp
+    include/AtomicString.hpp
+    include/FileStats.hpp
+    include/StatsGenerator.hpp
+    include/LanguageClassifier.hpp
+    include/LanguageStats.hpp
+    include/LanguageModel.generated.hpp
+)
+target_include_directories(DebugLanguageOutputTests PRIVATE include)
+target_link_libraries(DebugLanguageOutputTests clangLex clangBasic)
+if (OpenMP_CXX_FOUND)
+    target_compile_definitions(DebugLanguageOutputTests PRIVATE USE_OPENMP=1)
+    target_link_libraries(DebugLanguageOutputTests OpenMP::OpenMP_CXX)
+else ()
+    target_compile_definitions(DebugLanguageOutputTests PRIVATE USE_OPENMP=0)
+endif ()
+add_test(NAME debug_language_output
+    COMMAND DebugLanguageOutputTests
+    ${CMAKE_SOURCE_DIR}/tests/string_bucket_mix.cpp
+    ${CMAKE_BINARY_DIR}/debug-language-output)
+
 # === LLVM & Clang ===
 find_package(LLVM REQUIRED CONFIG)
 find_package(Clang REQUIRED CONFIG)
