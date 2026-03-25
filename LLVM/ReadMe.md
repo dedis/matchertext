@@ -65,6 +65,58 @@ Only C and C++ files are processed when scanning directories:
 
 `--log-strings` prints the max-string diagnostics in addition to the metrics tables.
 
+## Language Classification
+
+Embedded strings are classified through `ClassifyString` in
+`include/LanguageClassifier.hpp`.
+
+The classifier uses two layers:
+
+- Fast structural detectors for precise categories such as `URL`, `FilePath`,
+  `JSON`, `HTML`, `SQL`, `Regex`, `Shell`, `YAML`, and `PlainText`
+- A trigram Naive Bayes model for broader programming-language and
+  domain-specific-language detection when the string is long enough and the
+  match is unambiguous
+
+The generated model is already checked in as
+`include/LanguageModel.generated.hpp`, so normal builds and tests do not need
+to retrain it.
+
+Retrain the model when you change the language enum, the trainable language
+mapping, or the snippet-extraction / feature-selection heuristics:
+
+The generator needs:
+
+- Python 3.8 or newer
+- Git, because `make train` fetches or updates `github-linguist/linguist`
+
+It does not require any third-party Python packages.
+
+```sh
+make train
+```
+
+`make train` clones or updates `ignore/linguist`, runs
+`train/generate_model.py`, rewrites `include/LanguageModel.generated.hpp`, and
+rebuilds the project. It auto-detects `python3` first, then `python`, and you
+can override the interpreter explicitly if needed:
+
+```sh
+make train PYTHON=/path/to/python
+```
+
+To run the generator manually:
+
+```sh
+/path/to/python train/generate_model.py ignore/linguist/samples \
+  -o include/LanguageModel.generated.hpp \
+  --eval-holdout 0.1
+```
+
+Keep `LANGUAGE_MAP` in `train/generate_model.py` aligned with `Language` in
+`include/LanguageClassifier.hpp`; the generated header stores those numeric ids
+directly.
+
 ## Output
 
 The tool prints three sections:

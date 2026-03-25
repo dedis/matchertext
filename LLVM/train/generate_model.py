@@ -1,22 +1,29 @@
 #!/usr/bin/env python3
 """
-Generate an embedded-string-oriented trigram language model from Linguist samples.
+Generate `include/LanguageModel.generated.hpp` from GitHub Linguist samples.
 
-Produces a C++ header (LanguageModel.generated.hpp) containing precomputed
-trigram log-probability boosts for use by the Naive Bayes classifier in
-LanguageClassifier.cpp.
+This script trains the trigram Naive Bayes tables used by
+`src/LanguageClassifier.cpp`. The model is optimized for embedded strings, not
+whole-file language detection: it extracts short, deterministic snippets that
+resemble source literals, config fragments, markup, shell commands, SQL, and
+ordinary prose.
 
-Compared to the original generator, this version:
-  - trains on deterministic embedded-like snippets instead of random windows
-  - normalizes per-file contributions so large files do not dominate
-  - builds PlainText from real string literals and text snippets
-  - counts UTF-8 byte trigrams instead of ASCII-only character trigrams
-  - keeps the most discriminative trigrams instead of the most frequent ones
-  - can optionally evaluate held-out snippets by length bucket
+Training pipeline:
+  1. Extract embedded-like snippets from each supported Linguist language.
+  2. Build `PlainText` from text corpora, READMEs, and real string literals.
+  3. Normalize each file to a fixed trigram mass so large files do not dominate.
+  4. Keep the most discriminative UTF-8 byte trigrams per language.
+  5. Emit `LanguageModel.generated.hpp`, optionally printing holdout metrics.
+
+Keep `LANGUAGE_MAP` aligned with the `Language` enum in
+`include/LanguageClassifier.hpp`: the generated header stores those numeric ids
+directly. If the trainable language set or enum values change, regenerate the
+header before rebuilding the C++ targets.
 
 Usage:
     python3 train/generate_model.py /path/to/linguist/samples \
         -o include/LanguageModel.generated.hpp
+    python3 train/generate_model.py ignore/linguist/samples --eval-holdout 0.1
 
 Requirements: Python 3.8+, no external dependencies.
 """
@@ -38,7 +45,10 @@ from typing import Iterable, Iterator, Sequence
 
 # ---------------------------------------------------------------------------
 # Language mapping: Linguist directory name -> (C++ enum name, enum int value)
-# Enum values MUST match the Language enum in LanguageClassifier.hpp.
+#
+# These ids are emitted into the generated header and consumed directly by the
+# C++ classifier, so they must stay in lock-step with `enum class Language` in
+# include/LanguageClassifier.hpp.
 # ---------------------------------------------------------------------------
 LANGUAGE_MAP = {
     # Domain-specific
@@ -83,9 +93,11 @@ MARKUP_LANGUAGES = {"HTML", "XML"}
 STRUCTURED_LANGUAGES = {"JSON", "YAML", "CSS", "SQL", "Shell"} | MARKUP_LANGUAGES
 
 # Trigrams to keep per language.
+# Higher values improve recall at the cost of a larger generated header.
 TOP_N_TRIGRAMS = 15_000
 
-# Snippet extraction parameters.
+# Snippet extraction parameters tuned for embedded strings rather than
+# full-file classification.
 MIN_SNIPPET_CHARS = 8
 MAX_SNIPPET_CHARS = 512
 TARGET_SNIPPET_LENGTHS = (12, 24, 48, 96, 192, 384)
@@ -95,7 +107,9 @@ MAX_SNIPPETS_PER_FILE = 192
 MAX_EVAL_SNIPPETS_PER_CLASS = 256
 MAX_FILE_BYTES = 500_000  # skip only genuinely large outliers
 
-# Per-file normalization and feature selection.
+# Per-file normalization and feature selection. The goal is to give each source
+# file similar weight, then keep trigrams that separate a language from the
+# rest of the corpus instead of merely favoring common tokens.
 PER_FILE_TRIGRAM_MASS = 4096.0
 NORMALIZED_VARIANT_WEIGHT = 0.35
 ESCAPED_VARIANT_WEIGHT = 0.30
@@ -104,7 +118,8 @@ MIN_FEATURE_COUNT = 2.0
 MIN_FEATURE_DOC_FREQ = 2
 MIN_TOTAL_TRIGRAM_MASS = 512.0
 
-# Optional NB-only holdout evaluation buckets.
+# Optional NB-only holdout evaluation buckets. These evaluate only the trigram
+# model, not the deterministic structural detectors used at runtime.
 EVAL_GAP_THRESHOLD = 0.30
 EVAL_CONFIDENCE_THRESHOLD = 0.85
 LENGTH_BUCKETS = (
@@ -1257,6 +1272,7 @@ def _set_top_n(n: int) -> None:
 
 
 def main() -> None:
+    """Parse CLI options, build corpora, emit the header, and optionally eval."""
     parser = argparse.ArgumentParser(
         description="Generate trigram language model from Linguist samples."
     )
