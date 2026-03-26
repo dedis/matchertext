@@ -4,7 +4,7 @@ This directory contains various developer tools and extensions for working with 
 
 ## Available Tools
 
-### [minml-preview](minml-preview)
+### [minml-preview](vscode/minml-preview)
 A VS Code extension that provides a live preview for MinML files (`.minml`, `.m`). It uses a WebAssembly version of the Go parser to render MinML to HTML in real-time.
 
 ## Installation

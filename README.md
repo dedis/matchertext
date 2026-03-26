@@ -10,7 +10,7 @@ The main contents of this repository are currently:
 
 * [doc](doc): the LaTeX source for the in-progress matchertext paper.
 * [go](go): experimental Go code for parsing and converting matchertext.
-* [devtools](devtools): developer tools and extensions (e.g., VS Code preview).
+* [devtools](dev): developer tools and extensions (e.g., VS Code preview).
 
 ### Build
 
