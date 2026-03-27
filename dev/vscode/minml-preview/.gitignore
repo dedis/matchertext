@@ -1,7 +1,0 @@
-out
-node_modules
-.vscode-test/
-*.vsix
-media/wasm_exec.js
-media/main.wasm
-dist
