@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!-- The head from the Go Wiki -->
+<head>
+  <meta charset="utf-8" />
+  <script src="./wasm_exec.js"></script>
+  <script defer>
+    const go = new Go();
+    WebAssembly.instantiateStreaming(fetch("./main.wasm"), go.importObject).then((result) => {
+      go.run(result.instance);
+    });
+
+  </script>
+  <title>WASM test</title>
+
+</head>
+
+<body>
+  <p>Click on the button to rapidly test the wasm of MinML to HTML conversion</p>
+  <button onclick="onClick()">Convert MinML</button>
+  <div id="output">
+  </div>
+</body>
+
+<script>
+  function onClick() {
+    const minmlTestString = `
+      div{style=[flex: 1 1 500px; background-color: #b3d0ff]}[
+        h1[This is just a test file to make sure the wasm is functioning correctly]
+        h2{style=[color:red]}[If this is red and looking like normal HTML then it's working pretty well]
+      ]
+    `
+    document.getElementById("output").innerHTML = minmlConvert(minmlTestString)
+  }
+</script>
+</html>
