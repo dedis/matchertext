@@ -103,6 +103,6 @@ struct ClassificationResult {
 /// @param minConfidence Minimum threshold for structural detectors. The trigram
 ///        classifier also enforces its own stricter acceptance floor.
 /// @return The detected language and confidence score.
-ClassificationResult ClassifyString(std::string_view body, float minConfidence = 0.5f);
+ClassificationResult ClassifyString(std::string_view body, float minConfidence = 0.8f);
 
 #endif // LANGUAGE_CLASSIFIER_HPP

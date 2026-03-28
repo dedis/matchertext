@@ -27,6 +27,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_BUILD_TYPE "Release")
 
+file(GLOB CLASSIFIER_SOURCES CONFIGURE_DEPENDS
+    src/classifiers/*.cpp
+)
+
 # Define the header-forge executable
 add_executable(${PROJECT_NAME}
     main.cpp
@@ -44,6 +48,7 @@ add_executable(${PROJECT_NAME}
     include/FileStats.hpp
     include/StatsGenerator.hpp
     src/LanguageClassifier.cpp
+    ${CLASSIFIER_SOURCES}
     src/LanguageStats.cpp
     include/LanguageClassifier.hpp
     include/LanguageStats.hpp
@@ -53,6 +58,7 @@ add_executable(${PROJECT_NAME}
 add_executable(LanguageClassifierTests
     tests/language_detection_test.cpp
     src/LanguageClassifier.cpp
+    ${CLASSIFIER_SOURCES}
     include/LanguageClassifier.hpp
     include/LanguageModel.generated.hpp
 )
@@ -67,6 +73,7 @@ add_executable(ParserFixtureTests
     src/Stats.cpp
     src/FileStats.cpp
     src/LanguageClassifier.cpp
+    ${CLASSIFIER_SOURCES}
     src/LanguageStats.cpp
     include/Parser.hpp
     include/EmbeddedStats.hpp
@@ -107,6 +114,7 @@ add_executable(DebugLanguageOutputTests
     src/Stats.cpp
     src/FileStats.cpp
     src/LanguageClassifier.cpp
+    ${CLASSIFIER_SOURCES}
     src/LanguageStats.cpp
     include/Parser.hpp
     include/EmbeddedStats.hpp

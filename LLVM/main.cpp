@@ -51,7 +51,7 @@ int main(const int argc, char *argv[]) {
   const auto programStart = Clock::now();
   if (argc < 2) {
     std::cerr << "Usage: " << argv[0]
-              << " [--log-strings] [--debug-languages] <file|directory>...\n";
+        << " [--log-strings] [--debug-languages] <file|directory>...\n";
     return -1;
   }
 
@@ -90,13 +90,11 @@ int main(const int argc, char *argv[]) {
           filesToProcess.try_emplace(normalize_path(entry.path().string()), inputPath);
     }
   }
-  const auto indexingEnd = Clock::now();
-
-  {
+  const auto indexingEnd = Clock::now(); {
     std::ostringstream message;
     message << "Indexed " << pluralize(filesToProcess.size(), "file", "files")
-            << " from " << pluralize(inputPaths.size(), "input path", "input paths")
-            << " in " << elapsed_ms(indexingStart, indexingEnd) << " ms";
+        << " from " << pluralize(inputPaths.size(), "input path", "input paths")
+        << " in " << elapsed_ms(indexingStart, indexingEnd) << " ms";
     log_info(message.str());
   }
 
@@ -108,15 +106,13 @@ int main(const int argc, char *argv[]) {
   try {
     std::vector<WorkItem> files;
     files.reserve(filesToProcess.size());
-    for (const auto &[filePath, inputPath] : filesToProcess)
+    for (const auto &[filePath, inputPath]: filesToProcess)
       files.push_back({filePath, inputPath});
 
     if (debugLanguages) {
       log_info("Debug language sampling enabled");
       Parser::ConfigureDebugLanguages(inputPaths);
-    }
-
-    {
+    } {
       std::ostringstream message;
       message << "Parsing " << pluralize(files.size(), "file", "files");
       if (logStrings)
@@ -140,8 +136,10 @@ int main(const int argc, char *argv[]) {
       const auto flushStart = Clock::now();
       Parser::FlushDebugLanguageLogs();
       const auto flushEnd = Clock::now();
-      log_info("Writing debug language samples took " +
-               std::to_string(elapsed_ms(flushStart, flushEnd)) + " ms");
+      log_info(
+        "Writing debug language samples took " +
+        std::to_string(elapsed_ms(flushStart, flushEnd)) + " ms"
+      );
     }
 
     PrintStatsTable(
