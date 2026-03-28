@@ -63,6 +63,9 @@ enum class Language : uint8_t {
   HexData,
   BinaryData,
   InlineAsm,
+  Email,
+  PseudoURL,
+  PseudoEmail,
   COUNT
 };
 

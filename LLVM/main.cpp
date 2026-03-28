@@ -1,12 +1,27 @@
+#include <chrono>
 #include <filesystem>
 #include <iostream>
 #include <map>
+#include <sstream>
 #include <vector>
 
 #include "include/Parser.hpp"
 #include "include/Stats.hpp"
 
 namespace fs = std::filesystem;
+using Clock = std::chrono::steady_clock;
+
+static long long elapsed_ms(const Clock::time_point start, const Clock::time_point end) {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+}
+
+static void log_info(const std::string &message) {
+  std::cerr << "[matchertext] " << message << '\n';
+}
+
+static std::string pluralize(const size_t count, const std::string_view singular, const std::string_view plural) {
+  return std::to_string(count) + " " + std::string(count == 1 ? singular : plural);
+}
 
 static std::string normalize_path(const std::string &in) {
   try {
@@ -33,17 +48,21 @@ struct WorkItem {
 };
 
 int main(const int argc, char *argv[]) {
+  const auto programStart = Clock::now();
   if (argc < 2) {
     std::cerr << "Usage: " << argv[0]
               << " [--log-strings] [--debug-languages] <file|directory>...\n";
     return -1;
   }
 
+  log_info("Starting parser");
+
   // Parse arguments
   bool logStrings = false;
   bool debugLanguages = false;
   std::map<std::string, std::string> filesToProcess;
   std::vector<std::string> inputPaths;
+  const auto indexingStart = Clock::now();
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
     if (arg == "--log-strings") {
@@ -71,6 +90,20 @@ int main(const int argc, char *argv[]) {
           filesToProcess.try_emplace(normalize_path(entry.path().string()), inputPath);
     }
   }
+  const auto indexingEnd = Clock::now();
+
+  {
+    std::ostringstream message;
+    message << "Indexed " << pluralize(filesToProcess.size(), "file", "files")
+            << " from " << pluralize(inputPaths.size(), "input path", "input paths")
+            << " in " << elapsed_ms(indexingStart, indexingEnd) << " ms";
+    log_info(message.str());
+  }
+
+  if (filesToProcess.empty()) {
+    log_info("No matching C/C++ files found, exiting");
+    return 0;
+  }
 
   try {
     std::vector<WorkItem> files;
@@ -78,10 +111,20 @@ int main(const int argc, char *argv[]) {
     for (const auto &[filePath, inputPath] : filesToProcess)
       files.push_back({filePath, inputPath});
 
-    if (debugLanguages)
+    if (debugLanguages) {
+      log_info("Debug language sampling enabled");
       Parser::ConfigureDebugLanguages(inputPaths);
+    }
 
-    const auto start = std::chrono::high_resolution_clock::now();
+    {
+      std::ostringstream message;
+      message << "Parsing " << pluralize(files.size(), "file", "files");
+      if (logStrings)
+        message << " with string logging enabled";
+      log_info(message.str());
+    }
+
+    const auto parseStart = Clock::now();
 
     #if USE_OPENMP
     #pragma omp parallel for schedule(dynamic) default(none) shared(files)
@@ -90,11 +133,16 @@ int main(const int argc, char *argv[]) {
       Parser::ParseFile(file.filePath, file.inputPath);
     }
 
-    const auto end = std::chrono::high_resolution_clock::now();
-    const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    const auto parseEnd = Clock::now();
+    log_info("Parsing files took " + std::to_string(elapsed_ms(parseStart, parseEnd)) + " ms");
 
-    if (debugLanguages)
+    if (debugLanguages) {
+      const auto flushStart = Clock::now();
       Parser::FlushDebugLanguageLogs();
+      const auto flushEnd = Clock::now();
+      log_info("Writing debug language samples took " +
+               std::to_string(elapsed_ms(flushStart, flushEnd)) + " ms");
+    }
 
     PrintStatsTable(
       {
@@ -126,7 +174,8 @@ int main(const int argc, char *argv[]) {
       PrintStatsMaxString(Parser::STRING_STATS, Parser::DOCS_STATS);
     }
 
-    std::cout << "\nParsing took " << duration << " ms\n";
+    log_info("Parsing took " + std::to_string(elapsed_ms(parseStart, parseEnd)) + " ms");
+    log_info("Completed in " + std::to_string(elapsed_ms(programStart, Clock::now())) + " ms");
   } catch (const std::exception &e) {
     std::cerr << "Parsing failed: " << e.what() << "\n";
     return -1;

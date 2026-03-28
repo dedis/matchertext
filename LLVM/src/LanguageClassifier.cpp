@@ -27,7 +27,8 @@ const char *LanguageName(const Language lang) {
     "Lua", "Swift", "Kotlin", "R", "Scala",
     "Haskell", "OCaml", "Erlang", "Elixir", "Dart",
     "Objective-C", "GLSL", "HLSL", "IdentifierLike",
-    "HexData", "BinaryData", "InlineAsm",
+    "HexData", "BinaryData", "InlineAsm", "Email",
+    "PseudoURL", "PseudoEmail",
   };
   static_assert(std::size(names) == static_cast<size_t>(Language::COUNT));
   const auto idx = static_cast<size_t>(lang);
@@ -209,9 +210,8 @@ static bool LooksLikeYAMLKey(const std::string_view key) {
   bool hasAlpha = false;
   bool hasLower = false;
   bool allDigits = true;
-  for (const char c : trimmed) {
-    const auto uc = static_cast<unsigned char>(c);
-    if (std::isalpha(uc)) {
+  for (const char c: trimmed) {
+    if (const auto uc = static_cast<unsigned char>(c); std::isalpha(uc)) {
       hasAlpha = true;
       allDigits = false;
       if (std::islower(uc))
@@ -244,7 +244,7 @@ static bool LooksLikeYAMLScalarValue(const std::string_view value) {
 
   int words = 0;
   bool inWord = false;
-  for (const char c : trimmed) {
+  for (const char c: trimmed) {
     const auto uc = static_cast<unsigned char>(c);
     const bool isWord = std::isalnum(uc) || c == '_' || c == '-' || c == '.' ||
                         c == '/' || c == '"' || c == '\'' || c == '@';
@@ -276,7 +276,7 @@ static bool LooksLikeYAMLListItem(const std::string_view item) {
 
   int words = 0;
   bool inWord = false;
-  for (const char c : trimmed) {
+  for (const char c: trimmed) {
     const auto uc = static_cast<unsigned char>(c);
     const bool isWord = std::isalnum(uc) || c == '_' || c == '-' || c == '.';
     if (isWord && !inWord)
@@ -310,12 +310,11 @@ static YAMLAnalysis AnalyzeYAMLStructure(const std::string_view s) {
         if (LooksLikeYAMLListItem(line.substr(2)))
           analysis.listLines++;
       } else if (line.find('\t') == std::string_view::npos) {
-        const size_t colon = line.find(':');
-        if (colon != std::string_view::npos && colon > 0) {
+        if (const size_t colon = line.find(':'); colon != std::string_view::npos && colon > 0) {
           const auto key = TrimRight(line.substr(0, colon));
           const auto value = colon + 1 < line.size()
-                                 ? TrimLeft(line.substr(colon + 1))
-                                 : std::string_view{};
+                               ? TrimLeft(line.substr(colon + 1))
+                               : std::string_view{};
           if (LooksLikeYAMLKey(key)) {
             if (value.empty())
               analysis.blockKeyLines++;
@@ -335,16 +334,14 @@ static YAMLAnalysis AnalyzeYAMLStructure(const std::string_view s) {
 }
 
 static bool HasStrongYAMLEvidence(const std::string_view s) {
-  const auto analysis = AnalyzeYAMLStructure(s);
-  if (analysis.nonEmptyLines == 0)
+  const auto [docMarkers, keyValueLines, blockKeyLines, listLines, nonEmptyLines] = AnalyzeYAMLStructure(s);
+  if (nonEmptyLines == 0)
     return false;
 
-  if (analysis.docMarkers > 0 &&
-      (analysis.keyValueLines + analysis.blockKeyLines + analysis.listLines) >= 2)
+  if (docMarkers > 0 && keyValueLines + blockKeyLines + listLines >= 2)
     return true;
 
-  if (analysis.blockKeyLines > 0 &&
-      (analysis.listLines > 0 || analysis.keyValueLines > 0))
+  if (blockKeyLines > 0 && (listLines > 0 || keyValueLines > 0))
     return true;
 
   return false;
@@ -766,6 +763,12 @@ static bool IsURLChar(const char c) {
   }
 }
 
+struct TokenMatch {
+  size_t start = std::string_view::npos;
+  size_t end = std::string_view::npos;
+  int count = 0;
+};
+
 static std::string_view StripURLWrappers(const std::string_view s) {
   auto trimmed = Trim(s);
   auto isWrapper = [](const char c) {
@@ -781,6 +784,10 @@ static std::string_view StripURLWrappers(const std::string_view s) {
       case '"':
       case '\'':
       case '`':
+      case '.':
+      case ':':
+      case '!':
+      case '?':
       case ',':
       case ';':
         return true;
@@ -853,7 +860,7 @@ static bool LooksLikeBriefURLContext(const std::string_view s) {
   int digits = 0;
   int other = 0;
   bool inWord = false;
-  for (const char c : trimmed) {
+  for (const char c: trimmed) {
     const auto uc = static_cast<unsigned char>(c);
     const bool isWord = std::isalnum(uc) || c == '\'' || c == '-' || c == '.';
     if (isWord && !inWord)
@@ -875,43 +882,15 @@ static bool LooksLikeBriefURLContext(const std::string_view s) {
   return other == 0;
 }
 
-/// Pack three bytes into a uint32_t trigram key.
-static uint32_t PackTrigram(const char a, const char b, const char c) {
-  return (static_cast<uint32_t>(static_cast<uint8_t>(a)) << 16) |
-         (static_cast<uint32_t>(static_cast<uint8_t>(b)) << 8) |
-         static_cast<uint32_t>(static_cast<uint8_t>(c));
-}
-
-static const std::array<uint16_t, 64> &ModelTrigramCounts() {
-  static const std::array<uint16_t, 64> counts = [] {
-    std::array<uint16_t, 64> values{};
-    static_assert(kNumLanguages <= values.size(), "Increase model trigram count buffer");
-    for (const auto kCombinedEntry: kCombinedEntries) {
-      if (kCombinedEntry.languageIdx < values.size())
-        values[kCombinedEntry.languageIdx]++;
-    }
-    return values;
-  }();
-  return counts;
-}
-
-// ============================================================================
-// Layer 1: Structural detectors
-// ============================================================================
-
-/// Detect URLs by scheme prefix.
-static ClassificationResult DetectURL(const std::string_view s) {
+static TokenMatch FindSingleURLToken(const std::string_view s) {
   static constexpr std::string_view schemes[] = {
     "http://", "https://", "ftp://", "ftps://", "file://",
     "mailto:", "ssh://", "git://", "svn://", "telnet://",
     "ws://", "wss://", "data:",
   };
 
-  size_t matchStart = std::string_view::npos;
-  size_t matchEnd = std::string_view::npos;
-  int matches = 0;
-
-  for (const auto scheme : schemes) {
+  TokenMatch match;
+  for (const auto scheme: schemes) {
     size_t searchPos = 0;
     while (searchPos < s.size()) {
       const size_t rel = FindCI(s.substr(searchPos), scheme);
@@ -942,29 +921,288 @@ static ClassificationResult DetectURL(const std::string_view s) {
         continue;
       }
 
-      matches++;
-      if (matches > 1)
-        return {Language::Unknown, 0.0f};
+      match.count++;
+      if (match.count > 1)
+        return match;
 
-      matchStart = pos;
-      matchEnd = end;
+      match.start = pos;
+      match.end = end;
       searchPos = end;
     }
   }
 
-  if (matches != 1)
+  return match;
+}
+
+static bool IsEmailLocalChar(const char c) {
+  const auto uc = static_cast<unsigned char>(c);
+  return std::isalnum(uc) || c == '.' || c == '_' || c == '%' || c == '+' || c == '-';
+}
+
+static bool IsEmailDomainChar(const char c) {
+  const auto uc = static_cast<unsigned char>(c);
+  return std::isalnum(uc) || c == '.' || c == '-';
+}
+
+static bool IsLikelyEmailToken(const std::string_view token) {
+  const size_t at = token.find('@');
+  if (at == std::string_view::npos || at == 0 || at + 1 >= token.size())
+    return false;
+  if (token.find('@', at + 1) != std::string_view::npos)
+    return false;
+
+  const auto local = token.substr(0, at);
+  const auto domain = token.substr(at + 1);
+  if (local.empty() || domain.empty())
+    return false;
+
+  if (!std::ranges::all_of(local, [](const char c) { return IsEmailLocalChar(c); }))
+    return false;
+
+  if (local.front() == '.' || local.back() == '.')
+    return false;
+  if (local.find("..") != std::string_view::npos)
+    return false;
+
+  if (!std::ranges::all_of(domain, [](const char c) { return IsEmailDomainChar(c); }))
+    return false;
+  if (domain.front() == '.' || domain.back() == '.')
+    return false;
+  if (domain.find('.') == std::string_view::npos)
+    return false;
+
+  std::string_view finalLabel;
+  size_t pos = 0;
+  while (pos <= domain.size()) {
+    const size_t dot = domain.find('.', pos);
+    const auto label = domain.substr(
+      pos, dot == std::string_view::npos ? domain.size() - pos : dot - pos
+    );
+    if (label.empty() || label.front() == '-' || label.back() == '-')
+      return false;
+
+    for (const char c: label) {
+      const auto uc = static_cast<unsigned char>(c);
+      if (!std::isalnum(uc) && c != '-')
+        return false;
+    }
+
+    finalLabel = label;
+    if (dot == std::string_view::npos)
+      break;
+    pos = dot + 1;
+  }
+
+  if (finalLabel.size() < 2 || finalLabel.size() > 24)
+    return false;
+
+  if (StartsWithCI(finalLabel, "xn--")) {
+    if (finalLabel.size() < 6)
+      return false;
+    return std::ranges::all_of(finalLabel.substr(4), [](const char c) {
+      const auto uc = static_cast<unsigned char>(c);
+      return std::isalnum(uc) || c == '-';
+    });
+  }
+
+  return std::ranges::all_of(finalLabel, [](const char c) {
+    return std::isalpha(static_cast<unsigned char>(c));
+  });
+}
+
+static bool LooksLikeBareDomainLikeToken(const std::string_view s) {
+  const auto trimmed = Trim(s);
+  if (trimmed.empty() || trimmed.find('@') != std::string_view::npos ||
+      trimmed.find_first_of(" \t\n\r/:<>") != std::string_view::npos)
+    return false;
+
+  if (trimmed.starts_with(".") || trimmed.ends_with(".") ||
+      trimmed.find("..") != std::string_view::npos)
+    return false;
+
+  if (const size_t firstDot = trimmed.find('.'); firstDot == std::string_view::npos)
+    return false;
+
+  const size_t lastDot = trimmed.rfind('.');
+  const auto tld = trimmed.substr(lastDot + 1);
+  if (const int dotCount = static_cast<int>(std::ranges::count(trimmed, '.')); dotCount < 2 &&
+                                                                               !(tld.size() >= 2 && tld.size() <= 4))
+    return false;
+
+  bool hasAlpha = false;
+  size_t pos = 0;
+  while (pos <= trimmed.size()) {
+    const size_t dot = trimmed.find('.', pos);
+    const auto label = trimmed.substr(
+      pos, dot == std::string_view::npos ? trimmed.size() - pos : dot - pos
+    );
+    if (label.empty() || label.front() == '-' || label.back() == '-')
+      return false;
+    for (const char c: label) {
+      if (const auto uc = static_cast<unsigned char>(c); std::isalpha(uc))
+        hasAlpha = true;
+      else if (!std::isdigit(uc) && c != '-')
+        return false;
+    }
+    if (dot == std::string_view::npos)
+      break;
+    pos = dot + 1;
+  }
+
+  return hasAlpha;
+}
+
+static TokenMatch FindSingleEmailToken(const std::string_view s) {
+  TokenMatch match;
+
+  size_t pos = 0;
+  while (pos < s.size()) {
+    const size_t at = s.find('@', pos);
+    if (at == std::string_view::npos)
+      break;
+
+    size_t start = at;
+    while (start > 0 && IsEmailLocalChar(s[start - 1]))
+      start--;
+
+    if (at == start || at + 1 >= s.size()) {
+      pos = at + 1;
+      continue;
+    }
+
+    size_t end = at + 1;
+    while (end < s.size() && IsEmailDomainChar(s[end]))
+      end++;
+    while (end > at + 1 &&
+           (s[end - 1] == '.' || s[end - 1] == ',' || s[end - 1] == ';' ||
+            s[end - 1] == ':' || s[end - 1] == '!' || s[end - 1] == '?'))
+      end--;
+
+    if (const auto token = s.substr(start, end - start); !IsLikelyEmailToken(token)) {
+      pos = at + 1;
+      continue;
+    }
+
+    match.count++;
+    if (match.count > 1)
+      return match;
+
+    match.start = start;
+    match.end = end;
+    pos = end;
+  }
+
+  return match;
+}
+
+static bool HasTightPunctuationContinuation(const std::string_view side) {
+  if (side.empty())
+    return false;
+
+  auto IsTerminalPunctuation = [](const char c) {
+    return c == '.' || c == ',' || c == ';' || c == ':' || c == '!' || c == '?';
+  };
+
+  size_t pos = 0;
+  while (pos < side.size() && IsTerminalPunctuation(side[pos]))
+    pos++;
+
+  if (pos == 0 || pos >= side.size())
+    return false;
+
+  const auto next = static_cast<unsigned char>(side[pos]);
+  if (std::isspace(next))
+    return false;
+  if (side[pos] == ')' || side[pos] == ']' || side[pos] == '}' ||
+      side[pos] == '>' || side[pos] == '"' || side[pos] == '\'')
+    return false;
+
+  return true;
+}
+
+static bool IsOnlyTerminalPunctuation(const std::string_view s) {
+  if (s.empty())
+    return false;
+  return std::ranges::all_of(s, [](const char c) {
+    return c == '.' || c == ',' || c == ';' || c == ':' || c == '!' || c == '?';
+  });
+}
+
+/// Pack three bytes into a uint32_t trigram key.
+static uint32_t PackTrigram(const char a, const char b, const char c) {
+  return (static_cast<uint32_t>(static_cast<uint8_t>(a)) << 16) |
+         (static_cast<uint32_t>(static_cast<uint8_t>(b)) << 8) |
+         static_cast<uint32_t>(static_cast<uint8_t>(c));
+}
+
+static const std::array<uint16_t, 64> &ModelTrigramCounts() {
+  static const std::array<uint16_t, 64> counts = [] {
+    std::array<uint16_t, 64> values{};
+    static_assert(kNumLanguages <= values.size(), "Increase model trigram count buffer");
+    for (const auto kCombinedEntry: kCombinedEntries) {
+      if (kCombinedEntry.languageIdx < values.size())
+        values[kCombinedEntry.languageIdx]++;
+    }
+    return values;
+  }();
+  return counts;
+}
+
+// ============================================================================
+// Layer 1: Structural detectors
+// ============================================================================
+
+/// Detect URLs and URL-containing wrapper strings.
+static ClassificationResult DetectURL(const std::string_view s) {
+  const auto match = FindSingleURLToken(s);
+  if (match.count != 1)
     return {Language::Unknown, 0.0f};
 
-  const auto prefix = StripURLWrappers(s.substr(0, matchStart));
-  const auto suffix = StripURLWrappers(s.substr(matchEnd));
-  if (!prefix.empty() && !suffix.empty())
+  const auto prefix = StripURLWrappers(s.substr(0, match.start));
+  const auto suffix = StripURLWrappers(s.substr(match.end));
+  if (!prefix.empty() && !suffix.empty() &&
+      (!LooksLikeBriefURLContext(prefix) || !LooksLikeBriefURLContext(suffix)))
     return {Language::Unknown, 0.0f};
 
-  const auto context = !prefix.empty() ? prefix : suffix;
-  if (!LooksLikeBriefURLContext(context))
+  if (!prefix.empty() && !LooksLikeBriefURLContext(prefix))
+    return {Language::Unknown, 0.0f};
+  if (!suffix.empty() && !LooksLikeBriefURLContext(suffix))
     return {Language::Unknown, 0.0f};
 
-  return {Language::URL, context.empty() ? 0.95f : 0.88f};
+  if (prefix.empty() && suffix.empty())
+    return {Language::URL, 0.95f};
+  return {Language::PseudoURL, 0.88f};
+}
+
+/// Detect email addresses and email-containing wrapper strings.
+static ClassificationResult DetectEmail(const std::string_view s) {
+  const auto match = FindSingleEmailToken(s);
+  if (match.count != 1)
+    return {Language::Unknown, 0.0f};
+
+  const auto rawPrefix = s.substr(0, match.start);
+  const auto rawSuffix = s.substr(match.end);
+  if (HasTightPunctuationContinuation(rawPrefix) || HasTightPunctuationContinuation(rawSuffix))
+    return {Language::Unknown, 0.0f};
+  if (rawPrefix.empty() && IsOnlyTerminalPunctuation(rawSuffix))
+    return {Language::Unknown, 0.0f};
+  if (rawSuffix.empty() && IsOnlyTerminalPunctuation(rawPrefix))
+    return {Language::Unknown, 0.0f};
+
+  const auto prefix = StripURLWrappers(rawPrefix);
+  const auto suffix = StripURLWrappers(rawSuffix);
+  if (!prefix.empty() && !suffix.empty() &&
+      (!LooksLikeBriefURLContext(prefix) || !LooksLikeBriefURLContext(suffix)))
+    return {Language::Unknown, 0.0f};
+
+  if (!prefix.empty() && !LooksLikeBriefURLContext(prefix))
+    return {Language::Unknown, 0.0f};
+  if (!suffix.empty() && !LooksLikeBriefURLContext(suffix))
+    return {Language::Unknown, 0.0f};
+
+  if (prefix.empty() && suffix.empty())
+    return {Language::Email, 0.95f};
+  return {Language::PseudoEmail, 0.88f};
 }
 
 /// Detect file paths by prefix patterns and separator density.
@@ -1651,6 +1889,8 @@ static ClassificationResult DetectIdentifierLike(const std::string_view s) {
 
   if (trimmed.find_first_of(" \t\n\r") != std::string_view::npos)
     return {Language::Unknown, 0.0f};
+  if (LooksLikeBareDomainLikeToken(trimmed))
+    return {Language::Unknown, 0.0f};
 
   int letters = 0;
   int digits = 0;
@@ -1719,6 +1959,8 @@ static ClassificationResult DetectIdentifierLike(const std::string_view s) {
 static ClassificationResult DetectPlainText(const std::string_view s) {
   const auto trimmed = Trim(s);
   if (trimmed.size() < 12)
+    return {Language::Unknown, 0.0f};
+  if (trimmed.find('@') != std::string_view::npos)
     return {Language::Unknown, 0.0f};
 
   if (LooksLikeDecoratedPlainText(trimmed))
@@ -1895,11 +2137,13 @@ ClassificationResult ClassifyString(
 
   const std::string normalized = NormalizeForClassification(body);
   const std::string_view text = normalized.empty() ? body : std::string_view(normalized);
+  if (LooksLikeBareDomainLikeToken(text))
+    return {Language::Unknown, 0.0f};
 
   // Layer 1: structural detectors (ordered by specificity, lowest FP first)
   using Detector = ClassificationResult (*)(std::string_view);
   static constexpr Detector detectors[] = {
-    DetectURL, DetectXML, DetectFilePath,
+    DetectEmail, DetectURL, DetectXML, DetectFilePath,
     DetectHexData, DetectSQL, DetectJSON,
     DetectHTML, DetectRegex, DetectInlineAsm, DetectFormatString,
     DetectCSS, DetectShell, DetectYAML,
