@@ -64,3 +64,5 @@ dev/tree-sitter/zig-out/
 *.tar.gz
 *.tgz
 *.zip
+
+dev/tree-sitter/src
