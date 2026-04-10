@@ -16,3 +16,51 @@ out/wasm/wasm_exec.js
 dev/vscode/.vscode-test/
 dev/vscode/out
 dev/vscode/dist
+
+
+
+# gitignore from dev/tree-sitter
+
+# Rust artifacts
+dev/tree-sitter/target/
+
+# Node artifacts
+dev/tree-sitter/build/
+dev/tree-sitter/prebuilds/
+
+# Swift artifacts
+dev/tree-sitter/.build/
+
+# Go artifacts
+dev/tree-sitter/_obj/
+
+# Python artifacts
+dev/tree-sitter/.venv/
+dev/tree-sitter/dist/
+*.egg-info
+*.whl
+
+# C artifacts
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.pc
+*.exp
+*.lib
+
+# Zig artifacts
+dev/tree-sitter/.zig-cache/
+dev/tree-sitter/zig-cache/
+dev/tree-sitter/zig-out/
+
+# Grammar volatiles
+*.wasm
+*.obj
+*.o
+
+# Archives
+*.tar.gz
+*.tgz
+*.zip
