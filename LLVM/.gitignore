@@ -5,3 +5,4 @@ build-test
 ./ignore
 ./include/LanguageModel.generated.hpp
 result/**
+train/__pycache__
