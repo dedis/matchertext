@@ -1,15 +1,17 @@
-package main
+package minml
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/dedis/matchertext/go/markup/html"
-	"github.com/dedis/matchertext/go/markup/minml"
 )
 
 // Convert parses a MinML source file and writes the HTML output to w.
@@ -44,6 +46,18 @@ func Convert(path string, w io.Writer, isStdOut bool, extensions []string) error
 	return nil
 }
 
+// ConvertString takes MinML string content and returns the HTML output.
+func ConvertString(content string) (string, error) {
+	r := strings.NewReader(content)
+	buf := bytes.NewBuffer(nil)
+
+	err := convertFromReader(r, buf, "string")
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
 // convert converts a single minml file to HTML
 // Non-.minml files are ignored.
 func convert(path string, w io.Writer, extensions []string) error {
@@ -63,7 +77,7 @@ func convert(path string, w io.Writer, extensions []string) error {
 // convertFromReader parses MinML from r and writes HTML to w.
 // name is used only in error messages.
 func convertFromReader(r io.Reader, w io.Writer, name string) error {
-	mp := minml.NewTreeParser(r).WithTransformer(minml.EntityTransformer).WithTransformer(minml.QuoteTransformer)
+	mp := NewTreeParser(r).WithTransformer(EntityTransformer).WithTransformer(QuoteTransformer)
 	ns, err := mp.ParseAST()
 	if err != nil {
 		return fmt.Errorf("parsing %v: %w", name, err)
@@ -75,4 +89,19 @@ func convertFromReader(r io.Reader, w io.Writer, name string) error {
 	}
 
 	return nil
+}
+
+// IsMinmlFile checks if the file at the given path uses a supported minml extension.
+// If it does it also returns the file extension.
+func IsMinmlFile(path string, extensions []string) (bool, string) {
+	ext := filepath.Ext(path)
+	if ext == "" {
+		return false, ""
+	}
+	extension := ext[1:]
+	if !slices.Contains(extensions, extension) {
+		return false, ""
+	}
+
+	return true, extension
 }
