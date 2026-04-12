@@ -133,7 +133,7 @@ bool TestCommentsAndRelaxed() {
   ok &= CheckEq("comments.file.with_violation_relaxed", file.withViolationRelaxed, 0.0);
   ok &= CheckEq("comments.file.violation_count_relaxed", file.violationCountRelaxed, 0.0);
   ok &= CheckEq("comments.lang.total", static_cast<double>(lang.total), 1.0);
-  ok &= CheckLanguageCount(lang, Language::IdentifierLike, 1);
+  ok &= CheckLanguageCount(lang, Language::Unknown, 1);
 
   const uint64_t docsRawLevel2 =
       docsNested.rawLevels.size() > 2 ? docsNested.rawLevels[2] : 0;
@@ -180,7 +180,7 @@ bool TestPrefixedLiterals() {
   ok &= CheckLanguageCount(lang, Language::SQL, 1);
   ok &= CheckLanguageCount(lang, Language::HTML, 1);
   ok &= CheckLanguageCount(lang, Language::JSON, 1);
-  ok &= CheckLanguageCount(lang, Language::IdentifierLike, 1);
+  ok &= CheckLanguageCount(lang, Language::Unknown, 1);
   ok &= CheckNoFileViolations();
   return ok;
 }
@@ -210,7 +210,7 @@ bool TestStringBucketMix() {
   ok &= CheckLanguageCount(lang, Language::YAML, 1);
   ok &= CheckLanguageCount(lang, Language::Shell, 1);
   ok &= CheckLanguageCount(lang, Language::HexData, 1);
-  ok &= CheckLanguageCount(lang, Language::BinaryData, 1);
+  ok &= CheckLanguageCount(lang, Language::PseudoBinaryData, 1);
   ok &= CheckNoFileViolations();
   return ok;
 }

@@ -56,7 +56,6 @@
 |------------------------------------------------------|------------------------------------------------------------------------------------------------------|
 | Unknown                                              | Abstain bucket used when no detector or statistical model has enough evidence to make a safe call.   |
 | PlainText                                            | Natural-language prose, log-like text, labels, and general human-readable strings.                   |
-| IdentifierLike                                       | Token-like strings such as metric names, trace categories, enum keys, symbol names, or resources.    |
 | FormatString                                         | `printf`-style or placeholder-driven message templates.                                              |
 | FilePath                                             | Filesystem paths or path-like resource names.                                                        |
 | URL                                                  | URLs and URI-like strings.                                                                           |
@@ -183,7 +182,6 @@
 | String Language   | Count   | %      | Violations   | Toothpicks  |
 |-------------------|---------|--------|--------------|-------------|
 | Unknown           | 589469  | 41.38% | 3230         | 83173       |
-| IdentifierLike    | 384728  | 27.01% | 0            | 2619        |
 | FormatString      | 271068  | 19.03% | 1002         | 233581      |
 | PlainText         | 162534  | 11.41% | 439          | 112203      |
 | FilePath          | 7883    | 0.55%  | 11           | 79          |
@@ -289,7 +287,6 @@ Parsing takes around 1600-2300 ms
 
 | String Language  | Count   |  %     | Violations | Toothpicks |
 |------------------|---------|--------|------------|------------|
-| IdentifierLike   | 1508585 | 61.42% | 0          | 435        |
 | Unknown          | 641015  | 26.10% | 52464      | 96413      |
 | PlainText        | 128404  | 5.23%  | 4067       | 25128      |
 | URL              | 74559   | 3.04%  | 39         | 798        |

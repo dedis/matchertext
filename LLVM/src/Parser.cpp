@@ -187,6 +187,7 @@ class DebugLanguageLogger {
     void Flush() {
       struct PendingWrite {
         fs::path path;
+        fs::path directory;
         std::string inputPath;
         Language language;
         uint64_t totalSeen = 0;
@@ -194,6 +195,7 @@ class DebugLanguageLogger {
       };
 
       std::vector<PendingWrite> pending;
+      std::vector<fs::path> directoriesToClear;
 
       {
         std::lock_guard lock(mutex_);
@@ -201,6 +203,7 @@ class DebugLanguageLogger {
           return;
 
         for (const auto &[inputPath, state] : states_) {
+          directoriesToClear.push_back(root_ / state->relativePath);
           for (size_t idx = 0; idx < kLanguageCount; idx++) {
             auto &bucket = state->buckets[idx];
             std::lock_guard bucketLock(bucket.mutex);
@@ -210,6 +213,7 @@ class DebugLanguageLogger {
             pending.push_back({
                 root_ / state->relativePath /
                     (std::string(LanguageName(static_cast<Language>(idx))) + ".txt"),
+                root_ / state->relativePath,
                 inputPath,
                 static_cast<Language>(idx),
                 bucket.seen,
@@ -219,7 +223,35 @@ class DebugLanguageLogger {
         }
       }
 
+      for (const auto &directory : directoriesToClear) {
+        std::error_code ec;
+        if (!fs::exists(directory, ec))
+          continue;
+
+        for (const auto &entry : fs::directory_iterator(directory, ec)) {
+          if (ec)
+            break;
+          if (!entry.is_regular_file(ec) || ec)
+            continue;
+          if (entry.path().extension() != ".txt")
+            continue;
+          fs::remove(entry.path(), ec);
+          if (ec)
+            throw std::runtime_error("Failed to clear stale debug language log '" +
+                                     entry.path().string() + "': " + ec.message());
+        }
+        if (ec)
+          throw std::runtime_error("Failed to enumerate debug language directory '" +
+                                   directory.string() + "': " + ec.message());
+      }
+
       for (const auto &entry : pending) {
+        std::error_code ec;
+        fs::create_directories(entry.directory, ec);
+        if (ec)
+          throw std::runtime_error("Failed to create debug language directory '" +
+                                   entry.directory.string() + "': " + ec.message());
+
         std::ofstream out(entry.path, std::ios::trunc);
         if (!out)
           throw std::runtime_error("Failed to open debug language log '" +

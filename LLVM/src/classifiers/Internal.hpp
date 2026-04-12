@@ -5,6 +5,7 @@
 #include <ranges>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "../../include/LanguageClassifier.hpp"
 
@@ -313,8 +314,78 @@ inline bool HasStrongYAMLEvidence(const std::string_view s) {
   return false;
 }
 
-inline bool IsIdentifierLikeSeparator(const char c) {
+inline bool LooksLikeBareDomainLikeToken(std::string_view s);
+
+inline bool IsTokenLikeSeparator(const char c) {
   return c == '_' || c == '-' || c == '.' || c == '/' || c == ':';
+}
+
+inline bool LooksLikeTokenLikeUnknown(const std::string_view s) {
+  const auto trimmed = Trim(s);
+  if (trimmed.size() < 4 || trimmed.size() > 160)
+    return false;
+
+  if (trimmed.find_first_of(" \t\n\r") != std::string_view::npos)
+    return false;
+  if (LooksLikeBareDomainLikeToken(trimmed))
+    return false;
+
+  int letters = 0;
+  int digits = 0;
+  int separators = 0;
+  int camelTransitions = 0;
+  int componentStarts = 0;
+  bool hasDoubleColon = false;
+  bool hasDot = false;
+  bool hasSlash = false;
+
+  char prev = '\0';
+  bool prevWasSeparator = true;
+  for (const char c : trimmed) {
+    if (const auto uc = static_cast<unsigned char>(c); std::isalnum(uc)) {
+      if (std::isalpha(uc))
+        letters++;
+      if (std::isdigit(uc))
+        digits++;
+      if (prevWasSeparator)
+        componentStarts++;
+      if (std::islower(static_cast<unsigned char>(prev)) &&
+          std::isupper(uc))
+        camelTransitions++;
+      prevWasSeparator = false;
+    } else if (IsTokenLikeSeparator(c)) {
+      separators++;
+      prevWasSeparator = true;
+      if (c == '.')
+        hasDot = true;
+      if (c == '/')
+        hasSlash = true;
+      if (c == ':' && prev == ':')
+        hasDoubleColon = true;
+    } else {
+      return false;
+    }
+    prev = c;
+  }
+
+  if (letters == 0 || (separators == 0 && camelTransitions == 0))
+    return false;
+
+  const float letterRatio = static_cast<float>(letters) /
+                            static_cast<float>(trimmed.size());
+  if (letterRatio < 0.45f)
+    return false;
+
+  const int signals = componentStarts + camelTransitions +
+                      (hasDoubleColon ? 2 : 0) + (hasDot ? 1 : 0) +
+                      (hasSlash ? 1 : 0);
+  if (signals < 2)
+    return false;
+
+  if (digits > 0 && letters < 3)
+    return false;
+
+  return true;
 }
 
 inline bool IsHexDigit(const char c) {
@@ -323,6 +394,137 @@ inline bool IsHexDigit(const char c) {
 
 inline bool IsOctalDigit(const char c) {
   return c >= '0' && c <= '7';
+}
+
+struct BinaryDataAnalysis {
+  int controlBytes = 0;
+  int escapedBytes = 0;
+  int hexEscapes = 0;
+  int octalEscapes = 0;
+  int nullEscapes = 0;
+  int letters = 0;
+  int spaces = 0;
+  int visiblePrintableChars = 0;
+  int visibleWordTokens = 0;
+  int visibleWordChars = 0;
+
+  [[nodiscard]] int StrongEscapes() const {
+    return hexEscapes + octalEscapes + nullEscapes;
+  }
+
+  [[nodiscard]] float ControlRatio(const size_t size) const {
+    return static_cast<float>(controlBytes) /
+           static_cast<float>(std::max<size_t>(size, 1));
+  }
+
+  [[nodiscard]] float EscapeRatio(const size_t size) const {
+    return static_cast<float>(escapedBytes * 4) /
+           static_cast<float>(std::max<size_t>(size, 1));
+  }
+};
+
+inline BinaryDataAnalysis AnalyzeBinaryData(const std::string_view s) {
+  BinaryDataAnalysis analysis;
+  int currentWordChars = 0;
+
+  auto flushWord = [&]() {
+    if (currentWordChars >= 3) {
+      analysis.visibleWordTokens++;
+      analysis.visibleWordChars += currentWordChars;
+    }
+    currentWordChars = 0;
+  };
+
+  for (size_t i = 0; i < s.size(); i++) {
+    const auto uc = static_cast<unsigned char>(s[i]);
+    if (std::isalpha(uc))
+      analysis.letters++;
+    if (std::isspace(uc))
+      analysis.spaces++;
+    if (uc < 0x20 && s[i] != '\n' && s[i] != '\r' && s[i] != '\t')
+      analysis.controlBytes++;
+
+    if (s[i] != '\\' || i + 1 >= s.size()) {
+      if (std::isprint(uc) && !std::isspace(uc))
+        analysis.visiblePrintableChars++;
+      if (std::isalnum(uc))
+        currentWordChars++;
+      else
+        flushWord();
+      continue;
+    }
+
+    const char next = s[i + 1];
+    if (next == 'x' || next == 'X') {
+      size_t j = i + 2;
+      int digits = 0;
+      while (j < s.size() && IsHexDigit(s[j])) {
+        digits++;
+        j++;
+      }
+      if (digits >= 2) {
+        flushWord();
+        analysis.escapedBytes++;
+        analysis.hexEscapes++;
+        i = j - 1;
+        continue;
+      }
+    }
+
+    if (next == '0') {
+      size_t j = i + 1;
+      int digits = 0;
+      while (j < s.size() && digits < 3 && IsOctalDigit(s[j])) {
+        digits++;
+        j++;
+      }
+      flushWord();
+      analysis.escapedBytes++;
+      analysis.nullEscapes++;
+      if (digits > 1)
+        analysis.octalEscapes++;
+      i = j - 1;
+      continue;
+    }
+
+    if (IsOctalDigit(next)) {
+      size_t j = i + 1;
+      int digits = 0;
+      while (j < s.size() && digits < 3 && IsOctalDigit(s[j])) {
+        digits++;
+        j++;
+      }
+      if (digits >= 2) {
+        flushWord();
+        analysis.escapedBytes++;
+        analysis.octalEscapes++;
+        i = j - 1;
+        continue;
+      }
+    }
+
+    flushWord();
+  }
+
+  flushWord();
+  return analysis;
+}
+
+inline bool HasStrongBinaryEvidence(const BinaryDataAnalysis &analysis,
+                                    const std::string_view s) {
+  const int strongEscapes = analysis.StrongEscapes();
+  const float controlRatio = analysis.ControlRatio(s.size());
+  const float escapeRatio = analysis.EscapeRatio(s.size());
+
+  return (analysis.controlBytes >= 4 && controlRatio >= 0.08f) ||
+         (strongEscapes >= 4 && analysis.letters <= 8 && analysis.spaces == 0) ||
+         (analysis.hexEscapes >= 3 && escapeRatio >= 0.40f) ||
+         ((analysis.octalEscapes + analysis.nullEscapes) >= 4 &&
+          escapeRatio >= 0.35f);
+}
+
+inline bool HasReadableBinaryContext(const BinaryDataAnalysis &analysis) {
+  return analysis.visiblePrintableChars > 0;
 }
 
 inline bool IsLabelPunctuation(const char c) {
@@ -456,6 +658,38 @@ inline bool HasRepeatedNonLetterRun(const std::string_view s, int *maxRunLength 
   if (maxRunLength != nullptr)
     *maxRunLength = maxRepeatedRun;
   return hasRepeatedNonLetterRun;
+}
+
+inline bool HasRepeatedCharRun(const std::string_view s,
+                               const int minRunLength = 5,
+                               int *maxRunLength = nullptr) {
+  int currentRunLength = 1;
+  int maxRepeatedRun = 1;
+  char repeatedChar = '\0';
+  bool hasRepeatedRun = false;
+
+  for (const char c : s) {
+    if (std::isspace(static_cast<unsigned char>(c))) {
+      repeatedChar = '\0';
+      currentRunLength = 1;
+      continue;
+    }
+
+    if (c == repeatedChar) {
+      currentRunLength++;
+    } else {
+      repeatedChar = c;
+      currentRunLength = 1;
+    }
+
+    maxRepeatedRun = std::max(maxRepeatedRun, currentRunLength);
+    if (currentRunLength >= minRunLength)
+      hasRepeatedRun = true;
+  }
+
+  if (maxRunLength != nullptr)
+    *maxRunLength = maxRepeatedRun;
+  return hasRepeatedRun;
 }
 
 inline bool IsHumanWordToken(const std::string_view token) {
@@ -794,56 +1028,57 @@ inline bool LooksLikeBriefURLContext(const std::string_view s) {
   return other == 0;
 }
 
-inline TokenMatch FindSingleURLToken(const std::string_view s) {
+inline std::vector<TokenMatch> FindURLTokens(const std::string_view s) {
   static constexpr std::string_view schemes[] = {
     "http://", "https://", "ftp://", "ftps://", "file://",
     "mailto:", "ssh://", "git://", "svn://", "telnet://",
     "ws://", "wss://", "data:",
   };
 
-  TokenMatch match;
-  for (const auto scheme: schemes) {
-    size_t searchPos = 0;
-    while (searchPos < s.size()) {
-      const size_t rel = FindCI(s.substr(searchPos), scheme);
-      if (rel == std::string_view::npos)
+  std::vector<TokenMatch> matches;
+  size_t pos = 0;
+  while (pos < s.size()) {
+    std::string_view matchedScheme;
+    for (const auto scheme: schemes) {
+      if (StartsWithCI(s.substr(pos), scheme)) {
+        matchedScheme = scheme;
         break;
-
-      const size_t pos = searchPos + rel;
-      if (pos > 0 && IsURLChar(s[pos - 1])) {
-        searchPos = pos + 1;
-        continue;
       }
-
-      if (scheme == "data:" && !IsLikelyDataURL(s.substr(pos))) {
-        searchPos = pos + 1;
-        continue;
-      }
-
-      size_t end = pos + scheme.size();
-      while (end < s.size() && IsURLChar(s[end]))
-        end++;
-      while (end > pos + scheme.size() &&
-             (s[end - 1] == '.' || s[end - 1] == ',' || s[end - 1] == ';' ||
-              s[end - 1] == ':' || s[end - 1] == '!' || s[end - 1] == '?'))
-        end--;
-
-      if (end <= pos + scheme.size()) {
-        searchPos = pos + 1;
-        continue;
-      }
-
-      match.count++;
-      if (match.count > 1)
-        return match;
-
-      match.start = pos;
-      match.end = end;
-      searchPos = end;
     }
+
+    if (matchedScheme.empty()) {
+      pos++;
+      continue;
+    }
+
+    if (pos > 0 && IsURLChar(s[pos - 1])) {
+      pos++;
+      continue;
+    }
+
+    if (matchedScheme == "data:" && !IsLikelyDataURL(s.substr(pos))) {
+      pos++;
+      continue;
+    }
+
+    size_t end = pos + matchedScheme.size();
+    while (end < s.size() && IsURLChar(s[end]))
+      end++;
+    while (end > pos + matchedScheme.size() &&
+           (s[end - 1] == '.' || s[end - 1] == ',' || s[end - 1] == ';' ||
+            s[end - 1] == ':' || s[end - 1] == '!' || s[end - 1] == '?'))
+      end--;
+
+    if (end <= pos + matchedScheme.size()) {
+      pos++;
+      continue;
+    }
+
+    matches.push_back({pos, end, 1});
+    pos = end;
   }
 
-  return match;
+  return matches;
 }
 
 inline bool IsEmailLocalChar(const char c) {
@@ -1043,6 +1278,7 @@ ClassificationResult DetectEmail(std::string_view s);
 ClassificationResult DetectFilePath(std::string_view s);
 ClassificationResult DetectFormatString(std::string_view s);
 ClassificationResult DetectInlineAsm(std::string_view s);
+ClassificationResult DetectPseudoBinaryData(std::string_view s);
 ClassificationResult DetectBinaryData(std::string_view s);
 ClassificationResult DetectHexData(std::string_view s);
 ClassificationResult DetectJSON(std::string_view s);
@@ -1053,7 +1289,7 @@ ClassificationResult DetectXML(std::string_view s);
 ClassificationResult DetectRegex(std::string_view s);
 ClassificationResult DetectCSS(std::string_view s);
 ClassificationResult DetectShell(std::string_view s);
-ClassificationResult DetectIdentifierLike(std::string_view s);
+ClassificationResult DetectCPPDeclarationFragment(std::string_view s);
 ClassificationResult DetectPlainText(std::string_view s);
 ClassificationResult DetectSeparatorLine(std::string_view s);
 

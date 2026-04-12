@@ -3,24 +3,17 @@
 namespace classifier_internal {
 
 ClassificationResult DetectURL(const std::string_view s) {
-  const auto match = FindSingleURLToken(s);
-  if (match.count != 1)
+  const auto matches = FindURLTokens(s);
+  if (matches.empty())
     return {Language::Unknown, 0.0f};
 
-  const auto prefix = StripURLWrappers(s.substr(0, match.start));
-  const auto suffix = StripURLWrappers(s.substr(match.end));
-  if (!prefix.empty() && !suffix.empty() &&
-      (!LooksLikeBriefURLContext(prefix) || !LooksLikeBriefURLContext(suffix)))
-    return {Language::Unknown, 0.0f};
-
-  if (!prefix.empty() && !LooksLikeBriefURLContext(prefix))
-    return {Language::Unknown, 0.0f};
-  if (!suffix.empty() && !LooksLikeBriefURLContext(suffix))
-    return {Language::Unknown, 0.0f};
-
-  if (prefix.empty() && suffix.empty())
+  const auto &first = matches.front();
+  const auto prefix = s.substr(0, first.start);
+  const auto suffix = s.substr(first.end);
+  if (matches.size() == 1 && prefix.empty() && suffix.empty())
     return {Language::URL, 0.95f};
-  return {Language::PseudoURL, 0.88f};
+
+  return {Language::PseudoURL, matches.size() > 1 ? 0.92f : 0.88f};
 }
 
 } // namespace classifier_internal

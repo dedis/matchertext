@@ -30,6 +30,7 @@ int main() {
   const std::vector<TestCase> tests = {
     {"url", "https://example.com/api/v1/items?id=42", Language::URL},
     {"data_url", "data:text/plain;base64,SGVsbG8=", Language::URL},
+    {"pseudo_url_with_newline_wrappers", "\\nhttp://www.attotech.com\\n\\n", Language::PseudoURL},
     {"email", "thomas@kaiser-linux.li", Language::Email},
     {
       "pseudo_email_contact", "Thomas Kaiser <thomas@kaiser-linux.li>",
@@ -43,6 +44,17 @@ int main() {
       "wrapped_url_contact", "Jean-Francois Moine <http://moinejf.free.fr>",
       Language::PseudoURL
     },
+    {
+      "pseudo_url_mixed_with_binary_payload",
+      "SelectedBuyerAndSellerReportId\\n"
+      "https://example.org/\\n"
+      "https://example.org/bid.js\\n"
+      "https://ad3.com/\\n"
+      "\\x01\\x00\\x00\\x00\\x08s\\x00\\x01\\nbsid\\n"
+      "\\x01\\x00\\x00\\x00\\x07b\\x00\\x01\\nsid\\n"
+      "\\x01\\x00\\x00\\x00\\x06b\\x00\\x01\\nid",
+      Language::PseudoURL
+    },
     {"data_prefix_format_not_url", "data: %8ph", Language::FormatString},
     {
       "data_prefix_plain_text_not_url", "data: complete",
@@ -50,6 +62,13 @@ int main() {
     },
     {"file_path", "/usr/local/include/project/config.yaml", Language::FilePath},
     {"relative_file_path", "../src/LanguageClassifier.cpp", Language::FilePath},
+    {"repo_header_path", "base/uuid.h", Language::FilePath},
+    {"repo_nested_header_path", "chrome/browser/ai/features.h", Language::FilePath},
+    {
+      "repo_generated_header_path",
+      "mojo/public/cpp/bindings/tests/fixed_array_size_unittest.test-mojom-shared.h",
+      Language::FilePath
+    },
     {
       "windows_file_path",
       R"(C:\Program Files\MatcherText\config\settings.json)",
@@ -94,6 +113,11 @@ int main() {
     {
       "multiline_escaped_json",
       "{\\n  \\\"meta\\\": {\\\"count\\\": 2},\\n  \\\"items\\\": [\\\"one\\\", \\\"two\\\"]\\n}",
+      Language::JSON
+    },
+    {
+      "single_quoted_json_like_object",
+      "{'type': 'number'}",
       Language::JSON
     },
     {
@@ -204,12 +228,22 @@ int main() {
     },
     {
       "identifier_like", "ProcessBoundString::EncryptBuffer",
-      Language::IdentifierLike
+      Language::Unknown
+    },
+    {
+      "cpp_reference_declaration_fragment",
+      "Phone   &number  ",
+      Language::CPP
     },
     {
       "resource_identifier",
       "metrics/ui.startup/FirstContentfulPaint",
-      Language::IdentifierLike
+      Language::Unknown
+    },
+    {
+      "slash_identifier_without_extension",
+      "foo/bar/baz",
+      Language::Unknown
     },
     {
       "plain_text", "This function returns the current device state.",
@@ -298,7 +332,27 @@ int main() {
     },
     {
       "binary_data", "\\x89PNG\\x0d\\x0a\\x1a\\x0a\\x00\\x00\\x00\\x0dIHDR",
-      Language::BinaryData
+      Language::PseudoBinaryData
+    },
+    {
+      "pseudo_binary_data",
+      "Selected buyer record\\n\\x01\\x00\\x00\\x00\\x08s\\x00\\x01\\nbsid\\nid",
+      Language::PseudoBinaryData
+    },
+    {
+      "pseudo_binary_data_text_prefix",
+      "test_\\001\\002\\003\\n\\r",
+      Language::PseudoBinaryData
+    },
+    {
+      "pseudo_binary_data_ip_prefix",
+      "1.2.3.4\\xF0\\x9F\\x92\\xA9",
+      Language::PseudoBinaryData
+    },
+    {
+      "pseudo_binary_data_html_wrapper",
+      "<b>\\xF0\\x9F\\x8F\\xAB</b>",
+      Language::PseudoBinaryData
     },
     {
       "octal_binary_data", "\\000\\377\\123\\045\\000\\001\\002\\003",
@@ -318,6 +372,21 @@ int main() {
     },
     {
       "separator_equals_unknown", "==========",
+      Language::Unknown
+    },
+    {
+      "separator_short_alpha_islands_unknown",
+      "He********************************o",
+      Language::Unknown
+    },
+    {
+      "repeated_digits_unknown",
+      "111111111111111",
+      Language::Unknown
+    },
+    {
+      "repeated_letters_unknown",
+      "aaaaaaaaaaaaaaa",
       Language::Unknown
     },
     {"codeish_unknown", "foo::bar->baz", Language::Unknown},

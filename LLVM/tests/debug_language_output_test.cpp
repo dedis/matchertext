@@ -68,7 +68,7 @@ int main(const int argc, char *argv[]) {
   ok &= ExpectContains(base / "YAML.txt",
                        "service: matchertext\\nretries: 3\\npaths:\\n  - src");
   ok &= ExpectContains(base / "HexData.txt", "4d5a90000300000004000000ffff0000");
-  ok &= ExpectContains(base / "BinaryData.txt",
+  ok &= ExpectContains(base / "PseudoBinaryData.txt",
                        "\\\\x89PNG\\\\x0d\\\\x0a\\\\x1a\\\\x0a\\\\x00\\\\x00\\\\x00\\\\x0dIHDR");
   ok &= ExpectContains(base / "PlainText.txt",
                        "This subsystem schedules jobs and retries transient failures automatically.");

@@ -25,7 +25,7 @@ const char *LanguageName(const Language lang) {
     "Haskell", "OCaml", "Erlang", "Elixir", "Dart",
     "Objective-C", "GLSL", "HLSL", "IdentifierLike",
     "HexData", "BinaryData", "InlineAsm", "Email",
-    "PseudoURL", "PseudoEmail",
+    "PseudoURL", "PseudoEmail", "PseudoBinaryData",
   };
   static_assert(std::size(names) == static_cast<size_t>(Language::COUNT));
   const auto idx = static_cast<size_t>(lang);
@@ -130,12 +130,25 @@ ClassificationResult ClassifyString(const std::string_view body, const float min
   if (body.size() < 2)
     return {Language::Unknown, 0.0f};
 
+  const std::string normalized = classifier_internal::NormalizeForClassification(body);
+  const std::string_view text = normalized.empty() ? body : std::string_view(normalized);
+
+  if (const auto result = classifier_internal::DetectEmail(text);
+    result.confidence >= minConfidence)
+    return result;
+
+  if (const auto result = classifier_internal::DetectURL(text);
+    result.confidence >= minConfidence)
+    return result;
+
+  if (const auto result = classifier_internal::DetectPseudoBinaryData(body);
+    result.confidence >= minConfidence)
+    return result;
+
   if (const auto result = classifier_internal::DetectBinaryData(body);
     result.confidence >= minConfidence)
     return result;
 
-  const std::string normalized = classifier_internal::NormalizeForClassification(body);
-  const std::string_view text = normalized.empty() ? body : std::string_view(normalized);
   if (classifier_internal::LooksLikeBareDomainLikeToken(text))
     return {Language::Unknown, 0.0f};
 
@@ -155,15 +168,27 @@ ClassificationResult ClassifyString(const std::string_view body, const float min
     classifier_internal::DetectCSS,
     classifier_internal::DetectShell,
     classifier_internal::DetectYAML,
-    classifier_internal::DetectIdentifierLike,
-    classifier_internal::DetectPlainText,
-    classifier_internal::DetectSeparatorLine,
+    classifier_internal::DetectCPPDeclarationFragment,
   };
 
   for (const auto detect: detectors) {
     if (const auto result = detect(text); result.confidence >= minConfidence)
       return result;
   }
+
+  if (classifier_internal::LooksLikeTokenLikeUnknown(text))
+    return {Language::Unknown, 0.95f};
+
+  if (const auto result = classifier_internal::DetectPlainText(text);
+    result.confidence >= minConfidence)
+    return result;
+
+  if (const auto result = classifier_internal::DetectSeparatorLine(text);
+    result.confidence >= minConfidence)
+    return result;
+
+  if (classifier_internal::HasRepeatedCharRun(text))
+    return {Language::Unknown, 0.0f};
 
   if (text.size() >= 15) {
     const float nbThreshold = std::max(minConfidence, 0.85f);
