@@ -1,7 +1,7 @@
 .PHONY: train build test
 
-BUILD_DIR ?= build
-TEST_BUILD_DIR ?= build-test
+BUILD_DIR ?= build/main
+TEST_BUILD_DIR ?= build/test
 PYTHON ?= $(shell if command -v python3 >/dev/null 2>&1; then command -v python3; elif command -v python >/dev/null 2>&1; then command -v python; fi)
 
 train:
@@ -12,7 +12,7 @@ train:
 
 build:
 	@cmake -B $(BUILD_DIR) -S .
-	@cmake --build $(BUILD_DIR) --clean-first
+	@cmake --build $(BUILD_DIR) --target LLVM_MinML_Parser
 
 test:
 	@cmake -B $(TEST_BUILD_DIR) -S .

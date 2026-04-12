@@ -16,7 +16,10 @@ static long long elapsed_ms(const Clock::time_point start, const Clock::time_poi
 }
 
 static void log_info(const std::string &message) {
-  std::cerr << "[matchertext] " << message << '\n';
+  std::istringstream lines(message);
+  std::string line;
+  while (std::getline(lines, line))
+    std::cerr << "[matchertext] " << line << '\n';
 }
 
 static std::string pluralize(const size_t count, const std::string_view singular, const std::string_view plural) {
@@ -48,7 +51,7 @@ struct WorkItem {
 };
 
 int main(const int argc, char *argv[]) {
-  const auto programStart = Clock::now();
+  long long indexingMs = 0;
   if (argc < 2) {
     std::cerr << "Usage: " << argv[0]
         << " [--log-strings] [--debug-languages] <file|directory>...\n";
@@ -90,11 +93,12 @@ int main(const int argc, char *argv[]) {
           filesToProcess.try_emplace(normalize_path(entry.path().string()), inputPath);
     }
   }
-  const auto indexingEnd = Clock::now(); {
+  const auto indexingEnd = Clock::now();
+  indexingMs = elapsed_ms(indexingStart, indexingEnd);
+  {
     std::ostringstream message;
     message << "Indexed " << pluralize(filesToProcess.size(), "file", "files")
-        << " from " << pluralize(inputPaths.size(), "input path", "input paths")
-        << " in " << elapsed_ms(indexingStart, indexingEnd) << " ms";
+        << " from " << pluralize(inputPaths.size(), "input path", "input paths");
     log_info(message.str());
   }
 
@@ -104,6 +108,7 @@ int main(const int argc, char *argv[]) {
   }
 
   try {
+    long long parsingMs = 0;
     std::vector<WorkItem> files;
     files.reserve(filesToProcess.size());
     for (const auto &[filePath, inputPath]: filesToProcess)
@@ -130,16 +135,10 @@ int main(const int argc, char *argv[]) {
     }
 
     const auto parseEnd = Clock::now();
-    log_info("Parsing files took " + std::to_string(elapsed_ms(parseStart, parseEnd)) + " ms");
+    parsingMs = elapsed_ms(parseStart, parseEnd);
 
     if (debugLanguages) {
-      const auto flushStart = Clock::now();
       Parser::FlushDebugLanguageLogs();
-      const auto flushEnd = Clock::now();
-      log_info(
-        "Writing debug language samples took " +
-        std::to_string(elapsed_ms(flushStart, flushEnd)) + " ms"
-      );
     }
 
     PrintStatsTable(
@@ -172,8 +171,12 @@ int main(const int argc, char *argv[]) {
       PrintStatsMaxString(Parser::STRING_STATS, Parser::DOCS_STATS);
     }
 
-    log_info("Parsing took " + std::to_string(elapsed_ms(parseStart, parseEnd)) + " ms");
-    log_info("Completed in " + std::to_string(elapsed_ms(programStart, Clock::now())) + " ms");
+    std::ostringstream message;
+    std::cout.put('\n');
+    message << "Timing summary"
+            << "\n - Indexing: " << indexingMs << " ms"
+            << "\n - Parsing : " << parsingMs << " ms";
+    log_info(message.str());
   } catch (const std::exception &e) {
     std::cerr << "Parsing failed: " << e.what() << "\n";
     return -1;
