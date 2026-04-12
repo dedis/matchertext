@@ -6,9 +6,7 @@
 
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <cmath>
-#include <cstring>
 #include <limits>
 #include <string>
 
@@ -21,15 +19,15 @@
 
 const char *LanguageName(const Language lang) {
   static constexpr const char *names[] = {
-      "Unknown",     "PlainText",  "URL",        "FilePath",    "FormatString",
-      "SQL",         "HTML",       "XML",        "JSON",        "YAML",
-      "CSS",         "Regex",      "Shell",      "Python",      "JavaScript",
-      "TypeScript",  "Java",       "C",          "C++",         "C#",
-      "Go",          "Rust",       "Ruby",       "PHP",         "Perl",
-      "Lua",         "Swift",      "Kotlin",     "R",           "Scala",
-      "Haskell",     "OCaml",      "Erlang",     "Elixir",      "Dart",
-      "Objective-C", "GLSL",       "HLSL",       "IdentifierLike",
-      "HexData",     "BinaryData",
+    "Unknown", "PlainText", "URL", "FilePath", "FormatString",
+    "SQL", "HTML", "XML", "JSON", "YAML",
+    "CSS", "Regex", "Shell", "Python", "JavaScript",
+    "TypeScript", "Java", "C", "C++", "C#",
+    "Go", "Rust", "Ruby", "PHP", "Perl",
+    "Lua", "Swift", "Kotlin", "R", "Scala",
+    "Haskell", "OCaml", "Erlang", "Elixir", "Dart",
+    "Objective-C", "GLSL", "HLSL", "IdentifierLike",
+    "HexData", "BinaryData", "InlineAsm",
   };
   static_assert(std::size(names) == static_cast<size_t>(Language::COUNT));
   const auto idx = static_cast<size_t>(lang);
@@ -60,20 +58,23 @@ static std::string_view Trim(const std::string_view s) {
 
 /// Case-insensitive prefix check.
 static bool StartsWithCI(const std::string_view s, const std::string_view prefix) {
-  if (s.size() < prefix.size()) return false;
+  if (s.size() < prefix.size())
+    return false;
   for (size_t i = 0; i < prefix.size(); i++) {
-    if (ToLower(s[i]) != ToLower(prefix[i])) return false;
+    if (ToLower(s[i]) != ToLower(prefix[i]))
+      return false;
   }
   return true;
 }
 
 /// Case-insensitive substring search. Returns position or npos.
-static size_t FindCI(const std::string_view haystack, const std::string_view needle,
-                     const size_t pos = 0) {
-  if (needle.empty()) return pos;
-  if (needle.size() > haystack.size()) return std::string_view::npos;
+static size_t FindCI(const std::string_view haystack, const std::string_view needle) {
+  if (needle.empty())
+    return 0;
+  if (needle.size() > haystack.size())
+    return std::string_view::npos;
   const size_t last = haystack.size() - needle.size();
-  for (size_t i = pos; i <= last; i++) {
+  for (size_t i = 0; i <= last; i++) {
     bool found = true;
     for (size_t j = 0; j < needle.size(); j++) {
       if (ToLower(haystack[i + j]) != ToLower(needle[j])) {
@@ -81,7 +82,8 @@ static size_t FindCI(const std::string_view haystack, const std::string_view nee
         break;
       }
     }
-    if (found) return i;
+    if (found)
+      return i;
   }
   return std::string_view::npos;
 }
@@ -97,8 +99,10 @@ static std::string StripCommentDecorators(const std::string_view body) {
     const size_t lineEnd = end == std::string_view::npos ? body.size() : end;
     auto line = Trim(body.substr(pos, lineEnd - pos));
 
-    if (line.starts_with("/*")) line = TrimLeft(line.substr(2));
-    if (line.ends_with("*/")) line = TrimRight(line.substr(0, line.size() - 2));
+    if (line.starts_with("/*"))
+      line = TrimLeft(line.substr(2));
+    if (line.ends_with("*/"))
+      line = TrimRight(line.substr(0, line.size() - 2));
     if (line.starts_with("///"))
       line = TrimLeft(line.substr(3));
     else if (line.starts_with("//"))
@@ -115,16 +119,19 @@ static std::string StripCommentDecorators(const std::string_view body) {
       line = TrimRight(line.substr(0, line.size() - 3));
 
     if (!line.empty()) {
-      if (wroteLine) cleaned.push_back('\n');
+      if (wroteLine)
+        cleaned.push_back('\n');
       cleaned.append(line);
       wroteLine = true;
     }
 
-    if (end == std::string_view::npos) break;
+    if (end == std::string_view::npos)
+      break;
     pos = end + 1;
   }
 
-  if (!cleaned.empty()) return cleaned;
+  if (!cleaned.empty())
+    return cleaned;
   return std::string(Trim(body));
 }
 
@@ -138,15 +145,34 @@ static std::string UnescapeCommonSequences(const std::string_view body) {
       continue;
     }
 
-    const char next = body[i + 1];
-    switch (next) {
-      case '\\': result.push_back('\\'); i++; break;
-      case '"': result.push_back('"'); i++; break;
-      case '\'': result.push_back('\''); i++; break;
-      case 'n': result.push_back('\n'); i++; break;
-      case 'r': result.push_back('\r'); i++; break;
-      case 't': result.push_back('\t'); i++; break;
-      default: result.push_back(body[i]); break;
+    switch (body[i + 1]) {
+      case '\\':
+        result.push_back('\\');
+        i++;
+        break;
+      case '"':
+        result.push_back('"');
+        i++;
+        break;
+      case '\'':
+        result.push_back('\'');
+        i++;
+        break;
+      case 'n':
+        result.push_back('\n');
+        i++;
+        break;
+      case 'r':
+        result.push_back('\r');
+        i++;
+        break;
+      case 't':
+        result.push_back('\t');
+        i++;
+        break;
+      default:
+        result.push_back(body[i]);
+        break;
     }
   }
 
@@ -158,25 +184,170 @@ static std::string NormalizeForClassification(const std::string_view body) {
 }
 
 static bool IsSimpleKey(const std::string_view s) {
-  if (s.empty()) return false;
-  for (const char c : s) {
-    if (!std::isalnum(static_cast<unsigned char>(c)) &&
-        c != '_' && c != '-' && c != '.')
-      return false;
+  if (s.empty())
+    return false;
+  return std::ranges::all_of(
+    s, [](const unsigned char c) {
+      return std::isalnum(c) || c == '_' || c == '-' || c == '.';
+    }
+  );
+}
+
+struct YAMLAnalysis {
+  int docMarkers = 0;
+  int keyValueLines = 0;
+  int blockKeyLines = 0;
+  int listLines = 0;
+  int nonEmptyLines = 0;
+};
+
+static bool LooksLikeYAMLKey(const std::string_view key) {
+  const auto trimmed = Trim(key);
+  if (trimmed.empty() || trimmed.size() > 32 || !IsSimpleKey(trimmed))
+    return false;
+
+  bool hasAlpha = false;
+  bool hasLower = false;
+  bool allDigits = true;
+  for (const char c : trimmed) {
+    const auto uc = static_cast<unsigned char>(c);
+    if (std::isalpha(uc)) {
+      hasAlpha = true;
+      allDigits = false;
+      if (std::islower(uc))
+        hasLower = true;
+    } else if (!std::isdigit(uc)) {
+      allDigits = false;
+    }
   }
+
+  if (!hasAlpha || allDigits)
+    return false;
+  if (std::isdigit(static_cast<unsigned char>(trimmed.front())))
+    return false;
+  if (!hasLower && trimmed.size() <= 4)
+    return false;
   return true;
 }
 
-static int CountWords(const std::string_view s) {
+static bool LooksLikeYAMLScalarValue(const std::string_view value) {
+  const auto trimmed = Trim(value);
+  if (trimmed.empty())
+    return false;
+  if (trimmed.size() > 80)
+    return false;
+  if (trimmed.find('\t') != std::string_view::npos ||
+      trimmed.find('{') != std::string_view::npos ||
+      trimmed.find('}') != std::string_view::npos ||
+      trimmed.find(';') != std::string_view::npos)
+    return false;
+
   int words = 0;
   bool inWord = false;
-  for (const char c : s) {
-    const bool isWord =
-        std::isalnum(static_cast<unsigned char>(c)) || c == '\'' || c == '-';
-    if (isWord && !inWord) words++;
+  for (const char c : trimmed) {
+    const auto uc = static_cast<unsigned char>(c);
+    const bool isWord = std::isalnum(uc) || c == '_' || c == '-' || c == '.' ||
+                        c == '/' || c == '"' || c == '\'' || c == '@';
+    if (isWord && !inWord)
+      words++;
     inWord = isWord;
   }
-  return words;
+
+  if (words > 12)
+    return false;
+  if (trimmed.find(". ") != std::string_view::npos ||
+      trimmed.find("? ") != std::string_view::npos ||
+      trimmed.find("! ") != std::string_view::npos)
+    return false;
+  return true;
+}
+
+static bool LooksLikeYAMLListItem(const std::string_view item) {
+  const auto trimmed = Trim(item);
+  if (trimmed.empty() || trimmed.find('\t') != std::string_view::npos)
+    return false;
+
+  const size_t colon = trimmed.find(':');
+  if (colon != std::string_view::npos && colon > 0 && colon + 1 < trimmed.size()) {
+    const auto key = TrimRight(trimmed.substr(0, colon));
+    const auto value = TrimLeft(trimmed.substr(colon + 1));
+    return LooksLikeYAMLKey(key) && LooksLikeYAMLScalarValue(value);
+  }
+
+  int words = 0;
+  bool inWord = false;
+  for (const char c : trimmed) {
+    const auto uc = static_cast<unsigned char>(c);
+    const bool isWord = std::isalnum(uc) || c == '_' || c == '-' || c == '.';
+    if (isWord && !inWord)
+      words++;
+    inWord = isWord;
+  }
+
+  if (words == 0 || words > 4)
+    return false;
+  if (trimmed.find(". ") != std::string_view::npos ||
+      trimmed.find("? ") != std::string_view::npos ||
+      trimmed.find("! ") != std::string_view::npos)
+    return false;
+  return true;
+}
+
+static YAMLAnalysis AnalyzeYAMLStructure(const std::string_view s) {
+  YAMLAnalysis analysis;
+
+  size_t pos = 0;
+  while (pos <= s.size()) {
+    const size_t end = s.find('\n', pos);
+    const size_t lineEnd = end == std::string_view::npos ? s.size() : end;
+    const auto line = Trim(s.substr(pos, lineEnd - pos));
+
+    if (!line.empty()) {
+      analysis.nonEmptyLines++;
+      if (line == "---" || line == "...") {
+        analysis.docMarkers++;
+      } else if (line.starts_with("- ")) {
+        if (LooksLikeYAMLListItem(line.substr(2)))
+          analysis.listLines++;
+      } else if (line.find('\t') == std::string_view::npos) {
+        const size_t colon = line.find(':');
+        if (colon != std::string_view::npos && colon > 0) {
+          const auto key = TrimRight(line.substr(0, colon));
+          const auto value = colon + 1 < line.size()
+                                 ? TrimLeft(line.substr(colon + 1))
+                                 : std::string_view{};
+          if (LooksLikeYAMLKey(key)) {
+            if (value.empty())
+              analysis.blockKeyLines++;
+            else if (LooksLikeYAMLScalarValue(value))
+              analysis.keyValueLines++;
+          }
+        }
+      }
+    }
+
+    if (end == std::string_view::npos)
+      break;
+    pos = end + 1;
+  }
+
+  return analysis;
+}
+
+static bool HasStrongYAMLEvidence(const std::string_view s) {
+  const auto analysis = AnalyzeYAMLStructure(s);
+  if (analysis.nonEmptyLines == 0)
+    return false;
+
+  if (analysis.docMarkers > 0 &&
+      (analysis.keyValueLines + analysis.blockKeyLines + analysis.listLines) >= 2)
+    return true;
+
+  if (analysis.blockKeyLines > 0 &&
+      (analysis.listLines > 0 || analysis.keyValueLines > 0))
+    return true;
+
+  return false;
 }
 
 static bool IsIdentifierLikeSeparator(const char c) {
@@ -191,32 +362,517 @@ static bool IsOctalDigit(const char c) {
   return c >= '0' && c <= '7';
 }
 
+static bool IsLabelPunctuation(const char c) {
+  return c == '.' || c == ',' || c == ':' || c == ';' || c == '!' ||
+         c == '?' || c == '-' || c == '(' || c == ')';
+}
+
+static bool IsCodeKeywordToken(const std::string_view token) {
+  if (token.empty() || token.size() > 16)
+    return false;
+
+  char lower[17];
+  for (size_t i = 0; i < token.size(); i++)
+    lower[i] = ToLower(token[i]);
+  const std::string_view lowerToken(lower, token.size());
+
+  static constexpr std::string_view keywords[] = {
+    "async", "await", "bool", "break", "case", "catch",
+    "char", "class", "const", "continue", "def", "default",
+    "do", "double", "else", "enum", "false", "float",
+    "fn", "for", "function", "if", "import", "int",
+    "interface", "let", "namespace", "new", "null", "package",
+    "private", "protected", "public", "return", "static", "struct",
+    "switch", "template", "true", "try", "typename", "using",
+    "var", "void", "while",
+  };
+  return std::ranges::binary_search(keywords, lowerToken);
+}
+
+static bool LooksLikeShortPlainTextLabel(const std::string_view s) {
+  const auto trimmed = Trim(s);
+  if (trimmed.size() < 8 || trimmed.size() > 80)
+    return false;
+
+  int words = 0;
+  int alphaWords = 0;
+  int keywordWords = 0;
+  int letters = 0;
+  int digits = 0;
+  int spaces = 0;
+
+  for (const char c: trimmed) {
+    if (std::isspace(static_cast<unsigned char>(c)))
+      spaces++;
+  }
+
+  size_t pos = 0;
+  while (pos <= trimmed.size()) {
+    const size_t end = trimmed.find_first_of(" \t\n\r", pos);
+    std::string_view token = trimmed.substr(
+      pos, end == std::string_view::npos ? trimmed.size() - pos : end - pos
+    );
+
+    while (!token.empty() && IsLabelPunctuation(token.front()))
+      token.remove_prefix(1);
+    while (!token.empty() && IsLabelPunctuation(token.back()))
+      token.remove_suffix(1);
+
+    if (!token.empty()) {
+      int tokenLetters = 0;
+      int tokenDigits = 0;
+      for (const char c: token) {
+        const auto uc = static_cast<unsigned char>(c);
+        if (std::isalpha(uc)) {
+          tokenLetters++;
+          letters++;
+        } else if (std::isdigit(uc)) {
+          tokenDigits++;
+          digits++;
+        } else if (c != '\'' && c != '-') {
+          return false;
+        }
+      }
+
+      if (tokenLetters == 0)
+        return false;
+
+      words++;
+      if (tokenLetters >= tokenDigits)
+        alphaWords++;
+      if (IsCodeKeywordToken(token))
+        keywordWords++;
+    }
+
+    if (end == std::string_view::npos)
+      break;
+    pos = end + 1;
+  }
+
+  if (words < 2 || words > 5)
+    return false;
+  if (alphaWords < 2)
+    return false;
+  if (keywordWords == words)
+    return false;
+  if (digits > letters / 2)
+    return false;
+
+  const int nonSpace = static_cast<int>(trimmed.size()) - spaces;
+  if (nonSpace <= 0)
+    return false;
+
+  const float letterRatio =
+      static_cast<float>(letters) / static_cast<float>(nonSpace);
+  return letterRatio >= 0.65f;
+}
+
+static bool HasRepeatedNonLetterRun(const std::string_view s, int *maxRunLength = nullptr) {
+  int repeatedRunLength = 1;
+  int maxRepeatedRun = 1;
+  char repeatedChar = '\0';
+  bool hasRepeatedNonLetterRun = false;
+
+  for (const char c: s) {
+    const auto uc = static_cast<unsigned char>(c);
+    if (!std::isalpha(uc) && !std::isspace(uc)) {
+      if (c == repeatedChar) {
+        repeatedRunLength++;
+      } else {
+        repeatedChar = c;
+        repeatedRunLength = 1;
+      }
+      maxRepeatedRun = std::max(maxRepeatedRun, repeatedRunLength);
+      if (repeatedRunLength >= 5)
+        hasRepeatedNonLetterRun = true;
+    } else {
+      repeatedChar = '\0';
+      repeatedRunLength = 1;
+    }
+  }
+
+  if (maxRunLength != nullptr)
+    *maxRunLength = maxRepeatedRun;
+  return hasRepeatedNonLetterRun;
+}
+
+static bool IsHumanWordToken(const std::string_view token) {
+  if (token.empty())
+    return false;
+
+  int letters = 0;
+  int uppercase = 0;
+  int lowercase = 0;
+  for (const char c: token) {
+    const auto uc = static_cast<unsigned char>(c);
+    if (!std::isalpha(uc))
+      return false;
+    letters++;
+    if (std::isupper(uc))
+      uppercase++;
+    else
+      lowercase++;
+  }
+
+  if (letters < 3)
+    return false;
+  if (uppercase == letters || lowercase == letters)
+    return true;
+  return std::isupper(static_cast<unsigned char>(token.front())) &&
+         lowercase >= 2 && uppercase <= 3;
+}
+
+static std::string ExtractDecoratedTextCore(const std::string_view s) {
+  std::string core;
+  size_t pos = 0;
+
+  while (pos <= s.size()) {
+    const size_t lineEnd = s.find('\n', pos);
+    auto line = Trim(
+      s.substr(
+        pos, lineEnd == std::string_view::npos
+               ? s.size() - pos
+               : lineEnd - pos
+      )
+    );
+
+    while (!line.empty() &&
+           !std::isalnum(static_cast<unsigned char>(line.front())))
+      line.remove_prefix(1);
+    while (!line.empty() &&
+           !std::isalnum(static_cast<unsigned char>(line.back())))
+      line.remove_suffix(1);
+
+    if (!line.empty()) {
+      if (!core.empty())
+        core.push_back(' ');
+      core.append(line);
+    }
+
+    if (lineEnd == std::string_view::npos)
+      break;
+    pos = lineEnd + 1;
+  }
+
+  return core;
+}
+
+static bool LooksLikeDecoratedPlainText(const std::string_view s) {
+  const auto trimmed = Trim(s);
+  if (trimmed.size() < 8)
+    return false;
+
+  if (!HasRepeatedNonLetterRun(trimmed))
+    return false;
+
+  const std::string core = ExtractDecoratedTextCore(trimmed);
+  const auto coreView = Trim(std::string_view(core));
+  if (coreView.empty())
+    return false;
+
+  if (coreView.find("::") != std::string_view::npos ||
+      coreView.find("->") != std::string_view::npos ||
+      coreView.find("=>") != std::string_view::npos ||
+      coreView.find(":=") != std::string_view::npos ||
+      coreView.find("==") != std::string_view::npos)
+    return false;
+
+  if (LooksLikeShortPlainTextLabel(coreView))
+    return true;
+
+  int words = 0;
+  int alphaWords = 0;
+  int letters = 0;
+  int digits = 0;
+  int codeSymbols = 0;
+  size_t pos = 0;
+
+  while (pos <= coreView.size()) {
+    const size_t end = coreView.find_first_of(" \t\n\r", pos);
+    std::string_view token = coreView.substr(
+      pos, end == std::string_view::npos ? coreView.size() - pos : end - pos
+    );
+    if (!token.empty()) {
+      words++;
+      int tokenLetters = 0;
+      bool lettersOnly = true;
+      for (const char c: token) {
+        const auto uc = static_cast<unsigned char>(c);
+        if (std::isalpha(uc)) {
+          tokenLetters++;
+          letters++;
+        } else if (std::isdigit(uc)) {
+          digits++;
+          lettersOnly = false;
+        } else if (c == '\'' || c == '-') {
+          lettersOnly = false;
+        } else {
+          lettersOnly = false;
+          if (c == '{' || c == '}' || c == '[' || c == ']' || c == '<' ||
+              c == '>' || c == ';' || c == '=' || c == '$' || c == '|' ||
+              c == '&' || c == '@' || c == '`' || c == '_' || c == '/' ||
+              c == '\\')
+            codeSymbols++;
+        }
+      }
+
+      if (tokenLetters >= 2)
+        alphaWords++;
+      if (words == 1 && lettersOnly && IsHumanWordToken(token))
+        return true;
+    }
+
+    if (end == std::string_view::npos)
+      break;
+    pos = end + 1;
+  }
+
+  if (codeSymbols > 2)
+    return false;
+  if (alphaWords == 0)
+    return false;
+  if (digits > letters / 2)
+    return false;
+  return words >= 2 && alphaWords >= 1;
+}
+
+static ClassificationResult DetectSeparatorLine(const std::string_view s) {
+  const auto trimmed = Trim(s);
+  if (trimmed.size() < 8)
+    return {Language::Unknown, 0.0f};
+
+  int letters = 0;
+  int digits = 0;
+  int maxRepeatedRun = 1;
+  int shortAlphaRun = 0;
+  int maxAlphaRun = 0;
+
+  for (const char c: trimmed) {
+    const auto uc = static_cast<unsigned char>(c);
+    if (std::isalpha(uc))
+      letters++;
+    else if (std::isdigit(uc))
+      digits++;
+    if (std::isalpha(uc)) {
+      shortAlphaRun++;
+      maxAlphaRun = std::max(maxAlphaRun, shortAlphaRun);
+    } else {
+      shortAlphaRun = 0;
+    }
+  }
+
+  if (!HasRepeatedNonLetterRun(trimmed, &maxRepeatedRun))
+    return {Language::Unknown, 0.0f};
+
+  if (letters > 0 || digits > 0)
+    return (digits == 0 && letters <= 2 && maxAlphaRun <= 1)
+             ? ClassificationResult{Language::Unknown, 1.0f}
+             : ClassificationResult{Language::Unknown, 0.0f};
+
+  if (maxRepeatedRun < 5)
+    return {Language::Unknown, 0.0f};
+
+  return {Language::Unknown, 1.0f};
+}
+
 /// Check whether a tag name is a known HTML5 element (case-insensitive).
 static bool IsHTMLTagName(const std::string_view name) {
-  if (name.empty() || name.size() > 10) return false;
+  if (name.empty() || name.size() > 10)
+    return false;
 
   // Lowercase the tag name into a small stack buffer.
   char lower[11];
   for (size_t i = 0; i < name.size(); i++)
     lower[i] = ToLower(name[i]);
-  const std::string_view lname(lower, name.size());
+  const std::string_view lName(lower, name.size());
 
   // Sorted list of common HTML5 element names.
   static constexpr std::string_view tags[] = {
-      "a",       "abbr",     "address",  "article",  "aside",    "b",
-      "body",    "br",       "button",   "canvas",   "caption",  "code",
-      "col",     "dd",       "details",  "div",      "dl",       "dt",
-      "em",      "fieldset", "figure",   "footer",   "form",     "h1",
-      "h2",      "h3",       "h4",       "h5",       "h6",       "head",
-      "header",  "hr",       "html",     "i",        "iframe",   "img",
-      "input",   "label",    "li",       "link",     "main",     "meta",
-      "nav",     "ol",       "option",   "p",        "pre",      "script",
-      "section", "select",   "small",    "span",     "strong",   "style",
-      "summary", "svg",      "table",    "tbody",    "td",       "template",
-      "textarea","tfoot",    "th",       "thead",    "title",    "tr",
-      "u",       "ul",       "video",
+    "a", "abbr", "address", "article", "aside", "b",
+    "body", "br", "button", "canvas", "caption", "code",
+    "col", "dd", "details", "div", "dl", "dt",
+    "em", "fieldset", "figure", "footer", "form", "h1",
+    "h2", "h3", "h4", "h5", "h6", "head",
+    "header", "hr", "html", "i", "iframe", "img",
+    "input", "label", "li", "link", "main", "meta",
+    "nav", "ol", "option", "p", "pre", "script",
+    "section", "select", "small", "span", "strong", "style",
+    "summary", "svg", "table", "tbody", "td", "template",
+    "textarea", "tfoot", "th", "thead", "title", "tr",
+    "u", "ul", "video",
   };
-  return std::binary_search(std::begin(tags), std::end(tags), lname);
+  return std::ranges::binary_search(tags, lName);
+}
+
+static bool IsXMLNameStartChar(const char c) {
+  const auto uc = static_cast<unsigned char>(c);
+  return std::isalpha(uc) || c == '_';
+}
+
+static bool IsXMLNameChar(const char c) {
+  const auto uc = static_cast<unsigned char>(c);
+  return std::isalnum(uc) || c == '_' || c == '-' || c == '.';
+}
+
+static bool LooksLikeXMLQualifiedName(const std::string_view name) {
+  if (name.empty() || name.find("::") != std::string_view::npos)
+    return false;
+
+  const size_t colon = name.find(':');
+  if (colon == std::string_view::npos || colon == 0 || colon + 1 >= name.size())
+    return false;
+  if (name.find(':', colon + 1) != std::string_view::npos)
+    return false;
+
+  const auto prefix = name.substr(0, colon);
+  const auto local = name.substr(colon + 1);
+  if (!IsXMLNameStartChar(prefix.front()) || !IsXMLNameStartChar(local.front()))
+    return false;
+
+  return std::ranges::all_of(prefix.substr(1), IsXMLNameChar) &&
+         std::ranges::all_of(local.substr(1), IsXMLNameChar);
+}
+
+static bool IsURLChar(const char c) {
+  if (std::isalnum(static_cast<unsigned char>(c)))
+    return true;
+  switch (c) {
+    case '-':
+    case '.':
+    case '_':
+    case '~':
+    case ':':
+    case '/':
+    case '?':
+    case '#':
+    case '[':
+    case ']':
+    case '@':
+    case '!':
+    case '$':
+    case '&':
+    case '\'':
+    case '(':
+    case ')':
+    case '*':
+    case '+':
+    case ',':
+    case ';':
+    case '=':
+    case '%':
+      return true;
+    default:
+      return false;
+  }
+}
+
+static std::string_view StripURLWrappers(const std::string_view s) {
+  auto trimmed = Trim(s);
+  auto isWrapper = [](const char c) {
+    switch (c) {
+      case '<':
+      case '>':
+      case '(':
+      case ')':
+      case '[':
+      case ']':
+      case '{':
+      case '}':
+      case '"':
+      case '\'':
+      case '`':
+      case ',':
+      case ';':
+        return true;
+      default:
+        return false;
+    }
+  };
+
+  while (!trimmed.empty() && isWrapper(trimmed.front()))
+    trimmed.remove_prefix(1);
+  while (!trimmed.empty() && isWrapper(trimmed.back()))
+    trimmed.remove_suffix(1);
+  return Trim(trimmed);
+}
+
+static bool IsLikelyDataURL(const std::string_view s) {
+  if (!StartsWithCI(s, "data:"))
+    return false;
+
+  const auto rest = s.substr(5);
+  const size_t comma = rest.find(',');
+  if (comma == std::string_view::npos)
+    return false;
+
+  for (size_t i = 0; i < comma; i++) {
+    const char c = rest[i];
+    if (std::isspace(static_cast<unsigned char>(c)))
+      return false;
+    if (std::isalnum(static_cast<unsigned char>(c)))
+      continue;
+    switch (c) {
+      case '!':
+      case '$':
+      case '&':
+      case '\'':
+      case '(':
+      case ')':
+      case '*':
+      case '+':
+      case '-':
+      case '.':
+      case '/':
+      case ':':
+      case ';':
+      case '=':
+      case '?':
+      case '@':
+      case '_':
+      case '~':
+      case '%':
+        continue;
+      default:
+        return false;
+    }
+  }
+
+  return true;
+}
+
+static bool LooksLikeBriefURLContext(const std::string_view s) {
+  const auto trimmed = StripURLWrappers(s);
+  if (trimmed.empty())
+    return true;
+
+  if (LooksLikeShortPlainTextLabel(trimmed))
+    return true;
+
+  int words = 0;
+  int letters = 0;
+  int digits = 0;
+  int other = 0;
+  bool inWord = false;
+  for (const char c : trimmed) {
+    const auto uc = static_cast<unsigned char>(c);
+    const bool isWord = std::isalnum(uc) || c == '\'' || c == '-' || c == '.';
+    if (isWord && !inWord)
+      words++;
+    inWord = isWord;
+
+    if (std::isalpha(uc))
+      letters++;
+    else if (std::isdigit(uc))
+      digits++;
+    else if (!std::isspace(uc) && c != ':' && c != '.')
+      other++;
+  }
+
+  if (words == 0 || words > 4)
+    return false;
+  if (letters < 3 || digits > letters / 2)
+    return false;
+  return other == 0;
 }
 
 /// Pack three bytes into a uint32_t trigram key.
@@ -230,9 +886,9 @@ static const std::array<uint16_t, 64> &ModelTrigramCounts() {
   static const std::array<uint16_t, 64> counts = [] {
     std::array<uint16_t, 64> values{};
     static_assert(kNumLanguages <= values.size(), "Increase model trigram count buffer");
-    for (size_t i = 0; i < kNumCombinedEntries; i++) {
-      if (kCombinedEntries[i].languageIdx < values.size())
-        values[kCombinedEntries[i].languageIdx]++;
+    for (const auto kCombinedEntry: kCombinedEntries) {
+      if (kCombinedEntry.languageIdx < values.size())
+        values[kCombinedEntry.languageIdx]++;
     }
     return values;
   }();
@@ -246,20 +902,75 @@ static const std::array<uint16_t, 64> &ModelTrigramCounts() {
 /// Detect URLs by scheme prefix.
 static ClassificationResult DetectURL(const std::string_view s) {
   static constexpr std::string_view schemes[] = {
-      "http://", "https://", "ftp://",    "ftps://", "file://",
-      "mailto:", "ssh://",   "git://",    "svn://",  "telnet://",
-      "ws://",   "wss://",   "data:",
+    "http://", "https://", "ftp://", "ftps://", "file://",
+    "mailto:", "ssh://", "git://", "svn://", "telnet://",
+    "ws://", "wss://", "data:",
   };
+
+  size_t matchStart = std::string_view::npos;
+  size_t matchEnd = std::string_view::npos;
+  int matches = 0;
+
   for (const auto scheme : schemes) {
-    if (s.size() > scheme.size() && s.starts_with(scheme))
-      return {Language::URL, 0.95f};
+    size_t searchPos = 0;
+    while (searchPos < s.size()) {
+      const size_t rel = FindCI(s.substr(searchPos), scheme);
+      if (rel == std::string_view::npos)
+        break;
+
+      const size_t pos = searchPos + rel;
+      if (pos > 0 && IsURLChar(s[pos - 1])) {
+        searchPos = pos + 1;
+        continue;
+      }
+
+      if (scheme == "data:" && !IsLikelyDataURL(s.substr(pos))) {
+        searchPos = pos + 1;
+        continue;
+      }
+
+      size_t end = pos + scheme.size();
+      while (end < s.size() && IsURLChar(s[end]))
+        end++;
+      while (end > pos + scheme.size() &&
+             (s[end - 1] == '.' || s[end - 1] == ',' || s[end - 1] == ';' ||
+              s[end - 1] == ':' || s[end - 1] == '!' || s[end - 1] == '?'))
+        end--;
+
+      if (end <= pos + scheme.size()) {
+        searchPos = pos + 1;
+        continue;
+      }
+
+      matches++;
+      if (matches > 1)
+        return {Language::Unknown, 0.0f};
+
+      matchStart = pos;
+      matchEnd = end;
+      searchPos = end;
+    }
   }
-  return {Language::Unknown, 0.0f};
+
+  if (matches != 1)
+    return {Language::Unknown, 0.0f};
+
+  const auto prefix = StripURLWrappers(s.substr(0, matchStart));
+  const auto suffix = StripURLWrappers(s.substr(matchEnd));
+  if (!prefix.empty() && !suffix.empty())
+    return {Language::Unknown, 0.0f};
+
+  const auto context = !prefix.empty() ? prefix : suffix;
+  if (!LooksLikeBriefURLContext(context))
+    return {Language::Unknown, 0.0f};
+
+  return {Language::URL, context.empty() ? 0.95f : 0.88f};
 }
 
 /// Detect file paths by prefix patterns and separator density.
 static ClassificationResult DetectFilePath(const std::string_view s) {
-  if (s.size() < 2) return {Language::Unknown, 0.0f};
+  if (s.size() < 2)
+    return {Language::Unknown, 0.0f};
 
   // Windows absolute: C:\ or C:/
   if (s.size() >= 3 && std::isalpha(static_cast<unsigned char>(s[0])) &&
@@ -269,9 +980,11 @@ static ClassificationResult DetectFilePath(const std::string_view s) {
   // Unix absolute
   if (s[0] == '/' && s[1] != '*' && s[1] != '/') {
     int slashes = 0;
-    for (const char c : s)
-      if (c == '/') slashes++;
-    if (slashes >= 2) return {Language::FilePath, 0.80f};
+    for (const char c: s)
+      if (c == '/')
+        slashes++;
+    if (slashes >= 2)
+      return {Language::FilePath, 0.80f};
     return {Language::FilePath, 0.55f};
   }
 
@@ -284,26 +997,165 @@ static ClassificationResult DetectFilePath(const std::string_view s) {
 
 /// Detect printf-style format strings by counting specifiers.
 static ClassificationResult DetectFormatString(const std::string_view s) {
+  auto isFlag = [](const char c) {
+    return c == '-' || c == '+' || c == ' ' || c == '#' || c == '0' || c == '\'';
+  };
+  auto isConversion = [](const char c) {
+    switch (c) {
+      case 'd':
+      case 'i':
+      case 'u':
+      case 'o':
+      case 'x':
+      case 'X':
+      case 'f':
+      case 'F':
+      case 'e':
+      case 'E':
+      case 'g':
+      case 'G':
+      case 'a':
+      case 'A':
+      case 'c':
+      case 's':
+      case 'p':
+      case 'n':
+      case 'm':
+        return true;
+      default:
+        return false;
+    }
+  };
+
   int specs = 0;
   for (size_t i = 0; i + 1 < s.size(); i++) {
-    if (s[i] != '%') continue;
-    if (s[i + 1] == '%') { i++; continue; } // escaped %%
-    const char c = s[i + 1];
-    if (c == 'd' || c == 'i' || c == 'u' || c == 'f' || c == 'e' ||
-        c == 'g' || c == 'x' || c == 'X' || c == 'o' || c == 's' ||
-        c == 'c' || c == 'p' || c == 'l' || c == 'z' || c == 'h') {
-      specs++;
+    if (s[i] != '%')
+      continue;
+    if (s[i + 1] == '%') {
       i++;
+      continue;
+    }
+
+    size_t j = i + 1;
+
+    const size_t positionalStart = j;
+    while (j < s.size() && std::isdigit(static_cast<unsigned char>(s[j])))
+      j++;
+    if (j < s.size() && s[j] == '$' && j > positionalStart) {
+      j++;
+    } else {
+      j = i + 1;
+    }
+
+    while (j < s.size() && isFlag(s[j]))
+      j++;
+
+    if (j < s.size() && s[j] == '*') {
+      j++;
+    } else {
+      while (j < s.size() && std::isdigit(static_cast<unsigned char>(s[j])))
+        j++;
+    }
+
+    if (j < s.size() && s[j] == '.') {
+      j++;
+      if (j < s.size() && s[j] == '*') {
+        j++;
+      } else {
+        while (j < s.size() && std::isdigit(static_cast<unsigned char>(s[j])))
+          j++;
+      }
+    }
+
+    if (j + 1 < s.size()) {
+      if ((s[j] == 'h' && s[j + 1] == 'h') || (s[j] == 'l' && s[j + 1] == 'l')) {
+        j += 2;
+      } else if (s[j] == 'h' || s[j] == 'l' || s[j] == 'j' || s[j] == 'z' ||
+                 s[j] == 't' || s[j] == 'L') {
+        j++;
+      }
+    } else if (j < s.size() &&
+               (s[j] == 'h' || s[j] == 'l' || s[j] == 'j' || s[j] == 'z' ||
+                s[j] == 't' || s[j] == 'L')) {
+      j++;
+    }
+
+    if (j < s.size() && isConversion(s[j])) {
+      specs++;
+      i = j;
     }
   }
-  if (specs == 0) return {Language::Unknown, 0.0f};
+  if (specs == 0)
+    return {Language::Unknown, 0.0f};
   const float density = static_cast<float>(specs) / static_cast<float>(s.size());
   return {Language::FormatString, std::min(0.5f + density * 10.0f, 0.95f)};
 }
 
+/// Detect GCC/Clang inline-assembly templates and assembler directives.
+static ClassificationResult DetectInlineAsm(const std::string_view s) {
+  if (s.size() < 4)
+    return {Language::Unknown, 0.0f};
+
+  int signals = 0;
+
+  static constexpr std::string_view directives[] = {
+    ".align", ".ascii", ".asciz", ".balign", ".byte", ".fill",
+    ".globl", ".inst", ".long", ".macro", ".octa", ".popsection",
+    ".previous", ".pushsection", ".quad", ".section", ".short",
+    ".size", ".type", ".word",
+  };
+  for (const auto directive: directives) {
+    if (FindCI(s, directive) != std::string_view::npos)
+      signals += 2;
+  }
+
+  for (size_t i = 0; i + 1 < s.size(); i++) {
+    if (s[i] != '%')
+      continue;
+
+    if (s[i + 1] == '[') {
+      const size_t close = s.find(']', i + 2);
+      if (close != std::string_view::npos && close > i + 2)
+        signals += 2;
+      continue;
+    }
+
+    if (!std::isdigit(static_cast<unsigned char>(s[i + 1])))
+      continue;
+
+    size_t j = i + 1;
+    while (j < s.size() && std::isdigit(static_cast<unsigned char>(s[j])))
+      j++;
+    if (j >= s.size()) {
+      signals += 2;
+      continue;
+    }
+
+    const char next = s[j];
+    if (next == ',' || std::isspace(static_cast<unsigned char>(next)) ||
+        next == ')' || next == '(' || next == ']' || next == '"' ||
+        next == ';' || next == ':') {
+      signals += 2;
+    }
+  }
+
+  if (FindCI(s, "\\n.") != std::string_view::npos ||
+      FindCI(s, "\n.") != std::string_view::npos)
+    signals++;
+
+  if (signals < 2)
+    return {Language::Unknown, 0.0f};
+
+  return {
+    Language::InlineAsm,
+    std::min(0.70f + static_cast<float>(signals) * 0.05f, 0.97f)
+  };
+}
+
 /// Detect escaped-byte blobs or strings containing many non-printable bytes.
 static ClassificationResult DetectBinaryData(const std::string_view s) {
-  if (s.size() < 8) return {Language::Unknown, 0.0f};
+  if (s.size() < 8)
+    return {Language::Unknown, 0.0f};
 
   int controlBytes = 0;
   int escapedBytes = 0;
@@ -314,9 +1166,11 @@ static ClassificationResult DetectBinaryData(const std::string_view s) {
   int spaces = 0;
 
   for (size_t i = 0; i < s.size(); i++) {
-    const unsigned char uc = static_cast<unsigned char>(s[i]);
-    if (std::isalpha(uc)) letters++;
-    if (std::isspace(uc)) spaces++;
+    const auto uc = static_cast<unsigned char>(s[i]);
+    if (std::isalpha(uc))
+      letters++;
+    if (std::isspace(uc))
+      spaces++;
     if (uc < 0x20 && s[i] != '\n' && s[i] != '\r' && s[i] != '\t')
       controlBytes++;
 
@@ -348,7 +1202,8 @@ static ClassificationResult DetectBinaryData(const std::string_view s) {
       }
       escapedBytes++;
       nullEscapes++;
-      if (digits > 1) octalEscapes++;
+      if (digits > 1)
+        octalEscapes++;
       i = j - 1;
       continue;
     }
@@ -379,16 +1234,22 @@ static ClassificationResult DetectBinaryData(const std::string_view s) {
     return {Language::BinaryData, std::min(0.72f + controlRatio, 0.96f)};
 
   if (strongEscapes >= 4 && letters <= 8 && spaces == 0)
-    return {Language::BinaryData,
-            std::min(0.76f + static_cast<float>(strongEscapes) * 0.03f, 0.97f)};
+    return {
+      Language::BinaryData,
+      std::min(0.76f + static_cast<float>(strongEscapes) * 0.03f, 0.97f)
+    };
 
   if (hexEscapes >= 3 && escapeRatio >= 0.40f)
-    return {Language::BinaryData,
-            std::min(0.74f + static_cast<float>(hexEscapes) * 0.04f, 0.96f)};
+    return {
+      Language::BinaryData,
+      std::min(0.74f + static_cast<float>(hexEscapes) * 0.04f, 0.96f)
+    };
 
   if ((octalEscapes + nullEscapes) >= 4 && escapeRatio >= 0.35f)
-    return {Language::BinaryData,
-            std::min(0.74f + static_cast<float>(octalEscapes + nullEscapes) * 0.04f, 0.96f)};
+    return {
+      Language::BinaryData,
+      std::min(0.74f + static_cast<float>(octalEscapes + nullEscapes) * 0.04f, 0.96f)
+    };
 
   return {Language::Unknown, 0.0f};
 }
@@ -396,13 +1257,13 @@ static ClassificationResult DetectBinaryData(const std::string_view s) {
 /// Detect long hex strings and grouped hex payloads.
 static ClassificationResult DetectHexData(const std::string_view s) {
   const auto trimmed = Trim(s);
-  if (trimmed.size() < 16) return {Language::Unknown, 0.0f};
+  if (trimmed.size() < 16)
+    return {Language::Unknown, 0.0f};
 
   int hexDigits = 0;
   int separators = 0;
-  for (const char c : trimmed) {
-    const unsigned char uc = static_cast<unsigned char>(c);
-    if (std::isxdigit(uc)) {
+  for (const char c: trimmed) {
+    if (const auto uc = static_cast<unsigned char>(c); std::isxdigit(uc)) {
       hexDigits++;
       continue;
     }
@@ -426,23 +1287,28 @@ static ClassificationResult DetectHexData(const std::string_view s) {
   if (!evenDigits && separators == 0)
     return {Language::Unknown, 0.0f};
 
-  return {Language::HexData,
-          std::min(0.75f + static_cast<float>(hexDigits) / 128.0f, 0.97f)};
+  return {
+    Language::HexData,
+    std::min(0.75f + static_cast<float>(hexDigits) / 128.0f, 0.97f)
+  };
 }
 
 /// Detect JSON by leading brace/bracket and "key": patterns.
 static ClassificationResult DetectJSON(const std::string_view s) {
   const auto trimmed = TrimLeft(s);
-  if (trimmed.empty()) return {Language::Unknown, 0.0f};
+  if (trimmed.empty())
+    return {Language::Unknown, 0.0f};
   if (trimmed[0] != '{' && trimmed[0] != '[')
     return {Language::Unknown, 0.0f};
 
   // Count "key": patterns
   int pairs = 0;
   for (size_t i = 0; i + 2 < s.size(); i++) {
-    if (s[i] != '"') continue;
+    if (s[i] != '"')
+      continue;
     const size_t close = s.find('"', i + 1);
-    if (close == std::string_view::npos) break;
+    if (close == std::string_view::npos)
+      break;
     const size_t next = s.find_first_not_of(" \t\n\r", close + 1);
     if (next != std::string_view::npos && s[next] == ':') {
       pairs++;
@@ -451,84 +1317,58 @@ static ClassificationResult DetectJSON(const std::string_view s) {
       i = close;
     }
   }
-  if (pairs == 0) return {Language::Unknown, 0.0f};
-  return {Language::JSON, std::min(0.6f + pairs * 0.1f, 0.95f)};
+  if (pairs == 0)
+    return {Language::Unknown, 0.0f};
+  return {Language::JSON, std::min(0.6f + static_cast<float>(pairs) * 0.1f, 0.95f)};
 }
 
 /// Detect YAML by repeated "key: value" lines or list items.
 static ClassificationResult DetectYAML(const std::string_view s) {
-  int keyValueLines = 0;
-  int listLines = 0;
-  int nonEmptyLines = 0;
+  const auto analysis = AnalyzeYAMLStructure(s);
+  if (!HasStrongYAMLEvidence(s))
+    return {Language::Unknown, 0.0f};
 
-  size_t pos = 0;
-  while (pos <= s.size()) {
-    const size_t end = s.find('\n', pos);
-    const size_t lineEnd = end == std::string_view::npos ? s.size() : end;
-    const auto line = Trim(s.substr(pos, lineEnd - pos));
-
-    if (!line.empty()) {
-      nonEmptyLines++;
-      if (line == "---" || line == "...") {
-        keyValueLines++;
-      } else if (line.starts_with("- ")) {
-        listLines++;
-      } else {
-        const size_t colon = line.find(':');
-        if (colon != std::string_view::npos && colon > 0 && colon + 1 < line.size()) {
-          const auto key = TrimRight(line.substr(0, colon));
-          const auto value = TrimLeft(line.substr(colon + 1));
-          if (IsSimpleKey(key) && !value.empty() &&
-              line.find('{') == std::string_view::npos &&
-              line.find('}') == std::string_view::npos &&
-              line.find(';') == std::string_view::npos) {
-            keyValueLines++;
-          }
-        }
-      }
-    }
-
-    if (end == std::string_view::npos) break;
-    pos = end + 1;
-  }
-
-  const int signals = keyValueLines + listLines;
-  if (signals < 2) return {Language::Unknown, 0.0f};
-  if (nonEmptyLines == 1 && keyValueLines < 2) return {Language::Unknown, 0.0f};
-  return {Language::YAML, std::min(0.58f + signals * 0.08f, 0.92f)};
+  const int signals = analysis.docMarkers + analysis.keyValueLines +
+                      analysis.blockKeyLines + analysis.listLines;
+  return {Language::YAML, std::min(0.58f + static_cast<float>(signals) * 0.08f, 0.92f)};
 }
 
 /// Detect SQL by leading keyword and supporting keywords.
 static ClassificationResult DetectSQL(const std::string_view s) {
   const auto trimmed = TrimLeft(s);
-  if (trimmed.size() < 6) return {Language::Unknown, 0.0f};
+  if (trimmed.size() < 6)
+    return {Language::Unknown, 0.0f};
 
   static constexpr std::string_view leaders[] = {
-      "select ", "insert ", "update ", "delete ", "create ",
-      "alter ",  "drop ",   "merge ",  "with ",   "grant ",
-      "revoke ", "begin ",  "commit ", "rollback ", "explain ",
+    "select ", "insert ", "update ", "delete ", "create ",
+    "alter ", "drop ", "merge ", "with ", "grant ",
+    "revoke ", "begin ", "commit ", "rollback ", "explain ",
   };
   bool hasLeader = false;
-  for (const auto leader : leaders) {
-    if (StartsWithCI(trimmed, leader)) { hasLeader = true; break; }
+  for (const auto leader: leaders) {
+    if (StartsWithCI(trimmed, leader)) {
+      hasLeader = true;
+      break;
+    }
   }
-  if (!hasLeader) return {Language::Unknown, 0.0f};
+  if (!hasLeader)
+    return {Language::Unknown, 0.0f};
 
   // Count supporting keywords for confidence
   static constexpr std::string_view keywords[] = {
-      " from ",  " where ", " join ",   " inner ",  " outer ",
-      " left ",  " right ", " group ",  " order ",  " having ",
-      " limit ", " values", " into ",   " set ",    " table ",
-      " index ", " on ",    " and ",    " or ",     " not ",
-      " in ",    " like ",  " between "," exists ",  " null",
-      " as ",    " distinct"," union ",
+    " from ", " where ", " join ", " inner ", " outer ",
+    " left ", " right ", " group ", " order ", " having ",
+    " limit ", " values", " into ", " set ", " table ",
+    " index ", " on ", " and ", " or ", " not ",
+    " in ", " like ", " between ", " exists ", " null",
+    " as ", " distinct", " union ",
   };
   int kwCount = 0;
-  for (const auto kw : keywords) {
+  for (const auto kw: keywords) {
     if (FindCI(s, kw) != std::string_view::npos)
       kwCount++;
   }
-  return {Language::SQL, std::min(0.65f + kwCount * 0.05f, 0.95f)};
+  return {Language::SQL, std::min(0.65f + static_cast<float>(kwCount) * 0.05f, 0.95f)};
 }
 
 /// Detect HTML by scanning for known HTML5 tag names in angle brackets.
@@ -545,7 +1385,8 @@ static ClassificationResult DetectHTML(const std::string_view s) {
   int closingTags = 0;
 
   for (size_t i = 0; i < s.size(); i++) {
-    if (s[i] != '<') continue;
+    if (s[i] != '<')
+      continue;
 
     const bool isClosing = (i + 1 < s.size() && s[i + 1] == '/');
     const size_t nameStart = i + 1 + (isClosing ? 1 : 0);
@@ -558,7 +1399,8 @@ static ClassificationResult DetectHTML(const std::string_view s) {
            std::isalnum(static_cast<unsigned char>(s[nameEnd])))
       nameEnd++;
 
-    if (nameEnd == nameStart) continue;
+    if (nameEnd == nameStart)
+      continue;
     if (nameEnd < s.size()) {
       const char next = s[nameEnd];
       if (next != ' ' && next != '>' && next != '/' &&
@@ -568,14 +1410,17 @@ static ClassificationResult DetectHTML(const std::string_view s) {
 
     if (IsHTMLTagName(s.substr(nameStart, nameEnd - nameStart))) {
       htmlTags++;
-      if (isClosing) closingTags++;
+      if (isClosing)
+        closingTags++;
     }
   }
 
-  if (htmlTags == 0) return {Language::Unknown, 0.0f};
+  if (htmlTags == 0)
+    return {Language::Unknown, 0.0f};
   float confidence = 0.6f;
-  if (closingTags > 0) confidence += 0.15f;
-  confidence += std::min(htmlTags * 0.05f, 0.20f);
+  if (closingTags > 0)
+    confidence += 0.15f;
+  confidence += std::min(static_cast<float>(htmlTags) * 0.05f, 0.20f);
   return {Language::HTML, std::min(confidence, 0.95f)};
 }
 
@@ -586,42 +1431,108 @@ static ClassificationResult DetectXML(const std::string_view s) {
   if (s.find("<![CDATA[") != std::string_view::npos)
     return {Language::XML, 0.90f};
 
-  // Look for namespaced tags: <ns:tag
-  int nsTags = 0;
+  // Look for actual namespaced XML tags, not generic angle-bracket placeholders.
+  int nsOpenTags = 0;
+  int nsClosingTags = 0;
+  int nsSelfClosingTags = 0;
+  int attributeAssignments = 0;
+  bool hasXmlnsAttribute = false;
+
   for (size_t i = 0; i + 1 < s.size(); i++) {
-    if (s[i] != '<' || s[i + 1] == '/' || s[i + 1] == '!' || s[i + 1] == '?')
+    if (s[i] != '<' || s[i + 1] == '!' || s[i + 1] == '?')
       continue;
-    const size_t tagEnd = s.find_first_of("> \t\n/", i + 1);
-    if (tagEnd == std::string_view::npos) continue;
-    const auto tagName = s.substr(i + 1, tagEnd - i - 1);
-    if (tagName.find(':') != std::string_view::npos)
-      nsTags++;
+
+    const bool isClosing = s[i + 1] == '/';
+    const size_t nameStart = i + 1 + (isClosing ? 1 : 0);
+    if (nameStart >= s.size() || !IsXMLNameStartChar(s[nameStart]))
+      continue;
+
+    size_t nameEnd = nameStart + 1;
+    while (nameEnd < s.size() &&
+           (IsXMLNameChar(s[nameEnd]) || s[nameEnd] == ':'))
+      nameEnd++;
+
+    const auto tagName = s.substr(nameStart, nameEnd - nameStart);
+    if (!LooksLikeXMLQualifiedName(tagName))
+      continue;
+
+    if (nameEnd < s.size()) {
+      const char next = s[nameEnd];
+      if (next != '>' && next != '/' && next != ' ' &&
+          next != '\t' && next != '\n' && next != '\r')
+        continue;
+    }
+
+    const size_t tagEnd = s.find('>', nameEnd);
+    if (tagEnd == std::string_view::npos)
+      continue;
+
+    if (isClosing) {
+      nsClosingTags++;
+      i = tagEnd;
+      continue;
+    }
+
+    nsOpenTags++;
+    const auto tagTail = s.substr(nameEnd, tagEnd - nameEnd);
+    if (!tagTail.empty() && tagTail.find("xmlns") != std::string_view::npos)
+      hasXmlnsAttribute = true;
+    attributeAssignments += static_cast<int>(
+      std::ranges::count(tagTail, '='));
+    if (!tagTail.empty()) {
+      size_t tailPos = tagTail.size();
+      while (tailPos > 0 &&
+             std::isspace(static_cast<unsigned char>(tagTail[tailPos - 1])))
+        tailPos--;
+      if (tailPos > 0 && tagTail[tailPos - 1] == '/')
+        nsSelfClosingTags++;
+    }
     i = tagEnd;
   }
-  if (nsTags == 0) return {Language::Unknown, 0.0f};
-  return {Language::XML, std::min(0.7f + nsTags * 0.1f, 0.95f)};
+
+  if (nsOpenTags == 0)
+    return {Language::Unknown, 0.0f};
+
+  if (nsClosingTags == 0 && nsSelfClosingTags == 0 && !hasXmlnsAttribute)
+    return {Language::Unknown, 0.0f};
+
+  float confidence = 0.72f;
+  confidence += std::min(static_cast<float>(nsOpenTags) * 0.05f, 0.10f);
+  if (nsClosingTags > 0)
+    confidence += 0.08f;
+  if (nsSelfClosingTags > 0)
+    confidence += 0.05f;
+  if (attributeAssignments > 0)
+    confidence += 0.05f;
+  if (hasXmlnsAttribute)
+    confidence += 0.10f;
+
+  return {Language::XML, std::min(confidence, 0.95f)};
 }
 
 /// Detect regex patterns by counting metacharacter signals.
 static ClassificationResult DetectRegex(const std::string_view s) {
-  if (s.size() < 3) return {Language::Unknown, 0.0f};
+  if (s.size() < 3)
+    return {Language::Unknown, 0.0f};
 
   int signals = 0;
 
   // Regex-specific escape sequences
   static constexpr std::string_view escapes[] = {
-      "\\d", "\\D", "\\w", "\\W", "\\s", "\\S", "\\b", "\\B",
+    "\\d", "\\D", "\\w", "\\W", "\\s", "\\S", "\\b", "\\B",
   };
-  for (const auto esc : escapes) {
-    if (s.find(esc) != std::string_view::npos) signals += 2;
+  for (const auto esc: escapes) {
+    if (s.find(esc) != std::string_view::npos)
+      signals += 2;
   }
 
   // Regex-specific groups
   static constexpr std::string_view groups[] = {
-      "(?:", "(?=", "(?!", "(?<=", "(?<!", "(?P<", "(?P=",
+    "(?:", "(?=", "(?!", "(?<=", "(?<!", "(?P<", "(?P=",
   };
-  for (const auto grp : groups) {
-    if (s.find(grp) != std::string_view::npos) signals += 3;
+  for (const auto grp: groups) {
+    if (s.find(grp) != std::string_view::npos)
+      signals += 3;
   }
 
   // Character classes [...]
@@ -636,16 +1547,20 @@ static ClassificationResult DetectRegex(const std::string_view s) {
       while (j < s.size() &&
              (std::isdigit(static_cast<unsigned char>(s[j])) || s[j] == ','))
         j++;
-      if (j < s.size() && s[j] == '}') signals += 2;
+      if (j < s.size() && s[j] == '}')
+        signals += 2;
     }
   }
 
   // Anchors
-  if (s.front() == '^') signals++;
-  if (s.back() == '$') signals++;
+  if (s.front() == '^')
+    signals++;
+  if (s.back() == '$')
+    signals++;
 
-  if (signals < 2) return {Language::Unknown, 0.0f};
-  return {Language::Regex, std::min(0.5f + signals * 0.08f, 0.95f)};
+  if (signals < 2)
+    return {Language::Unknown, 0.0f};
+  return {Language::Regex, std::min(0.5f + static_cast<float>(signals) * 0.08f, 0.95f)};
 }
 
 /// Detect CSS by scanning for known CSS property names.
@@ -656,20 +1571,22 @@ static ClassificationResult DetectCSS(const std::string_view s) {
     return {Language::Unknown, 0.0f};
 
   static constexpr std::string_view props[] = {
-      "color:",       "background:",  "margin:",       "padding:",
-      "border:",      "display:",     "position:",     "font-size:",
-      "font-family:", "width:",       "height:",       "top:",
-      "left:",        "right:",       "bottom:",       "z-index:",
-      "overflow:",    "text-align:",  "float:",        "opacity:",
-      "transform:",   "transition:",  "animation:",    "flex:",
-      "grid:",        "justify-content:", "align-items:",
+    "color:", "background:", "margin:", "padding:",
+    "border:", "display:", "position:", "font-size:",
+    "font-family:", "width:", "height:", "top:",
+    "left:", "right:", "bottom:", "z-index:",
+    "overflow:", "text-align:", "float:", "opacity:",
+    "transform:", "transition:", "animation:", "flex:",
+    "grid:", "justify-content:", "align-items:",
   };
   int matches = 0;
-  for (const auto prop : props) {
-    if (FindCI(s, prop) != std::string_view::npos) matches++;
+  for (const auto prop: props) {
+    if (FindCI(s, prop) != std::string_view::npos)
+      matches++;
   }
-  if (matches == 0) return {Language::Unknown, 0.0f};
-  return {Language::CSS, std::min(0.6f + matches * 0.1f, 0.95f)};
+  if (matches == 0)
+    return {Language::Unknown, 0.0f};
+  return {Language::CSS, std::min(0.6f + static_cast<float>(matches) * 0.1f, 0.95f)};
 }
 
 /// Detect shell commands by pipes, redirections, and leading commands.
@@ -684,26 +1601,33 @@ static ClassificationResult DetectShell(const std::string_view s) {
     if (s[i] == '|') {
       const bool doublePipe =
           (i > 0 && s[i - 1] == '|') || (i + 1 < s.size() && s[i + 1] == '|');
-      if (!doublePipe) signals += 2;
+      if (!doublePipe)
+        signals += 2;
     }
   }
 
   // Redirections
-  if (s.find(">>") != std::string_view::npos) signals++;
-  if (s.find("2>&1") != std::string_view::npos) signals += 2;
-  if (s.find("2>/dev/null") != std::string_view::npos) signals += 2;
+  if (s.find(">>") != std::string_view::npos)
+    signals++;
+  if (s.find("2>&1") != std::string_view::npos)
+    signals += 2;
+  if (s.find("2>/dev/null") != std::string_view::npos)
+    signals += 2;
 
   // Leading commands
   const auto trimmed = TrimLeft(s);
   static constexpr std::string_view cmds[] = {
-      "echo ",  "cat ",   "grep ",  "sed ",   "awk ",   "find ",
-      "xargs ", "ls ",    "cd ",    "mv ",    "cp ",    "rm ",
-      "mkdir ", "chmod ", "chown ", "tar ",   "curl ",  "wget ",
-      "ssh ",   "scp ",   "git ",   "docker ","make ",  "cmake ",
-      "pip ",   "npm ",   "apt ",   "yum ",   "brew ",  "sudo ",
+    "echo ", "cat ", "grep ", "sed ", "awk ", "find ",
+    "xargs ", "ls ", "cd ", "mv ", "cp ", "rm ",
+    "mkdir ", "chmod ", "chown ", "tar ", "curl ", "wget ",
+    "ssh ", "scp ", "git ", "docker ", "make ", "cmake ",
+    "pip ", "npm ", "apt ", "yum ", "brew ", "sudo ",
   };
-  for (const auto cmd : cmds) {
-    if (trimmed.starts_with(cmd)) { signals += 2; break; }
+  for (const auto cmd: cmds) {
+    if (trimmed.starts_with(cmd)) {
+      signals += 2;
+      break;
+    }
   }
 
   // Shell variables: $VAR or ${VAR}
@@ -714,8 +1638,9 @@ static ClassificationResult DetectShell(const std::string_view s) {
       signals++;
   }
 
-  if (signals < 2) return {Language::Unknown, 0.0f};
-  return {Language::Shell, std::min(0.55f + signals * 0.08f, 0.95f)};
+  if (signals < 2)
+    return {Language::Unknown, 0.0f};
+  return {Language::Shell, std::min(0.55f + static_cast<float>(signals) * 0.08f, 0.95f)};
 }
 
 /// Detect metric names, trace categories, symbol names, and resource-like tokens.
@@ -738,12 +1663,14 @@ static ClassificationResult DetectIdentifierLike(const std::string_view s) {
 
   char prev = '\0';
   bool prevWasSeparator = true;
-  for (const char c : trimmed) {
-    const unsigned char uc = static_cast<unsigned char>(c);
-    if (std::isalnum(uc)) {
-      if (std::isalpha(uc)) letters++;
-      if (std::isdigit(uc)) digits++;
-      if (prevWasSeparator) componentStarts++;
+  for (const char c: trimmed) {
+    if (const auto uc = static_cast<unsigned char>(c); std::isalnum(uc)) {
+      if (std::isalpha(uc))
+        letters++;
+      if (std::isdigit(uc))
+        digits++;
+      if (prevWasSeparator)
+        componentStarts++;
       if (std::islower(static_cast<unsigned char>(prev)) &&
           std::isupper(uc))
         camelTransitions++;
@@ -751,9 +1678,12 @@ static ClassificationResult DetectIdentifierLike(const std::string_view s) {
     } else if (IsIdentifierLikeSeparator(c)) {
       separators++;
       prevWasSeparator = true;
-      if (c == '.') hasDot = true;
-      if (c == '/') hasSlash = true;
-      if (c == ':' && prev == ':') hasDoubleColon = true;
+      if (c == '.')
+        hasDot = true;
+      if (c == '/')
+        hasSlash = true;
+      if (c == ':' && prev == ':')
+        hasDoubleColon = true;
     } else {
       return {Language::Unknown, 0.0f};
     }
@@ -779,14 +1709,20 @@ static ClassificationResult DetectIdentifierLike(const std::string_view s) {
   if (digits > 0 && letters < 3)
     return {Language::Unknown, 0.0f};
 
-  return {Language::IdentifierLike,
-          std::min(0.62f + static_cast<float>(signals) * 0.05f, 0.95f)};
+  return {
+    Language::IdentifierLike,
+    std::min(0.62f + static_cast<float>(signals) * 0.05f, 0.95f)
+  };
 }
 
 /// Detect ordinary prose, log lines, and other natural-language fragments.
 static ClassificationResult DetectPlainText(const std::string_view s) {
   const auto trimmed = Trim(s);
-  if (trimmed.size() < 12) return {Language::Unknown, 0.0f};
+  if (trimmed.size() < 12)
+    return {Language::Unknown, 0.0f};
+
+  if (LooksLikeDecoratedPlainText(trimmed))
+    return {Language::PlainText, 0.82f};
 
   int letters = 0;
   int digits = 0;
@@ -796,18 +1732,23 @@ static ClassificationResult DetectPlainText(const std::string_view s) {
   int codeSymbols = 0;
   bool inWord = false;
 
-  for (const char c : trimmed) {
-    const unsigned char uc = static_cast<unsigned char>(c);
-    if (std::isalpha(uc)) letters++;
-    if (std::isdigit(uc)) digits++;
-    if (std::isspace(uc)) spaces++;
+  for (const char c: trimmed) {
+    const auto uc = static_cast<unsigned char>(c);
+    if (std::isalpha(uc))
+      letters++;
+    if (std::isdigit(uc))
+      digits++;
+    if (std::isspace(uc))
+      spaces++;
 
     const bool isWord =
         std::isalnum(uc) || c == '\'' || c == '-' || c == '_';
-    if (isWord && !inWord) words++;
+    if (isWord && !inWord)
+      words++;
     inWord = isWord;
 
-    if (c == '.' || c == '!' || c == '?' || c == ':') sentenceMarks++;
+    if (c == '.' || c == '!' || c == '?' || c == ':')
+      sentenceMarks++;
     if (c == '{' || c == '}' || c == '[' || c == ']' || c == '<' || c == '>' ||
         c == ';' || c == '=' || c == '$' || c == '|' || c == '&' || c == '@' ||
         c == '`')
@@ -821,10 +1762,12 @@ static ClassificationResult DetectPlainText(const std::string_view s) {
       trimmed.find("==") != std::string_view::npos)
     return {Language::Unknown, 0.0f};
 
-  if (codeSymbols > 2) return {Language::Unknown, 0.0f};
+  if (codeSymbols > 2)
+    return {Language::Unknown, 0.0f};
 
   const int nonSpace = static_cast<int>(trimmed.size()) - spaces;
-  if (nonSpace <= 0) return {Language::Unknown, 0.0f};
+  if (nonSpace <= 0)
+    return {Language::Unknown, 0.0f};
 
   const float letterRatio = static_cast<float>(letters) / static_cast<float>(nonSpace);
   const float digitRatio = static_cast<float>(digits) / static_cast<float>(nonSpace);
@@ -832,11 +1775,14 @@ static ClassificationResult DetectPlainText(const std::string_view s) {
   if (letterRatio < 0.55f || digitRatio > 0.30f)
     return {Language::Unknown, 0.0f};
 
+  if (LooksLikeShortPlainTextLabel(trimmed))
+    return {Language::PlainText, std::min(0.72f + static_cast<float>(words) * 0.04f, 0.88f)};
+
   if (words >= 4 && (spaces >= 2 || sentenceMarks > 0))
-    return {Language::PlainText, std::min(0.70f + words * 0.03f, 0.92f)};
+    return {Language::PlainText, std::min(0.70f + static_cast<float>(words) * 0.03f, 0.92f)};
 
   if (words >= 6)
-    return {Language::PlainText, std::min(0.68f + words * 0.025f, 0.90f)};
+    return {Language::PlainText, std::min(0.68f + static_cast<float>(words) * 0.025f, 0.90f)};
 
   return {Language::Unknown, 0.0f};
 }
@@ -852,9 +1798,6 @@ static ClassificationResult DetectPlainText(const std::string_view s) {
 /// where adjustedLogProb = logProb - unseen, precomputed during training.
 /// This avoids tracking which trigrams were NOT found per language.
 static ClassificationResult NaiveBayesClassify(const std::string_view body) {
-  if (kNumLanguages == 0 || kNumCombinedEntries == 0)
-    return {Language::Unknown, 0.0f};
-
   const size_t numTrigrams = body.size() >= 3 ? body.size() - 2 : 0;
   if (numTrigrams == 0)
     return {Language::Unknown, 0.0f};
@@ -940,8 +1883,10 @@ static ClassificationResult NaiveBayesClassify(const std::string_view body) {
 // Public API
 // ============================================================================
 
-ClassificationResult ClassifyString(const std::string_view body,
-                                    const float minConfidence) {
+ClassificationResult ClassifyString(
+  const std::string_view body,
+  const float minConfidence
+) {
   if (body.size() < 2)
     return {Language::Unknown, 0.0f};
 
@@ -954,14 +1899,14 @@ ClassificationResult ClassifyString(const std::string_view body,
   // Layer 1: structural detectors (ordered by specificity, lowest FP first)
   using Detector = ClassificationResult (*)(std::string_view);
   static constexpr Detector detectors[] = {
-      DetectURL,           DetectXML,          DetectFilePath,
-      DetectHexData,       DetectSQL,          DetectJSON,
-      DetectHTML,          DetectRegex,        DetectFormatString,
-      DetectCSS,           DetectShell,        DetectYAML,
-      DetectIdentifierLike,DetectPlainText,
+    DetectURL, DetectXML, DetectFilePath,
+    DetectHexData, DetectSQL, DetectJSON,
+    DetectHTML, DetectRegex, DetectInlineAsm, DetectFormatString,
+    DetectCSS, DetectShell, DetectYAML,
+    DetectIdentifierLike, DetectPlainText, DetectSeparatorLine,
   };
 
-  for (const auto detect : detectors) {
+  for (const auto detect: detectors) {
     if (const auto result = detect(text); result.confidence >= minConfidence)
       return result;
   }
@@ -971,8 +1916,11 @@ ClassificationResult ClassifyString(const std::string_view body,
   if (text.size() >= 15) {
     const float nbThreshold = std::max(minConfidence, 0.85f);
     if (const auto result = NaiveBayesClassify(text);
-        result.confidence >= nbThreshold)
+      result.confidence >= nbThreshold) {
+      if (result.language == Language::YAML && !HasStrongYAMLEvidence(text))
+        return {Language::Unknown, 0.0f};
       return result;
+    }
   }
 
   return {Language::Unknown, 0.0f};

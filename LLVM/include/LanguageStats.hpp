@@ -35,15 +35,14 @@ struct LanguageStats {
 
   /// Produce a snapshot with percentages, sorted by count descending.
   [[nodiscard]] LanguageStatsSnapshot Snapshot() const;
+  private:
+    struct Entry {
+      std::atomic<uint64_t> count{0};
+      std::atomic<uint64_t> violations{0};
+      std::atomic<uint64_t> toothpicks{0};
+    };
 
-private:
-  struct Entry {
-    std::atomic<uint64_t> count{0};
-    std::atomic<uint64_t> violations{0};
-    std::atomic<uint64_t> toothpicks{0};
-  };
-
-  Entry entries_[static_cast<size_t>(Language::COUNT)]{};
+    Entry entries_[static_cast<size_t>(Language::COUNT)]{};
 };
 
 #endif // LANGUAGE_STATS_HPP
