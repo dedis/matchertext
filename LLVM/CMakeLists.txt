@@ -42,6 +42,11 @@ add_executable(${PROJECT_NAME}
     src/FileStats.cpp
     include/FileStats.hpp
     include/StatsGenerator.hpp
+    src/LanguageClassifier.cpp
+    src/LanguageStats.cpp
+    include/LanguageClassifier.hpp
+    include/LanguageStats.hpp
+    include/LanguageModel.generated.hpp
 )
 
 # === LLVM & Clang ===

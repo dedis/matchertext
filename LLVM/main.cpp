@@ -87,6 +87,12 @@ int main(const int argc, char *argv[]) {
       }
     );
 
+    PrintLanguageStatsTable(
+      {
+        {"String", Parser::STRING_LANG_STATS.Snapshot()},
+      }
+    );
+
     if (logStrings) {
       std::cout << "\n\n";
       PrintStatsMaxString(Parser::STRING_STATS, Parser::DOCS_STATS);
