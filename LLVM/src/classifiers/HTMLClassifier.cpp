@@ -2,6 +2,36 @@
 
 namespace classifier_internal {
 
+namespace {
+
+bool IsHTMLTagName(const std::string_view name) {
+  if (name.empty() || name.size() > 10)
+    return false;
+
+  char lower[11];
+  for (size_t i = 0; i < name.size(); i++)
+    lower[i] = ToLower(name[i]);
+  const std::string_view lName(lower, name.size());
+
+  static constexpr std::string_view tags[] = {
+    "a", "abbr", "address", "article", "aside", "b",
+    "body", "br", "button", "canvas", "caption", "code",
+    "col", "dd", "details", "div", "dl", "dt",
+    "em", "fieldset", "figure", "footer", "form", "h1",
+    "h2", "h3", "h4", "h5", "h6", "head",
+    "header", "hr", "html", "i", "iframe", "img",
+    "input", "label", "li", "link", "main", "meta",
+    "nav", "ol", "option", "p", "pre", "script",
+    "section", "select", "small", "span", "strong", "style",
+    "summary", "svg", "table", "tbody", "td", "template",
+    "textarea", "tfoot", "th", "thead", "title", "tr",
+    "u", "ul", "video",
+  };
+  return std::ranges::binary_search(tags, lName);
+}
+
+} // namespace
+
 ClassificationResult DetectHTML(const std::string_view s) {
   if (s.find('<') == std::string_view::npos)
     return {Language::Unknown, 0.0f};

@@ -2,6 +2,39 @@
 
 namespace classifier_internal {
 
+namespace {
+
+bool IsXMLNameStartChar(const char c) {
+  const auto uc = static_cast<unsigned char>(c);
+  return std::isalpha(uc) || c == '_';
+}
+
+bool IsXMLNameChar(const char c) {
+  const auto uc = static_cast<unsigned char>(c);
+  return std::isalnum(uc) || c == '_' || c == '-' || c == '.';
+}
+
+bool LooksLikeXMLQualifiedName(const std::string_view name) {
+  if (name.empty() || name.find("::") != std::string_view::npos)
+    return false;
+
+  const size_t colon = name.find(':');
+  if (colon == std::string_view::npos || colon == 0 || colon + 1 >= name.size())
+    return false;
+  if (name.find(':', colon + 1) != std::string_view::npos)
+    return false;
+
+  const auto prefix = name.substr(0, colon);
+  const auto local = name.substr(colon + 1);
+  if (!IsXMLNameStartChar(prefix.front()) || !IsXMLNameStartChar(local.front()))
+    return false;
+
+  return std::ranges::all_of(prefix.substr(1), IsXMLNameChar) &&
+         std::ranges::all_of(local.substr(1), IsXMLNameChar);
+}
+
+} // namespace
+
 ClassificationResult DetectXML(const std::string_view s) {
   if (s.find("<?xml") != std::string_view::npos)
     return {Language::XML, 0.95f};

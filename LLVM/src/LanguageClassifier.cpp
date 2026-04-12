@@ -33,6 +33,110 @@ const char *LanguageName(const Language lang) {
 }
 
 namespace {
+  bool HasRepeatedCharRun(const std::string_view s,
+                          const int minRunLength = 5,
+                          int *maxRunLength = nullptr) {
+    int currentRunLength = 1;
+    int maxRepeatedRun = 1;
+    char repeatedChar = '\0';
+    bool hasRepeatedRun = false;
+
+    for (const char c : s) {
+      if (std::isspace(static_cast<unsigned char>(c))) {
+        repeatedChar = '\0';
+        currentRunLength = 1;
+        continue;
+      }
+
+      if (c == repeatedChar) {
+        currentRunLength++;
+      } else {
+        repeatedChar = c;
+        currentRunLength = 1;
+      }
+
+      maxRepeatedRun = std::max(maxRepeatedRun, currentRunLength);
+      if (currentRunLength >= minRunLength)
+        hasRepeatedRun = true;
+    }
+
+    if (maxRunLength != nullptr)
+      *maxRunLength = maxRepeatedRun;
+    return hasRepeatedRun;
+  }
+
+  bool IsTokenLikeSeparator(const char c) {
+    return c == '_' || c == '-' || c == '.' || c == '/' || c == ':';
+  }
+
+  bool LooksLikeTokenLikeUnknown(const std::string_view s) {
+    const auto trimmed = classifier_internal::Trim(s);
+    if (trimmed.size() < 4 || trimmed.size() > 160)
+      return false;
+
+    if (trimmed.find_first_of(" \t\n\r") != std::string_view::npos)
+      return false;
+    if (classifier_internal::LooksLikeBareDomainLikeToken(trimmed))
+      return false;
+
+    int letters = 0;
+    int digits = 0;
+    int separators = 0;
+    int camelTransitions = 0;
+    int componentStarts = 0;
+    bool hasDoubleColon = false;
+    bool hasDot = false;
+    bool hasSlash = false;
+
+    char prev = '\0';
+    bool prevWasSeparator = true;
+    for (const char c : trimmed) {
+      if (const auto uc = static_cast<unsigned char>(c); std::isalnum(uc)) {
+        if (std::isalpha(uc))
+          letters++;
+        if (std::isdigit(uc))
+          digits++;
+        if (prevWasSeparator)
+          componentStarts++;
+        if (std::islower(static_cast<unsigned char>(prev)) &&
+            std::isupper(uc))
+          camelTransitions++;
+        prevWasSeparator = false;
+      } else if (IsTokenLikeSeparator(c)) {
+        separators++;
+        prevWasSeparator = true;
+        if (c == '.')
+          hasDot = true;
+        if (c == '/')
+          hasSlash = true;
+        if (c == ':' && prev == ':')
+          hasDoubleColon = true;
+      } else {
+        return false;
+      }
+      prev = c;
+    }
+
+    if (letters == 0 || (separators == 0 && camelTransitions == 0))
+      return false;
+
+    const float letterRatio = static_cast<float>(letters) /
+                              static_cast<float>(trimmed.size());
+    if (letterRatio < 0.45f)
+      return false;
+
+    const int signals = componentStarts + camelTransitions +
+                        (hasDoubleColon ? 2 : 0) + (hasDot ? 1 : 0) +
+                        (hasSlash ? 1 : 0);
+    if (signals < 2)
+      return false;
+
+    if (digits > 0 && letters < 3)
+      return false;
+
+    return true;
+  }
+
   uint32_t PackTrigram(const char a, const char b, const char c) {
     return (static_cast<uint32_t>(static_cast<uint8_t>(a)) << 16) |
            (static_cast<uint32_t>(static_cast<uint8_t>(b)) << 8) |
@@ -154,8 +258,6 @@ ClassificationResult ClassifyString(const std::string_view body, const float min
 
   using Detector = ClassificationResult (*)(std::string_view);
   static constexpr Detector detectors[] = {
-    classifier_internal::DetectEmail,
-    classifier_internal::DetectURL,
     classifier_internal::DetectXML,
     classifier_internal::DetectFilePath,
     classifier_internal::DetectHexData,
@@ -176,7 +278,7 @@ ClassificationResult ClassifyString(const std::string_view body, const float min
       return result;
   }
 
-  if (classifier_internal::LooksLikeTokenLikeUnknown(text))
+  if (LooksLikeTokenLikeUnknown(text))
     return {Language::Unknown, 0.95f};
 
   if (const auto result = classifier_internal::DetectPlainText(text);
@@ -187,7 +289,7 @@ ClassificationResult ClassifyString(const std::string_view body, const float min
     result.confidence >= minConfidence)
     return result;
 
-  if (classifier_internal::HasRepeatedCharRun(text))
+  if (HasRepeatedCharRun(text))
     return {Language::Unknown, 0.0f};
 
   if (text.size() >= 15) {
