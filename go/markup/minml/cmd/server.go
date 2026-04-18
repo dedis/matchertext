@@ -1,9 +1,7 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"github.com/dedis/matchertext/go/markup/minml"
 	"io/fs"
 	"log"
 	"net/http"
@@ -15,6 +13,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/dedis/matchertext/go/markup/minml"
 
 	"github.com/dedis/matchertext/go/markup/minml/cmd/server_structs"
 	"github.com/fsnotify/fsnotify"
@@ -233,17 +233,17 @@ func convertFile(target server_structs.BuildTarget, relPath string, extensions [
 	}
 
 	// Convert MinML to HTML
-	var buf bytes.Buffer
-	if err := minml.ConvertFromReader(bytes.NewReader(data), &buf, relPath); err != nil {
+	html, err := minml.ConvertString(string(data))
+	if err != nil {
 		return fmt.Errorf("converting %s: %w", relPath, err)
 	}
 
 	// Inject live-reload script
-	buf.WriteString(reloadScript)
+	html += reloadScript
 
 	// Write HTML output to the build target
 	htmlPath := relPath[:len(relPath)-len(extension)] + "html"
-	if err := target.WriteFile(htmlPath, buf.Bytes()); err != nil {
+	if err := target.WriteFile(htmlPath, []byte(html)); err != nil {
 		return fmt.Errorf("writing %s: %w", htmlPath, err)
 	}
 
