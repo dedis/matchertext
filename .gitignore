@@ -40,23 +40,15 @@ dev/tree-sitter/dist/
 *.egg-info
 *.whl
 
-# C artifacts
+# C artifacts (tree-sitter generated libraries)
 *.a
 *.so
 *.so.*
 *.dylib
 *.dll
 *.pc
-*.exp
-*.lib
-
-# Zig artifacts
-dev/tree-sitter/.zig-cache/
-dev/tree-sitter/zig-cache/
-dev/tree-sitter/zig-out/
 
 # Grammar volatiles
-*.wasm
 *.obj
 *.o
 
@@ -66,3 +58,4 @@ dev/tree-sitter/zig-out/
 *.zip
 
 dev/tree-sitter/src
+dev/tree-sitter/build

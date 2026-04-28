@@ -5,9 +5,10 @@
       "name": "minml",
       "camelcase": "MinML",
       "title": "MinML",
-      "scope": "source.m",
+      "scope": "source.minml",
       "file-types": [
-        "minml,m"
+        "minml",
+        "m"
       ],
       "injection-regex": "^minml$",
       "class-name": "TreeSitterMinml"
@@ -28,12 +29,12 @@
     }
   },
   "bindings": {
-    "c": true,
+    "c": false,
     "go": true,
-    "node": true,
-    "python": true,
-    "rust": true,
-    "swift": true,
+    "node": false,
+    "python": false,
+    "rust": false,
+    "swift": false,
     "zig": false
   }
 }

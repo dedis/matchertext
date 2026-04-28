@@ -2,6 +2,40 @@
  * @file Minml grammar for tree-sitter
  * @author Philip Hamelink <philip.hamelink@epfl.ch>
  * @license MIT
+ *
+ * Grammar structure overview:
+ *
+ * A source file is a flat sequence of _node items. The main node types are:
+ *
+ *   element                 tag{attrs}[content] — the <> wrappers are optional
+ *   content_block           [...] — delimiter-scoped content, used in elements
+ *   attr_block              {...} — key=value attribute list
+ *   char_ref                [name] / [#123] / [#xABC] — character references
+ *   quoted_string           "[...] — verbatim string, brackets not interpreted
+ *   raw_block               +[...] — raw literal content (no escaping)
+ *   comment                 -[...] — ignored by processors
+ *   processing_instruction  ?[...] — out-of-band instructions (like XML PI)
+ *   matcher_escape          [[<]], [[>]], etc. — literal bracket characters
+ *   text                    plain characters (no brackets, braces, or <>)
+ *   word                    identifier-like text (letters, digits, _, :, -)
+ *
+ * Disambiguation:
+ *   - element vs word: both start with [a-zA-Z_]; element has prec(1) and
+ *     requires a following content_block, so "tag[...]" is an element while a
+ *     bare identifier is a word.
+ *   - char_ref vs content_block: char_ref is in _node; content_block is NOT —
+ *     it only appears as element.content or attr_value. A bare "[...]" in
+ *     content is always a char_ref.
+ *   - plain_value vs word in attr_value: plain_value handles unquoted values
+ *     with non-identifier characters (e.g. cat.jpg, 123); pure identifiers
+ *     fall through to $.word so "http[...]" still parses as an element-valued
+ *     attribute.
+ *
+ * Whitespace:
+ *   No global extras — whitespace is either meaningful content (captured by
+ *   the text rule inside content_block) or an explicit separator between
+ *   attributes in attr_block. This prevents the parser from accepting
+ *   syntactically invalid whitespace such as "< tag[...]" or "name =val".
  */
 
 /// <reference types="tree-sitter-cli/dsl" />
@@ -9,72 +43,227 @@
 
 module.exports = grammar({
   name: "minml",
-  extras: $ => [/\s/],
 
   rules: {
+    // Root rule. A MinML document is zero or more nodes at the top level.
+    // repeat() matches its argument any number of times (including zero).
     source_file: $ => repeat($._node),
+
+    // The set of all things that can appear as content — at the top level,
+    // inside a content_block, or anywhere nodes are allowed.
+    // The leading underscore makes this a hidden rule: tree-sitter will not
+    // create a named _node in the syntax tree; its children are inlined.
+    // choice() tries each alternative in order and uses the first that matches.
     _node: $ => choice(
-      $.element,
-      $.processing_instruction,
-      $.char_ref,
-      $.quoted_string,
-      $.raw_block,
-      $.comment,
-      $.matcher_escape,
-      $.word,
-      $.text,
+      $.element,              // tag[...] or tag{...}[...]
+      $.processing_instruction, // ?[...]
+      $.char_ref,             // [name], [#123], [#xAB]
+      $.quoted_string,        // "[...]
+      $.raw_block,            // +[...]
+      $.comment,              // -[...]
+      $.matcher_escape,       // [[<]], [[>]], [(<)], [(>)]
+      $.word,                 // bare identifier, e.g. "hello"
+      $.text,                 // any other characters (punctuation, spaces, digits)
     ),
 
+    // An element: optionally prefixed with "<" (space-sucker), then a tag name,
+    // an optional attribute block, a mandatory content block, and an optional
+    // ">" suffix (space-sucker).
+    //
+    // prec(1, ...) gives this rule higher precedence than the default (0) to
+    // resolve the shift/reduce conflict between element and word: when the parser
+    // sees a word followed by "[", it prefers element over bare word.
+    //
+    // seq() matches its arguments in order, left to right.
+    // optional() matches zero or one occurrences.
+    // field() attaches a named field to a child node so it is accessible by name
+    //   in queries and the API (e.g. node.childForFieldName("tag")).
+    // alias() renames a node type in the syntax tree — here word becomes tag_name
+    //   so consumers can distinguish tag identifiers from content words.
     element: $ => prec(1, seq(
-      optional("<"),
-      field("tag", alias($.word, $.tag_name)),
-      optional(field("attrs", $.attr_block)),
-      field("content", $.content_block),
-      optional(">"),
+      optional("<"),                                   // space-sucker prefix marker
+      field("tag", alias($.word, $.tag_name)),         // the element name
+      optional(field("attrs", $.attr_block)),          // optional {name=value ...}
+      field("content", $.content_block),               // mandatory [...]
+      optional(">"),                                   // space-sucker suffix marker
     )),
+
+    // A bare identifier: starts with a letter or underscore, followed by any
+    // number of letters, digits, underscores, colons, or hyphens.
+    // Regex: /[a-zA-Z_][a-zA-Z0-9_:-]*/
+    //   [a-zA-Z_]      — first char must be a letter or underscore
+    //   [a-zA-Z0-9_:-]*— subsequent chars: letters, digits, _, :, or -
+    // Colon and hyphen are included to support XML-style namespaced names
+    // (e.g. "xml:lang") and hyphenated names (e.g. "data-value").
     word: $ => /[a-zA-Z_][a-zA-Z0-9_:-]*/,
+
+    // A bracketed block of content: "[" followed by zero or more nodes, then "]".
+    // This is the body of an element and appears as its "content" field.
+    // It is NOT a standalone node (not in _node) — a bare "[...]" at the top
+    // level is always a char_ref, never a content_block.
     content_block: $ => seq("[", repeat($._node), "]"),
 
-    attr_block: $ => seq("{", repeat($.attribute), "}"),
+    // An attribute block: "{" followed by zero or more attributes, then "}".
+    //
+    // Attributes are separated by whitespace. The explicit optional(/\s+/) before
+    // each attribute and at the end handles the inter-attribute spacing, because
+    // there is no global extras whitespace rule in this grammar.
+    //   optional(/\s+/) — zero or one run of whitespace (space, tab, newline, etc.)
+    //                     /\s+/ matches one or more whitespace characters
+    //   repeat(seq(...)) — zero or more repetitions of (optional-space + attribute)
+    //
+    // Example: {src=cat.jpg alt=[a cat]}
+    //   → optional whitespace (none before "src")
+    //   → attribute(src=cat.jpg)
+    //   → optional whitespace (" " before "alt")
+    //   → attribute(alt=[a cat])
+    //   → optional whitespace (none before "}")
+    attr_block: $ => seq(
+      "{",
+      repeat(seq(optional(/\s+/), $.attribute)),  // whitespace-separated attributes
+      optional(/\s+/),                            // optional trailing whitespace before "}"
+      "}"
+    ),
+
+    // A single attribute: name=value with no whitespace around the "=".
+    // The name is an identifier aliased to attr_name in the tree.
+    // The value is one of several forms (see attr_value below).
     attribute: $ => seq(
-      field("name", alias($.word, $.attr_name)),
-      "=",
-      field("value", $.attr_value),
+      field("name", alias($.word, $.attr_name)),  // attribute name identifier
+      "=",                                        // literal equals sign — no spaces allowed
+      field("value", $.attr_value),               // the attribute value
     ),
+
+    // An attribute value is one of four forms, tried in order:
+    //   1. prec(1, $.element) — an element like http[//example.com/]
+    //                           prec(1) ensures element wins over bare word when
+    //                           the value starts with a word followed by "["
+    //   2. $.content_block   — a bracketed sequence like [a cute cat]
+    //   3. $.plain_value     — an unquoted value with non-identifier characters
+    //                           like cat.jpg or 123
+    //   4. $.word            — a plain identifier like en or utf-8
     attr_value: $ => choice(
-      prec(1, $.element),
-      $.content_block,
-      $.plain_value,
-      $.word,
+      prec(1, $.element),   // e.g. href=http[//example.com/]
+      $.content_block,      // e.g. alt=[a cute cat]
+      $.plain_value,        // e.g. src=cat.jpg  or  width=100px
+      $.word,               // e.g. lang=en
     ),
-    // plain_value matches values containing non-identifier chars (e.g. cat.jpg)
-    // or starting with a non-letter (e.g. 123). Pure identifiers fall through to
-    // $.word so that "http[...]" is still parsed as an element-valued attribute.
+
+    // An unquoted attribute value that contains at least one character outside the
+    // identifier set, so it cannot be matched as a plain word.
+    //
+    // token() wraps the pattern as a single atomic terminal token — the entire
+    // match is one leaf node with no internal structure.
+    //
+    // Two alternatives handle the two cases where an identifier alone is insufficient:
+    //
+    // Alternative 1: starts with an identifier prefix, then has a non-identifier char
+    //   /[a-zA-Z_][a-zA-Z0-9_:-]*/   — leading identifier portion (e.g. "cat" in "cat.jpg")
+    //   [^ \t\n\r\f{}\[\]<>a-zA-Z0-9_:-]  — one non-identifier, non-whitespace,
+    //                                         non-delimiter char (e.g. ".")
+    //   [^ \t\n\r\f{}\[\]<>]*/            — zero or more non-whitespace,
+    //                                         non-delimiter chars (e.g. "jpg")
+    //   Example matches: cat.jpg  version=1.0  data:image/png
+    //   Does NOT match bare identifiers like "en" — those fall through to $.word,
+    //   preserving the ability to parse "http[...]" as an element-valued attr.
+    //
+    // Alternative 2: starts with a non-identifier, non-delimiter character
+    //   /[^ \t\n\r\f{}\[\]<>a-zA-Z_]/   — first char is not a letter/underscore/whitespace/delimiter
+    //   [^ \t\n\r\f{}\[\]<>]*/           — zero or more non-whitespace, non-delimiter chars
+    //   Example matches: 123  42px  @charset
+    //
+    // Shared exclusion set for "non-delimiter" chars: space, tab, newline (\n),
+    // carriage return (\r), form feed (\f), braces {}, square brackets \[\],
+    // and angle brackets <>.
     plain_value: $ => token(choice(
       /[a-zA-Z_][a-zA-Z0-9_:-]*[^ \t\n\r\f{}\[\]<>a-zA-Z0-9_:-][^ \t\n\r\f{}\[\]<>]*/,
       /[^ \t\n\r\f{}\[\]<>a-zA-Z_][^ \t\n\r\f{}\[\]<>]*/,
     )),
 
+    // A character reference — the MinML equivalent of &name; / &#123; / &#xAB;
+    // Three forms, each wrapped in "[" ... "]":
+    //
+    //   named_ref:   /[a-zA-Z][a-zA-Z0-9]*/
+    //                starts with a letter, followed by letters/digits
+    //                Example: [reg]  [amp]  [nbsp]
+    //
+    //   decimal_ref: /#[0-9]+/
+    //                a "#" followed by one or more decimal digits
+    //                Example: [#174]  [#169]
+    //
+    //   hex_ref:     /#x[0-9a-fA-F]+/
+    //                "#x" followed by one or more hex digits (upper or lower case)
+    //                Example: [#xAE]  [#x00AE]
+    //
+    // alias() renames each regex match to its descriptive node type in the tree.
     char_ref: $ => seq("[", choice(
-      alias(/[a-zA-Z][a-zA-Z0-9]*/, $.named_ref),
-      alias(/#[0-9]+/, $.decimal_ref),
-      alias(/#x[0-9a-fA-F]+/, $.hex_ref),
+      alias(/[a-zA-Z][a-zA-Z0-9]*/,    $.named_ref),    // [reg]
+      alias(/#[0-9]+/,                  $.decimal_ref),  // [#174]
+      alias(/#x[0-9a-fA-F]+/,          $.hex_ref),      // [#xAE]
     ), "]"),
 
+    // A quoted string: the two-character delimiter '"[' followed by content, then ']'.
+    // Inside a quoted string, '[' does not start a new element or char_ref —
+    // the content is taken verbatim until the first ']'.
+    //
+    // /[^\]]*/  — zero or more characters that are not ']'
+    //   [^\]]   — negated character class: any character except ']'
+    //   *       — zero or more repetitions
+    // This means a quoted string cannot span multiple close-bracket characters.
+    // Example: "[hello [world]  — content is "hello [world"
     quoted_string: $ => seq('"[', /[^\]]*/, "]"),
+
+    // A raw block: '+[' followed by literal content, then ']'.
+    // The content is not parsed for MinML structure (no elements, no char refs).
+    // Useful for embedding raw markup like HTML.
+    // Same flat-until-']' regex as quoted_string.
+    // Example: +[<b>bold</b> text]
     raw_block: $ => seq("+[", /[^\]]*/, "]"),
+
+    // A comment: '-[' followed by content, then ']'.
+    // Comments are preserved in the parse tree but ignored by processors.
+    // Same flat-until-']' regex as quoted_string and raw_block.
+    // Example: -[this is a comment]
     comment: $ => seq("-[", /[^\]]*/, "]"),
 
+    // Matcher escape sequences — the MinML way to include literal bracket
+    // characters that would otherwise be parsed as structural delimiters.
+    //
+    // token() makes each a single atomic terminal (no sub-nodes).
+    // The four escape forms use square-bracket "matcher" notation:
+    //   [[<]]  — literal open square bracket  '['
+    //   [[>]]  — literal close square bracket ']'
+    //   [(<)]  — literal open parenthesis     '('  (via paren matcher)
+    //   [(>)]  — literal close parenthesis    ')'  (via paren matcher)
     matcher_escape: $ => token(choice(
-      "[[<]]",
-      "[[>]]",
-      "[(<)]",
-      "[(>)]",
+      "[[<]]",   // escaped '['
+      "[[>]]",   // escaped ']'
+      "[(<)]",   // escaped '('
+      "[(>)]",   // escaped ')'
     )),
 
-    // Processing instruction: ?[content]
+    // A processing instruction: '?[' followed by content, then ']'.
+    // Used for out-of-band processor directives, similar to XML's <?...?>.
+    // The content is flat (same /[^\]]*/ regex — no nesting until ']').
+    // Example: ?[xml version="1.0"]
     processing_instruction: $ => seq("?[", /[^\]]*/, "]"),
 
+    // Plain text: any run of characters that are NOT structural delimiters.
+    // This is the catch-all rule that captures everything not matched above,
+    // including spaces, punctuation, digits, and other Unicode characters.
+    //
+    // /[^\[\]{}<>a-zA-Z_]+/
+    //   [^...]   — negated character class: match any character NOT listed
+    //   \[       — exclude '[' (starts char_ref, content_block, etc.)
+    //   \]       — exclude ']' (closes content_block / char_ref / etc.)
+    //   {        — exclude '{' (starts attr_block)
+    //   }        — exclude '}' (closes attr_block)
+    //   <>       — exclude '<' and '>' (space-sucker markers on elements)
+    //   a-zA-Z_  — exclude letters and underscore (handled by word / element)
+    //   +        — one or more characters (text is never empty)
+    //
+    // Note: digits, spaces, punctuation like '.', '!', ':', '#', etc. all match
+    // text. Whitespace in content is preserved as text nodes.
     text: $ => /[^\[\]{}<>a-zA-Z_]+/,
   }
 });
