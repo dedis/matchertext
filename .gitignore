@@ -2,6 +2,10 @@
 **/.idea
 /minml
 **/minml.exe
+LLVM/ignore
+LLVM/include/LanguageModel.generated.hpp
+devtools
+out
 out/wasm/main.wasm
 out/wasm/wasm_exec.js
 

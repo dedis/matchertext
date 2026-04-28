@@ -1,4 +1,8 @@
 **/.DS_Store
 parser
 build
-ignore
+build-test
+./ignore
+./include/LanguageModel.generated.hpp
+result/**
+train/__pycache__

@@ -41,6 +41,29 @@
 | Average Relaxed Violations | Average relaxed violation count per file.                              |
 | Compliance Rate Relaxed    | Percentage of files without relaxed non-compliance.                    |
 
+## Language Classification Statistics
+
+| Metric     | Description                                                                 |
+|------------|-----------------------------------------------------------------------------|
+| Count      | Number of string literal samples assigned to the language bucket.           |
+| %          | Share of samples assigned to the bucket within the corresponding table.     |
+| Violations | Total MatcherText violation count accumulated by samples in the bucket.     |
+| Toothpicks | Total toothpick count accumulated by samples in the bucket.                 |
+
+## Language Bucket Definitions
+
+| Bucket                                               | Description                                                                                          |
+|------------------------------------------------------|------------------------------------------------------------------------------------------------------|
+| Unknown                                              | Abstain bucket used when no detector or statistical model has enough evidence to make a safe call.   |
+| PlainText                                            | Natural-language prose, log-like text, labels, and general human-readable strings.                   |
+| FormatString                                         | `printf`-style or placeholder-driven message templates.                                              |
+| FilePath                                             | Filesystem paths or path-like resource names.                                                        |
+| URL                                                  | URLs and URI-like strings.                                                                           |
+| HexData                                              | Hex-encoded payloads, hashes, or long grouped hexadecimal data.                                      |
+| BinaryData                                           | Escaped byte blobs or strings dominated by non-printable/binary content.                             |
+| JSON / YAML / XML / HTML / CSS / Shell / SQL / Regex | Structured-data or mini-language buckets matched by dedicated detectors and the fallback classifier. |
+| Named programming languages                          | Statistical fallback labels for snippets that most closely resemble the corresponding language.      |
+
 # Analysed Repositories
 
 ## Test Directory
@@ -154,7 +177,35 @@
 | Average Relaxed Violations | 0.218183    |
 | Compliance Rate Relaxed    | 94.2097     |
 
-Parsing takes around 1600-2300 ms
+### 4. String Language Breakdown
+
+| String  Language | Count  | %      | Violations  | Toothpicks  |
+|------------------|--------|--------|-------------|-------------|
+| Unknown          | 866086 | 60.80% | 3017        | 41902       |
+| FormatString     | 295770 | 20.76% | 1120        | 253712      |
+| PlainText        | 222789 | 15.64% | 427         | 119775      |
+| FilePath         | 15838  | 1.11%  | 11          | 79          |
+| PseudoEmail      | 8372   | 0.59%  | 0           | 15          |
+| InlineAsm        | 8238   | 0.58%  | 134         | 22884       |
+| BinaryData       | 3678   | 0.26%  | 0           | 287146      |
+| Shell            | 1423   | 0.10%  | 46          | 1299        |
+| SQL              | 1043   | 0.07%  | 0           | 684         |
+| HexData          | 433    | 0.03%  | 0           | 2           |
+| PseudoBinaryData | 298    | 0.02%  | 18          | 2944        |
+| PseudoURL        | 183    | 0.01%  | 0           | 110         |
+| Regex            | 86     | 0.01%  | 9           | 172         |
+| Email            | 79     | 0.01%  | 0           | 1           |
+| HTML             | 65     | 0.00%  | 2           | 321         |
+| CSS              | 46     | 0.00%  | 0           | 30          |
+| C++              | 26     | 0.00%  | 0           | 2           |
+| URL              | 16     | 0.00%  | 0           | 0           |
+| YAML             | 12     | 0.00%  | 0           | 198         |
+| XML              | 10     | 0.00%  | 2           | 37          |
+| JSON             | 5      | 0.00%  | 2           | 31          |
+| C                | 5      | 0.00%  | 0           | 2           |
+| JavaScript       | 3      | 0.00%  | 2           | 2           |
+| OCaml            | 2      | 0.00%  | 0           | 0           |
+| Objective-C      | 1      | 0.00%  | 0           | 0           |
 
 ## Chromium
 
@@ -226,4 +277,46 @@ Parsing takes around 1600-2300 ms
 | Average Relaxed Violations | 1.21242      |
 | Compliance Rate Relaxed    | 83.2057      |
 
-Parsing takes around 2900-3200 ms
+### 4. String Language Breakdown
+
+| String Language   | Count   | %      | Violations   | Toothpicks   |
+|-------------------|---------|--------|--------------|--------------|
+| FilePath          | 1161118 | 47.27% | 47           | 3037         |
+| Unknown           | 963722  | 39.24% | 51026        | 93786        |
+| PlainText         | 182033  | 7.41%  | 4917         | 33592        |
+| URL               | 71357   | 2.91%  | 21           | 0            |
+| FormatString      | 18483   | 0.75%  | 441          | 8046         |
+| HTML              | 13421   | 0.55%  | 185          | 7832         |
+| JSON              | 9467    | 0.39%  | 524          | 25735        |
+| PseudoURL         | 7894    | 0.32%  | 375          | 16026        |
+| Shell             | 5856    | 0.24%  | 590          | 7542         |
+| SQL               | 4562    | 0.19%  | 84           | 120          |
+| Email             | 4562    | 0.19%  | 0            | 3            |
+| HexData           | 4465    | 0.18%  | 0            | 7            |
+| Regex             | 2187    | 0.09%  | 1146         | 13472        |
+| InlineAsm         | 1839    | 0.07%  | 410          | 2471         |
+| BinaryData        | 1715    | 0.07%  | 0            | 986887       |
+| CSS               | 1348    | 0.05%  | 69           | 101          |
+| PseudoBinaryData  | 1002    | 0.04%  | 326          | 14680        |
+| YAML              | 564     | 0.02%  | 12           | 583          |
+| JavaScript        | 233     | 0.01%  | 226          | 38           |
+| XML               | 157     | 0.01%  | 14           | 249          |
+| PseudoEmail       | 83      | 0.00%  | 0            | 21           |
+| C++               | 48      | 0.00%  | 4            | 6            |
+| Objective-C       | 39      | 0.00%  | 3            | 5            |
+| GLSL              | 36      | 0.00%  | 1            | 119          |
+| Java              | 13      | 0.00%  | 5            | 5            |
+| C#                | 9       | 0.00%  | 8            | 0            |
+| Go                | 9       | 0.00%  | 0            | 0            |
+| OCaml             | 8       | 0.00%  | 2            | 4            |
+| Swift             | 6       | 0.00%  | 0            | 6            |
+| C                 | 4       | 0.00%  | 0            | 0            |
+| HLSL              | 4       | 0.00%  | 0            | 0            |
+| Erlang            | 3       | 0.00%  | 0            | 0            |
+| Elixir            | 3       | 0.00%  | 1            | 1            |
+| Python            | 2       | 0.00%  | 0            | 0            |
+| Ruby              | 1       | 0.00%  | 0            | 0            |
+| Kotlin            | 1       | 0.00%  | 0            | 4            |
+| R                 | 1       | 0.00%  | 1            | 0            |
+| Scala             | 1       | 0.00%  | 0            | 0            |
+| Haskell           | 1       | 0.00%  | 0            | 1            |

@@ -8,8 +8,11 @@
 #define PARSER_HPP
 
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include "FileStats.hpp"
+#include "LanguageStats.hpp"
 #include "Stats.hpp"
 
 /**
@@ -44,8 +47,16 @@ class Parser final {
      *       /\* block comments *\/
      *
      * @param path Absolute or relative path to the source file to scan.
+     * @param inputPath User-provided input root associated with this file. When
+     *        omitted, the file path itself is used for debug-language logging.
      */
-    static void ParseFile(const std::string &path);
+    static void ParseFile(const std::string &path, std::string_view inputPath = {});
+
+    /// Enable per-language debug sampling for the given top-level input paths.
+    static void ConfigureDebugLanguages(const std::vector<std::string> &inputPaths);
+
+    /// Flush any recorded debug-language samples to disk.
+    static void FlushDebugLanguageLogs();
 
     /// All the aggregated stats relating to parsed strings
     inline static EmbeddedStats STRING_STATS{};
@@ -58,10 +69,14 @@ class Parser final {
     inline static NestedStats DOCS_RELAXED_NESTED_STATS{};
     /// All the aggregated file level statistics
     inline static FileStats FILE_STATS{};
+    /// Per-language classification statistics for strings
+    inline static LanguageStats STRING_LANG_STATS{};
   private:
     /// Processes a string/doc and updates the given stat
     /// @returns the number of MatcherText violations found
-    static uint64_t process(std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats, bool relaxed = false);
+    static uint64_t process(std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats,
+                            LanguageStats *langStats = nullptr, bool relaxed = false,
+                            std::string_view sourcePath = {}, std::string_view inputPath = {});
 };
 
 #endif // PARSER_HPP
