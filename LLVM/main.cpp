@@ -117,13 +117,13 @@ int main(const int argc, char *argv[]) {
     if (debugLanguages) {
       log_info("Debug language sampling enabled");
       Parser::ConfigureDebugLanguages(inputPaths);
-    } {
-      std::ostringstream message;
-      message << "Parsing " << pluralize(files.size(), "file", "files");
-      if (logStrings)
-        message << " with string logging enabled";
-      log_info(message.str());
     }
+
+    std::ostringstream message;
+    message << "Parsing " << pluralize(files.size(), "file", "files");
+    if (logStrings)
+      message << " with string logging enabled";
+    log_info(message.str());
 
     const auto parseStart = Clock::now();
 

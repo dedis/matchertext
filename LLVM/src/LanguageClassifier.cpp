@@ -163,7 +163,7 @@ namespace {
 
     constexpr size_t kMaxLangs = 64;
     static_assert(kNumLanguages <= kMaxLangs, "Increase kMaxLangs");
-    float scores[kMaxLangs];
+    float scores[kMaxLangs]{};
     uint16_t matchedCounts[kMaxLangs]{};
     for (size_t i = 0; i < kNumLanguages; i++) {
       scores[i] = kLanguageInfos[i].logPrior +
@@ -278,8 +278,20 @@ ClassificationResult ClassifyString(const std::string_view body, const float min
       return result;
   }
 
-  if (LooksLikeTokenLikeUnknown(text))
+  if (LooksLikeTokenLikeUnknown(text)) {
+    bool hasCamelTransition = false;
+    for (size_t i = 1; i < text.size(); i++) {
+      if (std::islower(static_cast<unsigned char>(text[i - 1])) &&
+          std::isupper(static_cast<unsigned char>(text[i]))) {
+        hasCamelTransition = true;
+        break;
+      }
+    }
+    if (text.find('/') == std::string_view::npos &&
+        (text.find("::") != std::string_view::npos || hasCamelTransition))
+      return {Language::IdentifierLike, 0.95f};
     return {Language::Unknown, 0.95f};
+  }
 
   if (const auto result = classifier_internal::DetectPlainText(text);
     result.confidence >= minConfidence)

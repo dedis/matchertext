@@ -61,7 +61,7 @@ bool TestBasicLiterals() {
   ok &= CheckEq("basic.strings.raw_chars", strings.rawChars, 73.0);
   ok &= CheckEq("basic.docs.count", docs.count, 1.0);
   ok &= CheckEq("basic.docs_relaxed.count", docsRelaxed.count, 1.0);
-  ok &= CheckEq("basic.lang.total", static_cast<double>(lang.total), 6.0);
+  ok &= CheckEq("basic.lang.total", static_cast<double>(lang.total), 2.0);
 
   const uint64_t rawLevel1 =
       stringNested.rawLevels.size() > 1 ? stringNested.rawLevels[1] : 0;
@@ -69,7 +69,6 @@ bool TestBasicLiterals() {
       stringNested.validLevels.size() > 1 ? stringNested.validLevels[1] : 0;
   ok &= CheckEq("basic.nesting.raw_level_1", static_cast<double>(rawLevel1), 4.0);
   ok &= CheckEq("basic.nesting.valid_level_1", static_cast<double>(validLevel1), 4.0);
-  ok &= CheckLanguageCount(lang, Language::Unknown, 4);
   ok &= CheckLanguageCount(lang, Language::PlainText, 2);
   ok &= CheckNoFileViolations();
   return ok;
@@ -132,8 +131,7 @@ bool TestCommentsAndRelaxed() {
   ok &= CheckEq("comments.file.violation_count", file.violationCount, 4.0);
   ok &= CheckEq("comments.file.with_violation_relaxed", file.withViolationRelaxed, 0.0);
   ok &= CheckEq("comments.file.violation_count_relaxed", file.violationCountRelaxed, 0.0);
-  ok &= CheckEq("comments.lang.total", static_cast<double>(lang.total), 1.0);
-  ok &= CheckLanguageCount(lang, Language::Unknown, 1);
+  ok &= CheckEq("comments.lang.total", static_cast<double>(lang.total), 0.0);
 
   const uint64_t docsRawLevel2 =
       docsNested.rawLevels.size() > 2 ? docsNested.rawLevels[2] : 0;
@@ -168,7 +166,7 @@ bool TestPrefixedLiterals() {
   ok &= CheckEq("prefixed.strings.raw_chars", strings.rawChars, 175.0);
   ok &= CheckEq("prefixed.docs.count", docs.count, 0.0);
   ok &= CheckEq("prefixed.docs_relaxed.count", docsRelaxed.count, 0.0);
-  ok &= CheckEq("prefixed.lang.total", static_cast<double>(lang.total), 5.0);
+  ok &= CheckEq("prefixed.lang.total", static_cast<double>(lang.total), 4.0);
 
   const uint64_t rawLevel1 =
       stringNested.rawLevels.size() > 1 ? stringNested.rawLevels[1] : 0;
@@ -180,7 +178,6 @@ bool TestPrefixedLiterals() {
   ok &= CheckLanguageCount(lang, Language::SQL, 1);
   ok &= CheckLanguageCount(lang, Language::HTML, 1);
   ok &= CheckLanguageCount(lang, Language::JSON, 1);
-  ok &= CheckLanguageCount(lang, Language::Unknown, 1);
   ok &= CheckNoFileViolations();
   return ok;
 }

@@ -77,9 +77,12 @@ const char *LanguageName(Language lang);
 
 /// Result of classifying one extracted string fragment.
 struct ClassificationResult {
-  /// Most likely category, or `Language::Unknown` if nothing is accepted.
+  /// Most likely category, or `Language::Unknown` if nothing is accepted or
+  /// if the string is confidently classified as a non-language separator.
   Language language;
   /// Confidence in `[0.0, 1.0]`; `0.0` means the candidate was rejected.
+  /// Non-zero `Language::Unknown` values are internal suppression signals and
+  /// are omitted from language statistics and debug language logs.
   float confidence;
 };
 

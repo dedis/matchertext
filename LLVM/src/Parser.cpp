@@ -100,7 +100,7 @@ void EnsureDirectoryPrepared(const fs::path &directory, const bool clearExisting
 }
 
 uint64_t SeedDebugBucket(const std::string_view inputPath, const Language language) {
-  uint64_t seed = 1469598103934665603ull;
+  uint64_t seed = 14695981039346656037ull;
   for (const unsigned char c : inputPath) {
     seed ^= static_cast<uint64_t>(c);
     seed *= 1099511628211ull;
@@ -476,9 +476,11 @@ uint64_t Parser::process(std::string &&string, EmbeddedStats &stats, NestedStats
   if (langStats != nullptr) {
     /// Classify the embedded language and record per-language stats only for strings.
     const auto [lang, confidence] = ClassifyString(string);
-    langStats->Record(lang, unmatched, toothpicks);
-    GetDebugLanguageLogger().Record(inputPath, lang, sourcePath, string,
-                                    confidence, unmatched, toothpicks);
+    if (lang != Language::Unknown) {
+      langStats->Record(lang, unmatched, toothpicks);
+      GetDebugLanguageLogger().Record(inputPath, lang, sourcePath, string,
+                                      confidence, unmatched, toothpicks);
+    }
   }
 
   nestedStats.Record(maxDepth, maxValidDepth);

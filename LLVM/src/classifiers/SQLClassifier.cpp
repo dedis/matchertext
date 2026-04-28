@@ -35,6 +35,8 @@ ClassificationResult DetectSQL(const std::string_view s) {
     if (FindCI(s, kw) != std::string_view::npos)
       kwCount++;
   }
+  if (kwCount == 0)
+    return {Language::Unknown, 0.0f};
   return {Language::SQL, std::min(0.65f + static_cast<float>(kwCount) * 0.05f, 0.95f)};
 }
 

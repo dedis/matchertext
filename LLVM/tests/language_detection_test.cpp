@@ -102,6 +102,10 @@ int main() {
       Language::SQL
     },
     {
+      "sql_leader_without_secondary_keyword", "SELECT id",
+      Language::Unknown
+    },
+    {
       "escaped_json", "{\\\"items\\\": [\\\"one\\\", \\\"two\\\"], \\\"count\\\": 2}",
       Language::JSON
     },
@@ -228,7 +232,7 @@ int main() {
     },
     {
       "identifier_like", "ProcessBoundString::EncryptBuffer",
-      Language::Unknown
+      Language::IdentifierLike
     },
     {
       "cpp_reference_declaration_fragment",
