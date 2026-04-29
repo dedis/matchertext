@@ -127,6 +127,10 @@ add_executable(DebugLanguageOutputTests
     include/LanguageClassifier.hpp
     include/LanguageStats.hpp
     include/LanguageModel.generated.hpp
+    src/JSON.cpp
+    include/JSON.hpp
+    src/JsonParser.cpp
+    include/JsonParser.hpp
 )
 target_include_directories(DebugLanguageOutputTests PRIVATE include)
 target_link_libraries(DebugLanguageOutputTests clangLex clangBasic)

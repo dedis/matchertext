@@ -171,7 +171,7 @@ int main(const int argc, char *argv[]) {
       PrintStatsMaxString(Parser::STRING_STATS, Parser::DOCS_STATS);
     }
 
-    std::ostringstream message;
+    message.clear();
     std::cout.put('\n');
     message << "Timing summary"
             << "\n - Indexing: " << indexingMs << " ms"
