@@ -4,8 +4,8 @@
 // Date: 07.07.2025
 //
 
-#include "JsonParser.hpp"
-#include "JSON.hpp"
+#include "../include/JsonParser.hpp"
+#include "../include/JSON.hpp"
 
 JSONParser::JSONParser(std::istream &stream)
   : stream(&stream), streamView(""), ptr(nullptr), end(nullptr), pendingKeyIsSet(), commaDetected(true),
@@ -243,7 +243,7 @@ int JSONParser::parseBuffer(const char *buffer, const size_t buffered, const std
         constexpr std::string_view null_lit = "null";
 
         const std::string_view lit = c == 't' ? true_lit : c == 'f' ? false_lit : null_lit;
-        const JSON val = c == 't' ? true : c == 'f' ? false : JSON{};
+        const JSON val = c == 't' ? JSON{true} : c == 'f' ? JSON{false} : JSON{};
 
         if (p + lit.size() > bufferEnd)
           return static_cast<int>(p - buffer);
@@ -384,7 +384,6 @@ std::string hexString(const uint16_t value) {
 }
 
 JSON JSONParser::parseString() {
-  const char *start = ptr;
   if (const size_t newSize = end - ptr - 2; newSize > result.capacity())
     result.reserve(newSize);
   result.clear();

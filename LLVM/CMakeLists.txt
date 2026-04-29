@@ -53,6 +53,12 @@ add_executable(${PROJECT_NAME}
     include/LanguageClassifier.hpp
     include/LanguageStats.hpp
     include/LanguageModel.generated.hpp
+    src/LanguageParser.cpp
+    include/LanguageParser.hpp
+    src/JSON.cpp
+    include/JSON.hpp
+    src/JsonParser.cpp
+    include/JsonParser.hpp
 )
 
 add_executable(LanguageClassifierTests
@@ -86,6 +92,12 @@ add_executable(ParserFixtureTests
     include/LanguageClassifier.hpp
     include/LanguageStats.hpp
     include/LanguageModel.generated.hpp
+    src/LanguageParser.cpp
+    include/LanguageParser.hpp
+    src/JSON.cpp
+    include/JSON.hpp
+    src/JsonParser.cpp
+    include/JsonParser.hpp
 )
 target_include_directories(ParserFixtureTests PRIVATE include)
 target_link_libraries(ParserFixtureTests clangLex clangBasic)
@@ -127,6 +139,8 @@ add_executable(DebugLanguageOutputTests
     include/LanguageClassifier.hpp
     include/LanguageStats.hpp
     include/LanguageModel.generated.hpp
+    src/LanguageParser.cpp
+    include/LanguageParser.hpp
     src/JSON.cpp
     include/JSON.hpp
     src/JsonParser.cpp
@@ -169,7 +183,7 @@ endif ()
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     target_compile_options(${PROJECT_NAME} PRIVATE
         -O3 -DNDEBUG -finline-functions -fomit-frame-pointer
-        -ffunction-sections -fdata-sections -flto
+        -ffunction-sections -fdata-sections -flto -Wno-c99-designator
     )
     target_link_options(${PROJECT_NAME} PRIVATE -Wl,-O2)
     set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)

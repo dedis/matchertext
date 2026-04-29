@@ -5,6 +5,7 @@
 #include <sstream>
 #include <vector>
 
+#include "include/LanguageParser.hpp"
 #include "include/Parser.hpp"
 #include "include/Stats.hpp"
 
@@ -45,16 +46,11 @@ inline bool is_c_cpp_file(const std::string &path) {
          ext == "hxx";
 }
 
-struct WorkItem {
-  std::string filePath;
-  std::string inputPath;
-};
-
 int main(const int argc, char *argv[]) {
   long long indexingMs = 0;
-  if (argc < 2) {
+  if (argc < 3) {
     std::cerr << "Usage: " << argv[0]
-        << " [--log-strings] [--debug-languages] <file|directory>...\n";
+        << " <language> [--log-strings] [--debug-languages] [--compiler <compiler>] <file|directory>...\n";
     return -1;
   }
 
@@ -63,6 +59,8 @@ int main(const int argc, char *argv[]) {
   // Parse arguments
   bool logStrings = false;
   bool debugLanguages = false;
+  std::string compilerOverride;
+  auto language = Language::Unknown;
   std::map<std::string, std::string> filesToProcess;
   std::vector<std::string> inputPaths;
   const auto indexingStart = Clock::now();
@@ -74,6 +72,25 @@ int main(const int argc, char *argv[]) {
     }
     if (arg == "--debug-languages") {
       debugLanguages = true;
+      continue;
+    }
+    if (arg == "--compiler") {
+      if (i + 1 >= argc) {
+        std::cerr << "--compiler requires a value\n";
+        return -1;
+      }
+      compilerOverride = argv[++i];
+      continue;
+    }
+
+    if (language == Language::Unknown) {
+      Language parsed;
+      if (!LanguageParser::ParseLanguage(arg, parsed)) {
+        std::cerr << "Unknown language: " << arg
+            << " (expected one of: c, cpp, go, python)\n";
+        return -1;
+      }
+      language = parsed;
       continue;
     }
 
@@ -93,6 +110,11 @@ int main(const int argc, char *argv[]) {
           filesToProcess.try_emplace(normalize_path(entry.path().string()), inputPath);
     }
   }
+
+  if (language == Language::Unknown) {
+    std::cerr << "Missing required <language> argument\n";
+    return -1;
+  }
   const auto indexingEnd = Clock::now();
   indexingMs = elapsed_ms(indexingStart, indexingEnd);
   {
@@ -109,10 +131,10 @@ int main(const int argc, char *argv[]) {
 
   try {
     long long parsingMs = 0;
-    std::vector<WorkItem> files;
+    std::vector<std::pair<std::string, std::string>> files;
     files.reserve(filesToProcess.size());
     for (const auto &[filePath, inputPath]: filesToProcess)
-      files.push_back({filePath, inputPath});
+      files.emplace_back(filePath, inputPath);
 
     if (debugLanguages) {
       log_info("Debug language sampling enabled");
@@ -128,10 +150,11 @@ int main(const int argc, char *argv[]) {
     const auto parseStart = Clock::now();
 
     #if USE_OPENMP
-    #pragma omp parallel for schedule(dynamic) default(none) shared(files)
+    #pragma omp parallel for schedule(dynamic) default(none) shared(files, language, compilerOverride)
     #endif
-    for (const auto &file: files) {
-      Parser::ParseFile(file.filePath, file.inputPath);
+    for (const auto &[filePath, inputPath]: files) {
+      if (JSON result; LanguageParser::ExtractData(language, compilerOverride, filePath, result))
+        Parser::GatherStatistics(std::move(result), filePath, inputPath);
     }
 
     const auto parseEnd = Clock::now();

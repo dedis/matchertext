@@ -46,6 +46,7 @@ class JSON final {
     JSON();
     /// Creates a JSON boolean value
     explicit JSON(bool value);
+    explicit JSON(const char *value);
     /// Assigns the given array or object to this instance.
     JSON(const std::initializer_list<JSON> &values);
 

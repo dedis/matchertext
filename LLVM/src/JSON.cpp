@@ -5,19 +5,20 @@
 //
 
 #include <cmath>
+#include <iostream>
 #include <sstream>
 
-#include "JSON.hpp"
-
-#include <iostream>
-
-#include "JsonParser.hpp"
+#include "../include/JSON.hpp"
+#include "../include/JsonParser.hpp"
 
 JSON::JSON()
   : type(Null), data(null) {}
 
 JSON::JSON(const bool value)
   : type(Boolean), data(value) {}
+
+JSON::JSON(const char *value)
+  : JSON(std::string(value)) {}
 
 JSON::JSON(const std::initializer_list<JSON> &values) {
   const bool isObject = std::ranges::all_of(
