@@ -72,9 +72,27 @@ JSON JSONParser::Parse() {
       throw std::logic_error("Missing closing ']' for array");
   }
 
-  if (buffered - consumed > 0 || iss.peek() != EOF) {
+  // Skip any trailing whitespace remaining in the buffer.
+  while (consumed < buffered) {
+    const unsigned char c = static_cast<unsigned char>(buffer[consumed]);
+    if (c != ' ' && c != '\t' && c != '\r' && c != '\n')
+      break;
+    ++consumed;
+  }
+  // And any trailing whitespace still pending in the stream.
+  while (iss && iss.peek() != EOF) {
+    const int c = iss.peek();
+    if (c != ' ' && c != '\t' && c != '\r' && c != '\n')
+      break;
+    iss.get();
+  }
+
+  if (consumed < buffered) {
     ++column;
-    eof(buffer[consumed + 1]);
+    eof(buffer[consumed]);
+  } else if (iss && iss.peek() != EOF) {
+    ++column;
+    eof(static_cast<char>(iss.peek()));
   }
 
   return json;
@@ -85,12 +103,9 @@ int JSONParser::parseBuffer(const char *buffer, const size_t buffered, const std
   const char *bufferEnd = buffer + buffered;
 
   while (p < bufferEnd) {
-    #if ENGINE_DEBUG
-      ++column;
-    #endif
-
     switch (const char c = *p; tokenTable[static_cast<unsigned char>(c)]) {
-      case TOKEN_WHITESPACE | TOKEN_NEWLINE:
+      case TOKEN_WHITESPACE:
+      case TOKEN_NEWLINE:
         break;
       case TOKEN_OBJECT_START:
         if (stack.back()->IsObject())
@@ -100,6 +115,7 @@ int JSONParser::parseBuffer(const char *buffer, const size_t buffered, const std
           stack.push_back(&stack.back()->Back());
         } else if (stack.size() == 1)
           *stack.back() = JSON::Object();
+        commaDetected = false;
         foundData = true;
         break;
       case TOKEN_OBJECT_END:
@@ -123,6 +139,7 @@ int JSONParser::parseBuffer(const char *buffer, const size_t buffered, const std
           stack.push_back(&stack.back()->Back());
         } else if (stack.size() == 1)
           *stack.back() = JSON::Array();
+        commaDetected = false;
         foundData = true;
         break;
       case TOKEN_ARRAY_END:
@@ -157,8 +174,13 @@ int JSONParser::parseBuffer(const char *buffer, const size_t buffered, const std
         ptr = p;
         const char *q = p + 1;
         bool done = false;
+        bool escaped = false;
         while (q < bufferEnd) {
-          if (*q == '"' && q[-1] != '\\') {
+          if (escaped) {
+            escaped = false;
+          } else if (*q == '\\') {
+            escaped = true;
+          } else if (*q == '"') {
             end = q;
             JSON json = parseString();
             foundData = true;
@@ -363,13 +385,10 @@ JSON JSONParser::parseNumber() {
     value *= std::pow(10.0, exponent * (1 - 2 * expNeg));
   }
 
-  #if ENGINE_DEBUG
-    column += ptr - start;
-  #endif
   return JSON(value * (1 - 2 * neg));
 }
 
-std::string result;
+thread_local std::string result;
 
 std::string hexString(const uint16_t value) {
   static constexpr char hexDigits[] = "0123456789ABCDEF";
@@ -384,7 +403,8 @@ std::string hexString(const uint16_t value) {
 }
 
 JSON JSONParser::parseString() {
-  if (const size_t newSize = end - ptr - 2; newSize > result.capacity())
+  const size_t newSize = end > ptr ? static_cast<size_t>(end - ptr) : 0;
+  if (newSize > result.capacity())
     result.reserve(newSize);
   result.clear();
 
@@ -393,9 +413,10 @@ JSON JSONParser::parseString() {
       if (ptr == end)
         throw std::logic_error("Unterminated escape sequence");
 
-      if (const char escaped = escapedMap[static_cast<unsigned char>(*ptr)])
+      if (const char escaped = escapedMap[static_cast<unsigned char>(*ptr)]) {
         result.push_back(escaped);
-      else if (*ptr++ == 'u') {
+        ++ptr;
+      } else if (*ptr++ == 'u') {
         if (end - ptr < 4)
           throw std::logic_error("Incomplete unicode escape");
 
@@ -434,7 +455,6 @@ JSON JSONParser::parseString() {
           result.push_back(static_cast<char>(0x80 | (code >> 6 & 0x3F)));
           result.push_back(static_cast<char>(0x80 | (code & 0x3F)));
         }
-        break;
       } else
         throw std::logic_error("Invalid escape sequence");
     } else {
@@ -448,9 +468,6 @@ JSON JSONParser::parseString() {
     }
   }
 
-  #if ENGINE_DEBUG
-    column += ptr - start;
-  #endif
   return JSON(result);
 }
 

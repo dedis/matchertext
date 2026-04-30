@@ -165,6 +165,30 @@ find_package(Clang REQUIRED CONFIG)
 
 include_directories(${LLVM_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} clangLex clangBasic)
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+    MATCHERTEXT_PARSERS_DIR="${CMAKE_SOURCE_DIR}/parsers")
+
+# === Go parser binary ===
+# Pre-compile parsers/parser.go into a native binary so each per-file invocation
+# avoids recompiling, and dodges `go run`'s rule that disallows .go arguments
+# from a different directory than the source file.
+find_program(GO_EXECUTABLE go)
+if (GO_EXECUTABLE)
+    set(GO_PARSER_BIN "${CMAKE_BINARY_DIR}/matchertext_go_parser")
+    add_custom_command(
+        OUTPUT ${GO_PARSER_BIN}
+        COMMAND ${GO_EXECUTABLE} build -o ${GO_PARSER_BIN} ${CMAKE_SOURCE_DIR}/parsers/parser.go
+        DEPENDS ${CMAKE_SOURCE_DIR}/parsers/parser.go
+        COMMENT "Building Go parser binary"
+        VERBATIM
+    )
+    add_custom_target(go_parser ALL DEPENDS ${GO_PARSER_BIN})
+    add_dependencies(${PROJECT_NAME} go_parser)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE
+        MATCHERTEXT_GO_PARSER_BIN="${GO_PARSER_BIN}")
+else ()
+    message(WARNING "go executable not found; Go parsing will be disabled at runtime")
+endif ()
 
 # === OpenMP ===
 find_package(OpenMP QUIET)

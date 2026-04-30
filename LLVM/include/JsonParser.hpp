@@ -110,6 +110,9 @@ class JSONParser final {
     /// The current column number the parsed character is located on
     size_t column;
 
+    /// Scratch buffer reused across parseString() calls within this parser instance.
+    std::string result;
+
     /// Parses the given buffer
     int parseBuffer(const char *buffer, size_t buffered, const std::istream &is);
     /// Assigns the given JSON value to the object at the back of the JSON stack and to the pending key

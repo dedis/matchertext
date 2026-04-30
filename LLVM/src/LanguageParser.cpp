@@ -20,10 +20,19 @@ struct LangSpec {
   const char *cmdTemplate;
 };
 
-// C and C++ are not included because they use the clang parser compiled into the parser
+#ifndef MATCHERTEXT_PARSERS_DIR
+#define MATCHERTEXT_PARSERS_DIR "./parsers"
+#endif
+#ifndef MATCHERTEXT_GO_PARSER_BIN
+#define MATCHERTEXT_GO_PARSER_BIN "./matchertext_go_parser"
+#endif
+
+// C and C++ are not included because they use the clang parser compiled into the parser.
+// The Go parser is pre-compiled by CMake to avoid `go run` recompiling on every file
+// and to sidestep its same-directory rule for .go arguments.
 static const std::unordered_map<Language, LangSpec> specs = {
-  {Language::Go, {{"go"}, "{} run {}"}},
-  {Language::Python, {{"python3", "python"}, "{} {}"}},
+  {Language::Go, {{MATCHERTEXT_GO_PARSER_BIN}, "\"{}\" \"{}\""}},
+  {Language::Python, {{"python3", "python"}, "{} \"" MATCHERTEXT_PARSERS_DIR "/parser.py\" \"{}\""}},
 };
 
 static std::string format(const std::string &tpl, const std::string &a, const std::string &b) {
@@ -91,7 +100,7 @@ bool LanguageParser::ParseLanguage(const std::string &name, Language &out) {
     out = Language::CPP;
     return true;
   }
-  if (lower == "go") {
+  if (lower == "go" || lower == "golang") {
     out = Language::Go;
     return true;
   }
