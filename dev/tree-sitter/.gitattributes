@@ -5,7 +5,3 @@ src/*.json linguist-generated
 src/parser.c linguist-generated
 src/tree_sitter/* linguist-generated
 
-# Go bindings
-bindings/go/* linguist-generated
-go.mod linguist-generated
-go.sum linguist-generated

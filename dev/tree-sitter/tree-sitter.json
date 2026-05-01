@@ -3,6 +3,7 @@
   "grammars": [
     {
       "name": "minml",
+      "highlights": "queries/highlights.scm",
       "camelcase": "MinML",
       "title": "MinML",
       "scope": "source.minml",

@@ -44,6 +44,8 @@
 module.exports = grammar({
   name: "minml",
 
+  extras: $ => [],  // No implicit whitespace; text rule captures it explicitly inside content
+
   rules: {
     // Root rule. A MinML document is zero or more nodes at the top level.
     // repeat() matches its argument any number of times (including zero).
@@ -64,6 +66,9 @@ module.exports = grammar({
       $.matcher_escape,       // [[<]], [[>]], [(<)], [(>)]
       $.word,                 // bare identifier, e.g. "hello"
       $.text,                 // any other characters (punctuation, spaces, digits)
+      // Standalone special prefix chars not followed by '[': '-', '+', '?', '"'.
+      // When followed by '[' the longer 2-char construct opener wins instead.
+      /[-+?"]/,
     ),
 
     // An element: optionally prefixed with "<" (space-sucker), then a tag name,
@@ -202,29 +207,36 @@ module.exports = grammar({
       alias(/#x[0-9a-fA-F]+/,          $.hex_ref),      // [#xAE]
     ), "]"),
 
-    // A quoted string: the two-character delimiter '"[' followed by content, then ']'.
-    // Inside a quoted string, '[' does not start a new element or char_ref —
-    // the content is taken verbatim until the first ']'.
+    // Content rule for verbatim constructs: matches any character sequence that
+    // may contain balanced bracket pairs but does NOT interpret MinML inside them.
+    // This handles the case where ']' appears inside a quoted string, raw block,
+    // comment, or processing instruction — as long as brackets are balanced, the
+    // construct is not prematurely closed.
     //
-    // /[^\]]*/  — zero or more characters that are not ']'
-    //   [^\]]   — negated character class: any character except ']'
-    //   *       — zero or more repetitions
-    // This means a quoted string cannot span multiple close-bracket characters.
-    // Example: "[hello [world]  — content is "hello [world"
-    quoted_string: $ => seq('"[', /[^\]]*/, "]"),
+    // Two alternatives, repeated one or more times:
+    //   /[^\[\]]+/               — one or more chars that are not '[' or ']'
+    //   seq("[", optional(...), "]") — a balanced inner bracket pair
+    //
+    // Used with optional() in the four constructs below to also allow empty content.
+    _raw_content: $ => repeat1(choice(
+      /[^\[\]]+/,
+      seq("[", optional($._raw_content), "]"),
+    )),
 
-    // A raw block: '+[' followed by literal content, then ']'.
-    // The content is not parsed for MinML structure (no elements, no char refs).
+    // A quoted string: the two-character delimiter '"[' followed by verbatim
+    // content (brackets allowed if balanced), then ']'.
+    // Example: "[hello [world]]  — content is "hello [world]"
+    quoted_string: $ => seq('"[', optional($._raw_content), "]"),
+
+    // A raw block: '+[' followed by verbatim content (balanced brackets ok), then ']'.
     // Useful for embedding raw markup like HTML.
-    // Same flat-until-']' regex as quoted_string.
     // Example: +[<b>bold</b> text]
-    raw_block: $ => seq("+[", /[^\]]*/, "]"),
+    raw_block: $ => seq("+[", optional($._raw_content), "]"),
 
-    // A comment: '-[' followed by content, then ']'.
+    // A comment: '-[' followed by verbatim content (balanced brackets ok), then ']'.
     // Comments are preserved in the parse tree but ignored by processors.
-    // Same flat-until-']' regex as quoted_string and raw_block.
-    // Example: -[this is a comment]
-    comment: $ => seq("-[", /[^\]]*/, "]"),
+    // Example: -[this is a [nested] comment]
+    comment: $ => seq("-[", optional($._raw_content), "]"),
 
     // Matcher escape sequences — the MinML way to include literal bracket
     // characters that would otherwise be parsed as structural delimiters.
@@ -242,28 +254,33 @@ module.exports = grammar({
       "[(>)]",   // escaped ')'
     )),
 
-    // A processing instruction: '?[' followed by content, then ']'.
-    // Used for out-of-band processor directives, similar to XML's <?...?>.
-    // The content is flat (same /[^\]]*/ regex — no nesting until ']').
+    // A processing instruction: '?[' followed by verbatim content (balanced brackets
+    // ok), then ']'. Used for out-of-band processor directives, similar to XML's <?...?>.
     // Example: ?[xml version="1.0"]
-    processing_instruction: $ => seq("?[", /[^\]]*/, "]"),
+    processing_instruction: $ => seq("?[", optional($._raw_content), "]"),
 
     // Plain text: any run of characters that are NOT structural delimiters.
     // This is the catch-all rule that captures everything not matched above,
-    // including spaces, punctuation, digits, and other Unicode characters.
+    // including spaces, punctuation, digits, angle brackets, and other characters.
     //
-    // /[^\[\]{}<>a-zA-Z_]+/
+    // /[^\[\]{}a-zA-Z_]+/
     //   [^...]   — negated character class: match any character NOT listed
     //   \[       — exclude '[' (starts char_ref, content_block, etc.)
     //   \]       — exclude ']' (closes content_block / char_ref / etc.)
     //   {        — exclude '{' (starts attr_block)
     //   }        — exclude '}' (closes attr_block)
-    //   <>       — exclude '<' and '>' (space-sucker markers on elements)
     //   a-zA-Z_  — exclude letters and underscore (handled by word / element)
     //   +        — one or more characters (text is never empty)
     //
-    // Note: digits, spaces, punctuation like '.', '!', ':', '#', etc. all match
-    // text. Whitespace in content is preserved as text nodes.
-    text: $ => /[^\[\]{}<>a-zA-Z_]+/,
+    // Note: '<' and '>' are intentionally included — literal angle brackets in
+    // content like p[2 < 3] are valid. The element rule's prec(1) ensures that
+    // <tag[...]> sequences are still parsed as space-sucker elements.
+    // '-', '+', '?', '"' are excluded because they are the leading characters of
+    // special constructs (-[...], +[...], ?[...], "[...]).  When tree-sitter sees
+    // one of those chars followed by '[', it picks the longer literal token (the
+    // 2-char construct opener) over the 1-char anonymous alternative defined in
+    // _node.  When they appear without '[' (e.g. a dash in "a - b"), they are
+    // captured by the anonymous /[-+?"]/ alternative in _node.
+    text: $ => /[^\[\]{}a-zA-Z_+\-?"]+/,
   }
 });

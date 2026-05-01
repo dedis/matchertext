@@ -1,4 +1,4 @@
-module github.com/tree-sitter/tree-sitter-minml
+module github.com/dedis/matchertext/dev/tree-sitter
 
 go 1.23
 

@@ -3,8 +3,8 @@ package tree_sitter_minml_test
 import (
 	"testing"
 
+	tree_sitter_minml "github.com/dedis/matchertext/dev/tree-sitter/bindings/go"
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
-	tree_sitter_minml "github.com/tree-sitter/tree-sitter-minml/bindings/go"
 )
 
 func TestCanLoadGrammar(t *testing.T) {
