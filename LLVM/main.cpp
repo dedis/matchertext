@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <iostream>
 #include <map>
+#include <ranges>
 #include <sstream>
 #include <string_view>
 #include <vector>
@@ -15,7 +16,7 @@ namespace fs = std::filesystem;
 using Clock = std::chrono::steady_clock;
 
 // TODO:
-// [ ] - Pass in custom file extensions
+// [X] - Pass in custom file extensions
 // [X] - Add language config file for easier lang addition
 // [ ] - Auto detect language using linguist (skip  any <1% | byte count, add flag to disable language skipping)
 // [ ] - Multi language repo analysis (per repo + per language stats)
@@ -53,7 +54,7 @@ constexpr bool same_language_family(const LanguageEnum a, const LanguageEnum b) 
 }
 
 /// Return true if `path` has an extension belonging to `language` (or its family).
-inline bool matches_language(const std::string &path, const LanguageEnum language) {
+inline bool matches_language(const std::string &path, const LanguageEnum language, const std::vector<std::string_view> &extensions) {
   const auto pos = path.rfind('.');
   if (pos == std::string::npos)
     return false;
@@ -62,6 +63,9 @@ inline bool matches_language(const std::string &path, const LanguageEnum languag
   for (const auto &[lang, data]: kLanguageData) {
     if (!same_language_family(lang, language))
       continue;
+    for (const auto &e: extensions)
+      if (e == ext)
+        return true;
     for (const auto &e: data.extensions)
       if (e == ext)
         return true;
@@ -69,74 +73,88 @@ inline bool matches_language(const std::string &path, const LanguageEnum languag
   return false;
 }
 
+std::vector<std::string_view> split_comma(std::string_view s) {
+  std::vector<std::string_view> out;
+  size_t start = 0;
+
+  while (true) {
+    const size_t pos = s.find(',', start);
+    if (pos == std::string_view::npos) {
+      out.emplace_back(s.substr(start));
+      break;
+    }
+    out.emplace_back(s.substr(start, pos - start));
+    start = pos + 1;
+  }
+  return out;
+}
+
 int main(const int argc, char *argv[]) {
   long long indexingMs = 0;
   if (argc < 3) {
     std::cerr << "Usage: " << argv[0]
-        << " <language> [--log-strings] [--debug-languages] [--compiler <compiler>] <file|directory>...\n";
+        << " <language> [--log-strings] [--debug-languages] [--compiler <compiler>] [--extensions <ext1,ext2,...>] <file|directory>...\n";
     return -1;
   }
 
   log_info("Starting parser");
 
-  // Parse arguments
+  // Pass 1: extract all parameters
   bool logStrings = false;
   bool debugLanguages = false;
   std::string compilerOverride;
   auto language = LanguageEnum::Unknown;
-  std::map<std::string, std::string> filesToProcess;
-  std::vector<std::string> inputPaths;
-  const auto indexingStart = Clock::now();
+  std::vector<std::string_view> extensions;
+  std::vector<std::string> rawPaths;
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
-    if (arg == "--log-strings") {
-      logStrings = true;
-      continue;
-    }
-    if (arg == "--debug-languages") {
-      debugLanguages = true;
-      continue;
-    }
+    if (arg == "--log-strings") { logStrings = true; continue; }
+    if (arg == "--debug-languages") { debugLanguages = true; continue; }
     if (arg == "--compiler") {
-      if (i + 1 >= argc) {
-        std::cerr << "--compiler requires a value\n";
-        return -1;
-      }
+      if (i + 1 >= argc) { std::cerr << "--compiler requires a value\n"; return -1; }
       compilerOverride = argv[++i];
       continue;
     }
-
+    if (arg == "--extensions") {
+      if (i + 1 >= argc) { std::cerr << "--extensions requires a value\n"; return -1; }
+      extensions = split_comma(argv[++i]);
+      continue;
+    }
     if (language == LanguageEnum::Unknown) {
-      LanguageEnum parsed;
-      if (!LanguageParser::ParseLanguage(arg, parsed)) {
-        std::cerr << "Unknown language: " << arg
-            << " (expected one of: c, cpp, go, python)\n";
+      if (!LanguageParser::ParseLanguage(arg, language)) {
+        std::cerr << "Unknown language: " << arg << " (expected one of: c, cpp, go, python)\n";
         return -1;
       }
-      language = parsed;
       continue;
     }
-
-    fs::path p(arg);
-    if (!fs::exists(p)) {
-      std::cerr << "Path does not exist: " << p << "\n";
-      continue;
-    }
-
-    const std::string inputPath = fs::path(arg).lexically_normal().string();
-    inputPaths.push_back(inputPath);
-    if (fs::is_regular_file(p) && matches_language(p.string(), language))
-      filesToProcess.try_emplace(normalize_path(p.string()), inputPath);
-    else if (fs::is_directory(p)) {
-      for (const auto &entry: fs::recursive_directory_iterator(p))
-        if (fs::is_regular_file(entry) && matches_language(entry.path().string(), language))
-          filesToProcess.try_emplace(normalize_path(entry.path().string()), inputPath);
-    }
+    rawPaths.push_back(arg);
   }
 
   if (language == LanguageEnum::Unknown) {
     std::cerr << "Missing required <language> argument\n";
     return -1;
+  }
+
+  // Pass 2: traverse files
+  std::map<std::string, std::string> filesToProcess;
+  std::vector<std::string> inputPaths;
+  const auto indexingStart = Clock::now();
+  for (const auto &rawPath: rawPaths) {
+    fs::path p(rawPath);
+    if (!fs::exists(p)) {
+      std::cerr << "Path does not exist: " << p << "\n";
+      continue;
+    }
+
+    const std::string inputPath = fs::path(rawPath).lexically_normal().string();
+    inputPaths.push_back(inputPath);
+    if (fs::is_regular_file(p) && matches_language(p.string(), language, extensions))
+      filesToProcess.try_emplace(normalize_path(p.string()), inputPath);
+    else if (fs::is_directory(p)) {
+      for (const auto &entry: fs::recursive_directory_iterator(p))
+        if (fs::is_regular_file(entry) && matches_language(entry.path().string(), language, extensions))
+          filesToProcess.try_emplace(normalize_path(entry.path().string()), inputPath);
+    }
   }
   const auto indexingEnd = Clock::now();
   indexingMs = elapsed_ms(indexingStart, indexingEnd);
@@ -224,8 +242,7 @@ int main(const int argc, char *argv[]) {
     }
 
     message.clear();
-    std::cout.put('\n');
-    message << "Timing summary"
+    message << "\nTiming summary"
             << "\n - Indexing: " << indexingMs << " ms"
             << "\n - Parsing : " << parsingMs << " ms";
     log_info(message.str());

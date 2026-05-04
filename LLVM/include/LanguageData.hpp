@@ -1,5 +1,5 @@
-#ifndef LANGUAGE_HPP
-#define LANGUAGE_HPP
+#ifndef LANGUAGE_DATA_HPP
+#define LANGUAGE_DATA_HPP
 
 #ifndef MATCHERTEXT_PARSERS_DIR
 #define MATCHERTEXT_PARSERS_DIR "./parsers"
@@ -82,4 +82,4 @@ static LanguageEnum GetLanguage(const std::string_view lang) {
   return LanguageEnum::Unknown;
 }
 
-#endif // LANGUAGE_HPP
+#endif // LANGUAGE_DATA_HPP

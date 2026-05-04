@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <array>
-#include <unordered_map>
 
 #include "../include/LanguageParser.hpp"
 #include "../include/JSON.hpp"
