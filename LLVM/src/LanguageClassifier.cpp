@@ -14,7 +14,7 @@
 #include "../include/LanguageModel.generated.hpp"
 #include "classifiers/Internal.hpp"
 
-const char *LanguageName(const Language lang) {
+const char *LanguageName(const LanguageEnum lang) {
   static constexpr const char *names[] = {
     "Unknown", "PlainText", "URL", "FilePath", "FormatString",
     "SQL", "HTML", "XML", "JSON", "YAML",
@@ -27,7 +27,7 @@ const char *LanguageName(const Language lang) {
     "HexData", "BinaryData", "InlineAsm", "Email",
     "PseudoURL", "PseudoEmail", "PseudoBinaryData",
   };
-  static_assert(std::size(names) == static_cast<size_t>(Language::COUNT));
+  static_assert(std::size(names) == static_cast<size_t>(LanguageEnum::COUNT));
   const auto idx = static_cast<size_t>(lang);
   return idx < std::size(names) ? names[idx] : "Unknown";
 }
@@ -159,7 +159,7 @@ namespace {
   ClassificationResult NaiveBayesClassify(const std::string_view body) {
     const size_t numTrigrams = body.size() >= 3 ? body.size() - 2 : 0;
     if (numTrigrams == 0)
-      return {Language::Unknown, 0.0f};
+      return {LanguageEnum::Unknown, 0.0f};
 
     constexpr size_t kMaxLangs = 64;
     static_assert(kNumLanguages <= kMaxLangs, "Increase kMaxLangs");
@@ -211,7 +211,7 @@ namespace {
 
     const uint16_t bestMatched = matchedCounts[bestIdx];
     if (bestMatched < 6)
-      return {Language::Unknown, 0.0f};
+      return {LanguageEnum::Unknown, 0.0f};
 
     const auto &modelTrigramCounts = ModelTrigramCounts();
     const float modelSize =
@@ -221,18 +221,18 @@ namespace {
     const float requiredMatchRatio =
         std::min(0.80f, 0.18f + 7.0f / std::sqrt(modelSize));
     if (matchRatio < requiredMatchRatio)
-      return {Language::Unknown, 0.0f};
+      return {LanguageEnum::Unknown, 0.0f};
 
     if (const float gap = (maxScore - secondMax) / static_cast<float>(numTrigrams); gap < 0.3f)
-      return {Language::Unknown, 0.0f};
+      return {LanguageEnum::Unknown, 0.0f};
 
-    return {static_cast<Language>(kLanguageInfos[bestIdx].languageId), confidence};
+    return {static_cast<LanguageEnum>(kLanguageInfos[bestIdx].languageId), confidence};
   }
 } // namespace
 
 ClassificationResult ClassifyString(const std::string_view body, const float minConfidence) {
   if (body.size() < 2)
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
 
   const std::string normalized = classifier_internal::NormalizeForClassification(body);
   const std::string_view text = normalized.empty() ? body : std::string_view(normalized);
@@ -254,7 +254,7 @@ ClassificationResult ClassifyString(const std::string_view body, const float min
     return result;
 
   if (classifier_internal::LooksLikeBareDomainLikeToken(text))
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
 
   using Detector = ClassificationResult (*)(std::string_view);
   static constexpr Detector detectors[] = {
@@ -289,8 +289,8 @@ ClassificationResult ClassifyString(const std::string_view body, const float min
     }
     if (text.find('/') == std::string_view::npos &&
         (text.find("::") != std::string_view::npos || hasCamelTransition))
-      return {Language::IdentifierLike, 0.95f};
-    return {Language::Unknown, 0.95f};
+      return {LanguageEnum::IdentifierLike, 0.95f};
+    return {LanguageEnum::Unknown, 0.95f};
   }
 
   if (const auto result = classifier_internal::DetectPlainText(text);
@@ -302,17 +302,17 @@ ClassificationResult ClassifyString(const std::string_view body, const float min
     return result;
 
   if (HasRepeatedCharRun(text))
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
 
   if (text.size() >= 15) {
     const float nbThreshold = std::max(minConfidence, 0.85f);
     if (const auto result = NaiveBayesClassify(text); result.confidence >= nbThreshold) {
-      if (result.language == Language::YAML &&
+      if (result.language == LanguageEnum::YAML &&
           !classifier_internal::HasStrongYAMLEvidence(text))
-        return {Language::Unknown, 0.0f};
+        return {LanguageEnum::Unknown, 0.0f};
       return result;
     }
   }
 
-  return {Language::Unknown, 0.0f};
+  return {LanguageEnum::Unknown, 0.0f};
 }

@@ -19,7 +19,7 @@ bool CheckEq(const std::string_view label, const double actual, const double exp
   return false;
 }
 
-bool CheckLanguageCount(const LanguageStatsSnapshot &snapshot, const Language language,
+bool CheckLanguageCount(const LanguageStatsSnapshot &snapshot, const LanguageEnum language,
                         const uint64_t expectedCount) {
   for (const auto &entry : snapshot.entries) {
     if (entry.language != language)
@@ -69,7 +69,7 @@ bool TestBasicLiterals() {
       stringNested.validLevels.size() > 1 ? stringNested.validLevels[1] : 0;
   ok &= CheckEq("basic.nesting.raw_level_1", static_cast<double>(rawLevel1), 4.0);
   ok &= CheckEq("basic.nesting.valid_level_1", static_cast<double>(validLevel1), 4.0);
-  ok &= CheckLanguageCount(lang, Language::PlainText, 2);
+  ok &= CheckLanguageCount(lang, LanguageEnum::PlainText, 2);
   ok &= CheckNoFileViolations();
   return ok;
 }
@@ -100,9 +100,9 @@ bool TestRawAndAdjacent() {
   ok &= CheckEq("raw.nesting.raw_level_3", static_cast<double>(rawLevel3), 1.0);
   ok &= CheckEq("raw.nesting.valid_level_2", static_cast<double>(validLevel2), 2.0);
   ok &= CheckEq("raw.nesting.valid_level_3", static_cast<double>(validLevel3), 1.0);
-  ok &= CheckLanguageCount(lang, Language::SQL, 1);
-  ok &= CheckLanguageCount(lang, Language::JSON, 1);
-  ok &= CheckLanguageCount(lang, Language::Regex, 1);
+  ok &= CheckLanguageCount(lang, LanguageEnum::SQL, 1);
+  ok &= CheckLanguageCount(lang, LanguageEnum::JSON, 1);
+  ok &= CheckLanguageCount(lang, LanguageEnum::Regex, 1);
   ok &= CheckNoFileViolations();
   return ok;
 }
@@ -174,10 +174,10 @@ bool TestPrefixedLiterals() {
       stringNested.validLevels.size() > 1 ? stringNested.validLevels[1] : 0;
   ok &= CheckEq("prefixed.nesting.raw_level_1", static_cast<double>(rawLevel1), 1.0);
   ok &= CheckEq("prefixed.nesting.valid_level_1", static_cast<double>(validLevel1), 1.0);
-  ok &= CheckLanguageCount(lang, Language::URL, 1);
-  ok &= CheckLanguageCount(lang, Language::SQL, 1);
-  ok &= CheckLanguageCount(lang, Language::HTML, 1);
-  ok &= CheckLanguageCount(lang, Language::JSON, 1);
+  ok &= CheckLanguageCount(lang, LanguageEnum::URL, 1);
+  ok &= CheckLanguageCount(lang, LanguageEnum::SQL, 1);
+  ok &= CheckLanguageCount(lang, LanguageEnum::HTML, 1);
+  ok &= CheckLanguageCount(lang, LanguageEnum::JSON, 1);
   ok &= CheckNoFileViolations();
   return ok;
 }
@@ -201,13 +201,13 @@ bool TestStringBucketMix() {
                 static_cast<double>(stringNested.rawLevels.size()), 0.0);
   ok &= CheckEq("bucket_mix.nesting.valid_levels_size",
                 static_cast<double>(stringNested.validLevels.size()), 0.0);
-  ok &= CheckLanguageCount(lang, Language::PlainText, 1);
-  ok &= CheckLanguageCount(lang, Language::FilePath, 1);
-  ok &= CheckLanguageCount(lang, Language::FormatString, 1);
-  ok &= CheckLanguageCount(lang, Language::YAML, 1);
-  ok &= CheckLanguageCount(lang, Language::Shell, 1);
-  ok &= CheckLanguageCount(lang, Language::HexData, 1);
-  ok &= CheckLanguageCount(lang, Language::PseudoBinaryData, 1);
+  ok &= CheckLanguageCount(lang, LanguageEnum::PlainText, 1);
+  ok &= CheckLanguageCount(lang, LanguageEnum::FilePath, 1);
+  ok &= CheckLanguageCount(lang, LanguageEnum::FormatString, 1);
+  ok &= CheckLanguageCount(lang, LanguageEnum::YAML, 1);
+  ok &= CheckLanguageCount(lang, LanguageEnum::Shell, 1);
+  ok &= CheckLanguageCount(lang, LanguageEnum::HexData, 1);
+  ok &= CheckLanguageCount(lang, LanguageEnum::PseudoBinaryData, 1);
   ok &= CheckNoFileViolations();
   return ok;
 }

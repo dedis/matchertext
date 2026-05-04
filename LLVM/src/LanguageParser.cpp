@@ -4,36 +4,15 @@
 // Date: 29.04.2026
 //
 
-
 #include <algorithm>
 #include <array>
-#include <initializer_list>
 #include <unordered_map>
 
 #include "../include/LanguageParser.hpp"
 #include "../include/JSON.hpp"
 #include "../include/JsonParser.hpp"
+#include "../include/LanguageData.hpp"
 #include "../include/Parser.hpp"
-
-struct LangSpec {
-  std::initializer_list<const char *> compilers;
-  const char *cmdTemplate;
-};
-
-#ifndef MATCHERTEXT_PARSERS_DIR
-#define MATCHERTEXT_PARSERS_DIR "./parsers"
-#endif
-#ifndef MATCHERTEXT_GO_PARSER_BIN
-#define MATCHERTEXT_GO_PARSER_BIN "./matchertext_go_parser"
-#endif
-
-// C and C++ are not included because they use the clang parser compiled into the parser.
-// The Go parser is pre-compiled by CMake to avoid `go run` recompiling on every file
-// and to sidestep its same-directory rule for .go arguments.
-static const std::unordered_map<Language, LangSpec> specs = {
-  {Language::Go, {{MATCHERTEXT_GO_PARSER_BIN}, "\"{}\" \"{}\""}},
-  {Language::Python, {{"python3", "python"}, "{} \"" MATCHERTEXT_PARSERS_DIR "/parser.py\" \"{}\""}},
-};
 
 static std::string format(const std::string &tpl, const std::string &a, const std::string &b) {
   std::string out;
@@ -57,23 +36,23 @@ static std::string format(const std::string &tpl, const std::string &a, const st
   return out;
 }
 
-static bool isAvailable(const char *cmd) {
+static bool isAvailable(const std::string_view cmd) {
   const std::string check = "command -v " + std::string(cmd) + " >/dev/null 2>&1";
   return std::system(check.c_str()) == 0;
 }
 
-static std::string firstAvailable(const std::initializer_list<const char *> candidates) {
-  for (const auto *c: candidates)
+static std::string firstAvailable(const std::span<const std::string_view> candidates) {
+  for (const auto c: candidates)
     if (isAvailable(c))
-      return c;
+      return std::string(c);
   return "";
 }
 
 bool LanguageParser::ExtractData(
-  const Language language, const std::string &compilerOverride, const std::string &filePath, JSON &result
+  const LanguageEnum language, const std::string &compilerOverride, const std::string &filePath, JSON &result
 ) {
   // Use the built-in clang parser
-  if (language == Language::C || language == Language::CPP)
+  if (language == LanguageEnum::C || language == LanguageEnum::CPP)
     return Parser::ParseC_CPP(filePath, result) && result.IsArray();
 
   std::string out;
@@ -84,47 +63,28 @@ bool LanguageParser::ExtractData(
   return result.IsArray();
 }
 
-bool LanguageParser::ParseLanguage(const std::string &name, Language &out) {
+bool LanguageParser::ParseLanguage(const std::string &name, LanguageEnum &out) {
   std::string lower(name);
   std::ranges::transform(
-    lower, lower.begin(),
-    [](const unsigned char c) {
+    lower, lower.begin(), [](const unsigned char c) {
       return std::tolower(c);
     }
   );
-  if (lower == "c") {
-    out = Language::C;
-    return true;
-  }
-  if (lower == "cpp" || lower == "c++") {
-    out = Language::CPP;
-    return true;
-  }
-  if (lower == "go" || lower == "golang") {
-    out = Language::Go;
-    return true;
-  }
-  if (lower == "python" || lower == "py") {
-    out = Language::Python;
-    return true;
-  }
-  return false;
+  out = GetLanguage(lower);
+  return out != LanguageEnum::Unknown;
 }
 
 bool LanguageParser::RunBuildCommand(
-  const Language language, const std::string &compilerOverride, const std::string &filePath, std::string &out
+  const LanguageEnum language, const std::string &compilerOverride, const std::string &filePath, std::string &out
 ) {
   // Create the correct build command
-  const auto it = specs.find(language);
-  if (it == specs.end())
-    return false;
-
-  const std::string cc = compilerOverride.empty() ? firstAvailable(it->second.compilers) : compilerOverride;
+  const auto data = GetLanguageData(language);
+  const std::string cc = compilerOverride.empty() ? firstAvailable(data.compilers) : compilerOverride;
   if (cc.empty())
     return false;
 
   std::array<char, 4096> buffer{};
-  const std::string cmd = format(it->second.cmdTemplate, cc, filePath);
+  const std::string cmd = format(std::string(data.cmdTemplate), cc, filePath);
   FILE *pipe = popen(cmd.c_str(), "r");
   if (!pipe)
     throw std::runtime_error("popen() failed");

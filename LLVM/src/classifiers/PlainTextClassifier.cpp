@@ -271,10 +271,10 @@ bool HasRepeatedNonLetterRun(const std::string_view s, int *maxRunLength) {
 ClassificationResult DetectPlainText(const std::string_view s) {
   const auto trimmed = Trim(s);
   if (trimmed.size() < 12 || trimmed.find('@') != std::string_view::npos)
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
 
   if (LooksLikeDecoratedPlainText(trimmed))
-    return {Language::PlainText, 0.82f};
+    return {LanguageEnum::PlainText, 0.82f};
 
   int letters = 0;
   int digits = 0;
@@ -311,28 +311,28 @@ ClassificationResult DetectPlainText(const std::string_view s) {
       trimmed.find("=>") != std::string_view::npos ||
       trimmed.find(":=") != std::string_view::npos ||
       trimmed.find("==") != std::string_view::npos)
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
 
   if (codeSymbols > 2)
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
 
   const int nonSpace = static_cast<int>(trimmed.size()) - spaces;
   if (nonSpace <= 0)
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
 
   const float letterRatio = static_cast<float>(letters) / static_cast<float>(nonSpace);
   const float digitRatio = static_cast<float>(digits) / static_cast<float>(nonSpace);
   if (letterRatio < 0.55f || digitRatio > 0.30f)
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
 
   if (LooksLikeShortPlainTextLabel(trimmed))
-    return {Language::PlainText, std::min(0.72f + static_cast<float>(words) * 0.04f, 0.88f)};
+    return {LanguageEnum::PlainText, std::min(0.72f + static_cast<float>(words) * 0.04f, 0.88f)};
   if (words >= 4 && (spaces >= 2 || sentenceMarks > 0))
-    return {Language::PlainText, std::min(0.70f + static_cast<float>(words) * 0.03f, 0.92f)};
+    return {LanguageEnum::PlainText, std::min(0.70f + static_cast<float>(words) * 0.03f, 0.92f)};
   if (words >= 6)
-    return {Language::PlainText, std::min(0.68f + static_cast<float>(words) * 0.025f, 0.90f)};
+    return {LanguageEnum::PlainText, std::min(0.68f + static_cast<float>(words) * 0.025f, 0.90f)};
 
-  return {Language::Unknown, 0.0f};
+  return {LanguageEnum::Unknown, 0.0f};
 }
 
 } // namespace classifier_internal

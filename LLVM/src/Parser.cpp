@@ -32,7 +32,7 @@ namespace fs = std::filesystem;
 
 namespace {
   constexpr size_t kMaxDebugSamplesPerLanguage = 1000;
-  constexpr size_t kLanguageCount = static_cast<size_t>(Language::COUNT);
+  constexpr size_t kLanguageCount = static_cast<size_t>(LanguageEnum::COUNT);
 
   struct DebugLanguageSample {
     std::string sourcePath;
@@ -102,7 +102,7 @@ namespace {
       );
   }
 
-  uint64_t SeedDebugBucket(const std::string_view inputPath, const Language language) {
+  uint64_t SeedDebugBucket(const std::string_view inputPath, const LanguageEnum language) {
     uint64_t seed = 14695981039346656037ull;
     for (const unsigned char c: inputPath) {
       seed ^= static_cast<uint64_t>(c);
@@ -164,7 +164,7 @@ namespace {
       }
 
       void Record(
-        const std::string_view inputPath, const Language language,
+        const std::string_view inputPath, const LanguageEnum language,
         const std::string_view sourcePath, const std::string_view text,
         const float confidence, const uint64_t violations,
         const uint64_t toothpicks
@@ -202,7 +202,7 @@ namespace {
           fs::path path;
           fs::path directory;
           std::string inputPath;
-          Language language;
+          LanguageEnum language;
           uint64_t totalSeen = 0;
           std::vector<DebugLanguageSample> samples;
         };
@@ -224,10 +224,10 @@ namespace {
               pending.push_back(
                 {
                   root_ / state->relativePath /
-                  (std::string(LanguageName(static_cast<Language>(idx))) + ".txt"),
+                  (std::string(LanguageName(static_cast<LanguageEnum>(idx))) + ".txt"),
                   root_ / state->relativePath,
                   inputPath,
-                  static_cast<Language>(idx),
+                  static_cast<LanguageEnum>(idx),
                   bucket.seen,
                   bucket.samples,
                 }
@@ -309,7 +309,7 @@ namespace {
 
         for (size_t idx = 0; idx < kLanguageCount; idx++)
           state->buckets[idx].rng.seed(
-            SeedDebugBucket(inputPath, static_cast<Language>(idx))
+            SeedDebugBucket(inputPath, static_cast<LanguageEnum>(idx))
           );
 
         auto *raw = state.get();
@@ -516,7 +516,7 @@ uint64_t Parser::process(
 
   if (langStats != nullptr) {
     /// Classify the embedded language and record per-language stats only for strings.
-    if (const auto [lang, confidence] = ClassifyString(string); lang != Language::Unknown) {
+    if (const auto [lang, confidence] = ClassifyString(string); lang != LanguageEnum::Unknown) {
       langStats->Record(lang, unmatched, toothpicks);
       GetDebugLanguageLogger().Record(
         inputPath, lang, sourcePath, string,

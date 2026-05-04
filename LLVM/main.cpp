@@ -4,15 +4,21 @@
 #include <map>
 #include <sstream>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
+#include "include/LanguageData.hpp"
 #include "include/LanguageParser.hpp"
 #include "include/Parser.hpp"
 #include "include/Stats.hpp"
 
 namespace fs = std::filesystem;
 using Clock = std::chrono::steady_clock;
+
+// TODO:
+// [ ] - Pass in custom file extensions
+// [X] - Add language config file for easier lang addition
+// [ ] - Auto detect language using linguist (skip  any <1% | byte count, add flag to disable language skipping)
+// [ ] - Multi language repo analysis (per repo + per language stats)
 
 static long long elapsed_ms(const Clock::time_point start, const Clock::time_point end) {
   return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -37,35 +43,26 @@ static std::string normalize_path(const std::string &in) {
   }
 }
 
-/// File extensions recognized per language. C and C++ share the indexing pool
-/// because headers like `.h` are ambiguous and the underlying parser handles both.
-static const std::unordered_map<Language, std::vector<std::string_view>> kLanguageExtensions = {
-  {Language::C,      {"c", "h"}},
-  {Language::CPP,    {"cc", "cpp", "cxx", "hpp", "hh", "hxx"}},
-  {Language::Go,     {"go"}},
-  {Language::Python, {"py", "pyw", "pyc", "pyo", "pyd", "pyi", "pyz", "pyzw"}},
-};
-
 /// True when `a` and `b` are the same language family for indexing purposes.
-constexpr bool same_language_family(const Language a, const Language b) {
+constexpr bool same_language_family(const LanguageEnum a, const LanguageEnum b) {
   if (a == b)
     return true;
-  const bool aIsCFamily = a == Language::C || a == Language::CPP;
-  const bool bIsCFamily = b == Language::C || b == Language::CPP;
+  const bool aIsCFamily = a == LanguageEnum::C || a == LanguageEnum::CPP;
+  const bool bIsCFamily = b == LanguageEnum::C || b == LanguageEnum::CPP;
   return aIsCFamily && bIsCFamily;
 }
 
 /// Return true if `path` has an extension belonging to `language` (or its family).
-inline bool matches_language(const std::string &path, const Language language) {
+inline bool matches_language(const std::string &path, const LanguageEnum language) {
   const auto pos = path.rfind('.');
   if (pos == std::string::npos)
     return false;
 
   const std::string_view ext(path.data() + pos + 1, path.size() - pos - 1);
-  for (const auto &[lang, extensions]: kLanguageExtensions) {
+  for (const auto &[lang, data]: kLanguageData) {
     if (!same_language_family(lang, language))
       continue;
-    for (const auto &e: extensions)
+    for (const auto &e: data.extensions)
       if (e == ext)
         return true;
   }
@@ -86,7 +83,7 @@ int main(const int argc, char *argv[]) {
   bool logStrings = false;
   bool debugLanguages = false;
   std::string compilerOverride;
-  auto language = Language::Unknown;
+  auto language = LanguageEnum::Unknown;
   std::map<std::string, std::string> filesToProcess;
   std::vector<std::string> inputPaths;
   const auto indexingStart = Clock::now();
@@ -109,8 +106,8 @@ int main(const int argc, char *argv[]) {
       continue;
     }
 
-    if (language == Language::Unknown) {
-      Language parsed;
+    if (language == LanguageEnum::Unknown) {
+      LanguageEnum parsed;
       if (!LanguageParser::ParseLanguage(arg, parsed)) {
         std::cerr << "Unknown language: " << arg
             << " (expected one of: c, cpp, go, python)\n";
@@ -137,7 +134,7 @@ int main(const int argc, char *argv[]) {
     }
   }
 
-  if (language == Language::Unknown) {
+  if (language == LanguageEnum::Unknown) {
     std::cerr << "Missing required <language> argument\n";
     return -1;
   }
@@ -239,5 +236,3 @@ int main(const int argc, char *argv[]) {
 
   return 0;
 }
-
-// Most common violation in files

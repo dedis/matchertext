@@ -92,9 +92,9 @@ ClassificationResult DetectFormatString(const std::string_view s) {
     }
   }
   if (specs == 0)
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
   const float density = static_cast<float>(specs) / static_cast<float>(s.size());
-  return {Language::FormatString, std::min(0.5f + density * 10.0f, 0.95f)};
+  return {LanguageEnum::FormatString, std::min(0.5f + density * 10.0f, 0.95f)};
 }
 
 } // namespace classifier_internal

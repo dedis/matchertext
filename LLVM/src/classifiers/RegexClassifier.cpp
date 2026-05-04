@@ -4,7 +4,7 @@ namespace classifier_internal {
 
 ClassificationResult DetectRegex(const std::string_view s) {
   if (s.size() < 3)
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
 
   int signals = 0;
 
@@ -45,8 +45,8 @@ ClassificationResult DetectRegex(const std::string_view s) {
     signals++;
 
   if (signals < 2)
-    return {Language::Unknown, 0.0f};
-  return {Language::Regex, std::min(0.5f + static_cast<float>(signals) * 0.08f, 0.95f)};
+    return {LanguageEnum::Unknown, 0.0f};
+  return {LanguageEnum::Regex, std::min(0.5f + static_cast<float>(signals) * 0.08f, 0.95f)};
 }
 
 } // namespace classifier_internal

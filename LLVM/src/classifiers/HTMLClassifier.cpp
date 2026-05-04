@@ -34,10 +34,10 @@ bool IsHTMLTagName(const std::string_view name) {
 
 ClassificationResult DetectHTML(const std::string_view s) {
   if (s.find('<') == std::string_view::npos)
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
 
   if (FindCI(s, "<!doctype") != std::string_view::npos)
-    return {Language::HTML, 0.95f};
+    return {LanguageEnum::HTML, 0.95f};
 
   int htmlTags = 0;
   int closingTags = 0;
@@ -74,12 +74,12 @@ ClassificationResult DetectHTML(const std::string_view s) {
   }
 
   if (htmlTags == 0)
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
   float confidence = 0.6f;
   if (closingTags > 0)
     confidence += 0.15f;
   confidence += std::min(static_cast<float>(htmlTags) * 0.05f, 0.20f);
-  return {Language::HTML, std::min(confidence, 0.95f)};
+  return {LanguageEnum::HTML, std::min(confidence, 0.95f)};
 }
 
 } // namespace classifier_internal

@@ -37,9 +37,9 @@ bool LooksLikeXMLQualifiedName(const std::string_view name) {
 
 ClassificationResult DetectXML(const std::string_view s) {
   if (s.find("<?xml") != std::string_view::npos)
-    return {Language::XML, 0.95f};
+    return {LanguageEnum::XML, 0.95f};
   if (s.find("<![CDATA[") != std::string_view::npos)
-    return {Language::XML, 0.90f};
+    return {LanguageEnum::XML, 0.90f};
 
   int nsOpenTags = 0;
   int nsClosingTags = 0;
@@ -99,9 +99,9 @@ ClassificationResult DetectXML(const std::string_view s) {
   }
 
   if (nsOpenTags == 0)
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
   if (nsClosingTags == 0 && nsSelfClosingTags == 0 && !hasXmlnsAttribute)
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
 
   float confidence = 0.72f;
   confidence += std::min(static_cast<float>(nsOpenTags) * 0.05f, 0.10f);
@@ -114,7 +114,7 @@ ClassificationResult DetectXML(const std::string_view s) {
   if (hasXmlnsAttribute)
     confidence += 0.10f;
 
-  return {Language::XML, std::min(confidence, 0.95f)};
+  return {LanguageEnum::XML, std::min(confidence, 0.95f)};
 }
 
 } // namespace classifier_internal

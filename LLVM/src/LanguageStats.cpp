@@ -9,7 +9,7 @@
 #include "../include/LanguageStats.hpp"
 
 void LanguageStats::Record(
-  const Language lang, const uint64_t violations,
+  const LanguageEnum lang, const uint64_t violations,
   const uint64_t toothpicks
 ) {
   const auto idx = static_cast<size_t>(lang);
@@ -21,14 +21,14 @@ void LanguageStats::Record(
 LanguageStatsSnapshot LanguageStats::Snapshot() const {
   LanguageStatsSnapshot snap{};
 
-  for (size_t i = 0; i < static_cast<size_t>(Language::COUNT); i++) {
+  for (size_t i = 0; i < static_cast<size_t>(LanguageEnum::COUNT); i++) {
     const uint64_t c = entries_[i].count.load(std::memory_order_relaxed);
     if (c == 0)
       continue;
     snap.total += c;
     snap.entries.push_back(
       {
-        static_cast<Language>(i), c,
+        static_cast<LanguageEnum>(i), c,
         entries_[i].violations.load(std::memory_order_relaxed),
         entries_[i].toothpicks.load(std::memory_order_relaxed), 0.0,
       }

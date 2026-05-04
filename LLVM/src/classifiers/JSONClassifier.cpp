@@ -5,9 +5,9 @@ namespace classifier_internal {
 ClassificationResult DetectJSON(const std::string_view s) {
   const auto trimmed = TrimLeft(s);
   if (trimmed.empty())
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
   if (trimmed[0] != '{' && trimmed[0] != '[')
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
 
   auto countPairs = [&](const char quote) {
     int pairs = 0;
@@ -31,15 +31,15 @@ ClassificationResult DetectJSON(const std::string_view s) {
   const int doubleQuotedPairs = countPairs('"');
   if (doubleQuotedPairs > 0)
     return {
-      Language::JSON,
+      LanguageEnum::JSON,
       std::min(0.6f + static_cast<float>(doubleQuotedPairs) * 0.1f, 0.95f)
     };
 
   const int singleQuotedPairs = countPairs('\'');
   if (singleQuotedPairs == 0)
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
   return {
-    Language::JSON,
+    LanguageEnum::JSON,
     std::min(0.68f + static_cast<float>(singleQuotedPairs) * 0.08f, 0.88f)
   };
 }

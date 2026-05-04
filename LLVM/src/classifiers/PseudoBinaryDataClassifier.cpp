@@ -4,11 +4,11 @@ namespace classifier_internal {
 
 ClassificationResult DetectPseudoBinaryData(const std::string_view s) {
   if (s.size() < 8)
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
 
   const auto analysis = AnalyzeBinaryData(s);
   if (!HasStrongBinaryEvidence(analysis, s) || !HasReadableBinaryContext(analysis))
-    return {Language::Unknown, 0.0f};
+    return {LanguageEnum::Unknown, 0.0f};
 
   const int strongEscapes = analysis.StrongEscapes();
   const float controlRatio = analysis.ControlRatio(s.size());
@@ -35,7 +35,7 @@ ClassificationResult DetectPseudoBinaryData(const std::string_view s) {
       confidence, std::min(0.78f + static_cast<float>(strongEscapes) * 0.02f, 0.93f)
     );
 
-  return {Language::PseudoBinaryData, confidence};
+  return {LanguageEnum::PseudoBinaryData, confidence};
 }
 
 } // namespace classifier_internal

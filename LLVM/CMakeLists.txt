@@ -59,6 +59,7 @@ add_executable(${PROJECT_NAME}
     include/JSON.hpp
     src/JsonParser.cpp
     include/JsonParser.hpp
+    include/LanguageData.hpp
 )
 
 add_executable(LanguageClassifierTests
@@ -67,6 +68,7 @@ add_executable(LanguageClassifierTests
     ${CLASSIFIER_SOURCES}
     include/LanguageClassifier.hpp
     include/LanguageModel.generated.hpp
+    include/LanguageData.hpp
 )
 target_include_directories(LanguageClassifierTests PRIVATE include)
 add_test(NAME language_detection COMMAND LanguageClassifierTests)
@@ -98,6 +100,7 @@ add_executable(ParserFixtureTests
     include/JSON.hpp
     src/JsonParser.cpp
     include/JsonParser.hpp
+    include/LanguageData.hpp
 )
 target_include_directories(ParserFixtureTests PRIVATE include)
 target_link_libraries(ParserFixtureTests clangLex clangBasic)
@@ -145,6 +148,7 @@ add_executable(DebugLanguageOutputTests
     include/JSON.hpp
     src/JsonParser.cpp
     include/JsonParser.hpp
+    include/LanguageData.hpp
 )
 target_include_directories(DebugLanguageOutputTests PRIVATE include)
 target_link_libraries(DebugLanguageOutputTests clangLex clangBasic)
