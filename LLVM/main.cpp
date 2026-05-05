@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <ranges>
 #include <sstream>
 #include <string_view>
@@ -215,6 +216,10 @@ int main(const int argc, char *argv[]) {
     return 0;
   }
 
+  std::map<LanguageEnum, std::unique_ptr<PerLanguageStats>> perLangStats;
+  for (const auto &lang: langFiles | std::views::keys)
+    perLangStats.emplace(lang, std::make_unique<PerLanguageStats>());
+
   try {
     const auto parseStart = Clock::now();
 
@@ -227,13 +232,15 @@ int main(const int argc, char *argv[]) {
         log_info(msg.str());
       }
 
+      PerLanguageStats *pls = perLangStats.at(lang.first).get();
+
       #if USE_OPENMP
-      #pragma omp parallel for schedule(dynamic) default(none) shared(lang, compilerOverride)
+      #pragma omp parallel for schedule(dynamic) default(none) shared(lang, compilerOverride, pls)
       #endif
       for (const auto &[filePath, inputPath]: lang.second) {
         try {
           if (JSON result; LanguageParser::ExtractData(lang.first, compilerOverride, filePath, result))
-            Parser::GatherStatistics(std::move(result), filePath, inputPath);
+            Parser::GatherStatistics(std::move(result), filePath, inputPath, pls);
         } catch (const std::exception &e) {
           #pragma omp critical
           std::cerr << "FAILED " << filePath << ": " << e.what() << '\n';
@@ -288,6 +295,57 @@ int main(const int argc, char *argv[]) {
       auto f = open_stat_file("max_strings.md");
       f << "# Max Strings\n\n";
       PrintStatsMaxString(Parser::STRING_STATS, Parser::DOCS_STATS, f);
+    }
+
+    for (const auto &[lang, pls]: perLangStats) {
+      const fs::path langDir = fs::path(outputDir) / "language_stats" / LanguageName(lang);
+      std::error_code langEc;
+      fs::create_directories(langDir, langEc);
+      if (langEc)
+        throw std::runtime_error(
+          "Failed to create language stats dir '" + langDir.string() + "': " + langEc.message()
+        );
+
+      auto open_lang_file = [&](const std::string &name) -> std::ofstream {
+        const fs::path p = langDir / name;
+        std::ofstream f(p, std::ios::trunc);
+        if (!f)
+          throw std::runtime_error("Failed to open output file '" + p.string() + "'");
+        return f;
+      };
+
+      {
+        auto f = open_lang_file("strings.md");
+        f << "# Embedded String Statistics\n\n";
+        PrintStatsTable(
+          {
+            {"Strings", pls->stringStats.Snapshot()},
+            {"Documentation", pls->docsStats.Snapshot()},
+            {"Documentation Relaxed", pls->docsRelaxedStats.Snapshot()},
+          }, f
+        );
+      }
+      {
+        auto f = open_lang_file("files.md");
+        f << "# File Statistics\n\n";
+        PrintFileStatsTable(pls->fileStats.Snapshot(), f);
+      }
+      {
+        auto f = open_lang_file("nesting.md");
+        f << "# Nesting Statistics\n\n";
+        PrintNestedStatsTable(
+          {
+            {"Strings", pls->stringNestedStats.Snapshot()},
+            {"Documentation", pls->docsNestedStats.Snapshot()},
+            {"Documentation Relaxed", pls->docsRelaxedNestedStats.Snapshot()},
+          }, f
+        );
+      }
+      {
+        auto f = open_lang_file("language_stats.md");
+        f << "# String Language Distribution\n\n";
+        PrintLanguageStatsTable({{"String", pls->langStats.Snapshot()}}, f);
+      }
     }
 
     std::ostringstream msg;

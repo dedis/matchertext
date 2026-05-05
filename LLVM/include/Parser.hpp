@@ -16,6 +16,18 @@
 #include "LanguageStats.hpp"
 #include "Stats.hpp"
 
+/// Owned stats for a single source language (used for per-language output).
+struct PerLanguageStats {
+  EmbeddedStats stringStats;
+  NestedStats stringNestedStats;
+  EmbeddedStats docsStats;
+  NestedStats docsNestedStats;
+  EmbeddedStats docsRelaxedStats;
+  NestedStats docsRelaxedNestedStats;
+  FileStats fileStats;
+  LanguageStats langStats;
+};
+
 /**
  * Parser class that uses Clang's lexer to extract string literals from a C/C++ source file.
  */
@@ -52,7 +64,7 @@ class Parser final {
      */
     static bool ParseC_CPP(const std::string &path, JSON &result);
 
-    static void GatherStatistics(JSON &&json, const std::string &path, std::string_view inputPath = {});
+    static void GatherStatistics(JSON &&json, const std::string &path, std::string_view inputPath = {}, PerLanguageStats *perLang = nullptr);
 
     /// Parse a C/C++ file and gather statistics in one step.
     static void ParseFile(const std::string &filePath, const std::string &inputPath);
@@ -82,7 +94,9 @@ class Parser final {
     /// @returns the number of MatcherText violations found
     static uint64_t process(std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats,
                             LanguageStats *langStats = nullptr, bool relaxed = false,
-                            std::string_view sourcePath = {}, std::string_view inputPath = {});
+                            std::string_view sourcePath = {}, std::string_view inputPath = {},
+                            EmbeddedStats *extraEmbedded = nullptr, NestedStats *extraNested = nullptr,
+                            LanguageStats *extraLangStats = nullptr);
 };
 
 #endif // PARSER_HPP

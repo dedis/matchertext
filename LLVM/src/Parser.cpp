@@ -355,7 +355,7 @@ bool Parser::ParseC_CPP(const std::string &path, JSON &result) {
   return true;
 }
 
-void Parser::GatherStatistics(JSON &&json, const std::string &path, const std::string_view inputPath) {
+void Parser::GatherStatistics(JSON &&json, const std::string &path, const std::string_view inputPath, PerLanguageStats *perLang) {
   uint64_t fileViolations = 0;
   uint64_t fileViolationsRelaxed = 0;
 
@@ -364,34 +364,47 @@ void Parser::GatherStatistics(JSON &&json, const std::string &path, const std::s
     if (e["kind"].GetString() == "string") {
       const uint64_t violations = process(
         std::move(value), STRING_STATS, STRING_NESTED_STATS, &STRING_LANG_STATS, false, path,
-        inputPath.empty() ? std::string_view(path) : inputPath
+        inputPath.empty() ? std::string_view(path) : inputPath,
+        perLang ? &perLang->stringStats : nullptr,
+        perLang ? &perLang->stringNestedStats : nullptr,
+        perLang ? &perLang->langStats : nullptr
       );
       fileViolations += violations;
       fileViolationsRelaxed += violations;
     } else {
-      fileViolations += process(std::string(value), DOCS_STATS, DOCS_NESTED_STATS);
-      fileViolationsRelaxed += process(std::move(value), DOCS_RELAXED_STATS, DOCS_RELAXED_NESTED_STATS, nullptr, true);
+      fileViolations += process(
+        std::string(value), DOCS_STATS, DOCS_NESTED_STATS, nullptr, false, {}, {},
+        perLang ? &perLang->docsStats : nullptr,
+        perLang ? &perLang->docsNestedStats : nullptr
+      );
+      fileViolationsRelaxed += process(
+        std::move(value), DOCS_RELAXED_STATS, DOCS_RELAXED_NESTED_STATS, nullptr, true, {}, {},
+        perLang ? &perLang->docsRelaxedStats : nullptr,
+        perLang ? &perLang->docsRelaxedNestedStats : nullptr
+      );
     }
   }
 
-  AtomicAdd(FILE_STATS.count, 1.0);
+  auto updateFileStats = [](FileStats &fs, const uint64_t fv, const uint64_t fvr) {
+    AtomicAdd(fs.count, 1.0);
+    if (fv > 0) AtomicAdd(fs.withViolation, 1.0);
+    AtomicAdd(fs.violationCount, static_cast<double>(fv));
+    AtomicMax(fs.violationMax, static_cast<double>(fv));
+    if (fvr > 0) AtomicAdd(fs.withViolationRelaxed, 1.0);
+    AtomicAdd(fs.violationCountRelaxed, static_cast<double>(fvr));
+    AtomicMax(fs.violationMaxRelaxed, static_cast<double>(fvr));
+  };
 
-  if (fileViolations > 0)
-    AtomicAdd(FILE_STATS.withViolation, 1.0);
-  AtomicAdd(FILE_STATS.violationCount, static_cast<double>(fileViolations));
-  AtomicMax(FILE_STATS.violationMax, static_cast<double>(fileViolations));
-
-  if (fileViolationsRelaxed > 0)
-    AtomicAdd(FILE_STATS.withViolationRelaxed, 1.0);
-  AtomicAdd(FILE_STATS.violationCountRelaxed, static_cast<double>(fileViolationsRelaxed));
-  AtomicMax(FILE_STATS.violationMaxRelaxed, static_cast<double>(fileViolationsRelaxed));
+  updateFileStats(FILE_STATS, fileViolations, fileViolationsRelaxed);
+  if (perLang)
+    updateFileStats(perLang->fileStats, fileViolations, fileViolationsRelaxed);
 }
 
 uint64_t Parser::process(
   std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats,
   LanguageStats *langStats, const bool relaxed,
-  const std::string_view sourcePath,
-  const std::string_view inputPath
+  const std::string_view sourcePath, const std::string_view inputPath,
+  EmbeddedStats *extraEmbedded, NestedStats *extraNested, LanguageStats *extraLangStats
 ) {
   uint64_t toothpicks = 0;
   for (const unsigned char c: string) {
@@ -405,6 +418,8 @@ uint64_t Parser::process(
     /// Classify the embedded language and record per-language stats only for strings.
     if (const auto [lang, confidence] = ClassifyString(string); lang != LanguageEnum::Unknown) {
       langStats->Record(lang, unmatched, toothpicks);
+      if (extraLangStats)
+        extraLangStats->Record(lang, unmatched, toothpicks);
       GetDebugLanguageLogger().Record(
         inputPath, lang, sourcePath, string,
         confidence, unmatched, toothpicks
@@ -413,33 +428,41 @@ uint64_t Parser::process(
   }
 
   nestedStats.Record(maxDepth, maxValidDepth);
+  if (extraNested)
+    extraNested->Record(maxDepth, maxValidDepth);
 
-  AtomicAdd(stats.count, 1.0);
-  AtomicAdd(stats.rawChars, static_cast<double>(rawChars));
+  auto applyEmbedded = [&](EmbeddedStats &s) {
+    AtomicAdd(s.count, 1.0);
+    AtomicAdd(s.rawChars, static_cast<double>(rawChars));
 
-  if (toothpicks > 0)
-    AtomicAdd(stats.withToothpicks, 1.0);
-  AtomicAdd(stats.toothpicks, static_cast<double>(toothpicks));
-  if (AtomicMax(stats.toothpicksMax, static_cast<double>(toothpicks)))
-    stats.stringMaxToothpicks.set(string);
+    if (toothpicks > 0)
+      AtomicAdd(s.withToothpicks, 1.0);
+    AtomicAdd(s.toothpicks, static_cast<double>(toothpicks));
+    if (AtomicMax(s.toothpicksMax, static_cast<double>(toothpicks)))
+      s.stringMaxToothpicks.set(string);
 
-  if (unmatched > 0)
-    AtomicAdd(stats.withNonCompliance, 1.0);
-  AtomicAdd(stats.nonComplianceCount, static_cast<double>(unmatched));
-  if (AtomicMax(stats.nonComplianceMax, static_cast<double>(unmatched)))
-    stats.stringMaxNonCompliance.set(string);
+    if (unmatched > 0)
+      AtomicAdd(s.withNonCompliance, 1.0);
+    AtomicAdd(s.nonComplianceCount, static_cast<double>(unmatched));
+    if (AtomicMax(s.nonComplianceMax, static_cast<double>(unmatched)))
+      s.stringMaxNonCompliance.set(string);
 
-  if (maxDepth > 1)
-    AtomicAdd(stats.withNesting, 1.0);
-  AtomicAdd(stats.nestingDepthTotal, static_cast<double>(maxDepth));
-  if (AtomicMax(stats.nestingDepthMax, static_cast<double>(maxDepth)))
-    stats.stringMaxNested.set(string);
+    if (maxDepth > 1)
+      AtomicAdd(s.withNesting, 1.0);
+    AtomicAdd(s.nestingDepthTotal, static_cast<double>(maxDepth));
+    if (AtomicMax(s.nestingDepthMax, static_cast<double>(maxDepth)))
+      s.stringMaxNested.set(string);
 
-  if (maxValidDepth > 1)
-    AtomicAdd(stats.withValidNesting, 1.0);
-  AtomicAdd(stats.validNestingDepthTotal, static_cast<double>(maxValidDepth));
-  if (AtomicMax(stats.validNestingDepthMax, static_cast<double>(maxValidDepth)))
-    stats.stringMaxValidNested.set(string);
+    if (maxValidDepth > 1)
+      AtomicAdd(s.withValidNesting, 1.0);
+    AtomicAdd(s.validNestingDepthTotal, static_cast<double>(maxValidDepth));
+    if (AtomicMax(s.validNestingDepthMax, static_cast<double>(maxValidDepth)))
+      s.stringMaxValidNested.set(string);
+  };
+
+  applyEmbedded(stats);
+  if (extraEmbedded)
+    applyEmbedded(*extraEmbedded);
 
   return unmatched;
 }
