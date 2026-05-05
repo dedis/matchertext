@@ -159,18 +159,3 @@ void PrintLanguageStatsTable(
     out << '\n';
   }
 }
-
-void PrintStatsMaxString(
-  const EmbeddedStats &strings, const EmbeddedStats &docs, std::ostream &out
-) {
-  out << "## String\n\n"
-      << "- **Max Toothpicks**\n\n```\n" << EscapeForLog(strings.stringMaxToothpicks.get()) << "\n```\n\n"
-      << "- **Max Non Compliance**\n\n```\n" << EscapeForLog(strings.stringMaxNonCompliance.get()) << "\n```\n\n"
-      << "- **Max Raw Nested**\n\n```\n" << EscapeForLog(strings.stringMaxNested.get()) << "\n```\n\n"
-      << "- **Max Valid Nested**\n\n```\n" << EscapeForLog(strings.stringMaxValidNested.get()) << "\n```\n\n"
-      << "## Documentation\n\n"
-      << "- **Max Toothpicks**\n\n```\n" << EscapeForLog(docs.stringMaxToothpicks.get()) << "\n```\n\n"
-      << "- **Max Non Compliance**\n\n```\n" << EscapeForLog(docs.stringMaxNonCompliance.get()) << "\n```\n\n"
-      << "- **Max Raw Nested**\n\n```\n" << EscapeForLog(docs.stringMaxNested.get()) << "\n```\n\n"
-      << "- **Max Valid Nested**\n\n```\n" << EscapeForLog(docs.stringMaxValidNested.get()) << "\n```\n\n";
-}

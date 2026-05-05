@@ -19,12 +19,25 @@
 namespace fs = std::filesystem;
 using Clock = std::chrono::steady_clock;
 
-// TODO:
-// [X] - Pass in custom file extensions
-// [X] - Add language config file for easier lang addition
-// [X] - Auto detect language from repo file extensions (skip  any <1% | byte count, add flag to disable language skipping)
-// [X] - Multi language repo analysis (per repo + per language stats)
-// [ ] - Move stats from terminal logging to the results directory
+static const char *kUsage =
+    "Matchertext Analyzer\n"
+    "\n"
+    "USAGE:\n"
+    "    %s <file|directory>... [OPTIONS]\n"
+    "\n"
+    "ARGS:\n"
+    "    <file|directory>...    One or more source files or directories to analyze\n"
+    "\n"
+    "OPTIONS:\n"
+    "    --language <lang>              Only analyze files of the given language\n"
+    "    --output <dir>                 Directory to write results to (default: ./result)\n"
+    "    --compiler <compiler>          Override the compiler used for parsing\n"
+    "    --extensions <ext1,ext2,...>   Comma-separated list of additional file extensions\n"
+    "\n"
+    "EXAMPLES:\n"
+    "    %[1]s ./my_project\n"
+    "    %[1]s ./src --language cpp\n"
+    "    %[1]s ./src --language cpp --extensions cp+,hp+\n";
 
 static long long elapsed_ms(const Clock::time_point start, const Clock::time_point end) {
   return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -42,7 +55,8 @@ static std::string pluralize(const size_t count, const std::string_view singular
 }
 
 constexpr bool same_language_family(const LanguageEnum a, const LanguageEnum b) {
-  if (a == b) return true;
+  if (a == b)
+    return true;
   const bool aIsC = a == LanguageEnum::C || a == LanguageEnum::CPP;
   const bool bIsC = b == LanguageEnum::C || b == LanguageEnum::CPP;
   return aIsC && bIsC;
@@ -53,7 +67,10 @@ static std::vector<std::string_view> split_comma(std::string_view s) {
   size_t start = 0;
   while (true) {
     const size_t pos = s.find(',', start);
-    if (pos == std::string_view::npos) { out.emplace_back(s.substr(start)); break; }
+    if (pos == std::string_view::npos) {
+      out.emplace_back(s.substr(start));
+      break;
+    }
     out.emplace_back(s.substr(start, pos - start));
     start = pos + 1;
   }
@@ -63,8 +80,10 @@ static std::vector<std::string_view> split_comma(std::string_view s) {
 static std::string list_known_languages() {
   std::string out;
   for (const auto &data: kLanguageData | std::views::values) {
-    if (data.alias.empty()) continue;
-    if (!out.empty()) out += ", ";
+    if (data.alias.empty())
+      continue;
+    if (!out.empty())
+      out += ", ";
     out += data.alias[0];
   }
   return out;
@@ -72,41 +91,56 @@ static std::string list_known_languages() {
 
 int main(const int argc, char *argv[]) {
   if (argc < 2) {
-    std::cerr << "Usage: " << argv[0]
-        << " <file|directory>... [--language <lang>] [--output <dir>] [--log-strings]"
-           " [--compiler <compiler>] [--extensions <ext1,ext2,...>]\n";
+    std::fprintf(stderr, kUsage, argv[0]);
     return -1;
   }
 
   log_info("Starting parser");
 
-  bool logStrings = false;
   std::string compilerOverride;
   std::string outputDir = "./result";
-  LanguageEnum filterLanguage = LanguageEnum::Unknown;
+  auto filterLanguage = LanguageEnum::Unknown;
   std::vector<std::string_view> extraExtensions;
   std::vector<std::string> rawPaths;
 
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
-    if (arg == "--log-strings")    { logStrings = true; continue; }
     if (arg == "--output") {
-      if (i + 1 >= argc) { std::cerr << "--output requires a value\n"; return -1; }
-      outputDir = argv[++i]; continue;
+      if (i + 1 >= argc) {
+        std::fprintf(stderr, "--output requires a value\n\n");
+        std::fprintf(stderr, kUsage, argv[0]);
+        return -1;
+      }
+      outputDir = argv[++i];
+      continue;
     }
     if (arg == "--compiler") {
-      if (i + 1 >= argc) { std::cerr << "--compiler requires a value\n"; return -1; }
-      compilerOverride = argv[++i]; continue;
+      if (i + 1 >= argc) {
+        std::fprintf(stderr, "--compiler requires a value\n\n");
+        std::fprintf(stderr, kUsage, argv[0]);
+        return -1;
+      }
+      compilerOverride = argv[++i];
+      continue;
     }
     if (arg == "--extensions") {
-      if (i + 1 >= argc) { std::cerr << "--extensions requires a value\n"; return -1; }
-      extraExtensions = split_comma(argv[++i]); continue;
+      if (i + 1 >= argc) {
+        std::fprintf(stderr, "--extensions requires a value\n\n");
+        std::fprintf(stderr, kUsage, argv[0]);
+        return -1;
+      }
+      extraExtensions = split_comma(argv[++i]);
+      continue;
     }
     if (arg == "--language") {
-      if (i + 1 >= argc) { std::cerr << "--language requires a value\n"; return -1; }
+      if (i + 1 >= argc) {
+        std::fprintf(stderr, "--language requires a value\n\n");
+        std::fprintf(stderr, kUsage, argv[0]);
+        return -1;
+      }
       if (!LanguageParser::ParseLanguage(argv[++i], filterLanguage)) {
-        std::cerr << "Unknown language: " << argv[i]
-                  << " (known: " << list_known_languages() << ")\n";
+        std::fprintf(stderr, "Unknown language: %s (known: %s)\n\n", argv[i], list_known_languages().c_str());
+        std::fprintf(stderr, kUsage, argv[0]);
         return -1;
       }
       continue;
@@ -115,11 +149,14 @@ int main(const int argc, char *argv[]) {
   }
 
   if (rawPaths.empty()) {
-    std::cerr << "Missing required <file|directory> argument\n";
+    std::fprintf(stderr, "Missing required <file|directory> argument\n\n");
+    std::fprintf(stderr, kUsage, argv[0]);
     return -1;
   }
 
   const bool singleLanguage = filterLanguage != LanguageEnum::Unknown;
+  if (singleLanguage)
+    extraExtensions.clear();
 
   std::vector<std::string> inputPaths;
   inputPaths.reserve(rawPaths.size());
@@ -148,7 +185,8 @@ int main(const int argc, char *argv[]) {
   std::unordered_map<std::string, LanguageEnum> extToLang;
   if (singleLanguage) {
     for (const auto &[lang, data]: kLanguageData) {
-      if (!same_language_family(lang, filterLanguage)) continue;
+      if (!same_language_family(lang, filterLanguage))
+        continue;
       for (const auto &ext: data.extensions)
         extToLang.try_emplace(std::string(ext), filterLanguage);
     }
@@ -176,11 +214,14 @@ int main(const int argc, char *argv[]) {
 
     auto try_add = [&](const fs::path &fp) {
       const std::string extStr = fp.extension().string();
-      if (extStr.size() <= 1) return;
+      if (extStr.size() <= 1)
+        return;
       const auto it = extToLang.find(extStr.substr(1));
-      if (it == extToLang.end()) return;
+      if (it == extToLang.end())
+        return;
       const std::string norm = fp.lexically_normal().string();
-      if (!seen.insert(norm).second) return;
+      if (!seen.insert(norm).second)
+        return;
       buckets[it->second].emplace_back(norm, inputPath);
     };
 
@@ -196,15 +237,16 @@ int main(const int argc, char *argv[]) {
   std::vector<std::pair<LanguageEnum, std::vector<std::pair<std::string, std::string>>>> langFiles;
   size_t totalFiles = 0;
   for (const auto &lang: kLanguageData | std::views::keys) {
-    if (singleLanguage && lang != filterLanguage) continue;
+    if (singleLanguage && lang != filterLanguage)
+      continue;
     auto it = buckets.find(lang);
-    if (it == buckets.end() || it->second.empty()) continue;
+    if (it == buckets.end() || it->second.empty())
+      continue;
     totalFiles += it->second.size();
     langFiles.emplace_back(lang, std::move(it->second));
   }
 
-  const long long indexingMs = elapsed_ms(indexingStart, Clock::now());
-  {
+  const long long indexingMs = elapsed_ms(indexingStart, Clock::now()); {
     std::ostringstream msg;
     msg << "Indexed " << pluralize(totalFiles, "file", "files")
         << " across " << pluralize(langFiles.size(), "language", "languages");
@@ -226,9 +268,7 @@ int main(const int argc, char *argv[]) {
     for (auto &lang: langFiles) {
       {
         std::ostringstream msg;
-        msg << "Parsing " << pluralize(lang.second.size(), "file", "files")
-            << " [" << LanguageName(lang.first) << "]";
-        if (logStrings) msg << " with string logging enabled";
+        msg << "Parsing " << pluralize(lang.second.size(), "file", "files") << " [" << LanguageName(lang.first) << "]";
         log_info(msg.str());
       }
 
@@ -258,8 +298,7 @@ int main(const int argc, char *argv[]) {
       if (!f)
         throw std::runtime_error("Failed to open output file '" + p.string() + "'");
       return f;
-    };
-    {
+    }; {
       auto f = open_stat_file("strings.md");
       f << "# Embedded String Statistics\n\n";
       PrintStatsTable(
@@ -269,13 +308,11 @@ int main(const int argc, char *argv[]) {
           {"Documentation Relaxed", Parser::DOCS_RELAXED_STATS.Snapshot()},
         }, f
       );
-    }
-    {
+    } {
       auto f = open_stat_file("files.md");
       f << "# File Statistics\n\n";
       PrintFileStatsTable(Parser::FILE_STATS.Snapshot(), f);
-    }
-    {
+    } {
       auto f = open_stat_file("nesting.md");
       f << "# Nesting Statistics\n\n";
       PrintNestedStatsTable(
@@ -285,16 +322,10 @@ int main(const int argc, char *argv[]) {
           {"Documentation Relaxed", Parser::DOCS_RELAXED_NESTED_STATS.Snapshot()},
         }, f
       );
-    }
-    {
+    } {
       auto f = open_stat_file("language_stats.md");
       f << "# String Language Distribution\n\n";
       PrintLanguageStatsTable({{"String", Parser::STRING_LANG_STATS.Snapshot()}}, f);
-    }
-    if (logStrings) {
-      auto f = open_stat_file("max_strings.md");
-      f << "# Max Strings\n\n";
-      PrintStatsMaxString(Parser::STRING_STATS, Parser::DOCS_STATS, f);
     }
 
     for (const auto &[lang, pls]: perLangStats) {
@@ -312,9 +343,7 @@ int main(const int argc, char *argv[]) {
         if (!f)
           throw std::runtime_error("Failed to open output file '" + p.string() + "'");
         return f;
-      };
-
-      {
+      }; {
         auto f = open_lang_file("strings.md");
         f << "# Embedded String Statistics\n\n";
         PrintStatsTable(
@@ -324,13 +353,11 @@ int main(const int argc, char *argv[]) {
             {"Documentation Relaxed", pls->docsRelaxedStats.Snapshot()},
           }, f
         );
-      }
-      {
+      } {
         auto f = open_lang_file("files.md");
         f << "# File Statistics\n\n";
         PrintFileStatsTable(pls->fileStats.Snapshot(), f);
-      }
-      {
+      } {
         auto f = open_lang_file("nesting.md");
         f << "# Nesting Statistics\n\n";
         PrintNestedStatsTable(
@@ -340,8 +367,7 @@ int main(const int argc, char *argv[]) {
             {"Documentation Relaxed", pls->docsRelaxedNestedStats.Snapshot()},
           }, f
         );
-      }
-      {
+      } {
         auto f = open_lang_file("language_stats.md");
         f << "# String Language Distribution\n\n";
         PrintLanguageStatsTable({{"String", pls->langStats.Snapshot()}}, f);
