@@ -1,13 +1,15 @@
 **/.DS_Store
 **/.idea
 /minml
+minml-lsp
+lsp
 **/minml.exe
 LLVM/ignore
 LLVM/include/LanguageModel.generated.hpp
-devtools
 out
 out/wasm/main.wasm
 out/wasm/wasm_exec.js
+**/dist
 
 **/node_modules
 **/wasm_exec.js
