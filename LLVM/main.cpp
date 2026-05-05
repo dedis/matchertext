@@ -1,10 +1,13 @@
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <ranges>
 #include <sstream>
 #include <string_view>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "include/LanguageData.hpp"
@@ -18,8 +21,9 @@ using Clock = std::chrono::steady_clock;
 // TODO:
 // [X] - Pass in custom file extensions
 // [X] - Add language config file for easier lang addition
-// [ ] - Auto detect language using linguist (skip  any <1% | byte count, add flag to disable language skipping)
-// [ ] - Multi language repo analysis (per repo + per language stats)
+// [X] - Auto detect language from repo file extensions (skip  any <1% | byte count, add flag to disable language skipping)
+// [X] - Multi language repo analysis (per repo + per language stats)
+// [ ] - Move stats from terminal logging to the results directory
 
 static long long elapsed_ms(const Clock::time_point start, const Clock::time_point end) {
   return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -36,93 +40,72 @@ static std::string pluralize(const size_t count, const std::string_view singular
   return std::to_string(count) + " " + std::string(count == 1 ? singular : plural);
 }
 
-static std::string normalize_path(const std::string &in) {
-  try {
-    return fs::weakly_canonical(fs::path(in)).lexically_normal().string();
-  } catch (...) {
-    return fs::path(in).lexically_normal().string();
-  }
-}
-
-/// True when `a` and `b` are the same language family for indexing purposes.
 constexpr bool same_language_family(const LanguageEnum a, const LanguageEnum b) {
-  if (a == b)
-    return true;
-  const bool aIsCFamily = a == LanguageEnum::C || a == LanguageEnum::CPP;
-  const bool bIsCFamily = b == LanguageEnum::C || b == LanguageEnum::CPP;
-  return aIsCFamily && bIsCFamily;
+  if (a == b) return true;
+  const bool aIsC = a == LanguageEnum::C || a == LanguageEnum::CPP;
+  const bool bIsC = b == LanguageEnum::C || b == LanguageEnum::CPP;
+  return aIsC && bIsC;
 }
 
-/// Return true if `path` has an extension belonging to `language` (or its family).
-inline bool matches_language(const std::string &path, const LanguageEnum language, const std::vector<std::string_view> &extensions) {
-  const auto pos = path.rfind('.');
-  if (pos == std::string::npos)
-    return false;
-
-  const std::string_view ext(path.data() + pos + 1, path.size() - pos - 1);
-  for (const auto &[lang, data]: kLanguageData) {
-    if (!same_language_family(lang, language))
-      continue;
-    for (const auto &e: extensions)
-      if (e == ext)
-        return true;
-    for (const auto &e: data.extensions)
-      if (e == ext)
-        return true;
-  }
-  return false;
-}
-
-std::vector<std::string_view> split_comma(std::string_view s) {
+static std::vector<std::string_view> split_comma(std::string_view s) {
   std::vector<std::string_view> out;
   size_t start = 0;
-
   while (true) {
     const size_t pos = s.find(',', start);
-    if (pos == std::string_view::npos) {
-      out.emplace_back(s.substr(start));
-      break;
-    }
+    if (pos == std::string_view::npos) { out.emplace_back(s.substr(start)); break; }
     out.emplace_back(s.substr(start, pos - start));
     start = pos + 1;
   }
   return out;
 }
 
+static std::string list_known_languages() {
+  std::string out;
+  for (const auto &data: kLanguageData | std::views::values) {
+    if (data.alias.empty()) continue;
+    if (!out.empty()) out += ", ";
+    out += data.alias[0];
+  }
+  return out;
+}
+
 int main(const int argc, char *argv[]) {
-  long long indexingMs = 0;
-  if (argc < 3) {
+  if (argc < 2) {
     std::cerr << "Usage: " << argv[0]
-        << " <language> [--log-strings] [--debug-languages] [--compiler <compiler>] [--extensions <ext1,ext2,...>] <file|directory>...\n";
+        << " <file|directory>... [--language <lang>] [--output <dir>] [--log-strings]"
+           " [--compiler <compiler>] [--extensions <ext1,ext2,...>]\n";
     return -1;
   }
 
   log_info("Starting parser");
 
-  // Pass 1: extract all parameters
   bool logStrings = false;
-  bool debugLanguages = false;
   std::string compilerOverride;
-  auto language = LanguageEnum::Unknown;
-  std::vector<std::string_view> extensions;
+  std::string outputDir = "./result";
+  LanguageEnum filterLanguage = LanguageEnum::Unknown;
+  std::vector<std::string_view> extraExtensions;
   std::vector<std::string> rawPaths;
+
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
-    if (arg == "--log-strings") { logStrings = true; continue; }
-    if (arg == "--debug-languages") { debugLanguages = true; continue; }
+    if (arg == "--log-strings")    { logStrings = true; continue; }
+    if (arg == "--output") {
+      if (i + 1 >= argc) { std::cerr << "--output requires a value\n"; return -1; }
+      outputDir = argv[++i]; continue;
+    }
     if (arg == "--compiler") {
       if (i + 1 >= argc) { std::cerr << "--compiler requires a value\n"; return -1; }
-      compilerOverride = argv[++i];
-      continue;
+      compilerOverride = argv[++i]; continue;
     }
     if (arg == "--extensions") {
       if (i + 1 >= argc) { std::cerr << "--extensions requires a value\n"; return -1; }
-      extensions = split_comma(argv[++i]);
-      continue;
+      extraExtensions = split_comma(argv[++i]); continue;
     }
-    if (language == LanguageEnum::Unknown) {
-      if (!LanguageParser::ParseLanguage(arg, language)) {
-        std::cerr << "Unknown language: " << arg << " (expected one of: c, cpp, go, python)\n";
+    if (arg == "--language") {
+      if (i + 1 >= argc) { std::cerr << "--language requires a value\n"; return -1; }
+      if (!LanguageParser::ParseLanguage(argv[++i], filterLanguage)) {
+        std::cerr << "Unknown language: " << argv[i]
+                  << " (known: " << list_known_languages() << ")\n";
         return -1;
       }
       continue;
@@ -130,122 +113,189 @@ int main(const int argc, char *argv[]) {
     rawPaths.push_back(arg);
   }
 
-  if (language == LanguageEnum::Unknown) {
-    std::cerr << "Missing required <language> argument\n";
+  if (rawPaths.empty()) {
+    std::cerr << "Missing required <file|directory> argument\n";
     return -1;
   }
 
-  // Pass 2: traverse files
-  std::map<std::string, std::string> filesToProcess;
+  const bool singleLanguage = filterLanguage != LanguageEnum::Unknown;
+
   std::vector<std::string> inputPaths;
+  inputPaths.reserve(rawPaths.size());
+  for (const auto &p: rawPaths)
+    inputPaths.push_back(fs::path(p).lexically_normal().string());
+
+  // Derive per-repo output dir: ./result/<repo_path>
+  // For relative inputs use the path as-is; for absolute inputs use the last component.
+  {
+    const fs::path ip = fs::path(rawPaths[0]).lexically_normal();
+    const fs::path sub = ip.is_relative() ? ip : ip.filename();
+    outputDir = (fs::path(outputDir) / sub).string();
+  }
+
+  std::error_code ec;
+  fs::create_directories(outputDir, ec);
+  if (ec) {
+    std::cerr << "Failed to create output directory '" << outputDir << "': " << ec.message() << '\n';
+    return -1;
+  }
+
+  Parser::ConfigureDebugLanguages(inputPaths, outputDir);
+
+  // Build extension→language lookup once so the walk is O(1) per file.
+  // In single-language mode expand to the whole language family + extra extensions.
+  std::unordered_map<std::string, LanguageEnum> extToLang;
+  if (singleLanguage) {
+    for (const auto &[lang, data]: kLanguageData) {
+      if (!same_language_family(lang, filterLanguage)) continue;
+      for (const auto &ext: data.extensions)
+        extToLang.try_emplace(std::string(ext), filterLanguage);
+    }
+    for (const auto &ext: extraExtensions)
+      extToLang.try_emplace(std::string(ext), filterLanguage);
+  } else {
+    for (const auto &[lang, data]: kLanguageData)
+      for (const auto &ext: data.extensions)
+        extToLang.try_emplace(std::string(ext), lang);
+  }
+
+  // Single directory walk: bucket files by language.
+  // lexically_normal() is pure string arithmetic (no stat syscalls).
   const auto indexingStart = Clock::now();
+  std::unordered_set<std::string> seen;
+  std::map<LanguageEnum, std::vector<std::pair<std::string, std::string>>> buckets;
+
   for (const auto &rawPath: rawPaths) {
-    fs::path p(rawPath);
+    const fs::path p(rawPath);
     if (!fs::exists(p)) {
       std::cerr << "Path does not exist: " << p << "\n";
       continue;
     }
+    const std::string inputPath = p.lexically_normal().string();
 
-    const std::string inputPath = fs::path(rawPath).lexically_normal().string();
-    inputPaths.push_back(inputPath);
-    if (fs::is_regular_file(p) && matches_language(p.string(), language, extensions))
-      filesToProcess.try_emplace(normalize_path(p.string()), inputPath);
-    else if (fs::is_directory(p)) {
+    auto try_add = [&](const fs::path &fp) {
+      const std::string extStr = fp.extension().string();
+      if (extStr.size() <= 1) return;
+      const auto it = extToLang.find(extStr.substr(1));
+      if (it == extToLang.end()) return;
+      const std::string norm = fp.lexically_normal().string();
+      if (!seen.insert(norm).second) return;
+      buckets[it->second].emplace_back(norm, inputPath);
+    };
+
+    if (fs::is_regular_file(p))
+      try_add(p);
+    else if (fs::is_directory(p))
       for (const auto &entry: fs::recursive_directory_iterator(p))
-        if (fs::is_regular_file(entry) && matches_language(entry.path().string(), language, extensions))
-          filesToProcess.try_emplace(normalize_path(entry.path().string()), inputPath);
-    }
-  }
-  const auto indexingEnd = Clock::now();
-  indexingMs = elapsed_ms(indexingStart, indexingEnd);
-  {
-    std::ostringstream message;
-    message << "Indexed " << pluralize(filesToProcess.size(), "file", "files")
-        << " from " << pluralize(inputPaths.size(), "input path", "input paths");
-    log_info(message.str());
+        if (fs::is_regular_file(entry))
+          try_add(entry.path());
   }
 
-  if (filesToProcess.empty()) {
+  // Assemble langFiles in kLanguageData order for deterministic output.
+  std::vector<std::pair<LanguageEnum, std::vector<std::pair<std::string, std::string>>>> langFiles;
+  size_t totalFiles = 0;
+  for (const auto &lang: kLanguageData | std::views::keys) {
+    if (singleLanguage && lang != filterLanguage) continue;
+    auto it = buckets.find(lang);
+    if (it == buckets.end() || it->second.empty()) continue;
+    totalFiles += it->second.size();
+    langFiles.emplace_back(lang, std::move(it->second));
+  }
+
+  const long long indexingMs = elapsed_ms(indexingStart, Clock::now());
+  {
+    std::ostringstream msg;
+    msg << "Indexed " << pluralize(totalFiles, "file", "files")
+        << " across " << pluralize(langFiles.size(), "language", "languages");
+    log_info(msg.str());
+  }
+
+  if (langFiles.empty()) {
     log_info("No matching source files found, exiting");
     return 0;
   }
 
   try {
-    long long parsingMs = 0;
-    std::vector<std::pair<std::string, std::string>> files;
-    files.reserve(filesToProcess.size());
-    for (const auto &[filePath, inputPath]: filesToProcess)
-      files.emplace_back(filePath, inputPath);
-
-    if (debugLanguages) {
-      log_info("Debug language sampling enabled");
-      Parser::ConfigureDebugLanguages(inputPaths);
-    }
-
-    std::ostringstream message;
-    message << "Parsing " << pluralize(files.size(), "file", "files");
-    if (logStrings)
-      message << " with string logging enabled";
-    log_info(message.str());
-
     const auto parseStart = Clock::now();
 
-    #if USE_OPENMP
-    #pragma omp parallel for schedule(dynamic) default(none) shared(files, language, compilerOverride)
-    #endif
-    for (const auto &[filePath, inputPath]: files) {
-      try {
-        if (JSON result; LanguageParser::ExtractData(language, compilerOverride, filePath, result))
-          Parser::GatherStatistics(std::move(result), filePath, inputPath);
-      } catch (const std::exception &e) {
-        #pragma omp critical
-        std::cerr << "FAILED " << filePath << ": " << e.what() << '\n';
-        throw;
+    for (auto &lang: langFiles) {
+      {
+        std::ostringstream msg;
+        msg << "Parsing " << pluralize(lang.second.size(), "file", "files")
+            << " [" << LanguageName(lang.first) << "]";
+        if (logStrings) msg << " with string logging enabled";
+        log_info(msg.str());
+      }
+
+      #if USE_OPENMP
+      #pragma omp parallel for schedule(dynamic) default(none) shared(lang, compilerOverride)
+      #endif
+      for (const auto &[filePath, inputPath]: lang.second) {
+        try {
+          if (JSON result; LanguageParser::ExtractData(lang.first, compilerOverride, filePath, result))
+            Parser::GatherStatistics(std::move(result), filePath, inputPath);
+        } catch (const std::exception &e) {
+          #pragma omp critical
+          std::cerr << "FAILED " << filePath << ": " << e.what() << '\n';
+        }
       }
     }
 
-    const auto parseEnd = Clock::now();
-    parsingMs = elapsed_ms(parseStart, parseEnd);
+    const long long parsingMs = elapsed_ms(parseStart, Clock::now());
 
-    if (debugLanguages) {
-      Parser::FlushDebugLanguageLogs();
+    Parser::FlushDebugLanguageLogs();
+
+    auto open_stat_file = [&](const std::string &name) -> std::ofstream {
+      const fs::path p = fs::path(outputDir) / name;
+      std::ofstream f(p, std::ios::trunc);
+      if (!f)
+        throw std::runtime_error("Failed to open output file '" + p.string() + "'");
+      return f;
+    };
+    {
+      auto f = open_stat_file("strings.md");
+      f << "# Embedded String Statistics\n\n";
+      PrintStatsTable(
+        {
+          {"Strings", Parser::STRING_STATS.Snapshot()},
+          {"Documentation", Parser::DOCS_STATS.Snapshot()},
+          {"Documentation Relaxed", Parser::DOCS_RELAXED_STATS.Snapshot()},
+        }, f
+      );
     }
-
-    PrintStatsTable(
-      {
-        {"Strings", Parser::STRING_STATS.Snapshot()},
-        {"Documentation", Parser::DOCS_STATS.Snapshot()},
-        {"Documentation Relaxed", Parser::DOCS_RELAXED_STATS.Snapshot()},
-      }
-    );
-
-    std::cout << "\n\n\n";
-    PrintFileStatsTable(Parser::FILE_STATS.Snapshot());
-
-    PrintNestedStatsTable(
-      {
-        {"Strings", Parser::STRING_NESTED_STATS.Snapshot()},
-        {"Documentation", Parser::DOCS_NESTED_STATS.Snapshot()},
-        {"Documentation Relaxed", Parser::DOCS_RELAXED_NESTED_STATS.Snapshot()},
-      }
-    );
-
-    PrintLanguageStatsTable(
-      {
-        {"String", Parser::STRING_LANG_STATS.Snapshot()},
-      }
-    );
-
+    {
+      auto f = open_stat_file("files.md");
+      f << "# File Statistics\n\n";
+      PrintFileStatsTable(Parser::FILE_STATS.Snapshot(), f);
+    }
+    {
+      auto f = open_stat_file("nesting.md");
+      f << "# Nesting Statistics\n\n";
+      PrintNestedStatsTable(
+        {
+          {"Strings", Parser::STRING_NESTED_STATS.Snapshot()},
+          {"Documentation", Parser::DOCS_NESTED_STATS.Snapshot()},
+          {"Documentation Relaxed", Parser::DOCS_RELAXED_NESTED_STATS.Snapshot()},
+        }, f
+      );
+    }
+    {
+      auto f = open_stat_file("language_stats.md");
+      f << "# String Language Distribution\n\n";
+      PrintLanguageStatsTable({{"String", Parser::STRING_LANG_STATS.Snapshot()}}, f);
+    }
     if (logStrings) {
-      std::cout << "\n\n";
-      PrintStatsMaxString(Parser::STRING_STATS, Parser::DOCS_STATS);
+      auto f = open_stat_file("max_strings.md");
+      f << "# Max Strings\n\n";
+      PrintStatsMaxString(Parser::STRING_STATS, Parser::DOCS_STATS, f);
     }
 
-    message.clear();
-    message << "\nTiming summary"
-            << "\n - Indexing: " << indexingMs << " ms"
-            << "\n - Parsing : " << parsingMs << " ms";
-    log_info(message.str());
+    std::ostringstream msg;
+    msg << "\nTiming summary"
+        << "\n - Indexing: " << indexingMs << " ms"
+        << "\n - Parsing : " << parsingMs << " ms"
+        << "\nResults written to: " << fs::path(outputDir).lexically_normal().string();
+    log_info(msg.str());
   } catch (const std::exception &e) {
     std::cerr << "Parsing failed: " << e.what() << "\n";
     return -1;

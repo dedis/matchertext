@@ -60,7 +60,7 @@ def parse(path: str):
                 else:
                     flush_pending()
             flush_pending()
-    except (tokenize.TokenizeError, SyntaxError, OSError, UnicodeDecodeError):
+    except (tokenize.TokenError, SyntaxError, OSError, UnicodeDecodeError):
         # Bail out gracefully — return what we collected so far.
         flush_pending()
 

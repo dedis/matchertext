@@ -12,7 +12,6 @@
 #include <map>
 #include <mutex>
 #include <random>
-#include <set>
 #include <sstream>
 #include <system_error>
 
@@ -49,41 +48,6 @@ namespace {
     std::mt19937_64 rng{0};
   };
 
-  struct DebugLanguageInputState {
-    fs::path relativePath;
-    std::array<DebugLanguageBucket, kLanguageCount> buckets{};
-  };
-
-  fs::path ResolveDebugLanguageRoot() {
-    if (const char *overridePath = std::getenv("MATCHER_TEXT_DEBUG_LANGUAGE_DIR");
-      overridePath != nullptr && *overridePath != '\0')
-      return {overridePath};
-    if (const char *legacyOverridePath = std::getenv("MATCHERTEXT_DEBUG_LANGUAGE_DIR");
-      legacyOverridePath != nullptr && *legacyOverridePath != '\0')
-      return {legacyOverridePath};
-    return {"./result"};
-  }
-
-  fs::path SanitizeDebugInputPath(const std::string_view inputPath) {
-    const fs::path normalized = fs::path(std::string(inputPath)).lexically_normal();
-    const fs::path relative = normalized.is_absolute() ? normalized.relative_path() : normalized;
-
-    fs::path safe;
-    for (const auto &part: relative) {
-      const std::string component = part.string();
-      if (component.empty() || component == "." || component == "/")
-        continue;
-      if (component == "..")
-        safe /= "__parent__";
-      else
-        safe /= component;
-    }
-
-    if (safe.empty())
-      return {"_root"};
-    return safe;
-  }
-
   void EnsureDirectoryPrepared(const fs::path &directory, const bool clearExisting) {
     std::error_code ec;
     if (clearExisting)
@@ -102,13 +66,9 @@ namespace {
       );
   }
 
-  uint64_t SeedDebugBucket(const std::string_view inputPath, const LanguageEnum language) {
+  uint64_t SeedDebugBucket(const std::string_view, const LanguageEnum language) {
     uint64_t seed = 14695981039346656037ull;
-    for (const unsigned char c: inputPath) {
-      seed ^= static_cast<uint64_t>(c);
-      seed *= 1099511628211ull;
-    }
-    seed ^= static_cast<uint64_t>(language) + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2);
+    seed ^= static_cast<uint64_t>(language) + 0x9e3779b97f4a7c15ull;
     return seed;
   }
 
@@ -147,20 +107,15 @@ namespace {
 
   class DebugLanguageLogger {
     public:
-      void Configure(const std::vector<std::string> &inputPaths) {
+      void Configure(const std::vector<std::string> &inputPaths, const std::string &outputDir) {
         std::lock_guard lock(mutex_);
-
         enabled_ = true;
-        root_ = ResolveDebugLanguageRoot();
-        states_.clear();
+        root_ = fs::path(outputDir) / "languages";
         EnsureDirectoryPrepared(root_, false);
-
-        std::set<std::string> seenInputs;
-        for (const auto &inputPath: inputPaths) {
-          if (!seenInputs.insert(inputPath).second)
-            continue;
-          PrepareInputStateUnlocked(inputPath, true);
-        }
+        for (size_t idx = 0; idx < kLanguageCount; idx++)
+          buckets_[idx].rng.seed(
+            SeedDebugBucket("", static_cast<LanguageEnum>(idx))
+          );
       }
 
       void Record(
@@ -169,15 +124,12 @@ namespace {
         const float confidence, const uint64_t violations,
         const uint64_t toothpicks
       ) {
-        DebugLanguageInputState *state = nullptr; {
-          const std::string key = inputPath.empty() ? std::string(sourcePath) : std::string(inputPath);
+        {
           std::lock_guard lock(mutex_);
-          if (!enabled_)
-            return;
-          state = PrepareInputStateUnlocked(key, false);
+          if (!enabled_) return;
         }
 
-        auto &bucket = state->buckets[static_cast<size_t>(language)];
+        auto &bucket = buckets_[static_cast<size_t>(language)];
         std::lock_guard bucketLock(bucket.mutex);
 
         const DebugLanguageSample sample{
@@ -192,99 +144,47 @@ namespace {
         }
 
         std::uniform_int_distribution<uint64_t> dist(0, bucket.seen - 1);
-        const uint64_t index = dist(bucket.rng);
-        if (index < bucket.samples.size())
+        if (const uint64_t index = dist(bucket.rng); index < bucket.samples.size())
           bucket.samples[static_cast<size_t>(index)] = sample;
       }
 
       void Flush() {
-        struct PendingWrite {
-          fs::path path;
-          fs::path directory;
-          std::string inputPath;
-          LanguageEnum language;
-          uint64_t totalSeen = 0;
-          std::vector<DebugLanguageSample> samples;
-        };
+        std::lock_guard lock(mutex_);
+        if (!enabled_) return;
 
-        std::vector<PendingWrite> pending;
-        std::vector<fs::path> directoriesToClear; {
-          std::lock_guard lock(mutex_);
-          if (!enabled_)
-            return;
-
-          for (const auto &[inputPath, state]: states_) {
-            directoriesToClear.push_back(root_ / state->relativePath);
-            for (size_t idx = 0; idx < kLanguageCount; idx++) {
-              auto &bucket = state->buckets[idx];
-              std::lock_guard bucketLock(bucket.mutex);
-              if (bucket.seen == 0 || bucket.samples.empty())
-                continue;
-
-              pending.push_back(
-                {
-                  root_ / state->relativePath /
-                  (std::string(LanguageName(static_cast<LanguageEnum>(idx))) + ".txt"),
-                  root_ / state->relativePath,
-                  inputPath,
-                  static_cast<LanguageEnum>(idx),
-                  bucket.seen,
-                  bucket.samples,
-                }
-              );
-            }
-          }
-        }
-
-        for (const auto &directory: directoriesToClear) {
-          std::error_code ec;
-          if (!fs::exists(directory, ec))
-            continue;
-
-          for (const auto &entry: fs::directory_iterator(directory, ec)) {
-            if (ec)
-              break;
-            if (!entry.is_regular_file(ec) || ec)
-              continue;
-            if (entry.path().extension() != ".txt")
-              continue;
-            fs::remove(entry.path(), ec);
-            if (ec)
-              throw std::runtime_error(
-                "Failed to clear stale debug language log '" +
-                entry.path().string() + "': " + ec.message()
-              );
-          }
+        // Clear stale .txt files from a previous run.
+        std::error_code ec;
+        for (const auto &entry: fs::directory_iterator(root_, ec)) {
+          if (ec) break;
+          if (!entry.is_regular_file(ec) || ec) continue;
+          if (entry.path().extension() != ".txt") continue;
+          fs::remove(entry.path(), ec);
           if (ec)
             throw std::runtime_error(
-              "Failed to enumerate debug language directory '" +
-              directory.string() + "': " + ec.message()
+              "Failed to clear stale debug language log '" +
+              entry.path().string() + "': " + ec.message()
             );
         }
 
-        for (const auto &entry: pending) {
-          std::error_code ec;
-          fs::create_directories(entry.directory, ec);
-          if (ec)
-            throw std::runtime_error(
-              "Failed to create debug language directory '" +
-              entry.directory.string() + "': " + ec.message()
-            );
+        for (size_t idx = 0; idx < kLanguageCount; idx++) {
+          auto &bucket = buckets_[idx];
+          std::lock_guard bucketLock(bucket.mutex);
+          if (bucket.seen == 0 || bucket.samples.empty()) continue;
 
-          std::ofstream out(entry.path, std::ios::trunc);
+          const fs::path outPath =
+            root_ / (std::string(LanguageName(static_cast<LanguageEnum>(idx))) + ".txt");
+          std::ofstream out(outPath, std::ios::trunc);
           if (!out)
             throw std::runtime_error(
-              "Failed to open debug language log '" +
-              entry.path.string() + "' for writing."
+              "Failed to open debug language log '" + outPath.string() + "' for writing."
             );
 
-          out << "# Input: " << entry.inputPath << '\n'
-              << "# Language: " << LanguageName(entry.language) << '\n'
-              << "# TotalSeen: " << entry.totalSeen << '\n'
-              << "# SampleCount: " << entry.samples.size() << "\n\n";
+          out << "# Language: " << LanguageName(static_cast<LanguageEnum>(idx)) << '\n'
+              << "# TotalSeen: " << bucket.seen << '\n'
+              << "# SampleCount: " << bucket.samples.size() << "\n\n";
 
-          for (size_t i = 0; i < entry.samples.size(); i++) {
-            const auto &sample = entry.samples[i];
+          for (size_t i = 0; i < bucket.samples.size(); i++) {
+            const auto &sample = bucket.samples[i];
             out << "=== Sample " << (i + 1) << " ===\n"
                 << "# Source: " << sample.sourcePath << '\n'
                 << "# Confidence: " << std::fixed << std::setprecision(3)
@@ -295,32 +195,12 @@ namespace {
           }
         }
       }
+
     private:
-      DebugLanguageInputState *PrepareInputStateUnlocked(
-        const std::string &inputPath,
-        const bool clearExisting
-      ) {
-        if (const auto it = states_.find(inputPath); it != states_.end())
-          return it->second.get();
-
-        auto state = std::make_unique<DebugLanguageInputState>();
-        state->relativePath = SanitizeDebugInputPath(inputPath);
-        EnsureDirectoryPrepared(root_ / state->relativePath, clearExisting);
-
-        for (size_t idx = 0; idx < kLanguageCount; idx++)
-          state->buckets[idx].rng.seed(
-            SeedDebugBucket(inputPath, static_cast<LanguageEnum>(idx))
-          );
-
-        auto *raw = state.get();
-        states_.emplace(inputPath, std::move(state));
-        return raw;
-      }
-
       bool enabled_ = false;
       fs::path root_;
       std::mutex mutex_;
-      std::map<std::string, std::unique_ptr<DebugLanguageInputState>> states_;
+      std::array<DebugLanguageBucket, kLanguageCount> buckets_{};
   };
 
   DebugLanguageLogger &GetDebugLanguageLogger() {
@@ -381,8 +261,15 @@ static std::string ExtractLiteralBody(std::string_view spelling) {
   return std::string(spelling.substr(open + 1, close - open - 1));
 }
 
-void Parser::ConfigureDebugLanguages(const std::vector<std::string> &inputPaths) {
-  GetDebugLanguageLogger().Configure(inputPaths);
+void Parser::ParseFile(const std::string &filePath, const std::string &inputPath) {
+  if (JSON result; ParseC_CPP(filePath, result) && result.IsArray())
+    GatherStatistics(std::move(result), filePath, inputPath);
+}
+
+void Parser::ConfigureDebugLanguages(
+  const std::vector<std::string> &inputPaths, const std::string &outputDir
+) {
+  GetDebugLanguageLogger().Configure(inputPaths, outputDir);
 }
 
 void Parser::FlushDebugLanguageLogs() {

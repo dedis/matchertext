@@ -54,10 +54,14 @@ class Parser final {
 
     static void GatherStatistics(JSON &&json, const std::string &path, std::string_view inputPath = {});
 
-    /// Enable per-language debug sampling for the given top-level input paths.
-    static void ConfigureDebugLanguages(const std::vector<std::string> &inputPaths);
+    /// Parse a C/C++ file and gather statistics in one step.
+    static void ParseFile(const std::string &filePath, const std::string &inputPath);
 
-    /// Flush any recorded debug-language samples to disk.
+    /// Enable per-language debug sampling; samples are written under outputDir/languages/.
+    static void ConfigureDebugLanguages(
+      const std::vector<std::string> &inputPaths, const std::string &outputDir
+    );
+
     static void FlushDebugLanguageLogs();
 
     /// All the aggregated stats relating to parsed strings
