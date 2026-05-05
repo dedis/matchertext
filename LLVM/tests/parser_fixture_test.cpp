@@ -216,7 +216,7 @@ bool RunFixture(const std::string &fixturePath) {
   const fs::path path(fixturePath);
   const std::string name = path.filename().string();
 
-  Parser::ParseFile(path.string());
+  Parser::ParseFile(path.string(), path.string());
 
   if (name == "basic_literals.cpp")
     return TestBasicLiterals();
