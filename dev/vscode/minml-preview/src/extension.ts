@@ -1,10 +1,41 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
+import * as path from "path";
 import * as vscode from "vscode";
+import {
+  LanguageClient,
+  LanguageClientOptions,
+  ServerOptions,
+  TransportKind,
+} from "vscode-languageclient/node";
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+let client: LanguageClient;
+
 export function activate(context: vscode.ExtensionContext) {
+  const config = vscode.workspace.getConfiguration("minml");
+  // Prefer a user-configured path, then the binary bundled alongside the
+  // extension (installed by `make vscode-live-preview`), then fall back to PATH.
+  const serverPath =
+    config.get<string>("lspPath") ||
+    path.join(context.extensionPath, "minml-lsp");
+  const debug = config.get<boolean>("debug") || false;
+
+  const args: string[] = [];
+  if (debug) {
+    args.push("--debug");
+  }
+
+  const serverOptions: ServerOptions = {
+    run: { command: serverPath, args, transport: TransportKind.stdio },
+    debug: { command: serverPath, args, transport: TransportKind.stdio },
+  };
+
+  const clientOptions: LanguageClientOptions = {
+    documentSelector: [{ scheme: "file", language: "minml" }],
+  };
+
+  client = new LanguageClient("minml", "MinML Language Server", serverOptions, clientOptions);
+  context.subscriptions.push(client);
+  client.start();
+
   context.subscriptions.push(
     vscode.commands.registerCommand("minml-preview.showPreview", () => {
       LivePreviewPanel.createOrShow(context.extensionUri, vscode.ViewColumn.Active);
@@ -18,28 +49,24 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
+export function deactivate(): Thenable<void> | undefined {
+  if (!client) {
+    return undefined;
+  }
+  return client.stop();
+}
+
 function getWebviewOptions(extensionUri: vscode.Uri): vscode.WebviewOptions {
   const workspaceFolders = vscode.workspace.workspaceFolders?.map((folder) => folder.uri) || [];
 
   return {
-    // Enable javascript in the webview
     enableScripts: true,
-
-    // And restrict the webview to only loading content from our extension's `media` directory.
     localResourceRoots: [vscode.Uri.joinPath(extensionUri, "media"), ...workspaceFolders],
   };
 }
 
-/**
- * Manages live preview webview panel
- * This class was inspired from https://github.com/microsoft/vscode-extension-samples/blob/main/webview-sample/src/extension.ts
- */
 class LivePreviewPanel {
-  /**
-   * Track the currently panel. Only allow a single panel to exist at a time.
-   */
   public static currentPanel: LivePreviewPanel | undefined;
-
   public static readonly viewType = "MinMLPreview";
 
   private readonly _panel: vscode.WebviewPanel;
@@ -53,7 +80,6 @@ class LivePreviewPanel {
       return;
     }
 
-    // If we already have a panel, show it.
     if (LivePreviewPanel.currentPanel) {
       LivePreviewPanel.currentPanel._document = editor.document;
       LivePreviewPanel.currentPanel._panel.reveal(viewColumn);
@@ -61,7 +87,6 @@ class LivePreviewPanel {
       return;
     }
 
-    // Otherwise, create a new panel.
     const panel = vscode.window.createWebviewPanel(
       LivePreviewPanel.viewType,
       "MinML Live Preview",
@@ -70,14 +95,6 @@ class LivePreviewPanel {
     );
 
     LivePreviewPanel.currentPanel = new LivePreviewPanel(panel, extensionUri, editor.document);
-  }
-
-  public static revive(
-    panel: vscode.WebviewPanel,
-    extensionUri: vscode.Uri,
-    document: vscode.TextDocument,
-  ) {
-    LivePreviewPanel.currentPanel = new LivePreviewPanel(panel, extensionUri, document);
   }
 
   private constructor(
@@ -89,11 +106,8 @@ class LivePreviewPanel {
     this._extensionUri = extensionUri;
     this._document = document;
 
-    // Set the webview's initial html content
     this._update();
 
-    // Listen for when the panel is disposed
-    // This happens when the user closes the panel or when the panel is closed programmatically
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
     vscode.window.onDidChangeActiveTextEditor(
@@ -116,7 +130,6 @@ class LivePreviewPanel {
       this._disposables,
     );
 
-    // Update the content based on view changes
     this._panel.onDidChangeViewState(
       () => {
         if (this._panel.visible) {
@@ -127,7 +140,6 @@ class LivePreviewPanel {
       this._disposables,
     );
 
-    // Handle messages from the webview
     this._panel.webview.onDidReceiveMessage(
       (message) => {
         switch (message.command) {
@@ -153,10 +165,7 @@ class LivePreviewPanel {
 
   public dispose() {
     LivePreviewPanel.currentPanel = undefined;
-
-    // Clean up our resources
     this._panel.dispose();
-
     while (this._disposables.length) {
       const x = this._disposables.pop();
       if (x) {
@@ -188,21 +197,19 @@ class LivePreviewPanel {
   }
 
   private _getHtmlForWebview(webview: vscode.Webview, baseUri: vscode.Uri) {
-    // And the uri we use to load this script in the webview
     const scriptUri = this._getMediaUri("main.js", webview);
     const wasmExecUri = this._getMediaUri("wasm_exec.js", webview);
-
-    // Uri to load styles into webview
     const stylesMainUri = this._getMediaUri("vscode.css", webview);
+    const csp = `default-src 'none'; img-src ${webview.cspSource} https: data:; script-src ${webview.cspSource} 'wasm-unsafe-eval'; style-src ${webview.cspSource}; connect-src ${webview.cspSource};`;
 
     return `<!DOCTYPE html>
 			<html lang="en">
 			<head>
 				<meta charset="UTF-8">
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
+				<meta http-equiv="Content-Security-Policy" content="${csp}">
 				<base href="${baseUri}/">
 				<link href="${stylesMainUri}" rel="stylesheet">
-
 				<title>MinML Live Preview</title>
 				<script src="${wasmExecUri}"></script>
 			</head>
@@ -213,12 +220,8 @@ class LivePreviewPanel {
 			</html>`;
   }
 
-  private _getMediaUri(path: string, webview: vscode.Webview) {
-    const pathOnDisk = vscode.Uri.joinPath(this._extensionUri, "media", path);
-
+  private _getMediaUri(filePath: string, webview: vscode.Webview) {
+    const pathOnDisk = vscode.Uri.joinPath(this._extensionUri, "media", filePath);
     return webview.asWebviewUri(pathOnDisk);
   }
 }
-
-// This method is called when your extension is deactivated
-export function deactivate() {}
