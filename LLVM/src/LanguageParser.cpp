@@ -71,7 +71,8 @@ namespace {
 
     bool start(const std::string &cmd) {
       int to_child[2], from_child[2];
-      if (pipe(to_child) < 0) return false;
+      if (pipe(to_child) < 0)
+        return false;
       if (pipe(from_child) < 0) {
         ::close(to_child[0]);
         ::close(to_child[1]);
@@ -121,7 +122,8 @@ namespace {
       size_t remaining = msg.size();
       while (remaining > 0) {
         const ssize_t n = write(write_fd, p, remaining);
-        if (n <= 0) return false;
+        if (n <= 0)
+          return false;
         p += n;
         remaining -= static_cast<size_t>(n);
       }
@@ -132,17 +134,21 @@ namespace {
 
       while (true) {
         const auto now = std::chrono::steady_clock::now();
-        if (now >= deadline) return false;
+        if (now >= deadline)
+          return false;
 
         const int wait_ms = static_cast<int>(
           std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count()
         );
         struct pollfd pfd = {read_fd, POLLIN, 0};
-        if (::poll(&pfd, 1, wait_ms) <= 0) return false;
-        if (!(pfd.revents & POLLIN)) return false;
+        if (::poll(&pfd, 1, wait_ms) <= 0)
+          return false;
+        if (!(pfd.revents & POLLIN))
+          return false;
 
         const ssize_t n = ::read(read_fd, buf, sizeof(buf));
-        if (n <= 0) return false;
+        if (n <= 0)
+          return false;
         out.append(buf, static_cast<size_t>(n));
 
         if (!out.empty() && out.back() == '\n') {
@@ -153,10 +159,16 @@ namespace {
     }
 
     void stop() {
-      if (write_fd >= 0) { ::close(write_fd); write_fd = -1; }
-      if (read_fd >= 0) { ::close(read_fd); read_fd = -1; }
+      if (write_fd >= 0) {
+        ::close(write_fd);
+        write_fd = -1;
+      }
+      if (read_fd >= 0) {
+        ::close(read_fd);
+        read_fd = -1;
+      }
       if (pid > 0) {
-        kill(-pid, SIGKILL);  // kill entire process group (shell + python3 child)
+        kill(-pid, SIGKILL); // kill entire process group (shell + python3 child)
         waitpid(pid, nullptr, 0);
         pid = -1;
       }
@@ -165,6 +177,7 @@ namespace {
 
   struct ThreadProcesses {
     std::map<LanguageEnum, PersistentProcess> procs;
+
     ~ThreadProcesses() {
       for (auto &[lang, proc]: procs)
         proc.stop();
@@ -211,8 +224,10 @@ bool LanguageParser::RunBuildCommand(
   if (language == LanguageEnum::Python) {
     auto &proc = tl_procs.procs[language];
     auto try_start = [&]() -> bool {
-      if (proc.valid()) return true;
-      const std::string serverCmd = cc + " \"" MATCHERTEXT_PARSERS_DIR "/parser.py\" --server";
+      if (proc.valid())
+        return true;
+      const std::string serverCmd = cc + " \"" MATCHERTEXT_PARSERS_DIR
+      "/parser.py\" --server";
       return proc.start(serverCmd);
     };
     if (!try_start())
@@ -228,7 +243,7 @@ bool LanguageParser::RunBuildCommand(
   }
 
   // One-shot popen for other external parsers (e.g. Go binary).
-  std::array<char, 4096> buffer{};
+  std::array < char, 4096 > buffer{};
   const std::string cmd = format(std::string(data.cmdTemplate), cc, filePath);
   FILE *pipe = popen(cmd.c_str(), "r");
   if (!pipe)

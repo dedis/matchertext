@@ -19,7 +19,6 @@ struct NestedStatsSnapshot {
 struct NestedStats {
   void Record(uint64_t rawDepth, uint64_t validDepth);
   NestedStatsSnapshot Snapshot() const;
-
   private:
     mutable std::mutex mutex_;
     std::vector<uint64_t> rawLevels_;

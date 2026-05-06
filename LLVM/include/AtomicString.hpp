@@ -14,7 +14,6 @@
 /// Uses atomic operations on shared_ptr to allow lock-free reads.
 class AtomicString {
   public:
-
     /// Replace the stored string atomically.
     void set(std::string s) {
       const auto ptr = std::make_shared<const std::string>(std::move(s));
@@ -26,7 +25,6 @@ class AtomicString {
       const auto ptr = std::atomic_load(&data);
       return ptr ? *ptr : "";
     }
-
   private:
     std::shared_ptr<const std::string> data{};
 };

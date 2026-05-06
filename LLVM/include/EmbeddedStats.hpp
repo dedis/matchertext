@@ -47,6 +47,7 @@
   AtomicString stringMaxNested; \
   AtomicString stringMaxValidNested;
 
-CREATE_STATS_HPP(EmbeddedStats, EMBEDDED_STATS_FIELDS, EMBEDDED_EXTRA_FIELDS)
+CREATE_STATS_HPP(EmbeddedStats, EMBEDDED_STATS_FIELDS, EMBEDDED_EXTRA_FIELDS
+)
 
 #endif // EMBEDDED_STATS_HPP
