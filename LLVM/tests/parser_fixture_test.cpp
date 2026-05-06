@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 
+#include "JSON.hpp"
 #include "Parser.hpp"
 
 namespace fs = std::filesystem;
@@ -216,7 +217,8 @@ bool RunFixture(const std::string &fixturePath) {
   const fs::path path(fixturePath);
   const std::string name = path.filename().string();
 
-  Parser::ParseFile(path.string());
+  if (Serde::JSON result; Parser::ParseC_CPP(path.string(), result))
+    Parser::GatherStatistics(std::move(result), path.string());
 
   if (name == "basic_literals.cpp")
     return TestBasicLiterals();

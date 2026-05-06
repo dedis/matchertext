@@ -4,7 +4,6 @@
 // Date: 29.04.2026
 //
 
-
 #include <algorithm>
 #include <array>
 #include <initializer_list>

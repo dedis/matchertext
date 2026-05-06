@@ -76,9 +76,11 @@ class Parser final {
   private:
     /// Processes a string/doc and updates the given stat
     /// @returns the number of MatcherText violations found
-    static uint64_t process(std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats,
-                            LanguageStats *langStats = nullptr, bool relaxed = false,
-                            std::string_view sourcePath = {}, std::string_view inputPath = {});
+    static uint64_t process(
+      std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats,
+      LanguageStats *langStats = nullptr, bool relaxed = false,
+      std::string_view sourcePath = {}, std::string_view inputPath = {}
+    );
 };
 
 #endif // PARSER_HPP

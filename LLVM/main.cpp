@@ -43,7 +43,7 @@ static const std::unordered_map<Language, std::vector<std::string_view>> kLangua
   {Language::C,      {"c", "h"}},
   {Language::CPP,    {"cc", "cpp", "cxx", "hpp", "hh", "hxx"}},
   {Language::Go,     {"go"}},
-  {Language::Python, {"py", "pyw", "pyc", "pyo", "pyd", "pyi", "pyz", "pyzw"}},
+  {Language::Python, {"py", "pyw", "pyi", "pyz", "pyzw"}},
 };
 
 /// True when `a` and `b` are the same language family for indexing purposes.

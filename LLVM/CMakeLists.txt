@@ -25,7 +25,7 @@ endif ()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_BUILD_TYPE "Debug")
+set(CMAKE_BUILD_TYPE "Release")
 
 file(GLOB CLASSIFIER_SOURCES CONFIGURE_DEPENDS
     src/classifiers/*.cpp
@@ -153,8 +153,7 @@ find_package(Clang REQUIRED CONFIG)
 
 include_directories(${LLVM_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} clangLex clangBasic)
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-    MATCHERTEXT_PARSERS_DIR="${CMAKE_SOURCE_DIR}/parsers")
+target_compile_definitions(${PROJECT_NAME} PRIVATE MATCHERTEXT_PARSERS_DIR="${CMAKE_SOURCE_DIR}/parsers")
 
 # === Go parser binary ===
 # Pre-compile parsers/parser.go into a native binary so each per-file invocation
@@ -191,6 +190,9 @@ endif ()
 # === Serde ===
 add_subdirectory(extern/Serde)
 target_link_libraries(${PROJECT_NAME} Serde)
+target_link_libraries(LanguageClassifierTests Serde)
+target_link_libraries(ParserFixtureTests Serde)
+target_link_libraries(DebugLanguageOutputTests Serde)
 
 # --------------------------
 # Build Configs

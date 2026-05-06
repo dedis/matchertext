@@ -140,7 +140,7 @@ void PrintLanguageStatsTable(const std::vector<std::pair<std::string, LanguageSt
   if (rows.empty())
     return;
 
-  for (const auto &[category, snap] : rows) {
+  for (const auto &[category, snap]: rows) {
     if (snap.entries.empty())
       continue;
 
@@ -148,11 +148,11 @@ void PrintLanguageStatsTable(const std::vector<std::pair<std::string, LanguageSt
     std::cout << "| " << category << " Language | Count | % | Violations | Toothpicks |\n";
     std::cout << "|---|---|---|---|---|\n";
 
-    for (const auto &e : snap.entries) {
+    for (const auto &e: snap.entries) {
       char pctBuf[16];
       std::snprintf(pctBuf, sizeof(pctBuf), "%.2f%%", e.percentage);
       std::cout << "| " << LanguageName(e.language) << " | " << e.count << " | "
-                << pctBuf << " | " << e.violations << " | " << e.toothpicks << " |\n";
+          << pctBuf << " | " << e.violations << " | " << e.toothpicks << " |\n";
     }
   }
 }
