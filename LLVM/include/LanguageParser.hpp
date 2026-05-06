@@ -8,14 +8,13 @@
 #define LANGUAGE_PARSER_HPP
 #include <string>
 
+#include "JSON.hpp"
 #include "LanguageClassifier.hpp"
-
-class JSON;
 
 class LanguageParser {
   public:
     [[nodiscard]] static bool ExtractData(
-      LanguageEnum language, const std::string &compilerOverride, const std::string &filePath, JSON &result
+      LanguageEnum language, const std::string &compilerOverride, const std::string &filePath, Serde::JSON &result
     );
     static bool ParseLanguage(const std::string &name, LanguageEnum &out);
   private:

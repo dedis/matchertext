@@ -55,10 +55,6 @@ add_executable(${PROJECT_NAME}
     include/LanguageModel.generated.hpp
     src/LanguageParser.cpp
     include/LanguageParser.hpp
-    src/JSON.cpp
-    include/JSON.hpp
-    src/JsonParser.cpp
-    include/JsonParser.hpp
     include/LanguageData.hpp
 )
 
@@ -96,10 +92,6 @@ add_executable(ParserFixtureTests
     include/LanguageModel.generated.hpp
     src/LanguageParser.cpp
     include/LanguageParser.hpp
-    src/JSON.cpp
-    include/JSON.hpp
-    src/JsonParser.cpp
-    include/JsonParser.hpp
     include/LanguageData.hpp
 )
 target_include_directories(ParserFixtureTests PRIVATE include)
@@ -144,10 +136,6 @@ add_executable(DebugLanguageOutputTests
     include/LanguageModel.generated.hpp
     src/LanguageParser.cpp
     include/LanguageParser.hpp
-    src/JSON.cpp
-    include/JSON.hpp
-    src/JsonParser.cpp
-    include/JsonParser.hpp
     include/LanguageData.hpp
 )
 target_include_directories(DebugLanguageOutputTests PRIVATE include)
@@ -169,8 +157,7 @@ find_package(Clang REQUIRED CONFIG)
 
 include_directories(${LLVM_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} clangLex clangBasic)
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-    MATCHERTEXT_PARSERS_DIR="${CMAKE_SOURCE_DIR}/parsers")
+target_compile_definitions(${PROJECT_NAME} PRIVATE MATCHERTEXT_PARSERS_DIR="${CMAKE_SOURCE_DIR}/parsers")
 
 # === Go parser binary ===
 # Pre-compile parsers/parser.go into a native binary so each per-file invocation
@@ -203,6 +190,10 @@ else ()
     target_compile_definitions(${PROJECT_NAME} PRIVATE USE_OPENMP=0)
     message(STATUS "OpenMP not found, building without parallel parsing support")
 endif ()
+
+# === Serde ===
+add_subdirectory(extern/Serde)
+target_link_libraries(${PROJECT_NAME} Serde)
 
 # --------------------------
 # Build Configs

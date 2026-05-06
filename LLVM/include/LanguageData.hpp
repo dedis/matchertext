@@ -32,7 +32,7 @@ struct LanguageData {
   X(C, ("c"), ("c", "h"), (), "")                                            \
   X(CPP, ("cpp", "c++"), ("cc", "cpp", "cxx", "hpp", "hh", "hxx"), (), "")   \
   X(Go, ("go"), ("go"), (MATCHERTEXT_GO_PARSER_BIN), R"("{}" "{}")")         \
-  X(Python, ("python", "py"), ("py", "pyw", "pyc", "pyo", "pyd", "pyi", "pyz", "pyzw"), ("python3", "python"), "{} \"" MATCHERTEXT_PARSERS_DIR "/parser.py\" \"{}\"")
+  X(Python, ("python", "py"), ("py", "pyw", "pyi", "pyz", "pyzw"), ("python3", "python"), "{} \"" MATCHERTEXT_PARSERS_DIR "/parser.py\" \"{}\"")
 
 // The code bellow is to make sure the data above ^^^^^ is compiled into the parser instead of being constructed at
 // each parser startup for some speed optimizations.

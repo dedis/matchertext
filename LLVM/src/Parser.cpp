@@ -27,6 +27,10 @@
 #include "../include/LanguageClassifier.hpp"
 #include "../include/MatcherText.hpp"
 
+namespace Serde {
+  class JSON;
+}
+
 namespace fs = std::filesystem;
 
 namespace {
@@ -48,14 +52,11 @@ namespace {
     std::mt19937_64 rng{0};
   };
 
-  void EnsureDirectoryPrepared(const fs::path &directory, const bool clearExisting) {
+  void EnsureDirectoryPrepared(const fs::path &directory) {
     std::error_code ec;
-    if (clearExisting)
-      fs::remove_all(directory, ec);
     if (ec)
       throw std::runtime_error(
-        "Failed to clear debug language directory '" +
-        directory.string() + "': " + ec.message()
+        "Failed to clear debug language directory '" + directory.string() + "': " + ec.message()
       );
 
     fs::create_directories(directory, ec);
@@ -111,7 +112,7 @@ namespace {
         std::lock_guard lock(mutex_);
         enabled_ = true;
         root_ = fs::path(outputDir) / "languages";
-        EnsureDirectoryPrepared(root_, false);
+        EnsureDirectoryPrepared(root_);
         for (size_t idx = 0; idx < kLanguageCount; idx++)
           buckets_[idx].rng.seed(
             SeedDebugBucket("", static_cast<LanguageEnum>(idx))
@@ -123,10 +124,10 @@ namespace {
         const std::string_view sourcePath, const std::string_view text,
         const float confidence, const uint64_t violations,
         const uint64_t toothpicks
-      ) {
-        {
+      ) { {
           std::lock_guard lock(mutex_);
-          if (!enabled_) return;
+          if (!enabled_)
+            return;
         }
 
         auto &bucket = buckets_[static_cast<size_t>(language)];
@@ -150,14 +151,18 @@ namespace {
 
       void Flush() {
         std::lock_guard lock(mutex_);
-        if (!enabled_) return;
+        if (!enabled_)
+          return;
 
         // Clear stale .txt files from a previous run.
         std::error_code ec;
         for (const auto &entry: fs::directory_iterator(root_, ec)) {
-          if (ec) break;
-          if (!entry.is_regular_file(ec) || ec) continue;
-          if (entry.path().extension() != ".txt") continue;
+          if (ec)
+            break;
+          if (!entry.is_regular_file(ec) || ec)
+            continue;
+          if (entry.path().extension() != ".txt")
+            continue;
           fs::remove(entry.path(), ec);
           if (ec)
             throw std::runtime_error(
@@ -169,10 +174,11 @@ namespace {
         for (size_t idx = 0; idx < kLanguageCount; idx++) {
           auto &bucket = buckets_[idx];
           std::lock_guard bucketLock(bucket.mutex);
-          if (bucket.seen == 0 || bucket.samples.empty()) continue;
+          if (bucket.seen == 0 || bucket.samples.empty())
+            continue;
 
           const fs::path outPath =
-            root_ / (std::string(LanguageName(static_cast<LanguageEnum>(idx))) + ".txt");
+              root_ / (std::string(LanguageName(static_cast<LanguageEnum>(idx))) + ".txt");
           std::ofstream out(outPath, std::ios::trunc);
           if (!out)
             throw std::runtime_error(
@@ -195,7 +201,6 @@ namespace {
           }
         }
       }
-
     private:
       bool enabled_ = false;
       fs::path root_;
@@ -262,7 +267,7 @@ static std::string ExtractLiteralBody(std::string_view spelling) {
 }
 
 void Parser::ParseFile(const std::string &filePath, const std::string &inputPath) {
-  if (JSON result; ParseC_CPP(filePath, result) && result.IsArray())
+  if (Serde::JSON result; ParseC_CPP(filePath, result) && result.IsArray())
     GatherStatistics(std::move(result), filePath, inputPath);
 }
 
@@ -276,25 +281,22 @@ void Parser::FlushDebugLanguageLogs() {
   GetDebugLanguageLogger().Flush();
 }
 
-bool Parser::ParseC_CPP(const std::string &path, JSON &result) {
-  /// Static compiler infrastructure reused across calls to avoid repeated setup cost.
+bool Parser::ParseC_CPP(const std::string &path, Serde::JSON &result) {
+  /// Read-only after construction — safe to share across threads.
   static clang::DiagnosticOptions diagOpts;
   static auto diagIDs = llvm::makeIntrusiveRefCnt<clang::DiagnosticIDs>();
   static clang::IgnoringDiagConsumer diagConsumer;
-  static clang::DiagnosticsEngine diags(diagIDs, diagOpts, &diagConsumer, false);
-
-  /// Language configuration for the lexer.
-  static clang::LangOptions langOpts;
-  static bool langInitialized = false;
-  if (!langInitialized) {
-    langOpts.CPlusPlus = true;
-    langOpts.CPlusPlus20 = true;
-    langInitialized = true;
-  }
-
-  /// Shared file manager reused for all parsed files.
+  static clang::LangOptions langOpts = [] {
+    clang::LangOptions opts;
+    opts.CPlusPlus = true;
+    opts.CPlusPlus20 = true;
+    return opts;
+  }();
   static clang::FileSystemOptions fsOpts;
-  static clang::FileManager fileMgr(fsOpts);
+
+  /// Mutable — must be thread-local to avoid data races under OpenMP.
+  thread_local clang::DiagnosticsEngine diags(diagIDs, diagOpts, &diagConsumer, false);
+  thread_local clang::FileManager fileMgr(fsOpts);
 
   /// Source manager bound to this file.
   clang::SourceManager srcMgr(diags, fileMgr);
@@ -319,7 +321,7 @@ bool Parser::ParseC_CPP(const std::string &path, JSON &result) {
   lexer.SetCommentRetentionState(true);
 
   if (!result.IsArray())
-    result = JSON::Array();
+    result = Serde::JSON::Array();
 
   /// Tokenize the file until EOF.
   clang::Token tok{};
@@ -341,21 +343,23 @@ bool Parser::ParseC_CPP(const std::string &path, JSON &result) {
       } while (IsStringToken(current));
 
       tok = current;
-      result.PushBack(JSON::Object({{"kind", JSON("string")}, {"value", JSON(value)}}));
+      result.PushBack(Serde::JSON::Object({{"kind", Serde::JSON("string")}, {"value", Serde::JSON(value)}}));
       continue;
     }
 
     /// Capture comment tokens.
     if (tok.is(clang::tok::comment)) {
       std::string comment = clang::Lexer::getSpelling(tok, srcMgr, langOpts);
-      result.PushBack(JSON::Object({{"kind", JSON("comment")}, {"value", JSON(comment)}}));
+      result.PushBack(Serde::JSON::Object({{"kind", Serde::JSON("comment")}, {"value", Serde::JSON(comment)}}));
     }
   }
 
   return true;
 }
 
-void Parser::GatherStatistics(JSON &&json, const std::string &path, const std::string_view inputPath, PerLanguageStats *perLang) {
+void Parser::GatherStatistics(
+  Serde::JSON &&json, const std::string &path, const std::string_view inputPath, PerLanguageStats *perLang
+) {
   uint64_t fileViolations = 0;
   uint64_t fileViolationsRelaxed = 0;
 
@@ -387,10 +391,12 @@ void Parser::GatherStatistics(JSON &&json, const std::string &path, const std::s
 
   auto updateFileStats = [](FileStats &fs, const uint64_t fv, const uint64_t fvr) {
     AtomicAdd(fs.count, 1.0);
-    if (fv > 0) AtomicAdd(fs.withViolation, 1.0);
+    if (fv > 0)
+      AtomicAdd(fs.withViolation, 1.0);
     AtomicAdd(fs.violationCount, static_cast<double>(fv));
     AtomicMax(fs.violationMax, static_cast<double>(fv));
-    if (fvr > 0) AtomicAdd(fs.withViolationRelaxed, 1.0);
+    if (fvr > 0)
+      AtomicAdd(fs.withViolationRelaxed, 1.0);
     AtomicAdd(fs.violationCountRelaxed, static_cast<double>(fvr));
     AtomicMax(fs.violationMaxRelaxed, static_cast<double>(fvr));
   };

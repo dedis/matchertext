@@ -4,8 +4,8 @@
 # Python counterpart of Parser::ParseC_CPP.
 # Emits a JSON array of {"kind": "string"|"comment", "value": "..."} on stdout.
 # Usage: parser.py <path>
+#        parser.py --server   (reads file paths from stdin, one per line; writes one JSON array per line)
 
-import io
 import json
 import re
 import sys
@@ -67,7 +67,24 @@ def parse(path: str):
     return items
 
 
+def server_mode():
+    """Read file paths from stdin line by line, write one JSON array per line to stdout."""
+    for line in sys.stdin:
+        path = line.rstrip("\n")
+        if not path:
+            sys.stdout.write("[]\n")
+            sys.stdout.flush()
+            continue
+        items = parse(path)
+        json.dump(items, sys.stdout, ensure_ascii=False, separators=(",", ":"))
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+
+
 def main() -> int:
+    if len(sys.argv) >= 2 and sys.argv[1] == "--server":
+        server_mode()
+        return 0
     if len(sys.argv) < 2:
         sys.stdout.write("[]")
         return 0

@@ -1,0 +1,3 @@
+[submodule "LLVM/extern/Serde"]
+	path = LLVM/extern/Serde
+	url = https://github.com/AntoineBastide47/Serde.git

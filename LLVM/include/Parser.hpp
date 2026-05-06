@@ -62,9 +62,11 @@ class Parser final {
      * @param path Absolute or relative path to the source file to scan.
      * @param result
      */
-    static bool ParseC_CPP(const std::string &path, JSON &result);
+    static bool ParseC_CPP(const std::string &path, Serde::JSON &result);
 
-    static void GatherStatistics(JSON &&json, const std::string &path, std::string_view inputPath = {}, PerLanguageStats *perLang = nullptr);
+    static void GatherStatistics(
+      Serde::JSON &&json, const std::string &path, std::string_view inputPath = {}, PerLanguageStats *perLang = nullptr
+    );
 
     /// Parse a C/C++ file and gather statistics in one step.
     static void ParseFile(const std::string &filePath, const std::string &inputPath);
@@ -92,11 +94,13 @@ class Parser final {
   private:
     /// Processes a string/doc and updates the given stat
     /// @returns the number of MatcherText violations found
-    static uint64_t process(std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats,
-                            LanguageStats *langStats = nullptr, bool relaxed = false,
-                            std::string_view sourcePath = {}, std::string_view inputPath = {},
-                            EmbeddedStats *extraEmbedded = nullptr, NestedStats *extraNested = nullptr,
-                            LanguageStats *extraLangStats = nullptr);
+    static uint64_t process(
+      std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats,
+      LanguageStats *langStats = nullptr, bool relaxed = false,
+      std::string_view sourcePath = {}, std::string_view inputPath = {},
+      EmbeddedStats *extraEmbedded = nullptr, NestedStats *extraNested = nullptr,
+      LanguageStats *extraLangStats = nullptr
+    );
 };
 
 #endif // PARSER_HPP

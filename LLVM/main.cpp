@@ -1,3 +1,4 @@
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -274,18 +275,42 @@ int main(const int argc, char *argv[]) {
 
       PerLanguageStats *pls = perLangStats.at(lang.first).get();
 
+      std::atomic<size_t> done{0};
+      std::atomic<int> displayedPct{-1};
+      const size_t langTotal = lang.second.size();
+
       #if USE_OPENMP
-      #pragma omp parallel for schedule(dynamic) default(none) shared(lang, compilerOverride, pls)
+      #pragma omp parallel for schedule(dynamic) default(none) shared(lang, compilerOverride, pls, done, displayedPct, langTotal)
       #endif
       for (const auto &[filePath, inputPath]: lang.second) {
         try {
-          if (JSON result; LanguageParser::ExtractData(lang.first, compilerOverride, filePath, result))
+          if (Serde::JSON result; LanguageParser::ExtractData(lang.first, compilerOverride, filePath, result))
             Parser::GatherStatistics(std::move(result), filePath, inputPath, pls);
         } catch (const std::exception &e) {
           #pragma omp critical
-          std::cerr << "FAILED " << filePath << ": " << e.what() << '\n';
+          {
+            std::cerr << "\nFAILED " << filePath << ": " << e.what() << '\n';
+          }
+        }
+
+        const size_t n = ++done;
+        const int newPct = static_cast<int>(n * 100 / langTotal);
+        if (newPct > displayedPct.load(std::memory_order_relaxed)) {
+          #pragma omp critical
+          {
+            if (const int cur = displayedPct.load(); newPct > cur) {
+              displayedPct.store(newPct);
+              constexpr int W = 40;
+              const int filled = newPct * W / 100;
+              std::cerr << "\r  [";
+              for (int i = 0; i < W; ++i)
+                std::cerr << (i < filled ? '#' : '.');
+              std::cerr << "] " << n << "/" << langTotal << " (" << newPct << "%)   " << std::flush;
+            }
+          }
         }
       }
+      std::cerr << '\n';
     }
 
     const long long parsingMs = elapsed_ms(parseStart, Clock::now());
