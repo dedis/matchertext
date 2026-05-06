@@ -180,7 +180,7 @@ int main(const int argc, char *argv[]) {
     #endif
     for (const auto &[filePath, inputPath]: files) {
       try {
-        if (JSON result; LanguageParser::ExtractData(language, compilerOverride, filePath, result))
+        if (Serde::JSON result; LanguageParser::ExtractData(language, compilerOverride, filePath, result))
           Parser::GatherStatistics(std::move(result), filePath, inputPath);
       } catch (const std::exception &e) {
         #pragma omp critical

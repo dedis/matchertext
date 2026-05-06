@@ -50,9 +50,9 @@ class Parser final {
      * @param path Absolute or relative path to the source file to scan.
      * @param result
      */
-    static bool ParseC_CPP(const std::string &path, JSON &result);
+    static bool ParseC_CPP(const std::string &path, Serde::JSON &result);
 
-    static void GatherStatistics(JSON &&json, const std::string &path, std::string_view inputPath = {});
+    static void GatherStatistics(Serde::JSON &&json, const std::string &path, std::string_view inputPath = {});
 
     /// Enable per-language debug sampling for the given top-level input paths.
     static void ConfigureDebugLanguages(const std::vector<std::string> &inputPaths);

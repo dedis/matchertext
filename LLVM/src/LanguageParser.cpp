@@ -11,8 +11,8 @@
 #include <unordered_map>
 
 #include "../include/LanguageParser.hpp"
-#include "../include/JSON.hpp"
-#include "../include/JsonParser.hpp"
+#include "JSON.hpp"
+#include "JsonParser.hpp"
 #include "../include/Parser.hpp"
 
 struct LangSpec {
@@ -70,7 +70,7 @@ static std::string firstAvailable(const std::initializer_list<const char *> cand
 }
 
 bool LanguageParser::ExtractData(
-  const Language language, const std::string &compilerOverride, const std::string &filePath, JSON &result
+  const Language language, const std::string &compilerOverride, const std::string &filePath, Serde::JSON &result
 ) {
   // Use the built-in clang parser
   if (language == Language::C || language == Language::CPP)
@@ -80,7 +80,7 @@ bool LanguageParser::ExtractData(
   if (!RunBuildCommand(language, compilerOverride, filePath, out))
     return false;
 
-  result = JSONParser{out}.Parse();
+  result = Serde::JSONParser{out}.Parse();
   return result.IsArray();
 }
 

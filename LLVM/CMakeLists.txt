@@ -25,7 +25,7 @@ endif ()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_BUILD_TYPE "Release")
+set(CMAKE_BUILD_TYPE "Debug")
 
 file(GLOB CLASSIFIER_SOURCES CONFIGURE_DEPENDS
     src/classifiers/*.cpp
@@ -55,10 +55,6 @@ add_executable(${PROJECT_NAME}
     include/LanguageModel.generated.hpp
     src/LanguageParser.cpp
     include/LanguageParser.hpp
-    src/JSON.cpp
-    include/JSON.hpp
-    src/JsonParser.cpp
-    include/JsonParser.hpp
 )
 
 add_executable(LanguageClassifierTests
@@ -94,10 +90,6 @@ add_executable(ParserFixtureTests
     include/LanguageModel.generated.hpp
     src/LanguageParser.cpp
     include/LanguageParser.hpp
-    src/JSON.cpp
-    include/JSON.hpp
-    src/JsonParser.cpp
-    include/JsonParser.hpp
 )
 target_include_directories(ParserFixtureTests PRIVATE include)
 target_link_libraries(ParserFixtureTests clangLex clangBasic)
@@ -141,10 +133,6 @@ add_executable(DebugLanguageOutputTests
     include/LanguageModel.generated.hpp
     src/LanguageParser.cpp
     include/LanguageParser.hpp
-    src/JSON.cpp
-    include/JSON.hpp
-    src/JsonParser.cpp
-    include/JsonParser.hpp
 )
 target_include_directories(DebugLanguageOutputTests PRIVATE include)
 target_link_libraries(DebugLanguageOutputTests clangLex clangBasic)
@@ -199,6 +187,10 @@ else ()
     target_compile_definitions(${PROJECT_NAME} PRIVATE USE_OPENMP=0)
     message(STATUS "OpenMP not found, building without parallel parsing support")
 endif ()
+
+# === Serde ===
+add_subdirectory(extern/Serde)
+target_link_libraries(${PROJECT_NAME} Serde)
 
 # --------------------------
 # Build Configs

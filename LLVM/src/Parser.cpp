@@ -389,25 +389,22 @@ void Parser::FlushDebugLanguageLogs() {
   GetDebugLanguageLogger().Flush();
 }
 
-bool Parser::ParseC_CPP(const std::string &path, JSON &result) {
-  /// Static compiler infrastructure reused across calls to avoid repeated setup cost.
+bool Parser::ParseC_CPP(const std::string &path, Serde::JSON &result) {
+  /// Read-only after construction — safe to share across threads.
   static clang::DiagnosticOptions diagOpts;
   static auto diagIDs = llvm::makeIntrusiveRefCnt<clang::DiagnosticIDs>();
   static clang::IgnoringDiagConsumer diagConsumer;
-  static clang::DiagnosticsEngine diags(diagIDs, diagOpts, &diagConsumer, false);
-
-  /// Language configuration for the lexer.
-  static clang::LangOptions langOpts;
-  static bool langInitialized = false;
-  if (!langInitialized) {
-    langOpts.CPlusPlus = true;
-    langOpts.CPlusPlus20 = true;
-    langInitialized = true;
-  }
-
-  /// Shared file manager reused for all parsed files.
+  static clang::LangOptions langOpts = [] {
+    clang::LangOptions opts;
+    opts.CPlusPlus = true;
+    opts.CPlusPlus20 = true;
+    return opts;
+  }();
   static clang::FileSystemOptions fsOpts;
-  static clang::FileManager fileMgr(fsOpts);
+
+  /// Mutable — must be thread-local to avoid data races under OpenMP.
+  thread_local clang::DiagnosticsEngine diags(diagIDs, diagOpts, &diagConsumer, false);
+  thread_local clang::FileManager fileMgr(fsOpts);
 
   /// Source manager bound to this file.
   clang::SourceManager srcMgr(diags, fileMgr);
@@ -432,7 +429,7 @@ bool Parser::ParseC_CPP(const std::string &path, JSON &result) {
   lexer.SetCommentRetentionState(true);
 
   if (!result.IsArray())
-    result = JSON::Array();
+    result = Serde::JSON::Array();
 
   /// Tokenize the file until EOF.
   clang::Token tok{};
@@ -454,21 +451,21 @@ bool Parser::ParseC_CPP(const std::string &path, JSON &result) {
       } while (IsStringToken(current));
 
       tok = current;
-      result.PushBack(JSON::Object({{"kind", JSON("string")}, {"value", JSON(value)}}));
+      result.PushBack(Serde::JSON::Object({{"kind", Serde::JSON("string")}, {"value", Serde::JSON(value)}}));
       continue;
     }
 
     /// Capture comment tokens.
     if (tok.is(clang::tok::comment)) {
       std::string comment = clang::Lexer::getSpelling(tok, srcMgr, langOpts);
-      result.PushBack(JSON::Object({{"kind", JSON("comment")}, {"value", JSON(comment)}}));
+      result.PushBack(Serde::JSON::Object({{"kind", Serde::JSON("comment")}, {"value", Serde::JSON(comment)}}));
     }
   }
 
   return true;
 }
 
-void Parser::GatherStatistics(JSON &&json, const std::string &path, const std::string_view inputPath) {
+void Parser::GatherStatistics(Serde::JSON &&json, const std::string &path, const std::string_view inputPath) {
   uint64_t fileViolations = 0;
   uint64_t fileViolationsRelaxed = 0;
 
