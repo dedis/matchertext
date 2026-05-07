@@ -1,6 +1,8 @@
 package lsp
 
 import (
+	"fmt"
+
 	"github.com/tliron/commonlog"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
@@ -25,15 +27,16 @@ func NewServer(debug bool) *Server {
 		Log:   commonlog.GetLogger(serverName),
 	}
 	s.Handler = protocol.Handler{
-		Initialize:             s.Initialize,
-		Initialized:            s.Initialized,
-		Shutdown:               s.Shutdown,
-		SetTrace:               s.SetTrace,
-		TextDocumentDidOpen:    s.DidOpen,
-		TextDocumentDidChange:  s.DidChange,
-		TextDocumentDidClose:   s.DidClose,
-		TextDocumentCompletion: s.Completion,
-		TextDocumentHover:      s.Hover,
+		Initialize:                     s.Initialize,
+		Initialized:                    s.Initialized,
+		Shutdown:                       s.Shutdown,
+		SetTrace:                       s.SetTrace,
+		TextDocumentDidOpen:            s.DidOpen,
+		TextDocumentDidChange:          s.DidChange,
+		TextDocumentDidClose:           s.DidClose,
+		TextDocumentCompletion:         s.Completion,
+		TextDocumentHover:              s.Hover,
+		TextDocumentSemanticTokensFull: s.SemanticTokensFull,
 	}
 	s.Server = server.NewServer(&s.Handler, serverName, debug)
 	return s
@@ -45,9 +48,19 @@ func (s *Server) Initialize(context *glsp.Context, params *protocol.InitializePa
 	syncKind := protocol.TextDocumentSyncKindFull
 	capabilities.TextDocumentSync = &syncKind
 	capabilities.CompletionProvider = &protocol.CompletionOptions{
-		TriggerCharacters: []string{"[", "{"},
+		// { triggers attribute completions; tag completions fire on identifier characters
+		TriggerCharacters: []string{"{"},
 	}
 	capabilities.HoverProvider = true
+	capabilities.SemanticTokensProvider = protocol.SemanticTokensRegistrationOptions{
+		SemanticTokensOptions: protocol.SemanticTokensOptions{
+			Legend: protocol.SemanticTokensLegend{
+				TokenTypes:     tokenTypes,
+				TokenModifiers: tokenModifiers,
+			},
+			Full: true,
+		},
+	}
 
 	v := version
 	return protocol.InitializeResult{
@@ -66,6 +79,7 @@ func (s *Server) Initialized(context *glsp.Context, params *protocol.Initialized
 
 func (s *Server) Shutdown(context *glsp.Context) error {
 	s.Log.Info("server shutting down")
+	s.Store.CloseAll()
 	return nil
 }
 
@@ -76,12 +90,11 @@ func (s *Server) SetTrace(context *glsp.Context, params *protocol.SetTraceParams
 
 func (s *Server) DidOpen(context *glsp.Context, params *protocol.DidOpenTextDocumentParams) error {
 	s.Log.Debugf("didOpen: %s", params.TextDocument.URI)
-	doc, err := s.Store.Update(params.TextDocument.URI, params.TextDocument.Text, params.TextDocument.Version)
-	if err != nil {
+	if err := s.Store.Update(params.TextDocument.URI, params.TextDocument.Text, params.TextDocument.Version); err != nil {
 		s.Log.Errorf("failed to parse document on open: %v", err)
 		return nil
 	}
-	s.publishDiagnostics(context, doc)
+	s.publishDiagnostics(context, params.TextDocument.URI, params.TextDocument.Version)
 	return nil
 }
 
@@ -90,17 +103,21 @@ func (s *Server) DidChange(context *glsp.Context, params *protocol.DidChangeText
 	if len(params.ContentChanges) == 0 {
 		return nil
 	}
+
+	// We expect a single full-document sync change.
 	change, ok := params.ContentChanges[0].(protocol.TextDocumentContentChangeEventWhole)
 	if !ok {
-		s.Log.Warning("received incremental content change despite advertising full sync — document may be stale")
-		return nil
+		// Receiving incremental changes when we advertised full sync is a client-side error.
+		err := fmt.Errorf("minml-lsp requires full document sync (TextDocumentSyncKindFull)")
+		s.Log.Error(err.Error())
+		return err
 	}
-	doc, err := s.Store.Update(params.TextDocument.URI, change.Text, params.TextDocument.Version)
-	if err != nil {
+
+	if err := s.Store.Update(params.TextDocument.URI, change.Text, params.TextDocument.Version); err != nil {
 		s.Log.Errorf("failed to parse document on change: %v", err)
-		return nil
+		return err
 	}
-	s.publishDiagnostics(context, doc)
+	s.publishDiagnostics(context, params.TextDocument.URI, params.TextDocument.Version)
 	return nil
 }
 

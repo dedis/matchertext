@@ -18,8 +18,9 @@ func main() {
 	debug := flag.Bool("debug", false, "enable debug logging")
 	logPath := flag.String("log", "", "path to log file (default: stderr)")
 
-	// VS Code extension passes -stdio by default. We define it so it doesn't crash.
-	// We use the presence of -addr to decide between TCP and Stdio.
+	// We define the -stdio flag for compatibility with clients that pass it,
+	// though the VS Code extension currently uses the presence of -addr
+	// to decide between TCP and Stdio transport.
 	_ = flag.Bool("stdio", true, "use stdio transport (default)")
 
 	flag.Parse()

@@ -11,11 +11,15 @@ let client: LanguageClient;
 
 export function activate(context: vscode.ExtensionContext) {
   const config = vscode.workspace.getConfiguration("minml");
+
+  const binaryName = process.platform === "win32" ? "minml-lsp.exe" : "minml-lsp";
+
   // Prefer a user-configured path, then the binary bundled alongside the
   // extension (installed by `make vscode-live-preview`), then fall back to PATH.
   const serverPath =
     config.get<string>("lspPath") ||
-    path.join(context.extensionPath, "minml-lsp");
+    path.join(context.extensionPath, binaryName);
+
   const debug = config.get<boolean>("debug") || false;
 
   const args: string[] = [];
@@ -25,7 +29,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   const serverOptions: ServerOptions = {
     run: { command: serverPath, args, transport: TransportKind.stdio },
-    debug: { command: serverPath, args, transport: TransportKind.stdio },
+    debug: { command: serverPath, args: [...args, "--debug"], transport: TransportKind.stdio },
   };
 
   const clientOptions: LanguageClientOptions = {
@@ -34,7 +38,28 @@ export function activate(context: vscode.ExtensionContext) {
 
   client = new LanguageClient("minml", "MinML Language Server", serverOptions, clientOptions);
   context.subscriptions.push(client);
-  client.start();
+
+  client.start().catch((err) => {
+    vscode.window.showErrorMessage(`Failed to start MinML Language Server: ${err}`);
+  });
+
+  if (vscode.window.registerWebviewPanelSerializer) {
+    // Make sure we register a serializer in activation
+    vscode.window.registerWebviewPanelSerializer(LivePreviewPanel.viewType, {
+      async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, state: any) {
+        console.log(`Reviving MinML preview panel from state: ${state}`);
+        // We need an active editor to revive properly, or we can try to find the document
+        const editor = vscode.window.activeTextEditor;
+        if (editor && editor.document.languageId === "minml") {
+          LivePreviewPanel.revive(webviewPanel, context.extensionUri, editor.document);
+        } else {
+          // If no active editor, we might not be able to revive fully, but we can at least set it up
+          // For now, just dispose if we can't find a document to show
+          webviewPanel.dispose();
+        }
+      },
+    });
+  }
 
   context.subscriptions.push(
     vscode.commands.registerCommand("minml-preview.showPreview", () => {
@@ -95,6 +120,14 @@ class LivePreviewPanel {
     );
 
     LivePreviewPanel.currentPanel = new LivePreviewPanel(panel, extensionUri, editor.document);
+  }
+
+  public static revive(
+    panel: vscode.WebviewPanel,
+    extensionUri: vscode.Uri,
+    document: vscode.TextDocument,
+  ) {
+    LivePreviewPanel.currentPanel = new LivePreviewPanel(panel, extensionUri, document);
   }
 
   private constructor(
@@ -200,7 +233,7 @@ class LivePreviewPanel {
     const scriptUri = this._getMediaUri("main.js", webview);
     const wasmExecUri = this._getMediaUri("wasm_exec.js", webview);
     const stylesMainUri = this._getMediaUri("vscode.css", webview);
-    const csp = `default-src 'none'; img-src ${webview.cspSource} https: data:; script-src ${webview.cspSource} 'wasm-unsafe-eval'; style-src ${webview.cspSource}; connect-src ${webview.cspSource};`;
+    const csp = `default-src 'none'; img-src ${webview.cspSource} https: data:; script-src ${webview.cspSource} 'wasm-unsafe-eval'; style-src ${webview.cspSource} 'unsafe-inline'; connect-src ${webview.cspSource};`;
 
     return `<!DOCTYPE html>
 			<html lang="en">

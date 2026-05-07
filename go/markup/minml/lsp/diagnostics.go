@@ -8,23 +8,24 @@ import (
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-func (s *Server) publishDiagnostics(context *glsp.Context, doc *Document) {
-	diagnostics := []protocol.Diagnostic{}
-
-	// Walk the tree to find ERROR and MISSING nodes
-	root := doc.Tree.RootNode()
-	diagnostics = s.collectDiagnostics(root, diagnostics)
-
-	version := uint32(doc.Version)
-	params := protocol.PublishDiagnosticsParams{
-		URI:         doc.URI,
-		Version:     &version,
-		Diagnostics: diagnostics,
+func (s *Server) publishDiagnostics(ctx *glsp.Context, uri string, version int32) {
+	diags := []protocol.Diagnostic{}
+	found := s.Store.WithDocument(uri, func(doc *Document) {
+		diags = collectDiagnostics(doc.Tree.RootNode(), diags)
+	})
+	if !found {
+		return
 	}
-	context.Notify(protocol.ServerTextDocumentPublishDiagnostics, params)
+
+	v := uint32(version)
+	ctx.Notify(protocol.ServerTextDocumentPublishDiagnostics, protocol.PublishDiagnosticsParams{
+		URI:         uri,
+		Version:     &v,
+		Diagnostics: diags,
+	})
 }
 
-func (s *Server) collectDiagnostics(node *sitter.Node, diags []protocol.Diagnostic) []protocol.Diagnostic {
+func collectDiagnostics(node *sitter.Node, diags []protocol.Diagnostic) []protocol.Diagnostic {
 	if node.IsError() || node.IsMissing() {
 		msg := "Syntax error"
 		if node.IsMissing() {
@@ -52,7 +53,7 @@ func (s *Server) collectDiagnostics(node *sitter.Node, diags []protocol.Diagnost
 	}
 
 	for i := uint(0); i < node.ChildCount(); i++ {
-		diags = s.collectDiagnostics(node.Child(i), diags)
+		diags = collectDiagnostics(node.Child(i), diags)
 	}
 
 	return diags

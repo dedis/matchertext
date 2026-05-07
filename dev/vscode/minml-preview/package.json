@@ -3,9 +3,14 @@
   "displayName": "minml-livepreview",
   "description": "",
   "version": "0.0.1",
-  "publisher": "local",
+  "publisher": "matchertext",
+  "activationEvents": [
+    "onLanguage:minml",
+    "onCommand:minml-preview.showPreview",
+    "onCommand:minml-preview.showPreviewToSide"
+  ],
   "engines": {
-    "vscode": "^1.110.0"
+    "vscode": "^1.75.0"
   },
   "categories": [
     "Other"
@@ -22,7 +27,8 @@
         "aliases": [
           "MinML",
           "minml"
-        ]
+        ],
+        "configuration": "./language-configuration.json"
       }
     ],
     "commands": [

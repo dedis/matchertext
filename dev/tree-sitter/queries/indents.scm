@@ -1,4 +1,9 @@
 (content_block [
-  "[" @indent.begin
-  "]" @indent.end
+  "[" @indent
+  "]" @outdent
+])
+
+(attr_block [
+  "{" @indent
+  "}" @outdent
 ])
