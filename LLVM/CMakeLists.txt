@@ -194,6 +194,9 @@ endif ()
 # === Serde ===
 add_subdirectory(extern/Serde)
 target_link_libraries(${PROJECT_NAME} Serde)
+target_link_libraries(LanguageClassifierTests Serde)
+target_link_libraries(ParserFixtureTests Serde)
+target_link_libraries(DebugLanguageOutputTests Serde)
 
 # --------------------------
 # Build Configs

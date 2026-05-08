@@ -1,0 +1,41 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "minml",
+      "highlights": "queries/highlights.scm",
+      "camelcase": "MinML",
+      "title": "MinML",
+      "scope": "source.minml",
+      "file-types": [
+        "minml",
+        "m"
+      ],
+      "injection-regex": "^minml$",
+      "class-name": "TreeSitterMinml"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "Minml grammar for tree-sitter",
+    "authors": [
+      {
+        "name": "Philip Hamelink",
+        "email": "philip.hamelink@epfl.ch"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/tree-sitter/tree-sitter-minml"
+    }
+  },
+  "bindings": {
+    "c": false,
+    "go": true,
+    "node": false,
+    "python": false,
+    "rust": false,
+    "swift": false,
+    "zig": false
+  }
+}
