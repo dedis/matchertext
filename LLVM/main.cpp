@@ -2,6 +2,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -16,6 +17,10 @@
 #include "include/LanguageParser.hpp"
 #include "include/Parser.hpp"
 #include "include/Stats.hpp"
+
+#if USE_OPENMP
+#include <omp.h>
+#endif
 
 namespace fs = std::filesystem;
 using Clock = std::chrono::steady_clock;
@@ -96,7 +101,20 @@ int main(const int argc, char *argv[]) {
     return -1;
   }
 
-  log_info("Starting parser");
+  log_info("Starting parser"); {
+    std::ostringstream msg;
+#if USE_OPENMP
+    const char *envThreads = std::getenv("OMP_NUM_THREADS");
+    if (!envThreads)
+      omp_set_num_threads(omp_get_num_procs() * 2);
+    const int maxThreads = omp_get_max_threads();
+    msg << "OpenMP enabled: max_threads=" << maxThreads
+        << " (OMP_NUM_THREADS=" << (envThreads ? envThreads : "<unset, defaulting to 2x cores>") << ")";
+#else
+    msg << "OpenMP disabled at build time (single-threaded parsing)";
+#endif
+    log_info(msg.str());
+  }
 
   std::string compilerOverride;
   std::string outputDir = "./result";
@@ -265,6 +283,8 @@ int main(const int argc, char *argv[]) {
 
   try {
     const auto parseStart = Clock::now();
+    std::vector<std::tuple<LanguageEnum, size_t, long long>> perLangTiming;
+    perLangTiming.reserve(langFiles.size());
 
     for (auto &lang: langFiles) {
       {
@@ -278,6 +298,7 @@ int main(const int argc, char *argv[]) {
       std::atomic<size_t> done{0};
       std::atomic<int> displayedPct{-1};
       const size_t langTotal = lang.second.size();
+      const auto langStart = Clock::now();
 
       #if USE_OPENMP
       #pragma omp parallel for schedule(dynamic) default(none) shared(lang, compilerOverride, pls, done, displayedPct, langTotal)
@@ -311,6 +332,7 @@ int main(const int argc, char *argv[]) {
         }
       }
       std::cerr << '\n';
+      perLangTiming.emplace_back(lang.first, langTotal, elapsed_ms(langStart, Clock::now()));
     }
 
     const long long parsingMs = elapsed_ms(parseStart, Clock::now());
@@ -402,8 +424,15 @@ int main(const int argc, char *argv[]) {
     std::ostringstream msg;
     msg << "\nTiming summary"
         << "\n - Indexing: " << indexingMs << " ms"
-        << "\n - Parsing : " << parsingMs << " ms"
-        << "\nResults written to: " << fs::path(outputDir).lexically_normal().string();
+        << "\n - Parsing : " << parsingMs << " ms";
+    for (const auto &[lang, count, ms]: perLangTiming) {
+      const double secs = static_cast<double>(ms) / 1000.0;
+      const double rate = secs > 0 ? static_cast<double>(count) / secs : 0.0;
+      msg << "\n   - " << LanguageName(lang) << ": " << ms << " ms ("
+          << count << " files, " << std::fixed << std::setprecision(1) << rate << " files/s)";
+      msg.unsetf(std::ios::fixed);
+    }
+    msg << "\nResults written to: " << fs::path(outputDir).lexically_normal().string();
     log_info(msg.str());
   } catch (const std::exception &e) {
     std::cerr << "Parsing failed: " << e.what() << "\n";
