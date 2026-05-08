@@ -33,15 +33,17 @@ const char *LanguageName(const Language lang) {
 }
 
 namespace {
-  bool HasRepeatedCharRun(const std::string_view s,
-                          const int minRunLength = 5,
-                          int *maxRunLength = nullptr) {
+  bool HasRepeatedCharRun(
+    const std::string_view s,
+    const int minRunLength = 5,
+    int *maxRunLength = nullptr
+  ) {
     int currentRunLength = 1;
     int maxRepeatedRun = 1;
     char repeatedChar = '\0';
     bool hasRepeatedRun = false;
 
-    for (const char c : s) {
+    for (const char c: s) {
       if (std::isspace(static_cast<unsigned char>(c))) {
         repeatedChar = '\0';
         currentRunLength = 1;
@@ -90,7 +92,7 @@ namespace {
 
     char prev = '\0';
     bool prevWasSeparator = true;
-    for (const char c : trimmed) {
+    for (const char c: trimmed) {
       if (const auto uc = static_cast<unsigned char>(c); std::isalnum(uc)) {
         if (std::isalpha(uc))
           letters++;

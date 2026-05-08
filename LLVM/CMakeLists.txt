@@ -53,6 +53,8 @@ add_executable(${PROJECT_NAME}
     include/LanguageClassifier.hpp
     include/LanguageStats.hpp
     include/LanguageModel.generated.hpp
+    src/LanguageParser.cpp
+    include/LanguageParser.hpp
 )
 
 add_executable(LanguageClassifierTests
@@ -86,6 +88,8 @@ add_executable(ParserFixtureTests
     include/LanguageClassifier.hpp
     include/LanguageStats.hpp
     include/LanguageModel.generated.hpp
+    src/LanguageParser.cpp
+    include/LanguageParser.hpp
 )
 target_include_directories(ParserFixtureTests PRIVATE include)
 target_link_libraries(ParserFixtureTests clangLex clangBasic)
@@ -127,6 +131,8 @@ add_executable(DebugLanguageOutputTests
     include/LanguageClassifier.hpp
     include/LanguageStats.hpp
     include/LanguageModel.generated.hpp
+    src/LanguageParser.cpp
+    include/LanguageParser.hpp
 )
 target_include_directories(DebugLanguageOutputTests PRIVATE include)
 target_link_libraries(DebugLanguageOutputTests clangLex clangBasic)
@@ -147,6 +153,29 @@ find_package(Clang REQUIRED CONFIG)
 
 include_directories(${LLVM_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} clangLex clangBasic)
+target_compile_definitions(${PROJECT_NAME} PRIVATE MATCHERTEXT_PARSERS_DIR="${CMAKE_SOURCE_DIR}/parsers")
+
+# === Go parser binary ===
+# Pre-compile parsers/parser.go into a native binary so each per-file invocation
+# avoids recompiling, and dodges `go run`'s rule that disallows .go arguments
+# from a different directory than the source file.
+find_program(GO_EXECUTABLE go)
+if (GO_EXECUTABLE)
+    set(GO_PARSER_BIN "${CMAKE_BINARY_DIR}/matchertext_go_parser")
+    add_custom_command(
+        OUTPUT ${GO_PARSER_BIN}
+        COMMAND ${GO_EXECUTABLE} build -o ${GO_PARSER_BIN} ${CMAKE_SOURCE_DIR}/parsers/parser.go
+        DEPENDS ${CMAKE_SOURCE_DIR}/parsers/parser.go
+        COMMENT "Building Go parser binary"
+        VERBATIM
+    )
+    add_custom_target(go_parser ALL DEPENDS ${GO_PARSER_BIN})
+    add_dependencies(${PROJECT_NAME} go_parser)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE
+        MATCHERTEXT_GO_PARSER_BIN="${GO_PARSER_BIN}")
+else ()
+    message(WARNING "go executable not found; Go parsing will be disabled at runtime")
+endif ()
 
 # === OpenMP ===
 find_package(OpenMP QUIET)
@@ -158,6 +187,13 @@ else ()
     message(STATUS "OpenMP not found, building without parallel parsing support")
 endif ()
 
+# === Serde ===
+add_subdirectory(extern/Serde)
+target_link_libraries(${PROJECT_NAME} Serde)
+target_link_libraries(LanguageClassifierTests Serde)
+target_link_libraries(ParserFixtureTests Serde)
+target_link_libraries(DebugLanguageOutputTests Serde)
+
 # --------------------------
 # Build Configs
 # --------------------------
@@ -165,7 +201,7 @@ endif ()
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     target_compile_options(${PROJECT_NAME} PRIVATE
         -O3 -DNDEBUG -finline-functions -fomit-frame-pointer
-        -ffunction-sections -fdata-sections -flto
+        -ffunction-sections -fdata-sections -flto -Wno-c99-designator
     )
     target_link_options(${PROJECT_NAME} PRIVATE -Wl,-O2)
     set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)

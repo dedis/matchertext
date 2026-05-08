@@ -6,7 +6,6 @@
 
 #include "../include/FileStats.hpp"
 
-
 CREATE_STATS_CPP(FileStats, FILE_STATS_FIELDS)
 
 void FileStats::DeriveStats() {

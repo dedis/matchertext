@@ -55,7 +55,8 @@ int main(const int argc, char *argv[]) {
   }
 
   Parser::ConfigureDebugLanguages({inputPath});
-  Parser::ParseFile(fixturePath.string(), inputPath);
+  if (Serde::JSON result; Parser::ParseC_CPP(fixturePath.string(), result))
+    Parser::GatherStatistics(std::move(result), fixturePath.string(), inputPath);
   Parser::FlushDebugLanguageLogs();
 
   const fs::path base = outputRoot / "tests" / "string_bucket_mix.cpp";

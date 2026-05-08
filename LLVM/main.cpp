@@ -3,8 +3,11 @@
 #include <iostream>
 #include <map>
 #include <sstream>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
+#include "include/LanguageParser.hpp"
 #include "include/Parser.hpp"
 #include "include/Stats.hpp"
 
@@ -34,27 +37,46 @@ static std::string normalize_path(const std::string &in) {
   }
 }
 
-/// Return true if the path has a C/C++ source or header extension.
-inline bool is_c_cpp_file(const std::string &path) {
+/// File extensions recognized per language. C and C++ share the indexing pool
+/// because headers like `.h` are ambiguous and the underlying parser handles both.
+static const std::unordered_map<Language, std::vector<std::string_view>> kLanguageExtensions = {
+  {Language::C,      {"c", "h"}},
+  {Language::CPP,    {"cc", "cpp", "cxx", "hpp", "hh", "hxx"}},
+  {Language::Go,     {"go"}},
+  {Language::Python, {"py", "pyw", "pyi", "pyz", "pyzw"}},
+};
+
+/// True when `a` and `b` are the same language family for indexing purposes.
+constexpr bool same_language_family(const Language a, const Language b) {
+  if (a == b)
+    return true;
+  const bool aIsCFamily = a == Language::C || a == Language::CPP;
+  const bool bIsCFamily = b == Language::C || b == Language::CPP;
+  return aIsCFamily && bIsCFamily;
+}
+
+/// Return true if `path` has an extension belonging to `language` (or its family).
+inline bool matches_language(const std::string &path, const Language language) {
   const auto pos = path.rfind('.');
   if (pos == std::string::npos)
     return false;
 
-  const std::string ext = path.substr(pos + 1);
-  return ext == "c" || ext == "h" || ext == "cc" || ext == "cpp" || ext == "cxx" || ext == "hpp" || ext == "hh" ||
-         ext == "hxx";
+  const std::string_view ext(path.data() + pos + 1, path.size() - pos - 1);
+  for (const auto &[lang, extensions]: kLanguageExtensions) {
+    if (!same_language_family(lang, language))
+      continue;
+    for (const auto &e: extensions)
+      if (e == ext)
+        return true;
+  }
+  return false;
 }
-
-struct WorkItem {
-  std::string filePath;
-  std::string inputPath;
-};
 
 int main(const int argc, char *argv[]) {
   long long indexingMs = 0;
-  if (argc < 2) {
+  if (argc < 3) {
     std::cerr << "Usage: " << argv[0]
-        << " [--log-strings] [--debug-languages] <file|directory>...\n";
+        << " <language> [--log-strings] [--debug-languages] [--compiler <compiler>] <file|directory>...\n";
     return -1;
   }
 
@@ -63,6 +85,8 @@ int main(const int argc, char *argv[]) {
   // Parse arguments
   bool logStrings = false;
   bool debugLanguages = false;
+  std::string compilerOverride;
+  auto language = Language::Unknown;
   std::map<std::string, std::string> filesToProcess;
   std::vector<std::string> inputPaths;
   const auto indexingStart = Clock::now();
@@ -76,6 +100,25 @@ int main(const int argc, char *argv[]) {
       debugLanguages = true;
       continue;
     }
+    if (arg == "--compiler") {
+      if (i + 1 >= argc) {
+        std::cerr << "--compiler requires a value\n";
+        return -1;
+      }
+      compilerOverride = argv[++i];
+      continue;
+    }
+
+    if (language == Language::Unknown) {
+      Language parsed;
+      if (!LanguageParser::ParseLanguage(arg, parsed)) {
+        std::cerr << "Unknown language: " << arg
+            << " (expected one of: c, cpp, go, python)\n";
+        return -1;
+      }
+      language = parsed;
+      continue;
+    }
 
     fs::path p(arg);
     if (!fs::exists(p)) {
@@ -85,13 +128,18 @@ int main(const int argc, char *argv[]) {
 
     const std::string inputPath = fs::path(arg).lexically_normal().string();
     inputPaths.push_back(inputPath);
-    if (fs::is_regular_file(p) && is_c_cpp_file(p))
+    if (fs::is_regular_file(p) && matches_language(p.string(), language))
       filesToProcess.try_emplace(normalize_path(p.string()), inputPath);
     else if (fs::is_directory(p)) {
       for (const auto &entry: fs::recursive_directory_iterator(p))
-        if (fs::is_regular_file(entry) && is_c_cpp_file(entry.path().string()))
+        if (fs::is_regular_file(entry) && matches_language(entry.path().string(), language))
           filesToProcess.try_emplace(normalize_path(entry.path().string()), inputPath);
     }
+  }
+
+  if (language == Language::Unknown) {
+    std::cerr << "Missing required <language> argument\n";
+    return -1;
   }
   const auto indexingEnd = Clock::now();
   indexingMs = elapsed_ms(indexingStart, indexingEnd);
@@ -103,16 +151,16 @@ int main(const int argc, char *argv[]) {
   }
 
   if (filesToProcess.empty()) {
-    log_info("No matching C/C++ files found, exiting");
+    log_info("No matching source files found, exiting");
     return 0;
   }
 
   try {
     long long parsingMs = 0;
-    std::vector<WorkItem> files;
+    std::vector<std::pair<std::string, std::string>> files;
     files.reserve(filesToProcess.size());
     for (const auto &[filePath, inputPath]: filesToProcess)
-      files.push_back({filePath, inputPath});
+      files.emplace_back(filePath, inputPath);
 
     if (debugLanguages) {
       log_info("Debug language sampling enabled");
@@ -128,10 +176,17 @@ int main(const int argc, char *argv[]) {
     const auto parseStart = Clock::now();
 
     #if USE_OPENMP
-    #pragma omp parallel for schedule(dynamic) default(none) shared(files)
+    #pragma omp parallel for schedule(dynamic) default(none) shared(files, language, compilerOverride)
     #endif
-    for (const auto &file: files) {
-      Parser::ParseFile(file.filePath, file.inputPath);
+    for (const auto &[filePath, inputPath]: files) {
+      try {
+        if (Serde::JSON result; LanguageParser::ExtractData(language, compilerOverride, filePath, result))
+          Parser::GatherStatistics(std::move(result), filePath, inputPath);
+      } catch (const std::exception &e) {
+        #pragma omp critical
+        std::cerr << "FAILED " << filePath << ": " << e.what() << '\n';
+        throw;
+      }
     }
 
     const auto parseEnd = Clock::now();
@@ -171,7 +226,7 @@ int main(const int argc, char *argv[]) {
       PrintStatsMaxString(Parser::STRING_STATS, Parser::DOCS_STATS);
     }
 
-    std::ostringstream message;
+    message.clear();
     std::cout.put('\n');
     message << "Timing summary"
             << "\n - Indexing: " << indexingMs << " ms"

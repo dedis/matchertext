@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "FileStats.hpp"
+#include "JSON.hpp"
 #include "LanguageStats.hpp"
 #include "Stats.hpp"
 
@@ -47,10 +48,11 @@ class Parser final {
      *       /\* block comments *\/
      *
      * @param path Absolute or relative path to the source file to scan.
-     * @param inputPath User-provided input root associated with this file. When
-     *        omitted, the file path itself is used for debug-language logging.
+     * @param result
      */
-    static void ParseFile(const std::string &path, std::string_view inputPath = {});
+    static bool ParseC_CPP(const std::string &path, Serde::JSON &result);
+
+    static void GatherStatistics(Serde::JSON &&json, const std::string &path, std::string_view inputPath = {});
 
     /// Enable per-language debug sampling for the given top-level input paths.
     static void ConfigureDebugLanguages(const std::vector<std::string> &inputPaths);
@@ -74,9 +76,11 @@ class Parser final {
   private:
     /// Processes a string/doc and updates the given stat
     /// @returns the number of MatcherText violations found
-    static uint64_t process(std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats,
-                            LanguageStats *langStats = nullptr, bool relaxed = false,
-                            std::string_view sourcePath = {}, std::string_view inputPath = {});
+    static uint64_t process(
+      std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats,
+      LanguageStats *langStats = nullptr, bool relaxed = false,
+      std::string_view sourcePath = {}, std::string_view inputPath = {}
+    );
 };
 
 #endif // PARSER_HPP
