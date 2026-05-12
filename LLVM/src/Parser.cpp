@@ -266,6 +266,71 @@ static std::string ExtractLiteralBody(std::string_view spelling) {
   return std::string(spelling.substr(open + 1, close - open - 1));
 }
 
+// Counts the backslash bytes that would remain if a C/C++ string literal body were
+// rewritten verbatim inside a raw string literal R"(...)" — i.e. the backslashes in
+// the decoded content. Escape-introducing backslashes (\n, \t, \", \\, ...) collapse
+// away; only genuine content backslashes survive. Best effort: assumes `body` comes
+// from a normal (non-raw) literal, where every '\' starts an escape sequence; bodies
+// taken from raw literals (or normal+raw concatenations) are over-collapsed.
+static uint64_t CountRawStringToothpicks(const std::string_view body) {
+  const auto hexDigit = [](const unsigned char c) -> int {
+    if (c >= '0' && c <= '9')
+      return c - '0';
+    if (c >= 'a' && c <= 'f')
+      return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+      return c - 'A' + 10;
+    return -1;
+  };
+
+  uint64_t count = 0;
+  const size_t n = body.size();
+  for (size_t i = 0; i < n;) {
+    if (static_cast<unsigned char>(body[i]) != '\\') {
+      ++i;
+      continue;
+    }
+
+    // Start of an escape sequence; the leading backslash itself collapses away.
+    if (++i >= n)
+      break; // dangling backslash — not valid source, ignore.
+
+    if (const auto e = static_cast<unsigned char>(body[i]); e == '\\') {
+      // \\ -> one literal backslash survives.
+      ++count;
+      ++i;
+    } else if (e == 'x') {
+      // \xH... hex escape, greedy over hex digits.
+      ++i;
+      unsigned long value = 0;
+      bool any = false;
+      for (int d = 0; i < n && (d = hexDigit(static_cast<unsigned char>(body[i]))) >= 0; ++i) {
+        value = value * 16 + static_cast<unsigned long>(d);
+        any = true;
+      }
+      if (any && (value & 0xFFul) == 0x5Cul)
+        ++count;
+    } else if (e == 'u' || e == 'U') {
+      // \uHHHH / \UHHHHHHHH universal character name — never a bare backslash in valid source.
+      const int digits = e == 'u' ? 4 : 8;
+      ++i;
+      for (int d = 0; d < digits && i < n && hexDigit(static_cast<unsigned char>(body[i])) >= 0; ++d)
+        ++i;
+    } else if (e >= '0' && e <= '7') {
+      // \ooo octal escape, up to 3 digits.
+      unsigned value = 0;
+      for (int d = 0; d < 3 && i < n && body[i] >= '0' && body[i] <= '7'; ++d, ++i)
+        value = value * 8 + static_cast<unsigned>(body[i] - '0');
+      if ((value & 0xFFu) == 0x5Cu)
+        ++count;
+    } else {
+      // Simple escape (\n \t \r \v \f \a \b \" \' \? ...): the escaped char is not a backslash.
+      ++i;
+    }
+  }
+  return count;
+}
+
 void Parser::ParseFile(const std::string &filePath, const std::string &inputPath) {
   if (Serde::JSON result; ParseC_CPP(filePath, result) && result.IsArray())
     GatherStatistics(std::move(result), filePath, inputPath);
@@ -420,6 +485,14 @@ uint64_t Parser::process(
 
   const auto [unmatched, maxDepth, maxValidDepth, rawChars] = AnalyzeMatcherText(string, relaxed);
 
+  /// Toothpick count after rewriting this sample under the matchertext rule: a
+  /// matchertext-compliant string literal is replaced by an equivalent C++ raw
+  /// string literal (langStats is non-null only for string literals); everything
+  /// else (non-compliant strings, comments) is counted unchanged.
+  const bool compliantStringLiteral = langStats != nullptr && unmatched == 0;
+  const uint64_t convertedToothpicks =
+      compliantStringLiteral ? CountRawStringToothpicks(string) : toothpicks;
+
   if (langStats != nullptr) {
     /// Classify the embedded language and record per-language stats only for strings.
     if (const auto [lang, confidence] = ClassifyString(string); lang != LanguageEnum::Unknown) {
@@ -446,6 +519,11 @@ uint64_t Parser::process(
     AtomicAdd(s.toothpicks, static_cast<double>(toothpicks));
     if (AtomicMax(s.toothpicksMax, static_cast<double>(toothpicks)))
       s.stringMaxToothpicks.set(string);
+
+    if (convertedToothpicks > 0)
+      AtomicAdd(s.withToothpicksConverted, 1.0);
+    AtomicAdd(s.toothpicksConverted, static_cast<double>(convertedToothpicks));
+    AtomicMax(s.toothpicksConvertedMax, static_cast<double>(convertedToothpicks));
 
     if (unmatched > 0)
       AtomicAdd(s.withNonCompliance, 1.0);
