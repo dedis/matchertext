@@ -91,6 +91,8 @@ class Parser final {
     inline static FileStats FILE_STATS{};
     /// Per-language classification statistics for strings
     inline static LanguageStats STRING_LANG_STATS{};
+
+    static uint64_t CountRawStringToothpicks(std::string_view body);
   private:
     /// Processes a string/doc and updates the given stat
     /// @returns the number of MatcherText violations found

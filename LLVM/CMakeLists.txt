@@ -151,6 +151,41 @@ add_test(NAME debug_language_output
     ${CMAKE_SOURCE_DIR}/tests/string_bucket_mix.cpp
     ${CMAKE_BINARY_DIR}/debug-language-output)
 
+add_executable(StringLiteralDecodeTests
+    tests/string_literal_decode_test.cpp
+    src/Parser.cpp
+    src/EmbeddedStats.cpp
+    src/NestedStats.cpp
+    src/Stats.cpp
+    src/FileStats.cpp
+    src/LanguageClassifier.cpp
+    ${CLASSIFIER_SOURCES}
+    src/LanguageStats.cpp
+    include/Parser.hpp
+    include/EmbeddedStats.hpp
+    include/NestedStats.hpp
+    include/Stats.hpp
+    include/MatcherText.hpp
+    include/AtomicString.hpp
+    include/FileStats.hpp
+    include/StatsGenerator.hpp
+    include/LanguageClassifier.hpp
+    include/LanguageStats.hpp
+    include/LanguageModel.generated.hpp
+    src/LanguageParser.cpp
+    include/LanguageParser.hpp
+    include/LanguageData.hpp
+)
+target_include_directories(StringLiteralDecodeTests PRIVATE include)
+target_link_libraries(StringLiteralDecodeTests clangLex clangBasic)
+if (OpenMP_CXX_FOUND)
+    target_compile_definitions(StringLiteralDecodeTests PRIVATE USE_OPENMP=1)
+    target_link_libraries(StringLiteralDecodeTests OpenMP::OpenMP_CXX)
+else ()
+    target_compile_definitions(StringLiteralDecodeTests PRIVATE USE_OPENMP=0)
+endif ()
+add_test(NAME string_literal_decode COMMAND StringLiteralDecodeTests)
+
 # === LLVM & Clang ===
 find_package(LLVM REQUIRED CONFIG)
 find_package(Clang REQUIRED CONFIG)
@@ -197,6 +232,7 @@ target_link_libraries(${PROJECT_NAME} Serde)
 target_link_libraries(LanguageClassifierTests Serde)
 target_link_libraries(ParserFixtureTests Serde)
 target_link_libraries(DebugLanguageOutputTests Serde)
+target_link_libraries(StringLiteralDecodeTests Serde)
 
 # --------------------------
 # Build Configs

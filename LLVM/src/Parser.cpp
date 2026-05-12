@@ -267,12 +267,16 @@ static std::string ExtractLiteralBody(std::string_view spelling) {
 }
 
 // Counts the backslash bytes that would remain if a C/C++ string literal body were
-// rewritten verbatim inside a raw string literal R"(...)" — i.e. the backslashes in
-// the decoded content. Escape-introducing backslashes (\n, \t, \", \\, ...) collapse
-// away; only genuine content backslashes survive. Best effort: assumes `body` comes
-// from a normal (non-raw) literal, where every '\' starts an escape sequence; bodies
-// taken from raw literals (or normal+raw concatenations) are over-collapsed.
-static uint64_t CountRawStringToothpicks(const std::string_view body) {
+// rewritten verbatim inside a raw string literal R"(...)" — i.e. the number of '\'
+// characters in the *decoded* content. Escape sequences are decoded semantically:
+// only sequences that actually produce a 0x5C code unit are counted (\\, octal \ooo,
+// hex \xH..., the \uXXXX / \UXXXXXXXX universal-character-name forms, and the C++23
+// delimited forms \x{...} / \o{...} / \u{...} / \N{REVERSE SOLIDUS}). `body` is
+// expected to already have line splices removed
+// (clang::Lexer::getSpelling does this); bodies taken from raw literals — or from
+// normal+raw adjacent-literal concatenations — are decoded as if normal and may be
+// over-collapsed, which is an accepted approximation here.
+uint64_t Parser::CountRawStringToothpicks(std::string_view body) {
   const auto hexDigit = [](const unsigned char c) -> int {
     if (c >= '0' && c <= '9')
       return c - '0';
@@ -282,51 +286,140 @@ static uint64_t CountRawStringToothpicks(const std::string_view body) {
       return c - 'A' + 10;
     return -1;
   };
+  const auto octDigit = [](const unsigned char c) -> int {
+    return c >= '0' && c <= '7' ? c - '0' : -1;
+  };
+
+  const size_t n = body.size();
+
+  // Reads exactly `digits` hex digits starting at body[i]; advances i past them on success.
+  const auto parseFixedHex = [&](size_t &i, const int digits, uint32_t &value) -> bool {
+    value = 0;
+    for (int k = 0; k < digits; ++k) {
+      if (i >= n)
+        return false;
+      const int d = hexDigit(static_cast<unsigned char>(body[i]));
+      if (d < 0)
+        return false;
+      value = value * 16u + static_cast<uint32_t>(d);
+      ++i;
+    }
+    return true;
+  };
+
+  // Reads a "{ digits }" run in the given base starting at body[i]; advances i past the
+  // closing brace on success. Requires at least one digit.
+  const auto parseBracedNumber = [&](size_t &i, const int base, uint32_t &value) -> bool {
+    if (i >= n || body[i] != '{')
+      return false;
+    ++i;
+
+    value = 0;
+    bool any = false;
+    while (i < n && body[i] != '}') {
+      const int d = base == 16
+                      ? hexDigit(static_cast<unsigned char>(body[i]))
+                      : octDigit(static_cast<unsigned char>(body[i]));
+      if (d < 0)
+        return false;
+      value = value * static_cast<uint32_t>(base) + static_cast<uint32_t>(d);
+      any = true;
+      ++i;
+    }
+    if (i >= n || body[i] != '}')
+      return false;
+    ++i;
+    return any;
+  };
 
   uint64_t count = 0;
-  const size_t n = body.size();
   for (size_t i = 0; i < n;) {
-    if (static_cast<unsigned char>(body[i]) != '\\') {
+    if (body[i] != '\\') {
       ++i;
       continue;
     }
 
-    // Start of an escape sequence; the leading backslash itself collapses away.
+    // Start of an escape sequence; the leading backslash itself does not survive.
     if (++i >= n)
       break; // dangling backslash — not valid source, ignore.
 
-    if (const auto e = static_cast<unsigned char>(body[i]); e == '\\') {
-      // \\ -> one literal backslash survives.
+    const auto e = static_cast<unsigned char>(body[i]);
+
+    if (e == '\\') { // \\ -> one literal backslash survives
       ++count;
       ++i;
-    } else if (e == 'x') {
-      // \xH... hex escape, greedy over hex digits.
-      ++i;
-      unsigned long value = 0;
-      bool any = false;
-      for (int d = 0; i < n && (d = hexDigit(static_cast<unsigned char>(body[i]))) >= 0; ++i) {
-        value = value * 16 + static_cast<unsigned long>(d);
-        any = true;
-      }
-      if (any && (value & 0xFFul) == 0x5Cul)
-        ++count;
-    } else if (e == 'u' || e == 'U') {
-      // \uHHHH / \UHHHHHHHH universal character name — never a bare backslash in valid source.
-      const int digits = e == 'u' ? 4 : 8;
-      ++i;
-      for (int d = 0; d < digits && i < n && hexDigit(static_cast<unsigned char>(body[i])) >= 0; ++d)
-        ++i;
-    } else if (e >= '0' && e <= '7') {
-      // \ooo octal escape, up to 3 digits.
-      unsigned value = 0;
-      for (int d = 0; d < 3 && i < n && body[i] >= '0' && body[i] <= '7'; ++d, ++i)
-        value = value * 8 + static_cast<unsigned>(body[i] - '0');
-      if ((value & 0xFFu) == 0x5Cu)
-        ++count;
-    } else {
-      // Simple escape (\n \t \r \v \f \a \b \" \' \? ...): the escaped char is not a backslash.
-      ++i;
+      continue;
     }
+
+    if (e == 'x') { // \xH... or (C++23) \x{ H... }
+      ++i;
+      uint32_t value = 0;
+      if (i < n && body[i] == '{') {
+        if (parseBracedNumber(i, 16, value) && value == 0x5Cu)
+          ++count;
+        continue;
+      }
+      bool any = false;
+      while (i < n) {
+        const int d = hexDigit(static_cast<unsigned char>(body[i]));
+        if (d < 0)
+          break;
+        value = value * 16u + static_cast<uint32_t>(d);
+        any = true;
+        ++i;
+      }
+      if (any && value == 0x5Cu)
+        ++count;
+      continue;
+    }
+
+    if (e == 'o') { // (C++23) \o{ O... }
+      ++i;
+      uint32_t value = 0;
+      if (i < n && body[i] == '{' && parseBracedNumber(i, 8, value) && value == 0x5Cu)
+        ++count;
+      continue;
+    }
+
+    if (e == 'u' || e == 'U') { // \uHHHH, \UHHHHHHHH, or (C++23) \u{ H... }
+      ++i;
+      uint32_t value = 0;
+      if (i < n && body[i] == '{') {
+        if (parseBracedNumber(i, 16, value) && value == 0x5Cu)
+          ++count;
+        continue;
+      }
+      if (parseFixedHex(i, e == 'u' ? 4 : 8, value) && value == 0x5Cu)
+        ++count;
+      continue;
+    }
+
+    if (e == 'N') { // (C++23) named universal character escape \N{ NAME }
+      ++i;
+      constexpr std::string_view reverseSolidus = "{REVERSE SOLIDUS}";
+      if (body.substr(i, reverseSolidus.size()) == reverseSolidus) {
+        ++count;
+        i += reverseSolidus.size();
+      }
+      continue;
+    }
+
+    if (e >= '0' && e <= '7') { // \ooo octal escape, up to 3 digits
+      uint32_t value = 0;
+      for (int d = 0; d < 3 && i < n; ++d) {
+        const int od = octDigit(static_cast<unsigned char>(body[i]));
+        if (od < 0)
+          break;
+        value = value * 8u + static_cast<uint32_t>(od);
+        ++i;
+      }
+      if (value == 0x5Cu)
+        ++count;
+      continue;
+    }
+
+    // Simple escapes (\n \t \r \v \f \a \b \" \' \? ...): none decodes to a backslash.
+    ++i;
   }
   return count;
 }
