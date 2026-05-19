@@ -6,33 +6,25 @@
 
 #include <algorithm>
 #include <array>
-#include <initializer_list>
-#include <unordered_map>
+#include <cerrno>
+#include <chrono>
+#include <csignal>
+#include <cstdio>
+#include <iostream>
+#include <map>
+#include <poll.h>
+#include <ranges>
+#include <spawn.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+extern char **environ;
 
 #include "../include/LanguageParser.hpp"
 #include "JSON.hpp"
 #include "JsonParser.hpp"
+#include "../include/LanguageData.hpp"
 #include "../include/Parser.hpp"
-
-struct LangSpec {
-  std::initializer_list<const char *> compilers;
-  const char *cmdTemplate;
-};
-
-#ifndef MATCHERTEXT_PARSERS_DIR
-#define MATCHERTEXT_PARSERS_DIR "./parsers"
-#endif
-#ifndef MATCHERTEXT_GO_PARSER_BIN
-#define MATCHERTEXT_GO_PARSER_BIN "./matchertext_go_parser"
-#endif
-
-// C and C++ are not included because they use the clang parser compiled into the parser.
-// The Go parser is pre-compiled by CMake to avoid `go run` recompiling on every file
-// and to sidestep its same-directory rule for .go arguments.
-static const std::unordered_map<Language, LangSpec> specs = {
-  {Language::Go, {{MATCHERTEXT_GO_PARSER_BIN}, "\"{}\" \"{}\""}},
-  {Language::Python, {{"python3", "python"}, "{} \"" MATCHERTEXT_PARSERS_DIR "/parser.py\" \"{}\""}},
-};
 
 static std::string format(const std::string &tpl, const std::string &a, const std::string &b) {
   std::string out;
@@ -56,23 +48,153 @@ static std::string format(const std::string &tpl, const std::string &a, const st
   return out;
 }
 
-static bool isAvailable(const char *cmd) {
+static bool isAvailable(const std::string_view cmd) {
   const std::string check = "command -v " + std::string(cmd) + " >/dev/null 2>&1";
   return std::system(check.c_str()) == 0;
 }
 
-static std::string firstAvailable(const std::initializer_list<const char *> candidates) {
-  for (const auto *c: candidates)
+static std::string firstAvailable(const std::span<const std::string_view> candidates) {
+  for (const auto c: candidates)
     if (isAvailable(c))
-      return c;
+      return std::string(c);
   return "";
 }
 
+namespace {
+  // Bidirectional persistent subprocess. One instance per thread per language.
+  struct PersistentProcess {
+    int write_fd = -1;
+    int read_fd = -1;
+    pid_t pid = -1;
+
+    [[nodiscard]] bool valid() const {
+      return write_fd >= 0 && read_fd >= 0 && pid > 0;
+    }
+
+    bool start(const std::string &cmd) {
+      int to_child[2], from_child[2];
+      if (pipe(to_child) < 0)
+        return false;
+      if (pipe(from_child) < 0) {
+        ::close(to_child[0]);
+        ::close(to_child[1]);
+        return false;
+      }
+
+      posix_spawn_file_actions_t fa;
+      posix_spawn_file_actions_init(&fa);
+      posix_spawn_file_actions_adddup2(&fa, to_child[0], STDIN_FILENO);
+      posix_spawn_file_actions_adddup2(&fa, from_child[1], STDOUT_FILENO);
+      posix_spawn_file_actions_addclose(&fa, to_child[0]);
+      posix_spawn_file_actions_addclose(&fa, to_child[1]);
+      posix_spawn_file_actions_addclose(&fa, from_child[0]);
+      posix_spawn_file_actions_addclose(&fa, from_child[1]);
+
+      // Put the child in its own process group so kill(-pid, SIGKILL) reaches
+      // both /bin/sh and the python3 it forks, preventing orphaned subprocesses.
+      posix_spawnattr_t attr;
+      posix_spawnattr_init(&attr);
+      posix_spawnattr_setpgroup(&attr, 0);
+      posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP);
+
+      const char *argv[] = {"/bin/sh", "-c", cmd.c_str(), nullptr};
+      const int r = posix_spawn(&pid, "/bin/sh", &fa, &attr, const_cast<char **>(argv), environ);
+      posix_spawn_file_actions_destroy(&fa);
+      posix_spawnattr_destroy(&attr);
+
+      ::close(to_child[0]);
+      ::close(from_child[1]);
+
+      if (r != 0) {
+        ::close(to_child[1]);
+        ::close(from_child[0]);
+        pid = -1;
+        return false;
+      }
+
+      write_fd = to_child[1];
+      read_fd = from_child[0];
+      return true;
+    }
+
+    // Send a file path, read back the JSON line. Returns false if the subprocess died or timed out.
+    bool request(const std::string &path, std::string &out) const {
+      const std::string msg = path + "\n";
+      const char *p = msg.c_str();
+      size_t remaining = msg.size();
+      while (remaining > 0) {
+        const ssize_t n = write(write_fd, p, remaining);
+        if (n <= 0)
+          return false;
+        p += n;
+        remaining -= static_cast<size_t>(n);
+      }
+
+      out.clear();
+      char buf[4096];
+      const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(10000);
+
+      while (true) {
+        const auto now = std::chrono::steady_clock::now();
+        if (now >= deadline) {
+          std::cout << "File: " << path << " took to long to parse" << std::endl;
+          return false;
+        }
+
+        const int wait_ms = static_cast<int>(
+          std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count()
+        );
+        pollfd pfd = {read_fd, POLLIN, 0};
+        if (poll(&pfd, 1, wait_ms) <= 0)
+          return false;
+        if (!(pfd.revents & POLLIN))
+          return false;
+
+        const ssize_t n = read(read_fd, buf, sizeof(buf));
+        if (n <= 0)
+          return false;
+        out.append(buf, static_cast<size_t>(n));
+
+        if (!out.empty() && out.back() == '\n') {
+          out.pop_back();
+          return true;
+        }
+      }
+    }
+
+    void stop() {
+      if (write_fd >= 0) {
+        ::close(write_fd);
+        write_fd = -1;
+      }
+      if (read_fd >= 0) {
+        ::close(read_fd);
+        read_fd = -1;
+      }
+      if (pid > 0) {
+        kill(-pid, SIGKILL); // kill entire process group (shell + python3 child)
+        waitpid(pid, nullptr, 0);
+        pid = -1;
+      }
+    }
+  };
+
+  struct ThreadProcesses {
+    std::map<LanguageEnum, PersistentProcess> procs;
+
+    ~ThreadProcesses() {
+      for (auto &proc: procs | std::views::values)
+        proc.stop();
+    }
+  };
+
+  thread_local ThreadProcesses tl_procs;
+}
+
 bool LanguageParser::ExtractData(
-  const Language language, const std::string &compilerOverride, const std::string &filePath, Serde::JSON &result
+  const LanguageEnum language, const std::string &compilerOverride, const std::string &filePath, Serde::JSON &result
 ) {
-  // Use the built-in clang parser
-  if (language == Language::C || language == Language::CPP)
+  if (language == LanguageEnum::C || language == LanguageEnum::CPP)
     return Parser::ParseC_CPP(filePath, result) && result.IsArray();
 
   std::string out;
@@ -83,47 +205,50 @@ bool LanguageParser::ExtractData(
   return result.IsArray();
 }
 
-bool LanguageParser::ParseLanguage(const std::string &name, Language &out) {
+bool LanguageParser::ParseLanguage(const std::string &name, LanguageEnum &out) {
   std::string lower(name);
   std::ranges::transform(
-    lower, lower.begin(),
-    [](const unsigned char c) {
+    lower, lower.begin(), [](const unsigned char c) {
       return std::tolower(c);
     }
   );
-  if (lower == "c") {
-    out = Language::C;
-    return true;
-  }
-  if (lower == "cpp" || lower == "c++") {
-    out = Language::CPP;
-    return true;
-  }
-  if (lower == "go" || lower == "golang") {
-    out = Language::Go;
-    return true;
-  }
-  if (lower == "python" || lower == "py") {
-    out = Language::Python;
-    return true;
-  }
-  return false;
+  out = GetLanguage(lower);
+  return out != LanguageEnum::Unknown;
 }
 
 bool LanguageParser::RunBuildCommand(
-  const Language language, const std::string &compilerOverride, const std::string &filePath, std::string &out
+  const LanguageEnum language, const std::string &compilerOverride, const std::string &filePath, std::string &out
 ) {
-  // Create the correct build command
-  const auto it = specs.find(language);
-  if (it == specs.end())
-    return false;
-
-  const std::string cc = compilerOverride.empty() ? firstAvailable(it->second.compilers) : compilerOverride;
+  const auto data = GetLanguageData(language);
+  const std::string cc = compilerOverride.empty() ? firstAvailable(data.compilers) : compilerOverride;
   if (cc.empty())
     return false;
 
-  std::array<char, 4096> buffer{};
-  const std::string cmd = format(it->second.cmdTemplate, cc, filePath);
+  // Script-based parsers use a persistent per-thread subprocess to avoid interpreter startup overhead.
+  if (language == LanguageEnum::Python) {
+    auto &proc = tl_procs.procs[language];
+    auto try_start = [&]() -> bool {
+      if (proc.valid())
+        return true;
+      const std::string serverCmd = cc + " \"" MATCHERTEXT_PARSERS_DIR
+      "/parser.py\" --server";
+      return proc.start(serverCmd);
+    };
+    if (!try_start())
+      return false;
+    if (!proc.request(filePath, out)) {
+      // Subprocess died mid-run; restart and retry once.
+      proc.stop();
+      if (!try_start())
+        return false;
+      return proc.request(filePath, out);
+    }
+    return true;
+  }
+
+  // One-shot popen for other external parsers (e.g. Go binary).
+  std::array < char, 4096 > buffer{};
+  const std::string cmd = format(std::string(data.cmdTemplate), cc, filePath);
   FILE *pipe = popen(cmd.c_str(), "r");
   if (!pipe)
     throw std::runtime_error("popen() failed");

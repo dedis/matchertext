@@ -16,6 +16,18 @@
 #include "LanguageStats.hpp"
 #include "Stats.hpp"
 
+/// Owned stats for a single source language (used for per-language output).
+struct PerLanguageStats {
+  EmbeddedStats stringStats;
+  NestedStats stringNestedStats;
+  EmbeddedStats docsStats;
+  NestedStats docsNestedStats;
+  EmbeddedStats docsRelaxedStats;
+  NestedStats docsRelaxedNestedStats;
+  FileStats fileStats;
+  LanguageStats langStats;
+};
+
 /**
  * Parser class that uses Clang's lexer to extract string literals from a C/C++ source file.
  */
@@ -52,12 +64,18 @@ class Parser final {
      */
     static bool ParseC_CPP(const std::string &path, Serde::JSON &result);
 
-    static void GatherStatistics(Serde::JSON &&json, const std::string &path, std::string_view inputPath = {});
+    static void GatherStatistics(
+      Serde::JSON &&json, const std::string &path, std::string_view inputPath = {}, PerLanguageStats *perLang = nullptr
+    );
 
-    /// Enable per-language debug sampling for the given top-level input paths.
-    static void ConfigureDebugLanguages(const std::vector<std::string> &inputPaths);
+    /// Parse a C/C++ file and gather statistics in one step.
+    static void ParseFile(const std::string &filePath, const std::string &inputPath);
 
-    /// Flush any recorded debug-language samples to disk.
+    /// Enable per-language debug sampling; samples are written under outputDir/languages/.
+    static void ConfigureDebugLanguages(
+      const std::vector<std::string> &inputPaths, const std::string &outputDir
+    );
+
     static void FlushDebugLanguageLogs();
 
     /// All the aggregated stats relating to parsed strings
@@ -79,7 +97,9 @@ class Parser final {
     static uint64_t process(
       std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats,
       LanguageStats *langStats = nullptr, bool relaxed = false,
-      std::string_view sourcePath = {}, std::string_view inputPath = {}
+      std::string_view sourcePath = {}, std::string_view inputPath = {},
+      EmbeddedStats *extraEmbedded = nullptr, NestedStats *extraNested = nullptr,
+      LanguageStats *extraLangStats = nullptr
     );
 };
 

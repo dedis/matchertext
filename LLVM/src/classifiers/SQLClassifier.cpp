@@ -4,7 +4,7 @@ namespace classifier_internal {
   ClassificationResult DetectSQL(const std::string_view s) {
     const auto trimmed = TrimLeft(s);
     if (trimmed.size() < 6)
-      return {Language::Unknown, 0.0f};
+      return {LanguageEnum::Unknown, 0.0f};
 
     static constexpr std::string_view leaders[] = {
       "select ", "insert ", "update ", "delete ", "create ",
@@ -19,7 +19,7 @@ namespace classifier_internal {
       }
     }
     if (!hasLeader)
-      return {Language::Unknown, 0.0f};
+      return {LanguageEnum::Unknown, 0.0f};
 
     static constexpr std::string_view keywords[] = {
       " from ", " where ", " join ", " inner ", " outer ",
@@ -35,7 +35,7 @@ namespace classifier_internal {
         kwCount++;
     }
     if (kwCount == 0)
-      return {Language::Unknown, 0.0f};
-    return {Language::SQL, std::min(0.65f + static_cast<float>(kwCount) * 0.05f, 0.95f)};
+      return {LanguageEnum::Unknown, 0.0f};
+    return {LanguageEnum::SQL, std::min(0.65f + static_cast<float>(kwCount) * 0.05f, 0.95f)};
   }
 } // namespace classifier_internal

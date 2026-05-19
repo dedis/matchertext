@@ -1,11 +1,9 @@
-#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <vector>
 
 #include "Parser.hpp"
 
@@ -49,17 +47,12 @@ int main(const int argc, char *argv[]) {
     return 1;
   }
 
-  if (setenv("MATCHERTEXT_DEBUG_LANGUAGE_DIR", outputRoot.c_str(), 1) != 0) {
-    std::cerr << "debug_language_output_test failed: setenv failed\n";
-    return 1;
-  }
-
-  Parser::ConfigureDebugLanguages({inputPath});
+  Parser::ConfigureDebugLanguages({inputPath}, outputRoot.string());
   if (Serde::JSON result; Parser::ParseC_CPP(fixturePath.string(), result))
     Parser::GatherStatistics(std::move(result), fixturePath.string(), inputPath);
   Parser::FlushDebugLanguageLogs();
 
-  const fs::path base = outputRoot / "tests" / "string_bucket_mix.cpp";
+  const fs::path base = outputRoot / "languages";
   bool ok = true;
   ok &= ExpectContains(base / "FilePath.txt", "# SampleCount: 1");
   ok &= ExpectContains(base / "FilePath.txt", "../config/settings.yaml");

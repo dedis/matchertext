@@ -7,6 +7,7 @@
 #ifndef STATS_HPP
 #define STATS_HPP
 
+#include <ostream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -16,10 +17,9 @@
 #include "LanguageStats.hpp"
 #include "NestedStats.hpp"
 
-void PrintStatsTable(const std::vector<std::pair<std::string, EmbeddedStatsSnapshot>> &rows);
-void PrintFileStatsTable(const FileStatsSnapshot &stats);
-void PrintNestedStatsTable(const std::vector<std::pair<std::string, NestedStatsSnapshot>> &rows);
-void PrintStatsMaxString(const EmbeddedStats &strings, const EmbeddedStats &docs);
-void PrintLanguageStatsTable(const std::vector<std::pair<std::string, LanguageStatsSnapshot>> &rows);
+void PrintStatsTable(const std::vector<std::pair<std::string, EmbeddedStatsSnapshot>> &rows, std::ostream &out);
+void PrintFileStatsTable(const FileStatsSnapshot &stats, std::ostream &out);
+void PrintNestedStatsTable(const std::vector<std::pair<std::string, NestedStatsSnapshot>> &rows, std::ostream &out);
+void PrintLanguageStatsTable(const std::vector<std::pair<std::string, LanguageStatsSnapshot>> &rows, std::ostream &out);
 
 #endif // STATS_HPP

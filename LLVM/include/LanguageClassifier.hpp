@@ -16,7 +16,7 @@
 /// `train/generate_model.py` writes these ids into
 /// `include/LanguageModel.generated.hpp`. Keep existing values stable, and
 /// regenerate the model whenever the trainable language set changes.
-enum class Language : uint8_t {
+enum class LanguageEnum : uint8_t {
   Unknown = 0,
   PlainText,
   // Structural patterns (Layer 1)
@@ -73,13 +73,13 @@ enum class Language : uint8_t {
 /// Return a stable display name used in logs, metrics, and tests.
 ///
 /// The returned pointer refers to static storage owned by the classifier.
-const char *LanguageName(Language lang);
+const char *LanguageName(LanguageEnum lang);
 
 /// Result of classifying one extracted string fragment.
 struct ClassificationResult {
   /// Most likely category, or `Language::Unknown` if nothing is accepted or
   /// if the string is confidently classified as a non-language separator.
-  Language language;
+  LanguageEnum language;
   /// Confidence in `[0.0, 1.0]`; `0.0` means the candidate was rejected.
   /// Non-zero `Language::Unknown` values are internal suppression signals and
   /// are omitted from language statistics and debug language logs.

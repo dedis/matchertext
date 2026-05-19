@@ -14,12 +14,12 @@
 class LanguageParser {
   public:
     [[nodiscard]] static bool ExtractData(
-      Language language, const std::string &compilerOverride, const std::string &filePath, Serde::JSON &result
+      LanguageEnum language, const std::string &compilerOverride, const std::string &filePath, Serde::JSON &result
     );
-    static bool ParseLanguage(const std::string &name, Language &out);
+    static bool ParseLanguage(const std::string &name, LanguageEnum &out);
   private:
     [[nodiscard]] static bool RunBuildCommand(
-      Language language, const std::string &compilerOverride, const std::string &filePath, std::string &out
+      LanguageEnum language, const std::string &compilerOverride, const std::string &filePath, std::string &out
     );
 };
 

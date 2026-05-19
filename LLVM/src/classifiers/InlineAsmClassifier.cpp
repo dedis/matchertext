@@ -3,7 +3,7 @@
 namespace classifier_internal {
   ClassificationResult DetectInlineAsm(const std::string_view s) {
     if (s.size() < 4)
-      return {Language::Unknown, 0.0f};
+      return {LanguageEnum::Unknown, 0.0f};
 
     int signals = 0;
 
@@ -53,10 +53,10 @@ namespace classifier_internal {
       signals++;
 
     if (signals < 2)
-      return {Language::Unknown, 0.0f};
+      return {LanguageEnum::Unknown, 0.0f};
 
     return {
-      Language::InlineAsm,
+      LanguageEnum::InlineAsm,
       std::min(0.70f + static_cast<float>(signals) * 0.05f, 0.97f)
     };
   }

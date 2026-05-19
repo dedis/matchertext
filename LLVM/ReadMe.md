@@ -1,6 +1,6 @@
 # LLVM MatcherText Metrics Tool
 
-This tool parses C and C++ source trees with LLVM/Clang and reports:
+This tool parses multi-language source trees with LLVM/Clang and reports:
 
 - Embedded string and documentation statistics
 - File-level MatcherText violation statistics
@@ -46,31 +46,25 @@ Examples:
 ./parser file1.cpp file2.hpp
 ```
 
-Only C and C++ files are processed when scanning directories:
+By default the tool scans for all registered languages (C, C++, Python, Go).
+Use `--language` to restrict analysis to a single language:
 
-- `.c`
-- `.h`
-- `.cc`
-- `.cpp`
-- `.cxx`
-- `.hpp`
-- `.hh`
-- `.hxx`
+```sh
+./parser ../some-project/src --language cpp
+./parser ../some-project/src --language python
+```
+
+Known language identifiers: `c`, `cpp`, `go`, `python`.
 
 ### Optional flags
 
-```sh
-./parser --log-strings <file-or-directory>...
-```
-
-`--log-strings` prints the max-string diagnostics in addition to the metrics tables.
-
-```sh
-./parser --debug-languages <file-or-directory>...
-```
-
-`--debug-languages` writes up to 1,000 sampled string literals per detected
-language into `./result/<input-path>/<language>.txt`.
+| Flag | Description |
+|------|-------------|
+| `--language <lang>` | Restrict to a single language (default: all languages) |
+| `--output <dir>` | Output directory for all result files (default: `./result`) |
+| `--log-strings` | Write max-string diagnostics to `<output>/max_strings.md` |
+| `--compiler <path>` | Override the compiler/interpreter used for the selected language |
+| `--extensions <a,b,...>` | Add extra file extensions to match (single-language mode only) |
 
 ## Language Classification
 
@@ -126,17 +120,18 @@ directly.
 
 ## Output
 
-The tool prints three sections:
+All results are written to the output directory (default `./result`):
 
-1. Embedded statistics for `Strings`, `Documentation`, and `Documentation Relaxed`
-2. File-level violation statistics
-3. Nesting histograms
-4. String-language breakdowns
+| File | Contents |
+|------|----------|
+| `strings.md` | Embedded string and documentation statistics |
+| `files.md` | File-level violation statistics |
+| `nesting.md` | Nesting depth histograms |
+| `language_stats.md` | String language classification breakdown |
+| `max_strings.md` | Max-string diagnostics (`--log-strings` only) |
 
-When `--debug-languages` is enabled, the parser also writes per-language sample
-files under `./result/`.
-
-It finishes with the total parsing time in milliseconds.
+Each markdown file contains a description table followed by the data table.
+Timing is printed to stderr on completion.
 
 ## Metric definitions
 

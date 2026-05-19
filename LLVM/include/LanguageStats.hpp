@@ -15,7 +15,7 @@
 
 /// Per-language entry in a snapshot (only languages with count > 0).
 struct LanguageStatsEntry {
-  Language language;
+  LanguageEnum language;
   uint64_t count;
   uint64_t violations;
   uint64_t toothpicks;
@@ -31,7 +31,7 @@ struct LanguageStatsSnapshot {
 /// Thread-safe per-language counters for string classification results.
 struct LanguageStats {
   /// Record a classified string's language, violation count, and toothpick count.
-  void Record(Language lang, uint64_t violations, uint64_t toothpicks);
+  void Record(LanguageEnum lang, uint64_t violations, uint64_t toothpicks);
 
   /// Produce a snapshot with percentages, sorted by count descending.
   [[nodiscard]] LanguageStatsSnapshot Snapshot() const;
@@ -42,7 +42,7 @@ struct LanguageStats {
       std::atomic<uint64_t> toothpicks{0};
     };
 
-    Entry entries_[static_cast<size_t>(Language::COUNT)]{};
+    Entry entries_[static_cast<size_t>(LanguageEnum::COUNT)]{};
 };
 
 #endif // LANGUAGE_STATS_HPP

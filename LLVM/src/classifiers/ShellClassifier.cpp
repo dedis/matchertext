@@ -3,7 +3,7 @@
 namespace classifier_internal {
   ClassificationResult DetectShell(const std::string_view s) {
     if (s.starts_with("#!/"))
-      return {Language::Shell, 0.95f};
+      return {LanguageEnum::Shell, 0.95f};
 
     int signals = 0;
 
@@ -46,7 +46,7 @@ namespace classifier_internal {
     }
 
     if (signals < 2)
-      return {Language::Unknown, 0.0f};
-    return {Language::Shell, std::min(0.55f + static_cast<float>(signals) * 0.08f, 0.95f)};
+      return {LanguageEnum::Unknown, 0.0f};
+    return {LanguageEnum::Shell, std::min(0.55f + static_cast<float>(signals) * 0.08f, 0.95f)};
   }
 } // namespace classifier_internal

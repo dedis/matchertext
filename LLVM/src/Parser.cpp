@@ -12,7 +12,6 @@
 #include <map>
 #include <mutex>
 #include <random>
-#include <set>
 #include <sstream>
 #include <system_error>
 
@@ -28,11 +27,15 @@
 #include "../include/LanguageClassifier.hpp"
 #include "../include/MatcherText.hpp"
 
+namespace Serde {
+  class JSON;
+}
+
 namespace fs = std::filesystem;
 
 namespace {
   constexpr size_t kMaxDebugSamplesPerLanguage = 1000;
-  constexpr size_t kLanguageCount = static_cast<size_t>(Language::COUNT);
+  constexpr size_t kLanguageCount = static_cast<size_t>(LanguageEnum::COUNT);
 
   struct DebugLanguageSample {
     std::string sourcePath;
@@ -49,49 +52,11 @@ namespace {
     std::mt19937_64 rng{0};
   };
 
-  struct DebugLanguageInputState {
-    fs::path relativePath;
-    std::array<DebugLanguageBucket, kLanguageCount> buckets{};
-  };
-
-  fs::path ResolveDebugLanguageRoot() {
-    if (const char *overridePath = std::getenv("MATCHER_TEXT_DEBUG_LANGUAGE_DIR");
-      overridePath != nullptr && *overridePath != '\0')
-      return {overridePath};
-    if (const char *legacyOverridePath = std::getenv("MATCHERTEXT_DEBUG_LANGUAGE_DIR");
-      legacyOverridePath != nullptr && *legacyOverridePath != '\0')
-      return {legacyOverridePath};
-    return {"./result"};
-  }
-
-  fs::path SanitizeDebugInputPath(const std::string_view inputPath) {
-    const fs::path normalized = fs::path(std::string(inputPath)).lexically_normal();
-    const fs::path relative = normalized.is_absolute() ? normalized.relative_path() : normalized;
-
-    fs::path safe;
-    for (const auto &part: relative) {
-      const std::string component = part.string();
-      if (component.empty() || component == "." || component == "/")
-        continue;
-      if (component == "..")
-        safe /= "__parent__";
-      else
-        safe /= component;
-    }
-
-    if (safe.empty())
-      return {"_root"};
-    return safe;
-  }
-
-  void EnsureDirectoryPrepared(const fs::path &directory, const bool clearExisting) {
+  void EnsureDirectoryPrepared(const fs::path &directory) {
     std::error_code ec;
-    if (clearExisting)
-      fs::remove_all(directory, ec);
     if (ec)
       throw std::runtime_error(
-        "Failed to clear debug language directory '" +
-        directory.string() + "': " + ec.message()
+        "Failed to clear debug language directory '" + directory.string() + "': " + ec.message()
       );
 
     fs::create_directories(directory, ec);
@@ -102,13 +67,9 @@ namespace {
       );
   }
 
-  uint64_t SeedDebugBucket(const std::string_view inputPath, const Language language) {
+  uint64_t SeedDebugBucket(const std::string_view, const LanguageEnum language) {
     uint64_t seed = 14695981039346656037ull;
-    for (const unsigned char c: inputPath) {
-      seed ^= static_cast<uint64_t>(c);
-      seed *= 1099511628211ull;
-    }
-    seed ^= static_cast<uint64_t>(language) + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2);
+    seed ^= static_cast<uint64_t>(language) + 0x9e3779b97f4a7c15ull;
     return seed;
   }
 
@@ -147,37 +108,29 @@ namespace {
 
   class DebugLanguageLogger {
     public:
-      void Configure(const std::vector<std::string> &inputPaths) {
+      void Configure(const std::vector<std::string> &inputPaths, const std::string &outputDir) {
         std::lock_guard lock(mutex_);
-
         enabled_ = true;
-        root_ = ResolveDebugLanguageRoot();
-        states_.clear();
-        EnsureDirectoryPrepared(root_, false);
-
-        std::set<std::string> seenInputs;
-        for (const auto &inputPath: inputPaths) {
-          if (!seenInputs.insert(inputPath).second)
-            continue;
-          PrepareInputStateUnlocked(inputPath, true);
-        }
+        root_ = fs::path(outputDir) / "languages";
+        EnsureDirectoryPrepared(root_);
+        for (size_t idx = 0; idx < kLanguageCount; idx++)
+          buckets_[idx].rng.seed(
+            SeedDebugBucket("", static_cast<LanguageEnum>(idx))
+          );
       }
 
       void Record(
-        const std::string_view inputPath, const Language language,
+        const std::string_view inputPath, const LanguageEnum language,
         const std::string_view sourcePath, const std::string_view text,
         const float confidence, const uint64_t violations,
         const uint64_t toothpicks
-      ) {
-        DebugLanguageInputState *state = nullptr; {
-          const std::string key = inputPath.empty() ? std::string(sourcePath) : std::string(inputPath);
+      ) { {
           std::lock_guard lock(mutex_);
           if (!enabled_)
             return;
-          state = PrepareInputStateUnlocked(key, false);
         }
 
-        auto &bucket = state->buckets[static_cast<size_t>(language)];
+        auto &bucket = buckets_[static_cast<size_t>(language)];
         std::lock_guard bucketLock(bucket.mutex);
 
         const DebugLanguageSample sample{
@@ -192,99 +145,52 @@ namespace {
         }
 
         std::uniform_int_distribution<uint64_t> dist(0, bucket.seen - 1);
-        const uint64_t index = dist(bucket.rng);
-        if (index < bucket.samples.size())
+        if (const uint64_t index = dist(bucket.rng); index < bucket.samples.size())
           bucket.samples[static_cast<size_t>(index)] = sample;
       }
 
       void Flush() {
-        struct PendingWrite {
-          fs::path path;
-          fs::path directory;
-          std::string inputPath;
-          Language language;
-          uint64_t totalSeen = 0;
-          std::vector<DebugLanguageSample> samples;
-        };
+        std::lock_guard lock(mutex_);
+        if (!enabled_)
+          return;
 
-        std::vector<PendingWrite> pending;
-        std::vector<fs::path> directoriesToClear; {
-          std::lock_guard lock(mutex_);
-          if (!enabled_)
-            return;
-
-          for (const auto &[inputPath, state]: states_) {
-            directoriesToClear.push_back(root_ / state->relativePath);
-            for (size_t idx = 0; idx < kLanguageCount; idx++) {
-              auto &bucket = state->buckets[idx];
-              std::lock_guard bucketLock(bucket.mutex);
-              if (bucket.seen == 0 || bucket.samples.empty())
-                continue;
-
-              pending.push_back(
-                {
-                  root_ / state->relativePath /
-                  (std::string(LanguageName(static_cast<Language>(idx))) + ".txt"),
-                  root_ / state->relativePath,
-                  inputPath,
-                  static_cast<Language>(idx),
-                  bucket.seen,
-                  bucket.samples,
-                }
-              );
-            }
-          }
+        // Clear stale .txt files from a previous run.
+        std::error_code ec;
+        for (const auto &entry: fs::directory_iterator(root_, ec)) {
+          if (ec)
+            break;
+          if (!entry.is_regular_file(ec) || ec)
+            continue;
+          if (entry.path().extension() != ".txt")
+            continue;
+          fs::remove(entry.path(), ec);
+          if (ec)
+            throw std::runtime_error(
+              "Failed to clear stale debug language log '" +
+              entry.path().string() + "': " + ec.message()
+            );
         }
 
-        for (const auto &directory: directoriesToClear) {
-          std::error_code ec;
-          if (!fs::exists(directory, ec))
+        for (size_t idx = 0; idx < kLanguageCount; idx++) {
+          auto &bucket = buckets_[idx];
+          std::lock_guard bucketLock(bucket.mutex);
+          if (bucket.seen == 0 || bucket.samples.empty())
             continue;
 
-          for (const auto &entry: fs::directory_iterator(directory, ec)) {
-            if (ec)
-              break;
-            if (!entry.is_regular_file(ec) || ec)
-              continue;
-            if (entry.path().extension() != ".txt")
-              continue;
-            fs::remove(entry.path(), ec);
-            if (ec)
-              throw std::runtime_error(
-                "Failed to clear stale debug language log '" +
-                entry.path().string() + "': " + ec.message()
-              );
-          }
-          if (ec)
-            throw std::runtime_error(
-              "Failed to enumerate debug language directory '" +
-              directory.string() + "': " + ec.message()
-            );
-        }
-
-        for (const auto &entry: pending) {
-          std::error_code ec;
-          fs::create_directories(entry.directory, ec);
-          if (ec)
-            throw std::runtime_error(
-              "Failed to create debug language directory '" +
-              entry.directory.string() + "': " + ec.message()
-            );
-
-          std::ofstream out(entry.path, std::ios::trunc);
+          const fs::path outPath =
+              root_ / (std::string(LanguageName(static_cast<LanguageEnum>(idx))) + ".txt");
+          std::ofstream out(outPath, std::ios::trunc);
           if (!out)
             throw std::runtime_error(
-              "Failed to open debug language log '" +
-              entry.path.string() + "' for writing."
+              "Failed to open debug language log '" + outPath.string() + "' for writing."
             );
 
-          out << "# Input: " << entry.inputPath << '\n'
-              << "# Language: " << LanguageName(entry.language) << '\n'
-              << "# TotalSeen: " << entry.totalSeen << '\n'
-              << "# SampleCount: " << entry.samples.size() << "\n\n";
+          out << "# Language: " << LanguageName(static_cast<LanguageEnum>(idx)) << '\n'
+              << "# TotalSeen: " << bucket.seen << '\n'
+              << "# SampleCount: " << bucket.samples.size() << "\n\n";
 
-          for (size_t i = 0; i < entry.samples.size(); i++) {
-            const auto &sample = entry.samples[i];
+          for (size_t i = 0; i < bucket.samples.size(); i++) {
+            const auto &sample = bucket.samples[i];
             out << "=== Sample " << (i + 1) << " ===\n"
                 << "# Source: " << sample.sourcePath << '\n'
                 << "# Confidence: " << std::fixed << std::setprecision(3)
@@ -296,31 +202,10 @@ namespace {
         }
       }
     private:
-      DebugLanguageInputState *PrepareInputStateUnlocked(
-        const std::string &inputPath,
-        const bool clearExisting
-      ) {
-        if (const auto it = states_.find(inputPath); it != states_.end())
-          return it->second.get();
-
-        auto state = std::make_unique<DebugLanguageInputState>();
-        state->relativePath = SanitizeDebugInputPath(inputPath);
-        EnsureDirectoryPrepared(root_ / state->relativePath, clearExisting);
-
-        for (size_t idx = 0; idx < kLanguageCount; idx++)
-          state->buckets[idx].rng.seed(
-            SeedDebugBucket(inputPath, static_cast<Language>(idx))
-          );
-
-        auto *raw = state.get();
-        states_.emplace(inputPath, std::move(state));
-        return raw;
-      }
-
       bool enabled_ = false;
       fs::path root_;
       std::mutex mutex_;
-      std::map<std::string, std::unique_ptr<DebugLanguageInputState>> states_;
+      std::array<DebugLanguageBucket, kLanguageCount> buckets_{};
   };
 
   DebugLanguageLogger &GetDebugLanguageLogger() {
@@ -381,8 +266,15 @@ static std::string ExtractLiteralBody(std::string_view spelling) {
   return std::string(spelling.substr(open + 1, close - open - 1));
 }
 
-void Parser::ConfigureDebugLanguages(const std::vector<std::string> &inputPaths) {
-  GetDebugLanguageLogger().Configure(inputPaths);
+void Parser::ParseFile(const std::string &filePath, const std::string &inputPath) {
+  if (Serde::JSON result; ParseC_CPP(filePath, result) && result.IsArray())
+    GatherStatistics(std::move(result), filePath, inputPath);
+}
+
+void Parser::ConfigureDebugLanguages(
+  const std::vector<std::string> &inputPaths, const std::string &outputDir
+) {
+  GetDebugLanguageLogger().Configure(inputPaths, outputDir);
 }
 
 void Parser::FlushDebugLanguageLogs() {
@@ -465,7 +357,9 @@ bool Parser::ParseC_CPP(const std::string &path, Serde::JSON &result) {
   return true;
 }
 
-void Parser::GatherStatistics(Serde::JSON &&json, const std::string &path, const std::string_view inputPath) {
+void Parser::GatherStatistics(
+  Serde::JSON &&json, const std::string &path, const std::string_view inputPath, PerLanguageStats *perLang
+) {
   uint64_t fileViolations = 0;
   uint64_t fileViolationsRelaxed = 0;
 
@@ -474,34 +368,49 @@ void Parser::GatherStatistics(Serde::JSON &&json, const std::string &path, const
     if (e["kind"].GetString() == "string") {
       const uint64_t violations = process(
         std::move(value), STRING_STATS, STRING_NESTED_STATS, &STRING_LANG_STATS, false, path,
-        inputPath.empty() ? std::string_view(path) : inputPath
+        inputPath.empty() ? std::string_view(path) : inputPath,
+        perLang ? &perLang->stringStats : nullptr,
+        perLang ? &perLang->stringNestedStats : nullptr,
+        perLang ? &perLang->langStats : nullptr
       );
       fileViolations += violations;
       fileViolationsRelaxed += violations;
     } else {
-      fileViolations += process(std::string(value), DOCS_STATS, DOCS_NESTED_STATS);
-      fileViolationsRelaxed += process(std::move(value), DOCS_RELAXED_STATS, DOCS_RELAXED_NESTED_STATS, nullptr, true);
+      fileViolations += process(
+        std::string(value), DOCS_STATS, DOCS_NESTED_STATS, nullptr, false, {}, {},
+        perLang ? &perLang->docsStats : nullptr,
+        perLang ? &perLang->docsNestedStats : nullptr
+      );
+      fileViolationsRelaxed += process(
+        std::move(value), DOCS_RELAXED_STATS, DOCS_RELAXED_NESTED_STATS, nullptr, true, {}, {},
+        perLang ? &perLang->docsRelaxedStats : nullptr,
+        perLang ? &perLang->docsRelaxedNestedStats : nullptr
+      );
     }
   }
 
-  AtomicAdd(FILE_STATS.count, 1.0);
+  auto updateFileStats = [](FileStats &fs, const uint64_t fv, const uint64_t fvr) {
+    AtomicAdd(fs.count, 1.0);
+    if (fv > 0)
+      AtomicAdd(fs.withViolation, 1.0);
+    AtomicAdd(fs.violationCount, static_cast<double>(fv));
+    AtomicMax(fs.violationMax, static_cast<double>(fv));
+    if (fvr > 0)
+      AtomicAdd(fs.withViolationRelaxed, 1.0);
+    AtomicAdd(fs.violationCountRelaxed, static_cast<double>(fvr));
+    AtomicMax(fs.violationMaxRelaxed, static_cast<double>(fvr));
+  };
 
-  if (fileViolations > 0)
-    AtomicAdd(FILE_STATS.withViolation, 1.0);
-  AtomicAdd(FILE_STATS.violationCount, static_cast<double>(fileViolations));
-  AtomicMax(FILE_STATS.violationMax, static_cast<double>(fileViolations));
-
-  if (fileViolationsRelaxed > 0)
-    AtomicAdd(FILE_STATS.withViolationRelaxed, 1.0);
-  AtomicAdd(FILE_STATS.violationCountRelaxed, static_cast<double>(fileViolationsRelaxed));
-  AtomicMax(FILE_STATS.violationMaxRelaxed, static_cast<double>(fileViolationsRelaxed));
+  updateFileStats(FILE_STATS, fileViolations, fileViolationsRelaxed);
+  if (perLang)
+    updateFileStats(perLang->fileStats, fileViolations, fileViolationsRelaxed);
 }
 
 uint64_t Parser::process(
   std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats,
   LanguageStats *langStats, const bool relaxed,
-  const std::string_view sourcePath,
-  const std::string_view inputPath
+  const std::string_view sourcePath, const std::string_view inputPath,
+  EmbeddedStats *extraEmbedded, NestedStats *extraNested, LanguageStats *extraLangStats
 ) {
   uint64_t toothpicks = 0;
   for (const unsigned char c: string) {
@@ -513,8 +422,10 @@ uint64_t Parser::process(
 
   if (langStats != nullptr) {
     /// Classify the embedded language and record per-language stats only for strings.
-    if (const auto [lang, confidence] = ClassifyString(string); lang != Language::Unknown) {
+    if (const auto [lang, confidence] = ClassifyString(string); lang != LanguageEnum::Unknown) {
       langStats->Record(lang, unmatched, toothpicks);
+      if (extraLangStats)
+        extraLangStats->Record(lang, unmatched, toothpicks);
       GetDebugLanguageLogger().Record(
         inputPath, lang, sourcePath, string,
         confidence, unmatched, toothpicks
@@ -523,33 +434,41 @@ uint64_t Parser::process(
   }
 
   nestedStats.Record(maxDepth, maxValidDepth);
+  if (extraNested)
+    extraNested->Record(maxDepth, maxValidDepth);
 
-  AtomicAdd(stats.count, 1.0);
-  AtomicAdd(stats.rawChars, static_cast<double>(rawChars));
+  auto applyEmbedded = [&](EmbeddedStats &s) {
+    AtomicAdd(s.count, 1.0);
+    AtomicAdd(s.rawChars, static_cast<double>(rawChars));
 
-  if (toothpicks > 0)
-    AtomicAdd(stats.withToothpicks, 1.0);
-  AtomicAdd(stats.toothpicks, static_cast<double>(toothpicks));
-  if (AtomicMax(stats.toothpicksMax, static_cast<double>(toothpicks)))
-    stats.stringMaxToothpicks.set(string);
+    if (toothpicks > 0)
+      AtomicAdd(s.withToothpicks, 1.0);
+    AtomicAdd(s.toothpicks, static_cast<double>(toothpicks));
+    if (AtomicMax(s.toothpicksMax, static_cast<double>(toothpicks)))
+      s.stringMaxToothpicks.set(string);
 
-  if (unmatched > 0)
-    AtomicAdd(stats.withNonCompliance, 1.0);
-  AtomicAdd(stats.nonComplianceCount, static_cast<double>(unmatched));
-  if (AtomicMax(stats.nonComplianceMax, static_cast<double>(unmatched)))
-    stats.stringMaxNonCompliance.set(string);
+    if (unmatched > 0)
+      AtomicAdd(s.withNonCompliance, 1.0);
+    AtomicAdd(s.nonComplianceCount, static_cast<double>(unmatched));
+    if (AtomicMax(s.nonComplianceMax, static_cast<double>(unmatched)))
+      s.stringMaxNonCompliance.set(string);
 
-  if (maxDepth > 1)
-    AtomicAdd(stats.withNesting, 1.0);
-  AtomicAdd(stats.nestingDepthTotal, static_cast<double>(maxDepth));
-  if (AtomicMax(stats.nestingDepthMax, static_cast<double>(maxDepth)))
-    stats.stringMaxNested.set(string);
+    if (maxDepth > 1)
+      AtomicAdd(s.withNesting, 1.0);
+    AtomicAdd(s.nestingDepthTotal, static_cast<double>(maxDepth));
+    if (AtomicMax(s.nestingDepthMax, static_cast<double>(maxDepth)))
+      s.stringMaxNested.set(string);
 
-  if (maxValidDepth > 1)
-    AtomicAdd(stats.withValidNesting, 1.0);
-  AtomicAdd(stats.validNestingDepthTotal, static_cast<double>(maxValidDepth));
-  if (AtomicMax(stats.validNestingDepthMax, static_cast<double>(maxValidDepth)))
-    stats.stringMaxValidNested.set(string);
+    if (maxValidDepth > 1)
+      AtomicAdd(s.withValidNesting, 1.0);
+    AtomicAdd(s.validNestingDepthTotal, static_cast<double>(maxValidDepth));
+    if (AtomicMax(s.validNestingDepthMax, static_cast<double>(maxValidDepth)))
+      s.stringMaxValidNested.set(string);
+  };
+
+  applyEmbedded(stats);
+  if (extraEmbedded)
+    applyEmbedded(*extraEmbedded);
 
   return unmatched;
 }
