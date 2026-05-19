@@ -10,8 +10,10 @@
 #include <chrono>
 #include <csignal>
 #include <cstdio>
+#include <iostream>
 #include <map>
 #include <poll.h>
+#include <ranges>
 #include <spawn.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -116,7 +118,7 @@ namespace {
     }
 
     // Send a file path, read back the JSON line. Returns false if the subprocess died or timed out.
-    bool request(const std::string &path, std::string &out, int timeout_ms = 10000) {
+    bool request(const std::string &path, std::string &out) const {
       const std::string msg = path + "\n";
       const char *p = msg.c_str();
       size_t remaining = msg.size();
@@ -130,23 +132,25 @@ namespace {
 
       out.clear();
       char buf[4096];
-      const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+      const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(10000);
 
       while (true) {
         const auto now = std::chrono::steady_clock::now();
-        if (now >= deadline)
+        if (now >= deadline) {
+          std::cout << "File: " << path << " took to long to parse" << std::endl;
           return false;
+        }
 
         const int wait_ms = static_cast<int>(
           std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count()
         );
-        struct pollfd pfd = {read_fd, POLLIN, 0};
-        if (::poll(&pfd, 1, wait_ms) <= 0)
+        pollfd pfd = {read_fd, POLLIN, 0};
+        if (poll(&pfd, 1, wait_ms) <= 0)
           return false;
         if (!(pfd.revents & POLLIN))
           return false;
 
-        const ssize_t n = ::read(read_fd, buf, sizeof(buf));
+        const ssize_t n = read(read_fd, buf, sizeof(buf));
         if (n <= 0)
           return false;
         out.append(buf, static_cast<size_t>(n));
@@ -179,7 +183,7 @@ namespace {
     std::map<LanguageEnum, PersistentProcess> procs;
 
     ~ThreadProcesses() {
-      for (auto &[lang, proc]: procs)
+      for (auto &proc: procs | std::views::values)
         proc.stop();
     }
   };
