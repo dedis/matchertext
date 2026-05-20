@@ -1,7 +1,9 @@
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <map>
@@ -47,6 +49,16 @@ static const char *kUsage =
 
 static long long elapsed_ms(const Clock::time_point start, const Clock::time_point end) {
   return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+}
+
+// Index of the executing OpenMP thread (0 when built without OpenMP). Used to
+// route work into per-thread storage that needs no locking.
+static int current_thread() {
+#if USE_OPENMP
+  return omp_get_thread_num();
+#else
+  return 0;
+#endif
 }
 
 static void log_info(const std::string &message) {
@@ -217,40 +229,95 @@ int main(const int argc, char *argv[]) {
         extToLang.try_emplace(std::string(ext), lang);
   }
 
-  // Single directory walk: bucket files by language.
-  // lexically_normal() is pure string arithmetic (no stat syscalls).
+  // Parallel directory walk: bucket files by language.
+  // The readdir/stat syscalls and the per-file work (extension parsing plus
+  // lexically_normal, which is pure string arithmetic) are spread across
+  // threads via OpenMP tasks — one task per subdirectory, so sibling subtrees
+  // are walked concurrently. Each thread fills its own bucket set, so the hot
+  // path is lock-free; a cheap serial merge below deduplicates and assembles
+  // the global buckets.
   const auto indexingStart = Clock::now();
   std::unordered_set<std::string> seen;
   std::map<LanguageEnum, std::vector<std::pair<std::string, std::string>>> buckets;
 
+#if USE_OPENMP
+  const int indexThreads = omp_get_max_threads();
+#else
+  const int indexThreads = 1;
+#endif
+  std::vector<std::map<LanguageEnum, std::vector<std::pair<std::string, std::string>>>> tlBuckets(indexThreads);
+
+  // Resolve roots up front so their normalized input-path strings live in
+  // stable storage that every spawned task can safely reference.
+  std::vector<std::pair<fs::path, std::string>> roots;
+  roots.reserve(rawPaths.size());
   for (const auto &rawPath: rawPaths) {
     const fs::path p(rawPath);
     if (!fs::exists(p)) {
       std::cerr << "Path does not exist: " << p << "\n";
       continue;
     }
-    const std::string inputPath = p.lexically_normal().string();
-
-    auto try_add = [&](const fs::path &fp) {
-      const std::string extStr = fp.extension().string();
-      if (extStr.size() <= 1)
-        return;
-      const auto it = extToLang.find(extStr.substr(1));
-      if (it == extToLang.end())
-        return;
-      const std::string norm = fp.lexically_normal().string();
-      if (!seen.insert(norm).second)
-        return;
-      buckets[it->second].emplace_back(norm, inputPath);
-    };
-
-    if (fs::is_regular_file(p))
-      try_add(p);
-    else if (fs::is_directory(p))
-      for (const auto &entry: fs::recursive_directory_iterator(p))
-        if (fs::is_regular_file(entry))
-          try_add(entry.path());
+    roots.emplace_back(p, p.lexically_normal().string());
   }
+
+  // Match a candidate file against the extension table and stash it in the
+  // current thread's bucket. Deduplication is deferred to the serial merge, so
+  // this touches only thread-local state and needs no synchronization.
+  auto try_add = [&](const fs::path &fp, const std::string &inputPath) {
+    const std::string extStr = fp.extension().string();
+    if (extStr.size() <= 1)
+      return;
+    const auto it = extToLang.find(extStr.substr(1));
+    if (it == extToLang.end())
+      return;
+    tlBuckets[current_thread()][it->second].emplace_back(fp.lexically_normal().string(), inputPath);
+  };
+
+  // Non-recursive scan of one directory; each subdirectory is handed to its own
+  // task. is_directory/is_regular_file consume the file type cached by readdir
+  // where the platform provides it, avoiding extra stat calls. Errors (e.g.
+  // permission denied) skip the offending entry rather than aborting the walk.
+  std::function<void(const fs::path &, const std::string &)> walk =
+      [&](const fs::path &dir, const std::string &inputPath) {
+    std::vector<fs::path> subdirs;
+    std::error_code wec;
+    for (fs::directory_iterator it(dir, fs::directory_options::skip_permission_denied, wec), end;
+         !wec && it != end; it.increment(wec)) {
+      std::error_code tec;
+      if (it->is_directory(tec))
+        subdirs.push_back(it->path());
+      else if (it->is_regular_file(tec))
+        try_add(it->path(), inputPath);
+    }
+    for (auto &sd: subdirs) {
+#if USE_OPENMP
+#pragma omp task firstprivate(sd) shared(walk, inputPath)
+#endif
+      walk(sd, inputPath);
+    }
+  };
+
+#if USE_OPENMP
+#pragma omp parallel
+#pragma omp single
+#endif
+  for (const auto &[p, inputPath]: roots) {
+    if (fs::is_regular_file(p))
+      try_add(p, inputPath);
+    else if (fs::is_directory(p))
+      walk(p, inputPath);
+  }
+
+  // Serial merge: deduplicate across threads and assemble the global buckets,
+  // then sort each bucket so output is reproducible regardless of the order in
+  // which threads happened to discover files.
+  for (auto &tb: tlBuckets)
+    for (auto &[lang, files]: tb)
+      for (auto &entry: files)
+        if (seen.insert(entry.first).second)
+          buckets[lang].push_back(std::move(entry));
+  for (auto &files: buckets | std::views::values)
+    std::ranges::sort(files);
 
   // Assemble langFiles in kLanguageData order for deterministic output.
   std::vector<std::pair<LanguageEnum, std::vector<std::pair<std::string, std::string>>>> langFiles;
