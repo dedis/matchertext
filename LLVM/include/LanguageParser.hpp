@@ -14,13 +14,9 @@
 class LanguageParser {
   public:
     [[nodiscard]] static bool ExtractData(
-      LanguageEnum language, const std::string &compilerOverride, const std::string &filePath, Serde::JSON &result
+      LanguageEnum language, const std::string &filePath, Serde::JSON &result
     );
     static bool ParseLanguage(const std::string &name, LanguageEnum &out);
-  private:
-    [[nodiscard]] static bool RunBuildCommand(
-      LanguageEnum language, const std::string &compilerOverride, const std::string &filePath, std::string &out
-    );
 };
 
 #endif //LANGUAGE_PARSER_HPP

@@ -1,3 +1,75 @@
 [submodule "LLVM/extern/Serde"]
 	path = LLVM/extern/Serde
 	url = https://github.com/AntoineBastide47/Serde.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter"]
+	path = LLVM/extern/tree-sitter/tree-sitter
+	url = https://github.com/tree-sitter/tree-sitter.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-javascript"]
+	path = LLVM/extern/tree-sitter/tree-sitter-javascript
+	url = https://github.com/tree-sitter/tree-sitter-javascript.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-typescript"]
+	path = LLVM/extern/tree-sitter/tree-sitter-typescript
+	url = https://github.com/tree-sitter/tree-sitter-typescript.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-java"]
+	path = LLVM/extern/tree-sitter/tree-sitter-java
+	url = https://github.com/tree-sitter/tree-sitter-java.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-c-sharp"]
+	path = LLVM/extern/tree-sitter/tree-sitter-c-sharp
+	url = https://github.com/tree-sitter/tree-sitter-c-sharp.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-rust"]
+	path = LLVM/extern/tree-sitter/tree-sitter-rust
+	url = https://github.com/tree-sitter/tree-sitter-rust.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-ruby"]
+	path = LLVM/extern/tree-sitter/tree-sitter-ruby
+	url = https://github.com/tree-sitter/tree-sitter-ruby.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-php"]
+	path = LLVM/extern/tree-sitter/tree-sitter-php
+	url = https://github.com/tree-sitter/tree-sitter-php.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-perl"]
+	path = LLVM/extern/tree-sitter/tree-sitter-perl
+	url = https://github.com/tree-sitter-perl/tree-sitter-perl.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-lua"]
+	path = LLVM/extern/tree-sitter/tree-sitter-lua
+	url = https://github.com/tree-sitter-grammars/tree-sitter-lua.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-swift"]
+	path = LLVM/extern/tree-sitter/tree-sitter-swift
+	url = https://github.com/alex-pinkus/tree-sitter-swift.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-kotlin"]
+	path = LLVM/extern/tree-sitter/tree-sitter-kotlin
+	url = https://github.com/fwcd/tree-sitter-kotlin.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-r"]
+	path = LLVM/extern/tree-sitter/tree-sitter-r
+	url = https://github.com/r-lib/tree-sitter-r.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-scala"]
+	path = LLVM/extern/tree-sitter/tree-sitter-scala
+	url = https://github.com/tree-sitter/tree-sitter-scala.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-haskell"]
+	path = LLVM/extern/tree-sitter/tree-sitter-haskell
+	url = https://github.com/tree-sitter/tree-sitter-haskell.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-ocaml"]
+	path = LLVM/extern/tree-sitter/tree-sitter-ocaml
+	url = https://github.com/tree-sitter/tree-sitter-ocaml.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-erlang"]
+	path = LLVM/extern/tree-sitter/tree-sitter-erlang
+	url = https://github.com/WhatsApp/tree-sitter-erlang.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-elixir"]
+	path = LLVM/extern/tree-sitter/tree-sitter-elixir
+	url = https://github.com/elixir-lang/tree-sitter-elixir.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-dart"]
+	path = LLVM/extern/tree-sitter/tree-sitter-dart
+	url = https://github.com/UserNobody14/tree-sitter-dart.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-objc"]
+	path = LLVM/extern/tree-sitter/tree-sitter-objc
+	url = https://github.com/tree-sitter-grammars/tree-sitter-objc.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-glsl"]
+	path = LLVM/extern/tree-sitter/tree-sitter-glsl
+	url = https://github.com/tree-sitter-grammars/tree-sitter-glsl.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-hlsl"]
+	path = LLVM/extern/tree-sitter/tree-sitter-hlsl
+	url = https://github.com/tree-sitter-grammars/tree-sitter-hlsl.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-go"]
+	path = LLVM/extern/tree-sitter/tree-sitter-go
+	url = https://github.com/tree-sitter/tree-sitter-go.git
+[submodule "LLVM/extern/tree-sitter/tree-sitter-python"]
+	path = LLVM/extern/tree-sitter/tree-sitter-python
+	url = https://github.com/tree-sitter/tree-sitter-python.git

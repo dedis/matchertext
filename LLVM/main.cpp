@@ -39,7 +39,6 @@ static const char *kUsage =
     "OPTIONS:\n"
     "    --language <lang>              Only analyze files of the given language\n"
     "    --output <name>                Write results to ./result/<name> (default: ./result/<input-path>)\n"
-    "    --compiler <compiler>          Override the compiler used for parsing\n"
     "    --extensions <ext1,ext2,...>   Comma-separated list of additional file extensions\n"
     "\n"
     "EXAMPLES:\n"
@@ -128,7 +127,6 @@ int main(const int argc, char *argv[]) {
     log_info(msg.str());
   }
 
-  std::string compilerOverride;
   std::string outputName; // when set via --output, names the subdir under ./result
   auto filterLanguage = LanguageEnum::Unknown;
   std::vector<std::string_view> extraExtensions;
@@ -143,15 +141,6 @@ int main(const int argc, char *argv[]) {
         return -1;
       }
       outputName = argv[++i];
-      continue;
-    }
-    if (arg == "--compiler") {
-      if (i + 1 >= argc) {
-        std::fprintf(stderr, "--compiler requires a value\n\n");
-        std::fprintf(stderr, kUsage, argv[0]);
-        return -1;
-      }
-      compilerOverride = argv[++i];
       continue;
     }
     if (arg == "--extensions") {
@@ -375,11 +364,11 @@ int main(const int argc, char *argv[]) {
       const auto langStart = Clock::now();
 
       #if USE_OPENMP
-      #pragma omp parallel for schedule(dynamic) default(none) shared(lang, compilerOverride, pls, done, displayedPct, langTotal)
+      #pragma omp parallel for schedule(dynamic) default(none) shared(lang, pls, done, displayedPct, langTotal)
       #endif
       for (const auto &[filePath, inputPath]: lang.second) {
         try {
-          if (Serde::JSON result; LanguageParser::ExtractData(lang.first, compilerOverride, filePath, result))
+          if (Serde::JSON result; LanguageParser::ExtractData(lang.first, filePath, result))
             Parser::GatherStatistics(std::move(result), filePath, inputPath, pls);
         } catch (const std::exception &e) {
           #pragma omp critical
@@ -389,8 +378,7 @@ int main(const int argc, char *argv[]) {
         }
 
         const size_t n = ++done;
-        const int newPct = static_cast<int>(n * 100 / langTotal);
-        if (newPct > displayedPct.load(std::memory_order_relaxed)) {
+        if (const int newPct = static_cast<int>(n * 100 / langTotal); newPct > displayedPct.load(std::memory_order_relaxed)) {
           #pragma omp critical
           {
             if (const int cur = displayedPct.load(); newPct > cur) {

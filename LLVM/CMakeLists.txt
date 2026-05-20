@@ -54,8 +54,10 @@ add_executable(${PROJECT_NAME}
     include/LanguageStats.hpp
     include/LanguageModel.generated.hpp
     src/LanguageParser.cpp
+    src/TreeSitterParser.cpp
     include/LanguageParser.hpp
     include/LanguageData.hpp
+    include/TreeSitterParser.hpp
 )
 
 add_executable(LanguageClassifierTests
@@ -91,8 +93,10 @@ add_executable(ParserFixtureTests
     include/LanguageStats.hpp
     include/LanguageModel.generated.hpp
     src/LanguageParser.cpp
+    src/TreeSitterParser.cpp
     include/LanguageParser.hpp
     include/LanguageData.hpp
+    include/TreeSitterParser.hpp
 )
 target_include_directories(ParserFixtureTests PRIVATE include)
 target_link_libraries(ParserFixtureTests clangLex clangBasic)
@@ -135,8 +139,10 @@ add_executable(DebugLanguageOutputTests
     include/LanguageStats.hpp
     include/LanguageModel.generated.hpp
     src/LanguageParser.cpp
+    src/TreeSitterParser.cpp
     include/LanguageParser.hpp
     include/LanguageData.hpp
+    include/TreeSitterParser.hpp
 )
 target_include_directories(DebugLanguageOutputTests PRIVATE include)
 target_link_libraries(DebugLanguageOutputTests clangLex clangBasic)
@@ -173,8 +179,10 @@ add_executable(StringLiteralDecodeTests
     include/LanguageStats.hpp
     include/LanguageModel.generated.hpp
     src/LanguageParser.cpp
+    src/TreeSitterParser.cpp
     include/LanguageParser.hpp
     include/LanguageData.hpp
+    include/TreeSitterParser.hpp
 )
 target_include_directories(StringLiteralDecodeTests PRIVATE include)
 target_link_libraries(StringLiteralDecodeTests clangLex clangBasic)
@@ -192,29 +200,6 @@ find_package(Clang REQUIRED CONFIG)
 
 include_directories(${LLVM_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} clangLex clangBasic)
-target_compile_definitions(${PROJECT_NAME} PRIVATE MATCHERTEXT_PARSERS_DIR="${CMAKE_SOURCE_DIR}/parsers")
-
-# === Go parser binary ===
-# Pre-compile parsers/parser.go into a native binary so each per-file invocation
-# avoids recompiling, and dodges `go run`'s rule that disallows .go arguments
-# from a different directory than the source file.
-find_program(GO_EXECUTABLE go)
-if (GO_EXECUTABLE)
-    set(GO_PARSER_BIN "${CMAKE_BINARY_DIR}/matchertext_go_parser")
-    add_custom_command(
-        OUTPUT ${GO_PARSER_BIN}
-        COMMAND ${GO_EXECUTABLE} build -o ${GO_PARSER_BIN} ${CMAKE_SOURCE_DIR}/parsers/parser.go
-        DEPENDS ${CMAKE_SOURCE_DIR}/parsers/parser.go
-        COMMENT "Building Go parser binary"
-        VERBATIM
-    )
-    add_custom_target(go_parser ALL DEPENDS ${GO_PARSER_BIN})
-    add_dependencies(${PROJECT_NAME} go_parser)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE
-        MATCHERTEXT_GO_PARSER_BIN="${GO_PARSER_BIN}")
-else ()
-    message(WARNING "go executable not found; Go parsing will be disabled at runtime")
-endif ()
 
 # === OpenMP ===
 find_package(OpenMP QUIET)
@@ -233,6 +218,13 @@ target_link_libraries(LanguageClassifierTests Serde)
 target_link_libraries(ParserFixtureTests Serde)
 target_link_libraries(DebugLanguageOutputTests Serde)
 target_link_libraries(StringLiteralDecodeTests Serde)
+
+# === tree-sitter (in-process grammars for ~21 programming languages) ===
+add_subdirectory(extern/tree-sitter)
+target_link_libraries(${PROJECT_NAME} tree-sitter-grammars)
+target_link_libraries(ParserFixtureTests tree-sitter-grammars)
+target_link_libraries(DebugLanguageOutputTests tree-sitter-grammars)
+target_link_libraries(StringLiteralDecodeTests tree-sitter-grammars)
 
 # --------------------------
 # Build Configs
