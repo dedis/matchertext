@@ -20,14 +20,30 @@ target_include_directories(tree-sitter-core
 target_compile_options(tree-sitter-core PRIVATE -w -O2)
 set_target_properties(tree-sitter-core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+# A few grammars (perl, swift) don't commit a generated parser.c, so generate it
+# from grammar.json with the tree-sitter CLI. This also self-heals when a
+# submodule re-checkout wipes the previously generated (untracked) parser.c.
+find_program(TREE_SITTER_CLI tree-sitter HINTS /opt/homebrew/bin /usr/local/bin)
+
 # --- one static lib per grammar ---------------------------------------------
 # `name` becomes target ts_<name>; the language symbol tree_sitter_<name> lives
 # in the grammar's parser.c. `src_dir` is relative to TS_ROOT and holds parser.c
 # (+ optional scanner.c/.cc). Generated tables are huge: -O2 (not -O3) and -w.
 function(add_ts_grammar name src_dir)
   set(dir ${TS_ROOT}/${src_dir})
+  get_filename_component(repo_dir ${dir} DIRECTORY)
+  if (NOT EXISTS ${dir}/parser.c AND EXISTS ${dir}/grammar.json AND TREE_SITTER_CLI)
+    message(STATUS "tree-sitter: generating parser.c for '${name}'")
+    execute_process(
+      COMMAND ${TREE_SITTER_CLI} generate src/grammar.json
+      WORKING_DIRECTORY ${repo_dir}
+      RESULT_VARIABLE ts_gen_result OUTPUT_QUIET ERROR_QUIET)
+  endif ()
   if (NOT EXISTS ${dir}/parser.c)
-    message(FATAL_ERROR "tree-sitter grammar '${name}' missing parser.c at ${dir}")
+    message(FATAL_ERROR
+      "tree-sitter grammar '${name}' missing parser.c at ${dir}.\n"
+      "Install the tree-sitter CLI (brew install tree-sitter) and re-configure, or run:\n"
+      "  (cd ${repo_dir} && tree-sitter generate src/grammar.json)")
   endif ()
   set(srcs ${dir}/parser.c)
   if (EXISTS ${dir}/scanner.c)
@@ -38,7 +54,9 @@ function(add_ts_grammar name src_dir)
   endif ()
   add_library(ts_${name} STATIC ${srcs})
   target_include_directories(ts_${name} PRIVATE ${dir})
-  target_compile_options(ts_${name} PRIVATE -w -O2)
+  # parser.c is mostly static data tables (opt level emits identical data), but
+  # each lib may also include a hand-written scanner.c that IS hot code, so -O3.
+  target_compile_options(ts_${name} PRIVATE -w -O3 -DNDEBUG -mcpu=native)
   set_target_properties(ts_${name} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endfunction()
 

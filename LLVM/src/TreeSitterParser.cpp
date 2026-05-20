@@ -4,7 +4,6 @@
 #include <chrono>
 #include <cstring>
 #include <fstream>
-#include <iterator>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -115,7 +114,8 @@ namespace {
   }
 
   // ---- text helpers --------------------------------------------------------
-  std::string nodeText(const TSNode node, const std::string &src) {
+  // A node's source bytes as a view into `src` (no copy).
+  std::string_view nodeText(const TSNode node, const std::string_view src) {
     uint32_t s = ts_node_start_byte(node);
     uint32_t e = ts_node_end_byte(node);
     if (e > src.size())
@@ -129,8 +129,8 @@ namespace {
 
   // Strip surrounding string delimiters (and optional letter/@/$ prefixes),
   // handling triple-quote runs. Fallback when the grammar exposes no content
-  // child. Mirrors the spirit of parser.py / parser.go body extraction.
-  std::string stripDelimiters(const std::string &s) {
+  // child. Returns a view into the input. Mirrors parser.py / parser.go.
+  std::string_view stripDelimiters(const std::string_view s) {
     size_t b = 0;
     const size_t e = s.size();
     while (b < e && !isQuote(s[b]) && (std::isalpha(static_cast<unsigned char>(s[b])) || s[b] == '@' || s[b] == '$'))
@@ -150,24 +150,38 @@ namespace {
     return s.substr(bodyStart, bodyEnd - bodyStart);
   }
 
-  // Body of a string node: prefer content/fragment children (delimiters and
-  // interpolation markers excluded for free); otherwise strip delimiters.
-  std::string stringBody(const TSNode node, const std::string &src) {
-    std::string body;
-    bool found = false;
+  // Body of a string node, returned as a view. Prefer content/fragment children
+  // (delimiters and interpolation markers excluded for free); otherwise strip
+  // delimiters off the whole node. The rare multi-child case concatenates into
+  // `scratch` (reused across nodes) and returns a view into it.
+  std::string_view stringBody(const TSNode node, const std::string_view src, std::string &scratch) {
     const uint32_t n = ts_node_named_child_count(node);
+    int firstContent = -1;
+    int contentCount = 0;
     for (uint32_t i = 0; i < n; ++i) {
-      const TSNode c = ts_node_named_child(node, i);
-      const char *t = ts_node_type(c);
+      const char *t = ts_node_type(ts_node_named_child(node, i));
       if (std::strstr(t, "content") || std::strstr(t, "fragment")) {
-        body += nodeText(c, src);
-        found = true;
+        if (firstContent < 0)
+          firstContent = static_cast<int>(i);
+        ++contentCount;
       }
     }
-    return found ? body : stripDelimiters(nodeText(node, src));
+    if (contentCount == 1)
+      return nodeText(ts_node_named_child(node, static_cast<uint32_t>(firstContent)), src);
+    if (contentCount > 1) {
+      scratch.clear();
+      for (uint32_t i = 0; i < n; ++i) {
+        const TSNode c = ts_node_named_child(node, i);
+        const char *t = ts_node_type(c);
+        if (std::strstr(t, "content") || std::strstr(t, "fragment"))
+          scratch.append(nodeText(c, src));
+      }
+      return scratch;
+    }
+    return stripDelimiters(nodeText(node, src));
   }
 
-  Serde::JSON makeObj(const char *kind, const std::string &value) {
+  Serde::JSON makeObj(const char *kind, const std::string_view value) {
     return Serde::JSON::Object({{"kind", Serde::JSON(kind)}, {"value", Serde::JSON(value)}});
   }
 
@@ -175,8 +189,9 @@ namespace {
   // Iterative (explicit stack) to avoid recursion-depth blowups on deep trees.
   // String/comment nodes are emitted whole and not descended into; ERROR nodes
   // are descended through so well-formed descendants are still collected.
-  void walk(const TSNode root, const std::string &src, const Classifier &cls, Serde::JSON &out) {
+  void walk(const TSNode root, const std::string_view src, const Classifier &cls, Serde::JSON &out) {
     std::vector<TSNode> stack;
+    std::string scratch; // reused buffer for multi-child string concatenation
     stack.push_back(root);
     while (!stack.empty()) {
       const TSNode node = stack.back();
@@ -187,7 +202,7 @@ namespace {
           out.PushBack(makeObj("comment", nodeText(node, src)));
           continue;
         case Kind::String:
-          out.PushBack(makeObj("string", stringBody(node, src)));
+          out.PushBack(makeObj("string", stringBody(node, src, scratch)));
           continue;
         case Kind::Other:
           break;
@@ -245,13 +260,28 @@ bool TreeSitter::Parse(const LanguageEnum language, const std::string &path, Ser
   if (!tsLang)
     return false;
 
-  std::ifstream in(path, std::ios::binary);
+  // Bulk read (one allocation + one read) instead of istreambuf_iterator.
+  std::ifstream in(path, std::ios::binary | std::ios::ate);
   if (!in)
     return false;
-  const std::string src((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  const std::streamoff size = in.tellg();
+  if (size < 0)
+    return false;
+  std::string src(static_cast<size_t>(size), '\0');
+  in.seekg(0);
+  in.read(src.data(), size);
+  src.resize(static_cast<size_t>(in.gcount()));
 
   if (!result.IsArray())
     result = Serde::JSON::Array();
+
+  // Skip binary files. Source extensions collide with non-source formats (e.g.
+  // `.ts` is both TypeScript and MPEG transport stream, which Chromium ships as
+  // test data). A NUL byte is a reliable binary signal — source essentially
+  // never contains one — and feeding binary to the GLR parser triggers
+  // pathological error-recovery blowups the parse timeout can't always catch.
+  if (std::memchr(src.data(), '\0', src.size()) != nullptr)
+    return true;
 
   thread_local ParserHolder holder;
   TSParser *parser = holder.get();
