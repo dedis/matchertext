@@ -38,7 +38,7 @@ static const char *kUsage =
     "\n"
     "OPTIONS:\n"
     "    --language <lang>              Only analyze files of the given language\n"
-    "    --output <dir>                 Directory to write results to (default: ./result)\n"
+    "    --output <name>                Write results to ./result/<name> (default: ./result/<input-path>)\n"
     "    --compiler <compiler>          Override the compiler used for parsing\n"
     "    --extensions <ext1,ext2,...>   Comma-separated list of additional file extensions\n"
     "\n"
@@ -129,7 +129,7 @@ int main(const int argc, char *argv[]) {
   }
 
   std::string compilerOverride;
-  std::string outputDir = "./result";
+  std::string outputName; // when set via --output, names the subdir under ./result
   auto filterLanguage = LanguageEnum::Unknown;
   std::vector<std::string_view> extraExtensions;
   std::vector<std::string> rawPaths;
@@ -142,7 +142,7 @@ int main(const int argc, char *argv[]) {
         std::fprintf(stderr, kUsage, argv[0]);
         return -1;
       }
-      outputDir = argv[++i];
+      outputName = argv[++i];
       continue;
     }
     if (arg == "--compiler") {
@@ -194,12 +194,19 @@ int main(const int argc, char *argv[]) {
   for (const auto &p: rawPaths)
     inputPaths.push_back(fs::path(p).lexically_normal().string());
 
-  // Derive per-repo output dir: ./result/<repo_path>
-  // For relative inputs use the path as-is; for absolute inputs use the last component.
+  // Output goes under ./result. With --output <name> the subdir is exactly
+  // <name>; otherwise it is derived from the first input path (relative paths
+  // as-is, absolute paths by their last component).
+  std::string outputDir;
   {
-    const fs::path ip = fs::path(rawPaths[0]).lexically_normal();
-    const fs::path sub = ip.is_relative() ? ip : ip.filename();
-    outputDir = (fs::path(outputDir) / sub).string();
+    fs::path sub;
+    if (!outputName.empty())
+      sub = fs::path(outputName);
+    else {
+      const fs::path ip = fs::path(rawPaths[0]).lexically_normal();
+      sub = ip.is_relative() ? ip : ip.filename();
+    }
+    outputDir = (fs::path("./result") / sub).lexically_normal().string();
   }
 
   std::error_code ec;
