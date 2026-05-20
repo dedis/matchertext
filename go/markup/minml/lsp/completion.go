@@ -6,8 +6,8 @@ import (
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-func (s *Server) Completion(context *glsp.Context, params *protocol.CompletionParams) (any, error) {
-	items := []protocol.CompletionItem{}
+func (s *Server) Completion(_ *glsp.Context, params *protocol.CompletionParams) (any, error) {
+	var items []protocol.CompletionItem
 	s.Store.WithDocument(params.TextDocument.URI, func(doc *Document) {
 		node := doc.NodeAt(params.Position.Line, params.Position.Character)
 		if node == nil {
@@ -15,6 +15,9 @@ func (s *Server) Completion(context *glsp.Context, params *protocol.CompletionPa
 		}
 		items = buildCompletions(node, doc.TextBytes)
 	})
+	if items == nil {
+		items = []protocol.CompletionItem{}
+	}
 	return items, nil
 }
 

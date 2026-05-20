@@ -8,7 +8,7 @@ import (
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-func (s *Server) Hover(context *glsp.Context, params *protocol.HoverParams) (*protocol.Hover, error) {
+func (s *Server) Hover(_ *glsp.Context, params *protocol.HoverParams) (*protocol.Hover, error) {
 	var result *protocol.Hover
 	s.Store.WithDocument(params.TextDocument.URI, func(doc *Document) {
 		node := doc.NodeAt(params.Position.Line, params.Position.Character)

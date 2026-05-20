@@ -9,12 +9,16 @@ import (
 )
 
 func (s *Server) publishDiagnostics(ctx *glsp.Context, uri string, version int32) {
-	diags := []protocol.Diagnostic{}
+	var diags []protocol.Diagnostic
 	found := s.Store.WithDocument(uri, func(doc *Document) {
 		diags = collectDiagnostics(doc.Tree.RootNode(), diags)
 	})
 	if !found {
 		return
+	}
+
+	if diags == nil {
+		diags = []protocol.Diagnostic{}
 	}
 
 	v := uint32(version)

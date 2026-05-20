@@ -42,7 +42,7 @@ func NewServer(debug bool) *Server {
 	return s
 }
 
-func (s *Server) Initialize(context *glsp.Context, params *protocol.InitializeParams) (any, error) {
+func (s *Server) Initialize(_ *glsp.Context, params *protocol.InitializeParams) (any, error) {
 	s.Log.Infof("initializing server %s %s", serverName, version)
 	capabilities := s.Handler.CreateServerCapabilities()
 	syncKind := protocol.TextDocumentSyncKindFull
@@ -72,18 +72,18 @@ func (s *Server) Initialize(context *glsp.Context, params *protocol.InitializePa
 	}, nil
 }
 
-func (s *Server) Initialized(context *glsp.Context, params *protocol.InitializedParams) error {
+func (s *Server) Initialized(_ *glsp.Context, _ *protocol.InitializedParams) error {
 	s.Log.Info("server initialized")
 	return nil
 }
 
-func (s *Server) Shutdown(context *glsp.Context) error {
+func (s *Server) Shutdown(_ *glsp.Context) error {
 	s.Log.Info("server shutting down")
 	s.Store.CloseAll()
 	return nil
 }
 
-func (s *Server) SetTrace(context *glsp.Context, params *protocol.SetTraceParams) error {
+func (s *Server) SetTrace(_ *glsp.Context, params *protocol.SetTraceParams) error {
 	s.Log.Infof("set trace: %s", params.Value)
 	return nil
 }
@@ -121,7 +121,7 @@ func (s *Server) DidChange(context *glsp.Context, params *protocol.DidChangeText
 	return nil
 }
 
-func (s *Server) DidClose(context *glsp.Context, params *protocol.DidCloseTextDocumentParams) error {
+func (s *Server) DidClose(_ *glsp.Context, params *protocol.DidCloseTextDocumentParams) error {
 	s.Log.Debugf("didClose: %s", params.TextDocument.URI)
 	s.Store.Delete(params.TextDocument.URI)
 	return nil
