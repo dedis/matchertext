@@ -4,6 +4,7 @@
 // Date: 13/06/2025
 //
 
+#include <algorithm>
 #include <array>
 #include <filesystem>
 #include <fstream>
@@ -240,18 +241,22 @@ static bool IsStringToken(const clang::Token &tok) {
 // Returns the source-form body of one string token.
 // Normal strings keep escapes as written.
 // Raw strings return verbatim raw body.
-static std::string ExtractLiteralBody(std::string_view spelling) {
+// `isRaw` is set to true iff the token is a raw string literal (R"delim(...)delim");
+// this lets callers count toothpicks per-segment without re-decoding raw bodies.
+static std::string ExtractLiteralBody(std::string_view spelling, bool &isRaw) {
+  isRaw = false;
   const size_t quote = spelling.find('"');
   if (quote == std::string_view::npos)
     return {};
 
-  if (const bool isRaw = quote > 0 && spelling[quote - 1] == 'R'; !isRaw) {
+  if (const bool raw = quote > 0 && spelling[quote - 1] == 'R'; !raw) {
     const size_t end = spelling.rfind('"');
     if (end == std::string_view::npos || end <= quote)
       return {};
     return std::string(spelling.substr(quote + 1, end - quote - 1));
   }
 
+  isRaw = true;
   // Raw form: prefix R"delim(body)delim"
   const size_t open = spelling.find('(', quote);
   if (open == std::string_view::npos)
@@ -491,17 +496,34 @@ bool Parser::ParseC_CPP(const std::string &path, Serde::JSON &result) {
     /// Handle string literal tokens.
     if (IsStringToken(tok)) {
       std::string value;
+      uint64_t convertedToothpicks = 0;
       clang::Token current = tok;
 
       /// Concatenate adjacent string literals ("a" "b").
       do {
         const std::string spelling = clang::Lexer::getSpelling(current, srcMgr, langOpts);
-        value += ExtractLiteralBody(spelling);
+        bool isRaw = false;
+        std::string body = ExtractLiteralBody(spelling, isRaw);
+
+        /// Toothpicks that survive rewriting this segment as a raw string literal,
+        /// counted per-segment so adjacent normal+raw literals are each handled in
+        /// their own mode. A raw literal is already raw, so its backslashes are
+        /// literal and kept verbatim; a normal literal's escapes decode down to the
+        /// backslashes their content actually holds.
+        convertedToothpicks += isRaw
+          ? static_cast<uint64_t>(std::count(body.begin(), body.end(), '\\'))
+          : CountRawStringToothpicks(body);
+
+        value += body;
         lexer.LexFromRawLexer(current);
       } while (IsStringToken(current));
 
       tok = current;
-      result.PushBack(Serde::JSON::Object({{"kind", Serde::JSON("string")}, {"value", Serde::JSON(value)}}));
+      result.PushBack(Serde::JSON::Object({
+        {"kind", Serde::JSON("string")},
+        {"value", Serde::JSON(value)},
+        {"convertedToothpicks", Serde::JSON(static_cast<double>(convertedToothpicks))}
+      }));
       continue;
     }
 
@@ -524,12 +546,16 @@ void Parser::GatherStatistics(
   for (auto e: json.GetArray()) {
     std::string value = e["value"].GetString();
     if (e["kind"].GetString() == "string") {
+      const uint64_t convertedToothpicks = e.Contains("convertedToothpicks")
+        ? static_cast<uint64_t>(e["convertedToothpicks"].GetNumber())
+        : 0;
       const uint64_t violations = process(
         std::move(value), STRING_STATS, STRING_NESTED_STATS, &STRING_LANG_STATS, false, path,
         inputPath.empty() ? std::string_view(path) : inputPath,
         perLang ? &perLang->stringStats : nullptr,
         perLang ? &perLang->stringNestedStats : nullptr,
-        perLang ? &perLang->langStats : nullptr
+        perLang ? &perLang->langStats : nullptr,
+        convertedToothpicks
       );
       fileViolations += violations;
       fileViolationsRelaxed += violations;
@@ -568,7 +594,8 @@ uint64_t Parser::process(
   std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats,
   LanguageStats *langStats, const bool relaxed,
   const std::string_view sourcePath, const std::string_view inputPath,
-  EmbeddedStats *extraEmbedded, NestedStats *extraNested, LanguageStats *extraLangStats
+  EmbeddedStats *extraEmbedded, NestedStats *extraNested, LanguageStats *extraLangStats,
+  const uint64_t convertedToothpicksHint
 ) {
   uint64_t toothpicks = 0;
   for (const unsigned char c: string) {
@@ -581,10 +608,13 @@ uint64_t Parser::process(
   /// Toothpick count after rewriting this sample under the matchertext rule: a
   /// matchertext-compliant string literal is replaced by an equivalent C++ raw
   /// string literal (langStats is non-null only for string literals); everything
-  /// else (non-compliant strings, comments) is counted unchanged.
+  /// else (non-compliant strings, comments) is counted unchanged. The converted
+  /// count for compliant literals is computed per-segment at extraction time
+  /// (convertedToothpicksHint) so raw and adjacent normal+raw literals are each
+  /// counted in their own mode rather than re-decoding the concatenated body.
   const bool compliantStringLiteral = langStats != nullptr && unmatched == 0;
   const uint64_t convertedToothpicks =
-      compliantStringLiteral ? CountRawStringToothpicks(string) : toothpicks;
+      compliantStringLiteral ? convertedToothpicksHint : toothpicks;
 
   if (langStats != nullptr) {
     /// Classify the embedded language and record per-language stats only for strings.
@@ -617,6 +647,15 @@ uint64_t Parser::process(
       AtomicAdd(s.withToothpicksConverted, 1.0);
     AtomicAdd(s.toothpicksConverted, static_cast<double>(convertedToothpicks));
     AtomicMax(s.toothpicksConvertedMax, static_cast<double>(convertedToothpicks));
+
+    /// Per-sample reduction (%), accumulated so DeriveStats can report the mean
+    /// of per-sample reductions rather than a value algebraically identical to
+    /// the aggregate total. Samples with no toothpicks contribute 0%.
+    if (toothpicks > 0)
+      AtomicAdd(
+        s.toothpicksReductionSum,
+        100.0 * static_cast<double>(toothpicks - convertedToothpicks) / static_cast<double>(toothpicks)
+      );
 
     if (unmatched > 0)
       AtomicAdd(s.withNonCompliance, 1.0);

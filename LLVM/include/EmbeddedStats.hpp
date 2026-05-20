@@ -37,7 +37,7 @@
   X(toothpicksConvertedAvg, "Average Toothpicks (Converted)", "Average toothpick count per sample after rewriting each matchertext-compliant string literal as an equivalent C++ raw string literal.") \
   X(toothpicksConvertedAvgWith, "Average With Toothpicks (Converted)", "Average toothpick count among samples that still contain toothpicks after rewriting each matchertext-compliant string literal as an equivalent C++ raw string literal.") \
   X(toothpicksReductionTotal, "Toothpick Reduction Total (%)", "Percentage reduction in total toothpicks after rewriting matchertext-compliant string literals as C++ raw string literals.") \
-  X(toothpicksReductionAvg, "Toothpick Reduction Average (%)", "Percentage reduction in average per-sample toothpicks after rewriting matchertext-compliant string literals as C++ raw string literals.") \
+  X(toothpicksReductionAvg, "Toothpick Reduction Average (%)", "Mean of each sample's own percentage reduction in toothpicks after rewriting matchertext-compliant string literals as C++ raw string literals (samples without toothpicks count as 0%).") \
   X(toothpicksReductionMax, "Toothpick Reduction Maximum (%)", "Percentage reduction in the maximum per-sample toothpick count after rewriting matchertext-compliant string literals as C++ raw string literals.") \
   \
   X(withNesting, "With Raw Nested Embedding", "Number of samples whose raw nesting depth exceeds 1, even if the nesting is never closed.") \
@@ -55,7 +55,10 @@
   AtomicString stringMaxToothpicks; \
   AtomicString stringMaxNonCompliance; \
   AtomicString stringMaxNested; \
-  AtomicString stringMaxValidNested;
+  AtomicString stringMaxValidNested; \
+  /* Running sum of per-sample toothpick reduction percentages; consumed by */ \
+  /* DeriveStats to compute toothpicksReductionAvg. Not an output column. */ \
+  std::atomic<double> toothpicksReductionSum{0};
 
 CREATE_STATS_HPP(EmbeddedStats, EMBEDDED_STATS_FIELDS, EMBEDDED_EXTRA_FIELDS
 )

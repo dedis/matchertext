@@ -101,7 +101,7 @@ class Parser final {
       LanguageStats *langStats = nullptr, bool relaxed = false,
       std::string_view sourcePath = {}, std::string_view inputPath = {},
       EmbeddedStats *extraEmbedded = nullptr, NestedStats *extraNested = nullptr,
-      LanguageStats *extraLangStats = nullptr
+      LanguageStats *extraLangStats = nullptr, uint64_t convertedToothpicksHint = 0
     );
 };
 
