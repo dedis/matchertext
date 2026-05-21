@@ -19,7 +19,7 @@ In order to build the MinML tools, you can use the `Makefile`. Below is an overv
 | Command               | Description                                                                                        |
 |-----------------------|----------------------------------------------------------------------------------------------------|
 | build                 | Build the main `minml` CLI tool.                                                                   |
-| build-lsp             | Build the `minml-lsp` Language Server.                                                             |
+| build-lsp             | Build the `minml-lsp` Language Server (also copies Tree-sitter queries from `dev/tree-sitter/queries/`). |
 | build-wasm            | Builds the WASM binary used by browser-based tools and the VS Code extension.                      |
 | vscode-live-preview   | Builds the WASM and extension, then installs it to your local VS Code extensions directory.       |
 | gen-parser            | Generates the Tree-sitter C parser from `grammar.js`.                                              |
@@ -28,6 +28,11 @@ In order to build the MinML tools, you can use the `Makefile`. Below is an overv
 
 #### MinML Language Server (`minml-lsp`)
 An LSP server written in Go that provides real-time feedback and intelligent editing features for MinML files (`.m`, `.minml`). It uses Tree-sitter for error-tolerant parsing.
+
+> **Note:** The LSP embeds Tree-sitter highlight queries at build time. The `make build-lsp` target copies them automatically from `dev/tree-sitter/queries/`. If you build manually with `go build`, copy them first:
+> ```bash
+> cp -R dev/tree-sitter/queries go/markup/minml/lsp/queries
+> ```
 - **Diagnostics**: Immediate feedback on syntax errors, such as unmatched brackets.
 - **Completion**: Intelligent suggestions for HTML5 tags and attributes based on context.
 - **Hover**: Documentation for HTML5 tags and all MinML constructs (character references, raw blocks, comments, etc.).

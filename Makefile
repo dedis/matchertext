@@ -7,6 +7,7 @@ gen-parser:
 	cd dev/tree-sitter && tree-sitter generate
 
 build-lsp:
+	cp -R dev/tree-sitter/queries go/markup/minml/lsp/queries
 	go build -o minml-lsp ./go/markup/minml/cmd/lsp/
 
 EXT_NAME := $(shell node -p "require('./dev/vscode/minml-preview/package.json').publisher + '.' + require('./dev/vscode/minml-preview/package.json').name + '-' + require('./dev/vscode/minml-preview/package.json').version")
