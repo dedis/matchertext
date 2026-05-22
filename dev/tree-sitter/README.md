@@ -109,17 +109,19 @@ echo 'img{src = cat.jpg}[]' | tree-sitter parse /dev/stdin
 
 ## Syntax highlighting
 
-The `queries/highlights.scm` file maps node types to standard capture names used by editors and the tree-sitter CLI:
+The `queries/highlights.scm` file maps node types to standard capture names.
 
 | Capture | Node types | Typical colour |
 |---|---|---|
 | `@tag` | `tag_name` — element tag identifiers | blue |
-| `@property` | `attr_name` — attribute names | teal |
-| `@character.special` | `named_ref`, `decimal_ref`, `hex_ref` — character references | green |
+| `@tag.attribute` | `attr_name` — attribute names | teal |
+| `@punctuation.bracket` | `[` `]` `{` `}` — structural delimiters | grey |
+| `@constant.builtin` | `named_ref`, `decimal_ref`, `hex_ref` — character references | green |
 | `@string` | `quoted_string` | green |
 | `@string.special` | `raw_block` | green |
 | `@comment` | `comment` | grey italic |
 | `@keyword.directive` | `processing_instruction` | blue |
+| `@punctuation.delimiter` | `<` `>` — space-suckers | grey |
 | `@string.escape` | `matcher_escape` | green |
 
 Run highlighting in the terminal:
@@ -128,12 +130,55 @@ Run highlighting in the terminal:
 tree-sitter highlight examples/12-full-document.m
 ```
 
-A successful run produces coloured terminal output with **no warning lines**. The absence of a "you should add a highlights entry" warning confirms that `tree-sitter.json` is correctly wired. You can also spot-check individual examples:
+A successful run produces coloured terminal output with **no warning lines**.
+
+## Testing and Verifying Queries
+
+### 1. Manual Verification
+
+The fastest way to verify changes to your queries is using the Tree-sitter CLI.
+
+#### Syntax Highlighting
+
+Run the `highlight` command on a sample MinML file or an example:
 
 ```sh
-tree-sitter highlight examples/09-comment.m     # comments appear grey/italic
-tree-sitter highlight examples/11-matcher-escapes.m  # escapes appear green
+tree-sitter highlight examples/12-full-document.m
 ```
+
+**Check for errors:**
+If you see a warning like `Query error at 12:3. Invalid node type tag_name`, it means your `.scm` file references a node type that doesn't exist in `grammar.js`. Always check the output for such warnings.
+
+**Verify captures:**
+You can see which nodes are being captured by which names using the `query` command:
+
+```sh
+tree-sitter query queries/highlights.scm examples/02-basic-element.m
+```
+
+#### Indentation
+
+Verify indentation captures using the `query` command:
+
+```sh
+tree-sitter query queries/indents.scm examples/04-nested-elements.m
+```
+
+You should see `@indent.begin` on every `[` and `@indent.end` on every `]`.
+
+### 2. Automated Validation
+
+While highlight assertions in the corpus are difficult for MinML (because `;` is valid text content and not ignored by the grammar), you can still perform automated validation of the query files themselves.
+
+#### Query Linting
+
+The `highlight` command has a `--check` flag that validates the query file against the grammar without needing a source file:
+
+```sh
+tree-sitter highlight --check
+```
+
+This is useful for CI to catch typos in node names or capture names.
 
 ## Using the Go binding
 
@@ -193,7 +238,8 @@ dev/tree-sitter/
 │       ├── binding.go      # cgo wrapper — exposes Language() unsafe.Pointer
 │       └── binding_test.go # Smoke test: loads the grammar
 ├── queries/
-│   └── highlights.scm      # Syntax-highlight capture names
+│   ├── highlights.scm      # Syntax-highlight capture names
+│   └── indents.scm         # Indentation rules
 ├── test/
 │   └── corpus/
 │       └── minml.txt       # 39 corpus tests (tree-sitter test format)
@@ -229,12 +275,6 @@ tree-sitter highlight examples/12-full-document.m
 # 4. Go binding smoke test
 go test ./bindings/go/
 ```
-
-Expected outcomes:
-- `tree-sitter test`: `Total parses: 39; successful parses: 39; …; success percentage: 100.00%`
-- `tree-sitter parse examples/*.m`: no line contains `ERROR` or `MISSING`
-- `tree-sitter highlight`: produces coloured output, prints no warning lines
-- `go test ./bindings/go/`: `ok  github.com/dedis/matchertext/dev/tree-sitter/bindings/go`
 
 ## Design notes
 
