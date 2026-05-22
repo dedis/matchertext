@@ -4,6 +4,7 @@
 // Date: 13/06/2025
 //
 
+#include <algorithm>
 #include <array>
 #include <filesystem>
 #include <fstream>
@@ -240,18 +241,22 @@ static bool IsStringToken(const clang::Token &tok) {
 // Returns the source-form body of one string token.
 // Normal strings keep escapes as written.
 // Raw strings return verbatim raw body.
-static std::string ExtractLiteralBody(std::string_view spelling) {
+// `isRaw` is set to true iff the token is a raw string literal (R"delim(...)delim");
+// this lets callers count toothpicks per-segment without re-decoding raw bodies.
+static std::string ExtractLiteralBody(std::string_view spelling, bool &isRaw) {
+  isRaw = false;
   const size_t quote = spelling.find('"');
   if (quote == std::string_view::npos)
     return {};
 
-  if (const bool isRaw = quote > 0 && spelling[quote - 1] == 'R'; !isRaw) {
+  if (const bool raw = quote > 0 && spelling[quote - 1] == 'R'; !raw) {
     const size_t end = spelling.rfind('"');
     if (end == std::string_view::npos || end <= quote)
       return {};
     return std::string(spelling.substr(quote + 1, end - quote - 1));
   }
 
+  isRaw = true;
   // Raw form: prefix R"delim(body)delim"
   const size_t open = spelling.find('(', quote);
   if (open == std::string_view::npos)
@@ -264,6 +269,164 @@ static std::string ExtractLiteralBody(std::string_view spelling) {
     return {};
 
   return std::string(spelling.substr(open + 1, close - open - 1));
+}
+
+// Counts the backslash bytes that would remain if a C/C++ string literal body were
+// rewritten verbatim inside a raw string literal R"(...)" — i.e. the number of '\'
+// characters in the *decoded* content. Escape sequences are decoded semantically:
+// only sequences that actually produce a 0x5C code unit are counted (\\, octal \ooo,
+// hex \xH..., the \uXXXX / \UXXXXXXXX universal-character-name forms, and the C++23
+// delimited forms \x{...} / \o{...} / \u{...} / \N{REVERSE SOLIDUS}). `body` is
+// expected to already have line splices removed
+// (clang::Lexer::getSpelling does this); bodies taken from raw literals — or from
+// normal+raw adjacent-literal concatenations — are decoded as if normal and may be
+// over-collapsed, which is an accepted approximation here.
+uint64_t Parser::CountRawStringToothpicks(std::string_view body) {
+  const auto hexDigit = [](const unsigned char c) -> int {
+    if (c >= '0' && c <= '9')
+      return c - '0';
+    if (c >= 'a' && c <= 'f')
+      return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+      return c - 'A' + 10;
+    return -1;
+  };
+  const auto octDigit = [](const unsigned char c) -> int {
+    return c >= '0' && c <= '7' ? c - '0' : -1;
+  };
+
+  const size_t n = body.size();
+
+  // Reads exactly `digits` hex digits starting at body[i]; advances i past them on success.
+  const auto parseFixedHex = [&](size_t &i, const int digits, uint32_t &value) -> bool {
+    value = 0;
+    for (int k = 0; k < digits; ++k) {
+      if (i >= n)
+        return false;
+      const int d = hexDigit(static_cast<unsigned char>(body[i]));
+      if (d < 0)
+        return false;
+      value = value * 16u + static_cast<uint32_t>(d);
+      ++i;
+    }
+    return true;
+  };
+
+  // Reads a "{ digits }" run in the given base starting at body[i]; advances i past the
+  // closing brace on success. Requires at least one digit.
+  const auto parseBracedNumber = [&](size_t &i, const int base, uint32_t &value) -> bool {
+    if (i >= n || body[i] != '{')
+      return false;
+    ++i;
+
+    value = 0;
+    bool any = false;
+    while (i < n && body[i] != '}') {
+      const int d = base == 16
+                      ? hexDigit(static_cast<unsigned char>(body[i]))
+                      : octDigit(static_cast<unsigned char>(body[i]));
+      if (d < 0)
+        return false;
+      value = value * static_cast<uint32_t>(base) + static_cast<uint32_t>(d);
+      any = true;
+      ++i;
+    }
+    if (i >= n || body[i] != '}')
+      return false;
+    ++i;
+    return any;
+  };
+
+  uint64_t count = 0;
+  for (size_t i = 0; i < n;) {
+    if (body[i] != '\\') {
+      ++i;
+      continue;
+    }
+
+    // Start of an escape sequence; the leading backslash itself does not survive.
+    if (++i >= n)
+      break; // dangling backslash — not valid source, ignore.
+
+    const auto e = static_cast<unsigned char>(body[i]);
+
+    if (e == '\\') { // \\ -> one literal backslash survives
+      ++count;
+      ++i;
+      continue;
+    }
+
+    if (e == 'x') { // \xH... or (C++23) \x{ H... }
+      ++i;
+      uint32_t value = 0;
+      if (i < n && body[i] == '{') {
+        if (parseBracedNumber(i, 16, value) && value == 0x5Cu)
+          ++count;
+        continue;
+      }
+      bool any = false;
+      while (i < n) {
+        const int d = hexDigit(static_cast<unsigned char>(body[i]));
+        if (d < 0)
+          break;
+        value = value * 16u + static_cast<uint32_t>(d);
+        any = true;
+        ++i;
+      }
+      if (any && value == 0x5Cu)
+        ++count;
+      continue;
+    }
+
+    if (e == 'o') { // (C++23) \o{ O... }
+      ++i;
+      uint32_t value = 0;
+      if (i < n && body[i] == '{' && parseBracedNumber(i, 8, value) && value == 0x5Cu)
+        ++count;
+      continue;
+    }
+
+    if (e == 'u' || e == 'U') { // \uHHHH, \UHHHHHHHH, or (C++23) \u{ H... }
+      ++i;
+      uint32_t value = 0;
+      if (i < n && body[i] == '{') {
+        if (parseBracedNumber(i, 16, value) && value == 0x5Cu)
+          ++count;
+        continue;
+      }
+      if (parseFixedHex(i, e == 'u' ? 4 : 8, value) && value == 0x5Cu)
+        ++count;
+      continue;
+    }
+
+    if (e == 'N') { // (C++23) named universal character escape \N{ NAME }
+      ++i;
+      constexpr std::string_view reverseSolidus = "{REVERSE SOLIDUS}";
+      if (body.substr(i, reverseSolidus.size()) == reverseSolidus) {
+        ++count;
+        i += reverseSolidus.size();
+      }
+      continue;
+    }
+
+    if (e >= '0' && e <= '7') { // \ooo octal escape, up to 3 digits
+      uint32_t value = 0;
+      for (int d = 0; d < 3 && i < n; ++d) {
+        const int od = octDigit(static_cast<unsigned char>(body[i]));
+        if (od < 0)
+          break;
+        value = value * 8u + static_cast<uint32_t>(od);
+        ++i;
+      }
+      if (value == 0x5Cu)
+        ++count;
+      continue;
+    }
+
+    // Simple escapes (\n \t \r \v \f \a \b \" \' \? ...): none decodes to a backslash.
+    ++i;
+  }
+  return count;
 }
 
 void Parser::ParseFile(const std::string &filePath, const std::string &inputPath) {
@@ -333,17 +496,34 @@ bool Parser::ParseC_CPP(const std::string &path, Serde::JSON &result) {
     /// Handle string literal tokens.
     if (IsStringToken(tok)) {
       std::string value;
+      uint64_t convertedToothpicks = 0;
       clang::Token current = tok;
 
       /// Concatenate adjacent string literals ("a" "b").
       do {
         const std::string spelling = clang::Lexer::getSpelling(current, srcMgr, langOpts);
-        value += ExtractLiteralBody(spelling);
+        bool isRaw = false;
+        std::string body = ExtractLiteralBody(spelling, isRaw);
+
+        /// Toothpicks that survive rewriting this segment as a raw string literal,
+        /// counted per-segment so adjacent normal+raw literals are each handled in
+        /// their own mode. A raw literal is already raw, so its backslashes are
+        /// literal and kept verbatim; a normal literal's escapes decode down to the
+        /// backslashes their content actually holds.
+        convertedToothpicks += isRaw
+          ? static_cast<uint64_t>(std::count(body.begin(), body.end(), '\\'))
+          : CountRawStringToothpicks(body);
+
+        value += body;
         lexer.LexFromRawLexer(current);
       } while (IsStringToken(current));
 
       tok = current;
-      result.PushBack(Serde::JSON::Object({{"kind", Serde::JSON("string")}, {"value", Serde::JSON(value)}}));
+      result.PushBack(Serde::JSON::Object({
+        {"kind", Serde::JSON("string")},
+        {"value", Serde::JSON(value)},
+        {"convertedToothpicks", Serde::JSON(static_cast<double>(convertedToothpicks))}
+      }));
       continue;
     }
 
@@ -366,12 +546,16 @@ void Parser::GatherStatistics(
   for (auto e: json.GetArray()) {
     std::string value = e["value"].GetString();
     if (e["kind"].GetString() == "string") {
+      const uint64_t convertedToothpicks = e.Contains("convertedToothpicks")
+        ? static_cast<uint64_t>(e["convertedToothpicks"].GetNumber())
+        : 0;
       const uint64_t violations = process(
         std::move(value), STRING_STATS, STRING_NESTED_STATS, &STRING_LANG_STATS, false, path,
         inputPath.empty() ? std::string_view(path) : inputPath,
         perLang ? &perLang->stringStats : nullptr,
         perLang ? &perLang->stringNestedStats : nullptr,
-        perLang ? &perLang->langStats : nullptr
+        perLang ? &perLang->langStats : nullptr,
+        convertedToothpicks
       );
       fileViolations += violations;
       fileViolationsRelaxed += violations;
@@ -410,7 +594,8 @@ uint64_t Parser::process(
   std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats,
   LanguageStats *langStats, const bool relaxed,
   const std::string_view sourcePath, const std::string_view inputPath,
-  EmbeddedStats *extraEmbedded, NestedStats *extraNested, LanguageStats *extraLangStats
+  EmbeddedStats *extraEmbedded, NestedStats *extraNested, LanguageStats *extraLangStats,
+  const uint64_t convertedToothpicksHint
 ) {
   uint64_t toothpicks = 0;
   for (const unsigned char c: string) {
@@ -419,6 +604,17 @@ uint64_t Parser::process(
   }
 
   const auto [unmatched, maxDepth, maxValidDepth, rawChars] = AnalyzeMatcherText(string, relaxed);
+
+  /// Toothpick count after rewriting this sample under the matchertext rule: a
+  /// matchertext-compliant string literal is replaced by an equivalent C++ raw
+  /// string literal (langStats is non-null only for string literals); everything
+  /// else (non-compliant strings, comments) is counted unchanged. The converted
+  /// count for compliant literals is computed per-segment at extraction time
+  /// (convertedToothpicksHint) so raw and adjacent normal+raw literals are each
+  /// counted in their own mode rather than re-decoding the concatenated body.
+  const bool compliantStringLiteral = langStats != nullptr && unmatched == 0;
+  const uint64_t convertedToothpicks =
+      compliantStringLiteral ? convertedToothpicksHint : toothpicks;
 
   if (langStats != nullptr) {
     /// Classify the embedded language and record per-language stats only for strings.
@@ -446,6 +642,20 @@ uint64_t Parser::process(
     AtomicAdd(s.toothpicks, static_cast<double>(toothpicks));
     if (AtomicMax(s.toothpicksMax, static_cast<double>(toothpicks)))
       s.stringMaxToothpicks.set(string);
+
+    if (convertedToothpicks > 0)
+      AtomicAdd(s.withToothpicksConverted, 1.0);
+    AtomicAdd(s.toothpicksConverted, static_cast<double>(convertedToothpicks));
+    AtomicMax(s.toothpicksConvertedMax, static_cast<double>(convertedToothpicks));
+
+    /// Per-sample reduction (%), accumulated so DeriveStats can report the mean
+    /// of per-sample reductions rather than a value algebraically identical to
+    /// the aggregate total. Samples with no toothpicks contribute 0%.
+    if (toothpicks > 0)
+      AtomicAdd(
+        s.toothpicksReductionSum,
+        100.0 * static_cast<double>(toothpicks - convertedToothpicks) / static_cast<double>(toothpicks)
+      );
 
     if (unmatched > 0)
       AtomicAdd(s.withNonCompliance, 1.0);

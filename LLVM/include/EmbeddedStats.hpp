@@ -30,6 +30,16 @@
   X(nonComplianceAvg, "Avg Unmatched Matchers Per Sample", "Average non-compliance count per sample.") \
   X(complianceRate, "Compliance Rate", "Percentage of samples without non-compliance.") \
   \
+  X(compliantCount, "Compliant Samples", "Number of samples with no matchertext non-compliance (count minus With Non-Compliance).") \
+  X(withToothpicksConverted, "With Toothpicks (Converted)", "Number of samples still containing at least one toothpick after rewriting each matchertext-compliant string literal as an equivalent C++ raw string literal.") \
+  X(toothpicksConverted, "Total Toothpicks (Converted)", "Total toothpick count after rewriting each matchertext-compliant string literal as an equivalent C++ raw string literal.") \
+  X(toothpicksConvertedMax, "Maximum Toothpicks (Converted)", "Highest toothpick count in a single sample after rewriting each matchertext-compliant string literal as an equivalent C++ raw string literal.") \
+  X(toothpicksConvertedAvg, "Average Toothpicks (Converted)", "Average toothpick count per sample after rewriting each matchertext-compliant string literal as an equivalent C++ raw string literal.") \
+  X(toothpicksConvertedAvgWith, "Average With Toothpicks (Converted)", "Average toothpick count among samples that still contain toothpicks after rewriting each matchertext-compliant string literal as an equivalent C++ raw string literal.") \
+  X(toothpicksReductionTotal, "Toothpick Reduction Total (%)", "Percentage reduction in total toothpicks after rewriting matchertext-compliant string literals as C++ raw string literals.") \
+  X(toothpicksReductionAvg, "Toothpick Reduction Average (%)", "Mean of each sample's own percentage reduction in toothpicks after rewriting matchertext-compliant string literals as C++ raw string literals (samples without toothpicks count as 0%).") \
+  X(toothpicksReductionMax, "Toothpick Reduction Maximum (%)", "Percentage reduction in the maximum per-sample toothpick count after rewriting matchertext-compliant string literals as C++ raw string literals.") \
+  \
   X(withNesting, "With Raw Nested Embedding", "Number of samples whose raw nesting depth exceeds 1, even if the nesting is never closed.") \
   X(nestingDepthTotal, "Sum Of Per-Sample Raw Max Depth", "Sum of each sample's maximum raw nesting depth, counting unmatched openers such as '((('.") \
   X(nestingDepthMax, "Highest Per-Sample Raw Max Depth", "Greatest raw nesting depth observed in any single sample, even if the nesting is left open.") \
@@ -45,7 +55,10 @@
   AtomicString stringMaxToothpicks; \
   AtomicString stringMaxNonCompliance; \
   AtomicString stringMaxNested; \
-  AtomicString stringMaxValidNested;
+  AtomicString stringMaxValidNested; \
+  /* Running sum of per-sample toothpick reduction percentages; consumed by */ \
+  /* DeriveStats to compute toothpicksReductionAvg. Not an output column. */ \
+  std::atomic<double> toothpicksReductionSum{0};
 
 CREATE_STATS_HPP(EmbeddedStats, EMBEDDED_STATS_FIELDS, EMBEDDED_EXTRA_FIELDS
 )

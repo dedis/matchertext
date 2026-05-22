@@ -86,6 +86,19 @@ bool TestRawAndAdjacent() {
   ok &= CheckEq("raw.strings.with_toothpicks", strings.withToothpicks, 2.0);
   ok &= CheckEq("raw.strings.toothpicks", strings.toothpicks, 10.0);
   ok &= CheckEq("raw.strings.raw_chars", strings.rawChars, 94.0);
+
+  // Converted-form toothpicks. kRegex is a raw literal whose body holds 4 literal
+  // backslashes (\[ \] \( \)); converting an already-raw literal keeps all 4, so it
+  // must not be re-decoded down to 0. kJson's "\"" escapes (6 toothpicks) collapse to
+  // 0, and kSql has none — total converted = 4, all from the single raw kRegex sample.
+  ok &= CheckEq("raw.strings.toothpicks_converted", strings.toothpicksConverted, 4.0);
+  ok &= CheckEq("raw.strings.with_toothpicks_converted", strings.withToothpicksConverted, 1.0);
+  ok &= CheckEq("raw.strings.toothpicks_converted_max", strings.toothpicksConvertedMax, 4.0);
+  // Total reduction weights by toothpick count: (10-4)/10 = 60%. The per-sample mean
+  // weights each sample equally: (0% for kSql, 100% for kJson, 0% for kRegex)/3 ≈ 33.3%.
+  // The two metrics are now genuinely distinct.
+  ok &= CheckEq("raw.strings.reduction_total", strings.toothpicksReductionTotal, 60.0);
+  ok &= CheckEq("raw.strings.reduction_avg", strings.toothpicksReductionAvg, 100.0 / 3.0);
   ok &= CheckEq("raw.docs.count", docs.count, 1.0);
   ok &= CheckEq("raw.lang.total", static_cast<double>(lang.total), 3.0);
 
