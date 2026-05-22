@@ -31,13 +31,16 @@ void EmbeddedStats::DeriveStats() {
   const double wnc2 = withToothpicksConverted.load(std::memory_order_relaxed);
   const double tpcMax = toothpicksConvertedMax.load(std::memory_order_relaxed);
   const double tpcAvg = n > 0.0 ? tpc / n : 0.0;
-  const double tpAvg = n > 0.0 ? tp / n : 0.0;
   const double tpMax = toothpicksMax.load(std::memory_order_relaxed);
+  const double trs = toothpicksReductionSum.load(std::memory_order_relaxed);
 
   compliantCount.store(n - wnc, std::memory_order_relaxed);
   toothpicksConvertedAvg.store(tpcAvg, std::memory_order_relaxed);
   toothpicksConvertedAvgWith.store(wnc2 > 0.0 ? tpc / wnc2 : 0.0, std::memory_order_relaxed);
   toothpicksReductionTotal.store(tp > 0.0 ? 100.0 * (tp - tpc) / tp : 0.0, std::memory_order_relaxed);
-  toothpicksReductionAvg.store(tpAvg > 0.0 ? 100.0 * (tpAvg - tpcAvg) / tpAvg : 0.0, std::memory_order_relaxed);
+  // Mean of per-sample reductions. Aggregating per-sample percentages this way is
+  // genuinely distinct from the aggregate total: (tp-tpc)/tp weights each sample by
+  // its toothpick count, whereas this weights every sample equally.
+  toothpicksReductionAvg.store(n > 0.0 ? trs / n : 0.0, std::memory_order_relaxed);
   toothpicksReductionMax.store(tpMax > 0.0 ? 100.0 * (tpMax - tpcMax) / tpMax : 0.0, std::memory_order_relaxed);
 }

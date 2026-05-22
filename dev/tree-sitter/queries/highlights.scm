@@ -2,14 +2,19 @@
 (tag_name) @tag
 
 ; Attributes
-(attr_name) @property
+(attr_name) @tag.attribute
+(attr_block "{" @punctuation.bracket "}" @punctuation.bracket)
+
+; Content blocks
+(content_block "[" @punctuation.bracket "]" @punctuation.bracket)
 
 ; Character references
-(named_ref) @character.special
-(decimal_ref) @character.special
-(hex_ref) @character.special
+(char_ref "[" @punctuation.bracket "]" @punctuation.bracket)
+(named_ref) @constant.builtin
+(decimal_ref) @constant.builtin
+(hex_ref) @constant.builtin
 
-; Strings
+; Strings and Raw blocks
 (quoted_string) @string
 (raw_block) @string.special
 
@@ -18,6 +23,9 @@
 
 ; Processing instructions
 (processing_instruction) @keyword.directive
+
+; Space-suckers
+["<" ">"] @punctuation.delimiter
 
 ; Escape sequences
 (matcher_escape) @string.escape

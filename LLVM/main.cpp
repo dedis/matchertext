@@ -175,7 +175,7 @@ int main(const int argc, char *argv[]) {
   }
 
   const bool singleLanguage = filterLanguage != LanguageEnum::Unknown;
-  if (singleLanguage)
+  if (!singleLanguage)
     extraExtensions.clear();
 
   std::vector<std::string> inputPaths;

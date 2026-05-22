@@ -55,7 +55,7 @@ func (mt *MatcherTransformer) Transform(ns []Node) ([]Node, error) {
 	os.Sort() // we need the offsets sorted for in-order use
 
 	ofs := int64(0)
-	nns := []Node{}
+	var nns []Node
 	for len(ns) > 0 {
 		n := ns[0]  // grab the next source node
 		ns = ns[1:] // consume it
