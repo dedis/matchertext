@@ -12,8 +12,7 @@ This tool parses multi-language source trees with LLVM/Clang and reports:
 From the `LLVM/` directory:
 
 ```sh
-cmake -B build -S .
-cmake --build build
+make train build
 ```
 
 The build produces:
@@ -54,22 +53,25 @@ Use `--language` to restrict analysis to a single language:
 ./parser ../some-project/src --language python
 ```
 
-Known language identifiers: `c`, `cpp`, `go`, `python`.
+Custom file extensions for those languages can also be passed using `--extensions`
+
+```sh
+./parser ../some-project/src --language cpp --extensions c,h
+./parser ../some-project/src --language python --extensions python
+```
 
 ### Optional flags
 
-| Flag | Description |
-|------|-------------|
-| `--language <lang>` | Restrict to a single language (default: all languages) |
-| `--output <dir>` | Output directory for all result files (default: `./result`) |
-| `--log-strings` | Write max-string diagnostics to `<output>/max_strings.md` |
-| `--compiler <path>` | Override the compiler/interpreter used for the selected language |
-| `--extensions <a,b,...>` | Add extra file extensions to match (single-language mode only) |
+| Flag                     | Description                                                      |
+|--------------------------|------------------------------------------------------------------|
+| `--language <lang>`      | Restrict to a single language (default: all languages)           |
+| `--output <dir>`         | Output directory for all result files (default: `./result`)      |
+| `--compiler <path>`      | Override the compiler/interpreter used for the selected language |
+| `--extensions <a,b,...>` | Add extra file extensions to match (single-language mode only)   |
 
 ## Language Classification
 
-Embedded strings are classified through `ClassifyString` in
-`include/LanguageClassifier.hpp`.
+Embedded strings are classified through `ClassifyString` in `include/LanguageClassifier.hpp`.
 
 The classifier uses two layers:
 
@@ -97,10 +99,8 @@ It does not require any third-party Python packages.
 make train
 ```
 
-`make train` clones or updates `ignore/linguist`, runs
-`train/generate_model.py`, rewrites `include/LanguageModel.generated.hpp`, and
-rebuilds the project. It auto-detects `python3` first, then `python`, and you
-can override the interpreter explicitly if needed:
+`make train` clones or updates `ignore/linguist`, runs `train/generate_model.py`, rewrites `include/LanguageModel.generated.hpp`, and
+rebuilds the project. It auto-detects `python3` first, then `python`, and you can override the interpreter explicitly if needed:
 
 ```sh
 make train PYTHON=/path/to/python
@@ -122,17 +122,11 @@ directly.
 
 All results are written to the output directory (default `./result`):
 
-| File | Contents |
-|------|----------|
-| `strings.md` | Embedded string and documentation statistics |
-| `files.md` | File-level violation statistics |
-| `nesting.md` | Nesting depth histograms |
-| `language_stats.md` | String language classification breakdown |
-| `max_strings.md` | Max-string diagnostics (`--log-strings` only) |
+| File                | Contents                                     |
+|---------------------|----------------------------------------------|
+| `strings.md`        | Embedded string and documentation statistics |
+| `files.md`          | File-level violation statistics              |
+| `nesting.md`        | Nesting depth histograms                     |
+| `language_stats.md` | String language classification breakdown     |
 
-Each markdown file contains a description table followed by the data table.
-Timing is printed to stderr on completion.
-
-## Metric definitions
-
-See [Metrics.md](Metrics.md) for the meaning of each reported metric and example outputs on analysed repositories.
+Each output file contains 2 tables. The first one contains the metric name and it's definition, the second table has the metric name and actual value.
