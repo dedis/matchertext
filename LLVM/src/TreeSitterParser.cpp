@@ -220,6 +220,14 @@ namespace {
   // returning true cancels the parse, which then yields a null tree.
   constexpr auto kParseTimeout = std::chrono::seconds(5);
 
+  // Skip oversized files. Each parse holds the whole file plus its syntax tree
+  // (which can be ~10x the source) in memory, and the walk runs under OpenMP
+  // across many threads at once, so a handful of huge files parsed concurrently
+  // can exhaust RAM and get the process OOM-killed. Files this large are
+  // essentially always generated/minified/vendored blobs, not hand-written
+  // source, so skipping them costs no real signal.
+  constexpr std::streamoff kMaxFileBytes = 16 * 1024 * 1024; // 16 MiB
+
   // TSInput read callback: hand tree-sitter the whole remaining buffer at once.
   const char *readString(void *payload, const uint32_t byte, TSPoint, uint32_t *bytesRead) {
     const auto *s = static_cast<const std::string *>(payload);
@@ -267,13 +275,18 @@ bool TreeSitter::Parse(const LanguageEnum language, const std::string &path, Ser
   const std::streamoff size = in.tellg();
   if (size < 0)
     return false;
+
+  if (!result.IsArray())
+    result = Serde::JSON::Array();
+
+  // Oversized file: skip before allocating/parsing to bound peak memory.
+  if (size > kMaxFileBytes)
+    return true;
+
   std::string src(static_cast<size_t>(size), '\0');
   in.seekg(0);
   in.read(src.data(), size);
   src.resize(static_cast<size_t>(in.gcount()));
-
-  if (!result.IsArray())
-    result = Serde::JSON::Array();
 
   // Skip binary files. Source extensions collide with non-source formats (e.g.
   // `.ts` is both TypeScript and MPEG transport stream, which Chromium ships as
