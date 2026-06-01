@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/dedis/matchertext/go/markup/minml"
@@ -39,8 +40,11 @@ USAGE:
 COMMANDS:
     help                                  Print this help message
     convert  <file.minml>                 Parse MinML and write HTML to stdout (default)
-    from-xml <file.xml>                   Convert XML to MinML and write to stdout
+    from-xml <file.xml> [OPTIONS]         Convert XML to MinML (auto-creates <file>.m by default)
     server   <file|directory> [OPTIONS]   Start an HTTP server for MinML conversion
+
+OPTIONS (from-xml):
+    --output <file>                       Output file path (default: input path with .m extension)
 
 OPTIONS (server):
     --port <port>                         Port to listen on (default: 8080)
@@ -55,6 +59,7 @@ EXAMPLES:
     %[1]s input.minml
     %[1]s convert input.minml
     %[1]s from-xml input.xml
+    %[1]s from-xml input.xml --output output.m
     %[1]s server input.minml
 `
 
@@ -92,6 +97,20 @@ func main() {
 			log.Fatal(err)
 		}
 	case CmdFromXML:
+		outputPath := strings.TrimSuffix(inputPath, filepath.Ext(inputPath)) + ".m"
+		for i := 0; i < len(rest); i++ {
+			switch rest[i] {
+			case "--output":
+				i++
+				if i >= len(rest) {
+					log.Fatal("--output requires a value")
+				}
+				outputPath = rest[i]
+			default:
+				log.Fatal("unknown option for '", CmdFromXML, "': ", rest[i])
+			}
+		}
+
 		f, err := os.Open(inputPath)
 		if err != nil {
 			log.Fatal(err)
@@ -102,9 +121,17 @@ func main() {
 		if err != nil {
 			log.Fatalf("parsing %s: %v", inputPath, err)
 		}
-		if err := minml.NewTreeWriter(os.Stdout).WriteAST(ns); err != nil {
+
+		out, err := os.Create(outputPath)
+		if err != nil {
+			log.Fatalf("creating output file %s: %v", outputPath, err)
+		}
+		defer out.Close()
+
+		if err := minml.NewTreeWriter(out).WriteAST(ns); err != nil {
 			log.Fatalf("writing MinML: %v", err)
 		}
+		fmt.Fprintf(os.Stderr, "wrote %s\n", outputPath)
 	case CmdServer:
 		port := "8080"
 		noOpen := false
