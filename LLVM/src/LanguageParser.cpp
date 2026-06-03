@@ -5,6 +5,8 @@
 //
 
 #include <algorithm>
+#include <cctype>
+#include <string>
 #include <array>
 #include <cerrno>
 #include <chrono>
@@ -21,10 +23,9 @@
 extern char **environ;
 
 #include "../include/LanguageParser.hpp"
-#include "JSON.hpp"
-#include "JsonParser.hpp"
 #include "../include/LanguageData.hpp"
 #include "../include/Parser.hpp"
+#include "../include/TreeSitterParser.hpp"
 
 static std::string format(const std::string &tpl, const std::string &a, const std::string &b) {
   std::string out;
@@ -192,17 +193,17 @@ namespace {
 }
 
 bool LanguageParser::ExtractData(
-  const LanguageEnum language, const std::string &compilerOverride, const std::string &filePath, Serde::JSON &result
+  const LanguageEnum language, const std::string &filePath, Serde::JSON &result
 ) {
+  // C/C++ use the in-process clang lexer; every other supported language uses an
+  // in-process tree-sitter grammar (see src/TreeSitterParser.cpp).
   if (language == LanguageEnum::C || language == LanguageEnum::CPP)
     return Parser::ParseC_CPP(filePath, result) && result.IsArray();
 
-  std::string out;
-  if (!RunBuildCommand(language, compilerOverride, filePath, out))
-    return false;
+  if (TreeSitter::IsTreeSitterLanguage(language))
+    return TreeSitter::Parse(language, filePath, result) && result.IsArray();
 
-  result = Serde::JSONParser{out}.Parse();
-  return result.IsArray();
+  return false;
 }
 
 bool LanguageParser::ParseLanguage(const std::string &name, LanguageEnum &out) {
@@ -214,54 +215,4 @@ bool LanguageParser::ParseLanguage(const std::string &name, LanguageEnum &out) {
   );
   out = GetLanguage(lower);
   return out != LanguageEnum::Unknown;
-}
-
-bool LanguageParser::RunBuildCommand(
-  const LanguageEnum language, const std::string &compilerOverride, const std::string &filePath, std::string &out
-) {
-  const auto data = GetLanguageData(language);
-  const std::string cc = compilerOverride.empty() ? firstAvailable(data.compilers) : compilerOverride;
-  if (cc.empty())
-    return false;
-
-  // Script-based parsers use a persistent per-thread subprocess to avoid interpreter startup overhead.
-  if (language == LanguageEnum::Python) {
-    auto &proc = tl_procs.procs[language];
-    auto try_start = [&]() -> bool {
-      if (proc.valid())
-        return true;
-      const std::string serverCmd = cc + " \"" MATCHERTEXT_PARSERS_DIR
-      "/parser.py\" --server";
-      return proc.start(serverCmd);
-    };
-    if (!try_start())
-      return false;
-    if (!proc.request(filePath, out)) {
-      // Subprocess died mid-run; restart and retry once.
-      proc.stop();
-      if (!try_start())
-        return false;
-      return proc.request(filePath, out);
-    }
-    return true;
-  }
-
-  // One-shot popen for other external parsers (e.g. Go binary).
-  std::array < char, 4096 > buffer{};
-  const std::string cmd = format(std::string(data.cmdTemplate), cc, filePath);
-  FILE *pipe = popen(cmd.c_str(), "r");
-  if (!pipe)
-    throw std::runtime_error("popen() failed");
-
-  while (fgets(buffer.data(), buffer.size(), pipe) != nullptr)
-    out += buffer.data();
-
-  int status = pclose(pipe);
-  if (status == -1)
-    throw std::runtime_error("pclose() failed");
-
-  if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
-    throw std::runtime_error("command failed with exit code " + std::to_string(WEXITSTATUS(status)));
-
-  return true;
 }
