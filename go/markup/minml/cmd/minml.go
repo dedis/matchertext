@@ -23,24 +23,28 @@ package main
 
 import (
 	"fmt"
-	"github.com/dedis/matchertext/go/markup/minml"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/dedis/matchertext/go/markup/minml"
+	"github.com/dedis/matchertext/go/markup/xml"
 )
 
 const usage = `MinML Command-Line Tool
 
 USAGE:
-    %s [COMMAND] <input.minml> [OPTIONS]
-
-ARGS:
-    <input.minml>    MinML source file
+    %s [COMMAND] <input> [OPTIONS]
 
 COMMANDS:
     help                                  Print this help message
-    convert <file.minml>                  Parse MinML and write HTML to stdout (default)
-    server  <file|directory> [OPTIONS]    Start an HTTP server for MinML conversion
+    convert  <file.minml>                 Parse MinML and write HTML to stdout (default)
+    from-xml <file.xml> [OPTIONS]         Convert XML to MinML (auto-creates <file>.m by default)
+    server   <file|directory> [OPTIONS]   Start an HTTP server for MinML conversion
+
+OPTIONS (from-xml):
+    --output <file>                       Output file path (default: input path with .m extension)
 
 OPTIONS (server):
     --port <port>                         Port to listen on (default: 8080)
@@ -54,10 +58,13 @@ DESCRIPTION:
 EXAMPLES:
     %[1]s input.minml
     %[1]s convert input.minml
+    %[1]s from-xml input.xml
+    %[1]s from-xml input.xml --output output.m
     %[1]s server input.minml
 `
 
 const CmdConvert = "convert"
+const CmdFromXML = "from-xml"
 const CmdServer = "server"
 
 func main() {
@@ -89,6 +96,42 @@ func main() {
 		if err := minml.Convert(inputPath, os.Stdout, true, extensions); err != nil {
 			log.Fatal(err)
 		}
+	case CmdFromXML:
+		outputPath := strings.TrimSuffix(inputPath, filepath.Ext(inputPath)) + ".m"
+		for i := 0; i < len(rest); i++ {
+			switch rest[i] {
+			case "--output":
+				i++
+				if i >= len(rest) {
+					log.Fatal("--output requires a value")
+				}
+				outputPath = rest[i]
+			default:
+				log.Fatal("unknown option for '", CmdFromXML, "': ", rest[i])
+			}
+		}
+
+		f, err := os.Open(inputPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer f.Close()
+
+		ns, err := xml.NewTreeParser(f).ParseAST()
+		if err != nil {
+			log.Fatalf("parsing %s: %v", inputPath, err)
+		}
+
+		out, err := os.Create(outputPath)
+		if err != nil {
+			log.Fatalf("creating output file %s: %v", outputPath, err)
+		}
+		defer out.Close()
+
+		if err := minml.NewTreeWriter(out).WriteAST(ns); err != nil {
+			log.Fatalf("writing MinML: %v", err)
+		}
+		fmt.Fprintf(os.Stderr, "wrote %s\n", outputPath)
 	case CmdServer:
 		port := "8080"
 		noOpen := false
@@ -130,7 +173,7 @@ func parseArgs(args []string) (command string, inputPath string, rest []string) 
 	case "help":
 		printUsage(args[0])
 		os.Exit(0)
-	case CmdConvert, CmdServer:
+	case CmdConvert, CmdFromXML, CmdServer:
 		if len(args) < 3 {
 			log.Fatalf("'%s' requires an input file", args[1])
 		}
