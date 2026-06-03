@@ -14,7 +14,7 @@ import os, sys
 ROOT = "."
 REPOS = os.path.join(ROOT, "result", "repos")
 OUTDIR = os.path.join(ROOT, "result", "global")
-SKIP = {"google"}  # no accumulated $ORG/$ORG folder yet; parsed separately later
+SKIP = {""}  # no accumulated $ORG/$ORG folder yet; parsed separately later
 
 NOTE = ("<!-- GLOBAL AGGREGATE: built from result/repos/$ORG/$ORG/*.md across {n} "
         "organisations ({orgs}). Sums and maxima accumulated directly; averages, "
