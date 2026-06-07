@@ -263,12 +263,10 @@ then explore how a number of common languages of varying types
 might be incrementally adapted to support and leverage
 the matchertext discipline effectively.
 
-This work is in an early exploration and experimentation phase,
-so the evaluation is currently a placeholder,
-serving as a preliminary map for the ways in which
-we \emph{would like to} evaluate matchertext
-and its use in practical languages.
-Some key questions we would like to answer include:
+This work remains in an exploration and experimentation phase,
+but we now report an initial empirical evaluation of matchertext
+on a large corpus of real-world code in \cref{sec:eval}.
+This evaluation begins to answer several key questions:
 how common (and how painful) is the need for escaping
 in the most common cross-language embedding scenarios?
 How extensively would large existing repositories of code or data
@@ -279,6 +277,11 @@ such as synthesizing or editing HTTP or SQL queries?
 How does matchertext affect the frequency of syntax-related bugs --
 especially those potentially leading to security vulnerabilities --
 in code from typical developers?
+We find that existing code is already overwhelmingly matchertext-compliant,
+and that adopting matchertext could remove the large majority
+of the backslash escapes in string literals,
+while the questions of usability and of security-related bugs
+remain largely open for future work.
 
 One early pragmatic experiment with matchertext, however,
 is MinML~\cite{ford22minml},
