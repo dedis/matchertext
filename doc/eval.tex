@@ -24,11 +24,12 @@ how much of the escaping burden adopting matchertext would remove
 (\cref{sec:eval:reduction});
 and how common nested, multi-level embedding is in practice
 (\cref{sec:eval:nesting}).
-Questions of security defects
-and of the purposes of particular embeddings
-are outside what the analysis measures,
-and we return to them as open questions
-in \cref{sec:eval:open}.
+The content classification additionally yields a partial view
+of what these embeddings are used for (\cref{sec:eval:purposes}),
+while the purpose behind each embedding,
+together with questions of security defects,
+lies outside what the analysis measures
+and is taken up as open questions in \cref{sec:eval:open}.
 
 
 \subsection{Methodology}
@@ -309,6 +310,63 @@ and the long, sparse tail.
 \end{figure}
 
 
+\subsection{What embeddings are used for}
+\label{sec:eval:purposes}
+
+The content classifier that attributes violations and toothpicks above
+also gives a partial answer to a question we would otherwise leave open:
+what these embeddings are actually \emph{for}.
+The classifier labels the \emph{kind} of content in each string,
+which is a proxy for its purpose;
+it tells us that a fragment is an SQL query or a regular expression,
+but not the developer's intent in assembling it.
+
+At that granularity the picture is clear.
+Most string literals are not cross-language embeddings at all:
+plain prose, identifier-like tokens, and file paths
+together account for roughly 83\% of samples (\cref{tab:eval:categories}),
+the labels, keys, and paths of ordinary programs.
+The genuine embedded languages form the tail.
+Beyond the format strings, regular expressions, shell fragments,
+and HTML already visible in \cref{tab:eval:categories},
+the languages that motivate our injection discussion (\cref{sec:host:inject})
+appear only sparsely here:
+SQL accounts for 1,003,602 samples (0.79\%),
+CSS for 275,165 (0.22\%),
+JSON for 244,319 (0.19\%),
+and XML for 81,395 (0.06\%).
+That these query and web-facing languages are so thin a slice
+is itself informative.
+The corpus is deliberately infrastructure-heavy
+(kernels, databases, browsers, and toolchains, \cref{sec:eval:methodology}),
+so the SQL-in-application-code and HTML-templating combinations
+that dominate web software are under-represented,
+and these figures should be read as a lower bound
+on how common such combinations are in software at large.
+
+The data also speaks, more coarsely, to which host embeds what.
+As \cref{sec:eval:where} shows,
+the category a host most engages with is legible
+from where its violations and escaping concentrate:
+regular expressions and embedded binary data in JavaScript,
+escaped binary-like blobs and URL-bearing strings in Python,
+and ordinary prose in C++ and Java.
+The intrinsically bracket-heavy mini-languages, regular expressions,
+shell, and CSS, are the ones that recur as embeddings across hosts,
+whereas the bulk categories differ between hosts mainly in volume.
+
+Two caveats bound these readings.
+The classification is content-based and best-effort,
+so the finer categories, especially heuristic ones
+such as the pseudo-binary and pseudo-URL buckets,
+are approximate rather than exact (\cref{sec:eval:methodology}).
+And content type is only a proxy:
+it characterizes what is embedded and how often,
+not the human purpose behind each embedding,
+which the corpus cannot recover
+and which we leave to the usability studies noted below.
+
+
 \subsection{Discussion and open questions}
 \label{sec:eval:open}
 
@@ -337,26 +395,18 @@ rather than any change to nesting discipline.
 
 This evaluation is nonetheless only a first step.
 It measures embedded-language compliance and escaping,
-but several of the questions we raise in \cref{sec:intro}
+but two questions we raise in \cref{sec:intro}
 remain open for future work:
 \begin{itemize}
-\item	For what \emph{purposes} are particular host and embedded
-	language combinations used in practice,
-	beyond the kinds of embedded content the corpus reveals?
 \item	How does matchertext affect the usability to users or developers
 	of common constructs in common embedding use-cases,
 	such as synthesizing or editing HTTP or SQL queries?
-\item	How common have security bugs been related to
-	inadequate or incorrect escape armoring
-	when embedding untrusted content automatically?
-\item	What is the security-critical ``attack surface''
-	(\eg code size and complexity)
-	of typical string sanitizing mechanisms
-	for embedding of untrusted content?
-\item	What are the syntactic ``horror stories'' of cross-language embedding,
-	akin to leaning toothpick syndrome,
-	but perhaps in other combinations of languages
-	and/or resulting in other symptoms?
+\item	How does matchertext affect the frequency of syntax-related,
+	and especially security-related, bugs in typical code?
+	The structural injection resistance of \cref{sec:host:inject}
+	bears directly on this,
+	but measuring its effect on real defect rates
+	is beyond what a static corpus analysis can capture.
 \end{itemize}
 The corpus and analyzer used here~\cite{bastide26matchertext}
 provide a concrete basis for pursuing these questions,
