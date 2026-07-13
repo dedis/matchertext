@@ -123,6 +123,29 @@ def coverage(con):
     write("coverage.csv", ["metric", "value"], rows)
 
 
+def subclass_exports(con):
+    total = con.execute("SELECT COUNT(*) FROM classification").fetchone()[0]
+    write("subclass_coverage.csv", ["dimension", "labeled_cves", "coverage", "distinct_labels"],
+          [(d, n, round(n / total, 4), k) for d, n, k in con.execute(
+              """SELECT dimension, COUNT(DISTINCT cve_id), COUNT(DISTINCT label)
+                 FROM subclass GROUP BY 1 ORDER BY 2 DESC""")])
+    write("subclass_distribution.csv", ["dimension", "label", "count"], con.execute(
+        "SELECT dimension, label, COUNT(*) FROM subclass GROUP BY 1, 2 ORDER BY 1, 3 DESC"))
+    write("technique_by_syntax.csv", ["syntax_type", "technique", "count"], con.execute(
+        """SELECT c.syntax_type, s.label, COUNT(*) FROM subclass s
+           JOIN classification c USING(cve_id) WHERE s.dimension='technique'
+           GROUP BY 1, 2 ORDER BY 1, 3 DESC"""))
+
+
+def syntactic_groups(con):
+    write("syntactic_groups.csv", ["group_id", "syntax_type", "size", "skeleton", "example"],
+          con.execute("""SELECT group_id, syntax_type, COUNT(*) c, skeleton,
+                                MIN(example) FROM syntactic_group
+                         GROUP BY group_id ORDER BY c DESC"""))
+    write("syntactic_group_members.csv", ["cve_id", "syntax_type", "group_id"],
+          con.execute("SELECT cve_id, syntax_type, group_id FROM syntactic_group ORDER BY group_id"))
+
+
 def poc_by_source(con):
     write("poc_by_source.csv", ["source", "poc_rows", "distinct_cves", "injection_cves"],
           con.execute("""SELECT p.source, COUNT(*), COUNT(DISTINCT p.cve_id),
@@ -153,6 +176,8 @@ def run(args):
     enrichment_by_year(con)
     cwe_disagreement(con)
     poc_by_source(con)
+    subclass_exports(con)
+    syntactic_groups(con)
     audit_sample(con)
     coverage(con)
     con.close()

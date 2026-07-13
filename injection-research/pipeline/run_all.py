@@ -11,6 +11,8 @@ import build_db
 import classify
 import export
 import fetch
+import subclass
+import syntactic_group
 
 
 def main():
@@ -25,6 +27,8 @@ def main():
         fetch.run(args)
     build_db.run(args)
     classify.run(args)
+    subclass.run(args)
+    syntactic_group.run(args)
     export.run(args)
 
 

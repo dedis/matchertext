@@ -84,6 +84,68 @@ def md_escape(s):
     return s.replace("|", "\\|").replace("`", "\\`")
 
 
+def syntactic_group_section(out, q, top=12, per_syntax=5):
+    grouped = q("SELECT COUNT(*), COUNT(DISTINCT group_id) FROM syntactic_group")[0]
+    if not grouped[0]:
+        return
+    singletons = q("""SELECT COUNT(*) FROM (SELECT group_id FROM syntactic_group
+                      GROUP BY group_id HAVING COUNT(*)=1)""")[0][0]
+    out.append("## Syntactic groups")
+    out.append("")
+    out.append(f"PoC-backed CVEs are bucketed by an exact *syntactic skeleton* — the "
+               f"payload with literals, numbers and identifiers abstracted to `<q> <n> "
+               f"<id>` and only the structural grammar (matchers, operators, tags, "
+               f"keywords) kept. **{grouped[0]:,}** CVEs fall into **{grouped[1]:,}** "
+               f"distinct skeletons ({singletons:,} are singletons); the largest groups:")
+    out.append("")
+    table(out, ["size", "syntax", "skeleton", "example"],
+          [(f"{n:,}", s, "`" + md_escape(sk) + "`", "`" + md_escape(ex) + "`") for n, s, sk, ex in
+           q("""SELECT COUNT(*) c, syntax_type, skeleton, MIN(example) FROM syntactic_group
+                GROUP BY group_id ORDER BY c DESC LIMIT ?""", top)])
+
+    out.append("### Largest skeleton per syntax type")
+    out.append("")
+    rows = q("""SELECT syntax_type, skeleton, MIN(example) e, COUNT(*) c
+                FROM syntactic_group GROUP BY group_id ORDER BY c DESC""")
+    seen, picked = set(), []
+    for syn, sk, ex, n in rows:
+        if syn not in seen:
+            seen.add(syn)
+            picked.append((syn, f"{n:,}", "`" + md_escape(sk) + "`", "`" + md_escape(ex) + "`"))
+    table(out, ["syntax", "size", "skeleton", "example"], sorted(picked))
+
+
+def subclass_sections(out, q, related):
+    out.append("## Sub-classification")
+    out.append("")
+    out.append("Injection CVEs are labelled on orthogonal facets (a CVE can carry one "
+               "label per dimension). Coverage is the share of injection CVEs a facet "
+               "could be determined for; dimensions differ because their signals do.")
+    out.append("")
+    table(out, ["dimension", "labeled CVEs", "coverage", "distinct labels"],
+          [(d, f"{n:,}", f"{n / related:.1%}", k) for d, n, k in
+           q("""SELECT dimension, COUNT(DISTINCT cve_id), COUNT(DISTINCT label)
+                FROM subclass GROUP BY 1 ORDER BY 2 DESC""")])
+
+    for dim, title in (("privilege", "Reachability — privilege required (CVSS)"),
+                       ("attack_vector", "Attack vector (CVSS)"),
+                       ("impact", "Impact (description)")):
+        out.append(f"### {title}")
+        table(out, ["label", "count"], q(
+            "SELECT label, COUNT(*) FROM subclass WHERE dimension=? GROUP BY 1 ORDER BY 2 DESC", dim))
+
+    out.append("### Technique by syntax type")
+    out.append("")
+    for syn, in q("""SELECT DISTINCT c.syntax_type FROM classification c
+                     JOIN subclass s USING(cve_id) WHERE s.dimension='technique'
+                     ORDER BY 1"""):
+        techs = q("""SELECT s.label, COUNT(*) FROM subclass s JOIN classification c USING(cve_id)
+                     WHERE s.dimension='technique' AND c.syntax_type=?
+                     GROUP BY 1 ORDER BY 2 DESC""", syn)
+        out.append(f"- **{syn}**: " + ", ".join(f"{l} ({n:,})" for l, n in techs))
+    out.append("")
+
+
 def run(args):
     rng = random.Random(args.seed)
     con = sqlite3.connect(DB)
@@ -122,6 +184,9 @@ def run(args):
                        COUNT(DISTINCT e.cve_id)
                 FROM classification c LEFT JOIN kev k USING(cve_id)
                 LEFT JOIN poc e USING(cve_id) GROUP BY 1 ORDER BY 2 DESC""")])
+
+    syntactic_group_section(out, q)
+    subclass_sections(out, q, related)
 
     out.append("## Payload samples per syntax type")
     out.append("")
