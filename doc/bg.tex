@@ -44,6 +44,7 @@ has been aptly dubbed
 \href{https://en.wikipedia.org/wiki/Leaning_toothpick_syndrome}{\emph{leaning toothpick syndrome}}.
 
 \subsection{The complexity of multi-level escaping}
+\label{sec:bg:escaping}
 
 As \cref{fig:territorial-integrity} illustrates,
 each additional level of embedding in traditional syntax
@@ -195,21 +196,182 @@ embedded matchertext from an untrusted source, for example,
 then it will likely still be security-critical to check
 that the untrusted content \emph{is indeed valid matchertext},
 and reject it if not.
-However, a passive \emph{verification} like this
-can be much simpler, and hence less bug-prone,
-than a content-modifying \emph{transformation},
-to escape all characters or sequences that might be ``sensitive''
-in the host language.
-Further, this security-critical check
-could also be more uniform across host languages --
-\ie checking only that the three ASCII matcher pairs are matched corrrectly
-throughout the untrusted content,
-rather than deeply verifying and/or transforming
-based on the complex syntax of a particular host language.
-Thus, while matchertext will not eliminate the need for sanitization,
-it might tighten and simplify
-the function of the most security-critical ``checkpoint'' --
-namely checking that embedding content from an untrusted source
-preserves the structural integrity
-of the host language it is embedded in.
+Such a passive \emph{verification}, however,
+can be much simpler, and more uniform across host languages,
+than the content-modifying \emph{transformation}
+that conventional escaping and sanitization require --
+a contrast we develop in \cref{sec:bg:sanitizer}
+and put to work against injection in \cref{sec:host:inject}.
+
+
+\subsection{A wider family of embedding hazards}
+\label{sec:bg:hazards}
+
+SQL injection and XSS are only the most familiar members
+of a much larger family of failures with a single root cause:
+untrusted content escaping the syntactic context it was meant to occupy,
+because a delimiter in the content collides with one in the host language.
+The same failure recurs across many language pairs,
+and produces symptoms well beyond information disclosure.
+
+Several are, like SQL injection, outright remote compromises.
+In the 2021 Log4Shell vulnerability,
+a \verb|${jndi:...}| sequence appearing anywhere in a logged string
+was expanded by Log4j's message interpolation into a remote lookup
+that loaded and executed attacker-supplied code~\cite{cve2021log4shell}.
+Command injection arises when user input reaches a shell without proper quoting,
+so that metacharacters such as \verb|;| or \verb|&|
+break out of the intended single argument~\cite{owasp_cmdinjection}.
+Spreadsheet formula injection turns exported data into code:
+a field beginning with \verb|=| is re-interpreted as a formula
+when a CSV export is opened in a spreadsheet,
+as in an Azure activity-log entry
+that executed on an administrator's machine on download~\cite{gietzen18csv}.
+Server-side template injection embeds user input into a template
+instead of passing it as data,
+letting an expression such as \verb|{{7*7}}| reach the template engine
+and frequently the whole server~\cite{portswigger_ssti},
+while the analogous client-side attack
+breaks out of the AngularJS expression sandbox
+to run arbitrary JavaScript~\cite{peguero16angular}.
+Even purpose-built defenses are not immune:
+the DOMPurify sanitizer has been bypassed by \emph{mutation} XSS,
+in which the browser's own parser rewrites already-sanitized markup
+back into an executable form~\cite{heyes20mxss}.
+
+Other members corrupt data or deny service rather than disclose it.
+YAML's implicit typing silently coerces values,
+so a list entry \verb|NO|, a country code, parses as the boolean false,
+the widely cited ``Norway problem''~\cite{oconnor23yaml}.
+A regular expression with nested quantifiers
+fed adversarial input backtracks catastrophically and hangs the program,
+a regular-expression denial of service~\cite{owasp_redos};
+and the XML ``billion laughs'' attack
+expands a kilobyte of nested entity definitions into gigabytes,
+exhausting memory during parsing~\cite{sullivan09xml}.
+
+The maintainability face of the same problem
+is the leaning toothpick syndrome of \cref{sec:bg:escaping},
+and history shows that ad-hoc syntactic fixes tend to backfire:
+PHP's \verb|magic_quotes| feature auto-escaped quotes in request data
+to forestall injection,
+but did so inconsistently, invited double-escaping bugs,
+and was eventually deprecated~\cite{php_magicquotes}.
+What unites the largest of these cases is structural:
+content meant to be inert data is read as syntax
+because a bracket or quote within it escapes its intended region.
+That is exactly the failure a matcher-balance discipline is built to prevent,
+and because it recurs across the injection, template, and markup attacks above
+rather than in any single language pair,
+one structural guarantee can address all of them at once,
+as we develop in \cref{sec:host:inject}.
+
+
+\subsection{The prevalence and cost of injection failures}
+\label{sec:bg:prevalence}
+
+These failures are neither rare nor fading.
+Injection has appeared in every edition of the OWASP Top~10
+web application security risks since 2010,
+and since the 2021 edition it subsumes cross-site scripting~\cite{owasp_top10_2021}.
+The underlying weaknesses top MITRE's CWE Top~25 as well:
+in the 2025 ranking,
+cross-site scripting (CWE-79) is first
+and SQL injection (CWE-89) second~\cite{cwe_top25_2025}.
+The absolute volumes are large.
+OWASP's 2025 Injection category maps to 62,445 recorded CVEs,
+of which it attributes more than 30,000 to XSS
+and more than 14,000 to SQL injection~\cite{owasp_top10_2025}.
+Independent scanning corroborates this:
+Edgescan's 2025 report attributes 28.28\% of critical and high-severity
+web and API findings to SQL injection and a further 17\% to XSS~\cite{edgescan25},
+and Veracode has reported XSS in 47\% and SQL injection in 28\%
+of the applications it tested~\cite{veracode_soss}.
+The cost of a single failure can be severe:
+the 2015 TalkTalk breach, an SQL injection,
+exposed the data of over 150,000 customers
+and led to a regulatory fine~\cite{ico_talktalk}.
+
+More telling for our purposes is \emph{why} these bugs persist.
+The escaping and context-sensitive sanitization
+that the preceding sections describe as complex
+are empirically error-prone.
+In one controlled study,
+all ten programmers asked to fix an XSS flaw
+with a standard output-encoding library
+failed to remove it completely~\cite{wijayarathna18esapi};
+an analysis of real PHP applications
+found them carrying far more distinct sanitizers than syntactic contexts,
+one application defining 95 sanitization functions
+against thousands of output sites,
+an arrangement in which selecting the wrong encoder for a context
+is both easy and common~\cite{weinberger11xss}.
+The risky patterns remain widespread:
+a 2024 study of nearly a million GitHub projects
+found SQL assembled by string concatenation
+in 42\% of the Java, 56\% of the C\#, and 91\% of the PHP files examined,
+the construction from which injection arises
+once untrusted input reaches the query structure~\cite{dennis24sql}.
+
+The record is consistent and stark:
+injection and XSS are common, severe, and long-lived,
+and the escaping and sanitization meant to prevent them
+are difficult and routinely misused.
+That is precisely the burden
+a simpler, uniform, host-independent \emph{check} could relieve,
+and pursuing it is the aim of the rest of this paper (\cref{sec:host:inject}).
+
+
+\subsection{The sanitizer as attack surface}
+\label{sec:bg:sanitizer}
+
+The machinery built to perform this escaping
+is itself substantial code, and itself a recurring source of vulnerabilities.
+A production HTML sanitizer must track
+the host parser's full and quirk-laden behavior,
+so the components are not small:
+DOMPurify's core file runs to roughly 2,400 lines,
+and project-wide the larger sanitizers reach tens of thousands,
+HTML Purifier and OWASP's ESAPI each near 40,000
+and Python's Bleach around 15,000.
+Because such a sanitizer is correct only while its model
+matches every browser exactly,
+each divergence becomes a bypass,
+and the bypasses recur as named classes:
+mutation XSS, in which sanitized markup turns executable
+once the browser reparses it~\cite{heiderich13mxss};
+parsing differentials, in which the sanitizer and the browser
+disagree about the same input~\cite{klein24parsing};
+and DOM clobbering, in which attacker-named elements
+subvert the security logic itself~\cite{khodayari23clobbering}.
+
+The result is a steady stream of flaws in the sanitizers themselves.
+DOMPurify has carried at least nine CVEs,
+publishing sixteen security advisories in under three months
+of 2026 alone~\cite{dompurify_advisories},
+and the Rails HTML sanitizer disclosed five CVEs on a single day~\cite{rails_sanitizer_cves};
+Bleach, sanitize-html, and HTML Purifier
+each have their own multi-entry histories.
+These counts include only flaws \emph{in} the sanitizers,
+not the far larger number they prevent downstream,
+and the point is not that sanitizers are dispensable.
+It is that a transformation which must re-implement
+another language's parser, and re-synchronize with it as it changes,
+is inherently a large attack surface.
+
+This is the concrete case for preferring a structural \emph{check}
+to a structural \emph{transformation}.
+Verifying that a value's matchers balance
+is host-independent and small,
+whereas a sanitizer must shadow the host language's parser and its quirks;
+the security literature has repeatedly reached the analogous conclusion,
+favoring safety by construction, typed template contexts,
+and parameterized queries over ad-hoc escaping~\cite{samuel11csas,momot16langsec,owasp_parameterization}.
+The contrast could hardly be sharper:
+a few lines of uniform, host-independent balance-checking
+against tens of thousands of lines of parser-shadowing transformation
+that must be re-synchronized with every browser it shadows.
+Shrinking the trusted checkpoint to that structural check
+is exactly what matchertext's preference for verification over transformation
+offers (\cref{sec:host:inject}).
 
