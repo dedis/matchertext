@@ -12,6 +12,9 @@ This discipline
 enables the safe embedding any matchertext-compliant string
 into any matchertext-aware language via simple ``copy-and-paste'' --
 with no escaping, obfuscation, or expansion of embedded strings.
+We formalize this guarantee in a machine-checked Lean proof
+that delimiting valid matchertext always yields valid matchertext,
+so embeddings compose to any depth.
 Simple string-literal syntax extensions like \verb|M"(|$\dots$\verb|)"|,
 backward-compatible with a wide variety of languages,
 could enable the robust embedding of arbitrary matchertext strings
@@ -21,6 +24,10 @@ to several common and frequently-embedded
 language syntaxes such as URIs, HTML, and JavaScript,
 exploring the benefits, costs, and compatibility issues
 in adopting the proposed matchertext discipline.
+Because breaking out of a matcher pair would require an unmatched matcher,
+delimiting untrusted input with matchers rather than quotes
+gives a uniform, host-independent structural defense
+against injection attacks such as SQL injection and cross-site scripting.
 An empirical analysis of roughly 470~million string literals
 drawn from thousands of production repositories
 finds that real-world code is already overwhelmingly compliant

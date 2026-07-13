@@ -259,14 +259,20 @@ in both C-like languages and SGML-derived languages like HTML.
 
 In the rest of this paper, 
 we develop more deeply the design and rationale for the matchertext discipline,
+including a machine-checked proof that delimiting valid matchertext
+again yields valid matchertext (\cref{sec:design:abstract:formal}),
 then explore how a number of common languages of varying types
 might be incrementally adapted to support and leverage
-the matchertext discipline effectively.
+the matchertext discipline effectively --
+including how matcher-delimiting untrusted input
+yields a structural defense against injection attacks
+(\cref{sec:host:inject}).
 
 This work remains in an exploration and experimentation phase,
-but we now report an initial empirical evaluation of matchertext
+but now reports an initial empirical evaluation of matchertext
 on a large corpus of real-world code in \cref{sec:eval}.
-This evaluation begins to answer several key questions:
+Matchertext raises several key questions that this evaluation,
+with the preceding design, takes up:
 how common (and how painful) is the need for escaping
 in the most common cross-language embedding scenarios?
 How extensively would large existing repositories of code or data
@@ -277,11 +283,9 @@ such as synthesizing or editing HTTP or SQL queries?
 How does matchertext affect the frequency of syntax-related bugs --
 especially those potentially leading to security vulnerabilities --
 in code from typical developers?
-We find that existing code is already overwhelmingly matchertext-compliant,
-and that adopting matchertext could remove the large majority
-of the backslash escapes in string literals,
-while the questions of usability and of security-related bugs
-remain largely open for future work.
+For that last question we offer a structural answer in \cref{sec:host:inject},
+where matcher-delimiting untrusted input resists injection attacks,
+though its empirical effect on defect rates remains open.
 
 One early pragmatic experiment with matchertext, however,
 is MinML~\cite{ford22minml},
@@ -300,24 +304,6 @@ to the \href{https://gohugo.io}{Hugo} static website generator
 already allows web authoring in MinML.
 
 
-\xxx{
-Caveats:
-- does not eliminate other needs for escaping (just escaping for embedding).
-- does not eliminate the need for correct input validation
-in automated embedding
-(e.g., checking that the input is matchertext
-or transforming it into matchertext)),
-and thus cannot be expected to eliminate all syntax-related security bugs
-of the SQL injection variety.
-Mistakes will still happen.
-However, we may hope that the consistent and rigorous application
-of the matchertext discipline
-might significantly increase the robustness of embedding practices
-and hence decrease the frequency of such bugs.
-XXX to be tested empirically.
-}
-
-\xxx{ paper roadmap}
 
 
 \subsection*{An open research project}

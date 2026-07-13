@@ -12,8 +12,25 @@ and explore potential backward-compatible extensions
 to existing classes of languages
 both to host embedded matchertext strings,
 and to write embeddable matchertext conveniently.
-Further experience is needed implementing and using matchertext
-in order to evaluate its benefits and costs empirically.
+We give the discipline a machine-checked foundation,
+proving in Lean that delimiting any valid matchertext
+again yields valid matchertext (\cref{sec:design:abstract:formal}),
+so embeddings compose to any depth without escaping or expansion.
+Building on that structural guarantee,
+we show how matcher-delimiting untrusted input
+turns defenses against injection attacks --
+SQL injection, cross-site scripting, and their LDAP and PDF analogues --
+into a single host-independent check (\cref{sec:host:inject}).
+An empirical analysis of roughly 470~million string literals
+from thousands of production repositories (\cref{sec:eval})
+finds real-world code already overwhelmingly compliant with the discipline,
+and that adopting it would remove around 95\% of the backslash escapes
+in string literals,
+evidence that the adoption cost is small while the benefit is large.
+The chief remaining question is one of usability:
+how matchertext affects developers writing and editing
+common embedded constructs in practice,
+which we leave to future work.
 
 \subsection*{Acknowledgments}
 
