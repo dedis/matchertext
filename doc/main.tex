@@ -4,11 +4,50 @@
 \usepackage{times}
 \usepackage{xspace}
 \usepackage{cite} % sort citation numbers
+\usepackage{amsthm}
+\usepackage{xurl}
 \usepackage[hyperindex,breaklinks,colorlinks,
 	    linkcolor=blue,citecolor=blue,urlcolor=black]{hyperref}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 \usepackage{cleveref}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{definition}{Definition}
+\crefname{algorithm}{Algorithm}{Algorithms}
 \usepackage{graphicx}
 \usepackage[T1]{fontenc}
+\usepackage{listings}
+\lstdefinelanguage{Lean}{
+  morekeywords={inductive,theorem,def,where,variable,import,Prop,Set,List,Type},
+  morecomment=[l]{--},
+  morecomment=[s]{/-}{-/},
+  sensitive=true,
+}
+\lstset{
+  language=Lean,
+  basicstyle=\ttfamily\scriptsize,
+  commentstyle=\itshape,
+  columns=fullflexible,
+  keepspaces=true,
+  extendedchars=true,
+  breaklines=true,
+  showstringspaces=false,
+  literate=
+    {α}{{$\alpha$}}1
+    {∃}{{$\exists$}}1
+    {∈}{{$\in$}}1
+    {∨}{{$\lor$}}1
+    {∧}{{$\land$}}1
+    {¬}{{$\lnot$}}1
+    {×}{{$\times$}}1
+    {→}{{$\to$}}1
+    {∀}{{$\forall$}}1
+    {₁}{{$_1$}}1
+    {₂}{{$_2$}}1
+    {₃}{{$_3$}}1
+}
+\usepackage{upquote}
 
 %%%%%%%%%%%%%%%%%%%%%%
 
@@ -78,11 +117,16 @@
 \input{rel}
 \input{concl}
 
+\appendix
+\onecolumn
+\input{appendix}
+\twocolumn
+
 \bibliographystyle{plain}
 \arxiv{
-\bibliography{lang,net,sec,soc,thesis}
+\bibliography{lang,net,sec,soc,new,thesis}
 }{
-\bibliography{main,thesis}
+\bibliography{main,new,thesis}
 }
 
 \end{document}

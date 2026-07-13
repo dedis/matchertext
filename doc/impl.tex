@@ -1,24 +1,22 @@
 \section{Implementations of matchertext}
 \label{sec:impl}
 
-This section is mainly a placeholder at the present.
-Some preliminary work is underway
-implementing experimental matchertext extensions
-for several languages and embedding-oriented syntaxes.
-This section is intended to be expanded
-as we gain experience
-implementing and using matchertext extensions.
+This section reports early but growing work on realizing matchertext.
+We give a grammar-level account
+of how a C-like compiler can adopt the hosting and embedding extensions
+of \cref{sec:host} as a conservative extension,
+and describe MinML, a matchertext-based markup syntax
+with an existing experimental implementation.
+Further work implementing matchertext extensions
+for several languages and embedding-oriented syntaxes is underway,
+and this section is intended to be expanded
+as we gain experience implementing and using them.
 
 For those wishing to help with implementation and experimentation,
 the following are some of the key work items
 enabling us to start experimenting with matchertext in the context
 of any particular language of interest:
 \begin{itemize}
-\item	A brief specification of proposed
-	syntactic extensions for hosting matchertext
-	and/or conveniently writing embedded matchertext,
-	adapted to the specific language of interest,
-	with clearly-defined rationale for the particular syntax choices.
 \item	An implementation of those extensions for hosting and/or embedding,
 	selectively enabled via configuration parameters
 	for backward compatibility,
@@ -29,16 +27,165 @@ of any particular language of interest:
 	to check and enforce the matchertext discipline
 	in processed text:
 	\ie to verify that matchers match in source files or strings.
-\item	Purely for experimentation purposes,
-	an extension of some processor for the language
-	that can analyze ``legacy'' source files in the language
-	to detect and categorize matchertext violations
-	(\eg whether in string literals, comments, or elsewhere).
-	We will use this to help estimate the likely ``pain''
-	of adopting the matchertext discipline in the language
-	and how commonly this pain would affect typical code today.
 \end{itemize}
 
+
+\subsection{A compiler grammar for matchertext}
+\label{sec:impl:grammar}
+
+Realizing the syntactic extensions of \cref{sec:host} in an existing compiler
+reduces to a single requirement:
+the additions must form a \emph{conservative extension} of the language,
+under which every previously valid program stays valid and keeps its meaning.
+Only a conservative extension can be adopted incrementally,
+enabled behind a configuration flag without endangering existing code,
+the backward compatibility that \cref{sec:host} identifies as essential to adoption.
+The general technique is to guard each new form
+with a marker the old grammar could never accept,
+so the extension fires only on input the language previously rejected.
+We give grammar rules of this kind for the two directions in turn,
+first the embedded matchertext literal itself
+and then the accommodation a host language must make to admit it.
+
+\subsubsection{Embedded-matchertext grammar}
+\label{sec:impl:grammar:embed}
+
+We now cast the matchertext literal of \cref{sec:host:c:literals}
+as concrete grammar rules that a C-like language could fold into its lexer.
+
+We assume the target language already parses ordinary string literals
+with a rule of the general shape:
+\[
+\begin{array}{rcl}
+\mathit{content}
+  & ::= & \texttt{...} \\
+
+\mathit{delimiter}
+  & ::= & \texttt{"} \\
+
+\mathit{string}
+  & ::= & \mathit{delimiter}\ \mathit{content}\ \mathit{delimiter}
+\end{array}
+\]
+The delimiter is shown here as a double quote,
+but any string delimiter the language already uses would serve equally well,
+for instance \verb|'|, \verb|"|, \verb|"""|, \verb|'''|, or a backtick.
+
+The proposed form is \verb|M|$d$\verb|"|$O\dots C$\verb|"|,
+an ordinary string literal carrying a mandatory \verb|M| prefix
+and an optional specifier $d$.
+Its content $O\dots C$ is itself wrapped in a matcher pair,
+$O$ one of \verb|(|, \verb|[|, \verb|{| and $C$ its matching close.
+That wrapping is the crux:
+the processor finds the literal's end by matcher balance,
+at the $C$ closing the opening $O$ (\cref{alg:design:findend}),
+not at the first quote it meets inside,
+so the content may hold any character, quotes included,
+as long as its matchers balance.
+This is exactly the matchertext discipline,
+and \cref{thm:design:embed} then guarantees the content embeds verbatim
+without escaping.
+The optional $d$, one or more strictly nested matcher pairs,
+names the pair reserved for interpolation holes or antiquotations
+inside the literal (\cref{sec:host:interp}),
+so a template can mark its holes unambiguously.
+The lone \verb|M| prefix is what keeps the extension conservative:
+mainstream C-like languages reserve only a fixed set of string prefixes,
+such as \verb|L|, \verb|u8|, or \verb|R|,
+so an \verb|M| abutting a quote is input their grammars already reject,
+and the new form cannot change the meaning of any existing program.
+
+We first define the matchertext symbols used (prefixed with MT):
+\[
+\begin{array}{rcl}
+\mathit{MT\_prefix}
+  & ::= & \texttt{M} \\
+
+\mathit{MT\_d}
+  & ::= & \texttt{(}\mathit{MT\_d}\texttt{)}
+    \mid \texttt{[}\mathit{MT\_d}\texttt{]}
+    \mid \texttt{\{}\mathit{MT\_d}\texttt{\}} \mid \epsilon \\
+
+\mathit{MT\_string}
+  & ::= & \mathit{delimiter}\ \texttt{(}\,\mathit{content}\,\texttt{)}\ \mathit{delimiter} \\
+  & \mid & \mathit{delimiter}\ \texttt{\{}\,\mathit{content}\,\texttt{\}}\ \mathit{delimiter} \\
+  & \mid & \mathit{delimiter}\ \texttt{[}\,\mathit{content}\,\texttt{]}\ \mathit{delimiter} \\
+\end{array}
+\]
+
+We then introduce the extended rule \verb|string_ext|
+and use it wherever the grammar previously accepted a \verb|string|.
+Its first alternative is the unchanged \verb|string| rule,
+so every existing literal parses exactly as before,
+and its remaining alternatives add the matchertext forms:
+\[
+\begin{array}{rcl}
+\mathit{string\_ext}
+  & ::= & \mathit{string} \\
+  & \mid & \mathit{MT\_prefix}\,\mathit{MT\_d}\,\mathit{MT\_string}
+\end{array}
+\]
+
+The same rules refactored into LL(1) form,
+so a predictive parser can select each alternative from one token of lookahead.
+Here \verb|MT_string| omits the leading delimiter, which \verb|MT_content| supplies,
+letting the parser decide as soon as it sees the opening quote or an opening
+matcher after the \verb|M|:
+\[
+\begin{array}{rcl}
+\mathit{string\_ext}
+  & ::= & \mathit{string} \mid \mathit{MT\_prefix}\ \mathit{MT\_content} \\
+
+\mathit{MT\_content}
+  & ::= & \mathit{MT\_d}\ \mathit{delimiter}\ \mathit{MT\_string} \\
+
+\mathit{MT\_d}
+  & ::= & \texttt{(}\ \mathit{MT\_d}{\mathit{opt}}\ \texttt{)}
+          \mid \texttt{[}\ \mathit{MT\_d}{\mathit{opt}}\ \texttt{]} \\
+  & \mid & \texttt{\{}\ \mathit{MT\_d}{\mathit{opt}}\ \texttt{\}} \mid \epsilon \\
+
+\mathit{MT\_d}{\mathit{opt}}
+  & ::= & \mathit{MT\_d} \mid \epsilon \\
+
+\mathit{MT\_string}
+  & ::= & \texttt{(}\,\mathit{content}\,\texttt{)}\ \mathit{delimiter} \\
+  & \mid & \texttt{\{}\,\mathit{content}\,\texttt{\}}\ \mathit{delimiter} \\
+  & \mid & \texttt{[}\,\mathit{content}\,\texttt{]}\ \mathit{delimiter} \\
+\end{array}
+\]
+
+\subsubsection{Host-language grammar}
+\label{sec:impl:grammar:host}
+
+Hosting embedded matchertext asks less of the grammar than embedding does,
+at least for C-like languages,
+because the property a host must enforce inside an embedding,
+that matchers balance,
+is one these languages already enforce throughout their ordinary syntax.
+The expression, block, and argument-list grammars of
+C, C++, Rust, Java, Python, and their relatives
+all require every \verb|(|, \verb|[|, and \verb|{| to be matched
+for a program to compile at all,
+so at the structural level their code is already matchertext.
+The only contexts in which they admit unmatched matchers today
+are the opaque ones, string and character literals and comments,
+whose contents the compiler does not otherwise interpret.
+
+Those contexts are also the ones backward compatibility forbids us
+to constrain for existing, non-embedded code,
+so a host does not tighten them globally.
+It instead introduces a bracketed embedding region within them,
+such as the \verb|\[|$m$\verb|]| escape of \cref{sec:host:c:escapes},
+inside which two rules apply,
+following the general hosting principle of \cref{sec:host}:
+the host disables its own escaping and other transformations,
+and locates the region's end by matcher balance (\cref{alg:design:findend})
+rather than by its usual literal or comment terminator.
+Because the surrounding code already balances its matchers,
+this region composes cleanly with it,
+and the grammar change a C-like host needs is correspondingly small:
+the discipline it must impose inside an embedding
+is the one it already imposes everywhere else.
 
 \subsection{MinML: minified matchertext markup}
 
