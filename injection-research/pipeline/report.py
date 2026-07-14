@@ -177,7 +177,13 @@ def syntactic_groups(q, groups):
                    "<h3>Largest skeleton per syntax type</h3>", largest)
 
 
-def matchertext_section(q, groups, prev_cves, total_cves):
+def stat(big, klass, label, sub, frac):
+    return (f'<div class="callout {klass}"><div class="big">{big}</div>'
+            f'<div class="cbody"><div class="clabel">{label}</div>'
+            f'<div class="csub">{sub}</div>{bar(frac)}</div></div>')
+
+
+def matchertext_section(q, groups, prev_cves, total_cves, related):
     rows = []
     for s, sk, ex, n in groups[:20]:
         rewrite, prevent = matchertext.assess(s, sk)
@@ -194,16 +200,29 @@ def matchertext_section(q, groups, prev_cves, total_cves):
              f'<th class="num">size</th><th>syntax</th><th>skeleton</th>'
              f'<th>matchertext rewrite</th><th>matchertext preventable?</th>'
              f'</tr></thead><tbody>{body}</tbody></table></div>')
-    callout = (f'<div class="callout"><div class="big">{prev_cves / total_cves:.0%}</div>'
-               f'<div>of the <strong>{total_cves:,}</strong> grouped CVEs '
-               f'(<strong>{prev_cves:,}</strong>) fall in a matchertext-preventable skeleton</div></div>')
+    proj_prev = sum(n for s, n in q("SELECT syntax_type, COUNT(*) FROM classification GROUP BY 1")
+                    if s in matchertext.HOST)
+    callouts = ('<div class="callouts">' + stat(
+        f"{prev_cves / total_cves:.0%}", "", "Verified on payload-backed CVEs",
+        f"<strong>{prev_cves:,}</strong> of <strong>{total_cves:,}</strong> CVEs with an "
+        "extractable PoC were rewritten and shown to be contained", prev_cves / total_cves) + stat(
+        f"{proj_prev / related:.0%}", "proj", "Projected across all injection CVEs",
+        f"<strong>{proj_prev:,}</strong> of <strong>{related:,}</strong> fall in a "
+        "matchertext-hostable syntax (no payload needed)", proj_prev / related) + "</div>")
     return section("matchertext", "Matchertext prevention by skeleton",
                    p("Assuming the host adopts a matchertext syntax that delimits the "
                      f"untrusted value with a matcher pair (e.g. {co('[…]')} for SQL, as in the "
                      "paper), each skeleton is rewritten to its matchertext-equivalent — "
                      f"unmatched matchers escaped via ToMatchertext ({co('\\o()')} / "
                      f"{co('\\c()')}) — and checked for breakout (paper §4.7)."),
-                   callout,
+                   callouts,
+                   p("The left figure is <strong>verified</strong>: only the "
+                     f"{total_cves:,} CVEs with an extractable PoC payload can be skeletonized "
+                     "and rewritten. The right figure <strong>projects</strong> the syntax-level "
+                     "verdict onto every injection CVE — the rest simply have no payload in the "
+                     "record to rewrite. It is a mild upper bound, since a fraction of "
+                     f"{co('html_dom')} lands in semantic sinks ({co('javascript:')} URLs) that "
+                     "hosting cannot stop."),
                    p("A skeleton is <strong>not</strong> preventable (grey) when the sink "
                      "executes the contained value by design (templates, expression "
                      "languages, eval, spreadsheet formulas) or the breakout uses "
@@ -296,7 +315,7 @@ def run(args):
         families(q, related),
         syntax_types(q, related),
         syntactic_groups(q, groups),
-        matchertext_section(q, groups, prev_cves, grouped),
+        matchertext_section(q, groups, prev_cves, grouped, related),
         subclass_section(q, related),
         payload_samples(con, q, rng, args.samples),
     ])
@@ -356,9 +375,17 @@ padding:1px 9px;font-size:12px;white-space:nowrap}
 .badge.no{background:var(--pill);color:var(--mut)}
 tr.prevent{box-shadow:inset 3px 0 var(--good-ink)}
 tr.noprevent td{color:var(--mut)}
+.callouts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+@media (max-width:640px){.callouts{grid-template-columns:1fr}}
 .callout{display:flex;align-items:center;gap:16px;background:var(--good-bg);
-border:1px solid var(--good-line);border-radius:12px;padding:14px 18px;margin:14px 0}
-.callout .big{font-size:34px;font-weight:800;color:var(--good-ink);line-height:1}
+border:1px solid var(--good-line);border-radius:12px;padding:14px 18px;margin:0}
+.callout .big{font-size:34px;font-weight:800;color:var(--good-ink);line-height:1;white-space:nowrap}
+.callout.proj{background:color-mix(in srgb,var(--accent) 12%,var(--panel));border-color:var(--accent)}
+.callout.proj .big{color:var(--accent)}
+.callout.proj .bar>span{background:var(--accent)}
+.cbody{min-width:0}.clabel{font-weight:600;font-size:14px}
+.csub{font-size:12.5px;color:var(--mut);margin:2px 0 8px}
+.callout .bar{width:100%}
 .chip{display:inline-block;background:var(--pill);border:1px solid var(--line);border-radius:6px;
 padding:1px 8px;font-size:12px;margin:2px 3px 2px 0;color:var(--pill-ink)}
 .chip b{color:var(--ink)}.techrow{margin:6px 0}.mut{color:var(--mut);font-weight:400}
