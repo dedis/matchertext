@@ -200,8 +200,7 @@ Such a passive \emph{verification}, however,
 can be much simpler, and more uniform across host languages,
 than the content-modifying \emph{transformation}
 that conventional escaping and sanitization require --
-a contrast we develop in \cref{sec:bg:sanitizer}
-and put to work against injection in \cref{sec:host:inject}.
+a contrast we develop in \cref{sec:bg:sanitizer}.
 
 
 \subsection{A wider family of embedding hazards}
@@ -263,8 +262,7 @@ because a bracket or quote within it escapes its intended region.
 That is exactly the failure a matcher-balance discipline is built to prevent,
 and because it recurs across the injection, template, and markup attacks above
 rather than in any single language pair,
-one structural guarantee can address all of them at once,
-as we develop in \cref{sec:host:inject}.
+one structural guarantee can address all of them at once.
 
 
 \subsection{The prevalence and cost of injection failures}
@@ -319,7 +317,7 @@ and the escaping and sanitization meant to prevent them
 are difficult and routinely misused.
 That is precisely the burden
 a simpler, uniform, host-independent \emph{check} could relieve,
-and pursuing it is the aim of the rest of this paper (\cref{sec:host:inject}).
+and pursuing it is the aim of the rest of this paper.
 
 
 \subsection{The sanitizer as attack surface}
@@ -373,5 +371,5 @@ against tens of thousands of lines of parser-shadowing transformation
 that must be re-synchronized with every browser it shadows.
 Shrinking the trusted checkpoint to that structural check
 is exactly what matchertext's preference for verification over transformation
-offers (\cref{sec:host:inject}).
+offers.
 
