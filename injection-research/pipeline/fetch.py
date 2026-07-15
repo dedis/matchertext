@@ -8,7 +8,6 @@ import datetime
 import hashlib
 import json
 import subprocess
-import sys
 import urllib.request
 from pathlib import Path
 
@@ -52,14 +51,18 @@ def download(url, dest):
 
 
 def pin(manifest, key, url, dest, today, **extra):
+    prev = manifest.get(key, {}).get("sha256")
+    # These HTTP endpoints serve mutable "latest"/rolling feeds (NVD re-scores
+    # CVEs, CWE/Debian/Red Hat track head), so a drifted local copy means the
+    # upstream moved: re-fetch and re-pin rather than aborting.
+    if dest.exists() and prev and sha256(dest) != prev:
+        print(f"{key}: local copy differs from manifest pin, re-fetching", flush=True)
+        dest.unlink()
     if not dest.exists():
         print(f"fetching {key} ...", flush=True)
         download(url, dest)
-    digest = sha256(dest)
-    prev = manifest.get(key, {}).get("sha256")
-    if prev and prev != digest:
-        sys.exit(f"{key}: {dest} does not match pinned sha256 in {MANIFEST}")
-    manifest[key] = {"url": url, "sha256": digest, "fetched": manifest.get(key, {}).get("fetched", str(today)), **extra}
+    manifest[key] = {"url": url, "sha256": sha256(dest),
+                     "fetched": manifest.get(key, {}).get("fetched", str(today)), **extra}
 
 
 def run(args):

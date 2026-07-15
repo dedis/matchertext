@@ -143,11 +143,11 @@ def syntactic_groups(con):
     for gid, syn, n, sk, ex in con.execute(
             """SELECT group_id, syntax_type, COUNT(*) c, skeleton, MIN(example)
                FROM syntactic_group GROUP BY group_id ORDER BY c DESC"""):
-        rewrite, prevent = matchertext.assess(syn, sk)
-        rows.append((gid, syn, n, sk, ex, rewrite, prevent))
+        ok, mech, why = matchertext.assess(syn, sk)
+        rows.append((gid, syn, n, sk, ex, int(ok), mech, why))
     write("syntactic_groups.csv",
           ["group_id", "syntax_type", "size", "skeleton", "example",
-           "matchertext_rewrite", "matchertext_preventable"], rows)
+           "matchertext_preventable", "mechanism", "explanation"], rows)
     write("syntactic_group_members.csv", ["cve_id", "syntax_type", "group_id"],
           con.execute("SELECT cve_id, syntax_type, group_id FROM syntactic_group ORDER BY group_id"))
 

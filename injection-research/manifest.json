@@ -1,16 +1,16 @@
 {
   "PoC-in-GitHub": {
-    "commit": "56f876c4ed4327ee59f06426595dfe4056617e48",
+    "commit": "c27b1516f2f40af43ae8114264f8330e84ce4a6f",
     "fetched": "2026-07-13",
     "url": "https://github.com/nomi-sec/PoC-in-GitHub.git"
   },
   "advisory-database": {
-    "commit": "b374a29bcec3c2690c75e6b6936bbcae30286d31",
+    "commit": "79c2cf4630fcc44f2632735de08432a07cfaf204",
     "fetched": "2026-07-13",
     "url": "https://github.com/github/advisory-database.git"
   },
   "cvelistV5": {
-    "commit": "cf8b566727373a00deec66b48a6020b32823d911",
+    "commit": "92d64b4c9b3c5a0ce1fd1e5f8c017b9772e0139b",
     "fetched": "2026-07-13",
     "url": "https://github.com/CVEProject/cvelistV5.git"
   },
@@ -21,7 +21,7 @@
   },
   "debian": {
     "fetched": "2026-07-13",
-    "sha256": "d4eb5f3dba9f0c63c0cd7c6e4fa56d109987882deb39af9aac01bc5fb2352694",
+    "sha256": "55664c4ef5c117750ba80f4f2808883042a8ea59818f85c1a87cdb260aa687c6",
     "url": "https://security-tracker.debian.org/tracker/data/json"
   },
   "epss": {
@@ -37,16 +37,16 @@
   },
   "kev": {
     "fetched": "2026-07-13",
-    "sha256": "337e9a41ccd4dbfed1645d4a50b555a48543808ce3ccfe4594e2bc0ea4dbcd85",
+    "sha256": "c62c660cb9612925ce5910f313c8a09d1cf58f9b7bf677c785c44e20f2451b2c",
     "url": "https://raw.githubusercontent.com/cisagov/kev-data/develop/known_exploited_vulnerabilities.json"
   },
   "metasploit-framework": {
-    "commit": "dd425255fa3918bdb2cc3c23ae14453e95ea0b5d",
+    "commit": "972b893250311fe1061d82f40c38225f113e2631",
     "fetched": "2026-07-13",
     "url": "https://github.com/rapid7/metasploit-framework.git"
   },
   "nuclei-templates": {
-    "commit": "bd13fa15ecafabdbf2850c6dc99f32410ed5dab6",
+    "commit": "a5c2e8e4dab8c8e618ba76807c3e07587b7d781a",
     "fetched": "2026-07-13",
     "url": "https://github.com/projectdiscovery/nuclei-templates.git"
   },
@@ -82,7 +82,7 @@
   },
   "nvd-2008": {
     "fetched": "2026-07-13",
-    "sha256": "823a0938d409ab1e5b13393444c749f6b0cb40107c1a2faf591688dc9a1172da",
+    "sha256": "bd6020b8b49e208216dc2d7ec9f20201c2ea0b28608c7a7eb51cd66ffcadb110",
     "url": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2008.json.gz"
   },
   "nvd-2009": {
@@ -112,7 +112,7 @@
   },
   "nvd-2014": {
     "fetched": "2026-07-13",
-    "sha256": "8443f93753f25f65872ad256156bd6ca9bba72969d847a7014ec70c5a0046c16",
+    "sha256": "2ba3757299a7516855405ad6d9ac471517e52f40a8c36639b2f9e1ab85f0e7ad",
     "url": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2014.json.gz"
   },
   "nvd-2015": {
@@ -137,7 +137,7 @@
   },
   "nvd-2019": {
     "fetched": "2026-07-13",
-    "sha256": "5c54ab30259458d77a3a060ef97a0114a1b9aa347870e2390f146a1d2f5ed694",
+    "sha256": "597533bb59ba62a7304e3e9da0425aaeb01e5baab512351257245bfba4cc9195",
     "url": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2019.json.gz"
   },
   "nvd-2020": {
@@ -147,7 +147,7 @@
   },
   "nvd-2021": {
     "fetched": "2026-07-13",
-    "sha256": "f9b9ba1fec33f1189cdb4aa5fa7b79f057061e95e39fdd6dd2a39cad2d59e966",
+    "sha256": "7232171c97c74339b040cee094c6b53d329a139ae86f74fbebfa452ef3ba516c",
     "url": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2021.json.gz"
   },
   "nvd-2022": {
@@ -157,31 +157,31 @@
   },
   "nvd-2023": {
     "fetched": "2026-07-13",
-    "sha256": "1e6adf56f695919f0ef0cfe062678c1b43357b3912d2a0d8cf65d889e64f43e8",
+    "sha256": "d892f7f46027ee3d4e2a6dd4299edb411184e9f30edb96886f690b9441cd3ae3",
     "url": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2023.json.gz"
   },
   "nvd-2024": {
     "fetched": "2026-07-13",
-    "sha256": "3579094fcfcc0a9778c1b34703054d1ddde0a690ec1622c771c84a31d6e1c25c",
+    "sha256": "763c12f6f7817f5736fcb45d62dc12e4868af31f9a55e9e97412ba4e33d329fa",
     "url": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2024.json.gz"
   },
   "nvd-2025": {
     "fetched": "2026-07-13",
-    "sha256": "fb4494810c09b375cce1212ae5e9c55e4bfdb3b0d685f5859fba18b8ecef5e61",
+    "sha256": "8ce89de035ba78745e8f8f4b37f1536b607d3010b70ae9c78e4a4ec3c6928a36",
     "url": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2025.json.gz"
   },
   "nvd-2026": {
     "fetched": "2026-07-13",
-    "sha256": "ed1fae0a207fc834f88544b760956c06c2a665c002680bd1284f4427a052c0d4",
+    "sha256": "bc7cafd82fa61f426055b9a9012f5bc2a409836126cd5248c6425ae37c0c4985",
     "url": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2026.json.gz"
   },
   "redhat": {
     "fetched": "2026-07-13",
-    "sha256": "ff2c336af6f0a5c6dc8e25b5253e3418575076b2776decea49da33e35bb5a26d",
+    "sha256": "a96a85a365ea3ada08220bd748bc5921f60f4b63feb8e33c27da73c8d65c2084",
     "url": "https://access.redhat.com/hydra/rest/securitydata/cve.json"
   },
   "vulnrichment": {
-    "commit": "8d10c3027ceab9919a18df6da33ac232a1b94b08",
+    "commit": "3d48581d1262450948913da31a996c293c65dc6d",
     "fetched": "2026-07-13",
     "url": "https://github.com/cisagov/vulnrichment.git"
   }

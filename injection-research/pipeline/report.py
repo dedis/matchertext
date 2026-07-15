@@ -145,7 +145,8 @@ def families(q, related):
 def syntax_types(q, related):
     rows = [(pill(s), f"{n:,}", f"{k:,}", f"{pc:,}", f"{n / related:.1%}", bar(n / related))
             for s, n, k, pc in q(
-        """SELECT c.syntax_type, COUNT(*), COUNT(DISTINCT k.cve_id), COUNT(DISTINCT e.cve_id)
+        """SELECT c.syntax_type, COUNT(DISTINCT c.cve_id), COUNT(DISTINCT k.cve_id),
+                  COUNT(DISTINCT e.cve_id)
            FROM classification c LEFT JOIN kev k USING(cve_id)
            LEFT JOIN poc e USING(cve_id) GROUP BY 1 ORDER BY 2 DESC""")]
     return section("syntax", "Syntax types",
@@ -183,51 +184,74 @@ def stat(big, klass, label, sub, frac):
             f'<div class="csub">{sub}</div>{bar(frac)}</div></div>')
 
 
-def matchertext_section(q, groups, prev_cves, total_cves, related):
+MECH_BADGE = {
+    "inert": '<span class="badge yes">inert&nbsp;embed</span>',
+    "reject": '<span class="badge rej">rejected</span>',
+    "": '<span class="badge no">no</span>',
+}
+
+
+def matchertext_section(q, groups, mech_counts, prev_cves, total_cves, related):
+    # Show a representative mix of all three verdicts rather than only the
+    # largest (which are all inert), so the reject/not-preventable cases appear.
+    assessed = [(s, sk, ex, n, *matchertext.assess(s, sk)) for s, sk, ex, n in groups]
+    pick, seen = [], set()
+    for want in ("inert", "reject", ""):
+        for row in assessed:
+            key = row[1]
+            if row[5] == want and key not in seen and sum(r[5] == want for r in pick) < 7:
+                seen.add(key)
+                pick.append(row)
     rows = []
-    for s, sk, ex, n in groups[:20]:
-        rewrite, prevent = matchertext.assess(s, sk)
-        verdict = (f'<span class="badge yes">prevents</span> {esc(prevent)}' if prevent
-                   else '<span class="badge no">no</span>')
-        cls = "prevent" if prevent else "noprevent"
-        rows.append((f"{n:,}", pill(s), co(sk), co(rewrite), verdict, cls))
+    for s, sk, ex, n, ok, mech, why in sorted(pick, key=lambda r: -r[3]):
+        cls = {"inert": "prevent", "reject": "reject"}.get(mech, "noprevent")
+        verdict = f"{MECH_BADGE[mech]} {esc(why)}" if ok else MECH_BADGE[""]
+        rows.append((f"{n:,}", pill(s), co(sk), verdict, cls))
     body = "".join(
-        "<tr class='{}'>".format(r[5]) +
-        "".join(f'<td class="{a}">{c}</td>' for c, a in
-                zip(r[:5], ["num", "", "skel", "skel", "verdict"])) + "</tr>"
-        for r in rows)
-    table = (f'<div class="tw"><table><thead><tr>'
-             f'<th class="num">size</th><th>syntax</th><th>skeleton</th>'
-             f'<th>matchertext rewrite</th><th>matchertext preventable?</th>'
+        f"<tr class='{cls}'>" + f'<td class="num">{a}</td><td>{b}</td>'
+        f'<td class="skel">{c}</td><td class="verdict">{d}</td></tr>'
+        for a, b, c, d, cls in rows)
+    table = (f'<div class="tw"><table><thead><tr><th class="num">size</th>'
+             f'<th>syntax</th><th>skeleton</th><th>matchertext verdict</th>'
              f'</tr></thead><tbody>{body}</tbody></table></div>')
-    proj_prev = sum(n for s, n in q("SELECT syntax_type, COUNT(*) FROM classification GROUP BY 1")
-                    if s in matchertext.HOST)
+
+    proj = sum(n for s, n in q("SELECT syntax_type, COUNT(*) FROM classification GROUP BY 1")
+               if s in matchertext.HOST)
+    inert, reject = mech_counts["inert"], mech_counts["reject"]
     callouts = ('<div class="callouts">' + stat(
-        f"{prev_cves / total_cves:.0%}", "", "Verified on payload-backed CVEs",
+        f"{prev_cves / total_cves:.0%}", "", "Prevented, payload-backed",
         f"<strong>{prev_cves:,}</strong> of <strong>{total_cves:,}</strong> CVEs with an "
-        "extractable PoC were rewritten and shown to be contained", prev_cves / total_cves) + stat(
-        f"{proj_prev / related:.0%}", "proj", "Projected across all injection CVEs",
-        f"<strong>{proj_prev:,}</strong> of <strong>{related:,}</strong> fall in a "
-        "matchertext-hostable syntax (no payload needed)", proj_prev / related) + "</div>")
+        "extractable PoC land in a matcher-delimited slot their payload cannot escape",
+        prev_cves / total_cves) + stat(
+        f"{proj / related:.0%}", "proj", "Projected, all injection CVEs",
+        f"<strong>{proj:,}</strong> of <strong>{related:,}</strong> target a "
+        "matchertext-hostable syntax (payload not required)", proj / related) + "</div>")
+    mechbars = ('<div class="callouts">' + stat(
+        f"{inert / (inert + reject):.0%}", "", "Inert embedding",
+        f"<strong>{inert:,}</strong> payloads are valid matchertext — they embed verbatim "
+        "and the quote / angle-bracket breakout is inert data", inert / (inert + reject)) + stat(
+        f"{reject / (inert + reject):.0%}", "rejalt", "Rejected by VERIFY",
+        f"<strong>{reject:,}</strong> payloads carry an unmatched matcher — the delimiter they "
+        "would escape with — so VERIFY (Alg. 1) rejects them", reject / (inert + reject)) + "</div>")
     return section("matchertext", "Matchertext prevention by skeleton",
-                   p("Assuming the host adopts a matchertext syntax that delimits the "
-                     f"untrusted value with a matcher pair (e.g. {co('[…]')} for SQL, as in the "
-                     "paper), each skeleton is rewritten to its matchertext-equivalent — "
-                     f"unmatched matchers escaped via ToMatchertext ({co('\\o()')} / "
-                     f"{co('\\c()')}) — and checked for breakout (paper §4.7)."),
+                   p("Matchertext prevents an injection under two conditions (paper §2.4): "
+                     "the value lands in a slot a matchertext-aware host delimits with a "
+                     f"matcher pair (\\eg {co('WHERE name = [ v ]')} for SQL), and the value "
+                     "itself is valid matchertext, checked by the passive VERIFY scan "
+                     "(Algorithm 1) rather than by escaping. The canonical "
+                     f"{co('x&#39; OR &#39;1&#39;=&#39;1')} then fails two ways."),
                    callouts,
-                   p("The left figure is <strong>verified</strong>: only the "
-                     f"{total_cves:,} CVEs with an extractable PoC payload can be skeletonized "
-                     "and rewritten. The right figure <strong>projects</strong> the syntax-level "
-                     "verdict onto every injection CVE — the rest simply have no payload in the "
-                     "record to rewrite. It is a mild upper bound, since a fraction of "
-                     f"{co('html_dom')} lands in semantic sinks ({co('javascript:')} URLs) that "
-                     "hosting cannot stop."),
-                   p("A skeleton is <strong>not</strong> preventable (grey) when the sink "
-                     "executes the contained value by design (templates, expression "
-                     "languages, eval, spreadsheet formulas) or the breakout uses "
-                     "non-matchers with no matcher hosting (shell metacharacters, CR/LF, "
-                     "XML/XXE angle brackets)."),
+                   p("Running VERIFY on each payload-backed skeleton in a matcher-hostable "
+                     "context splits prevention into the paper's two mechanisms:"),
+                   mechbars,
+                   p(f"The {co('inert')} case is SQL/XSS (§4.7.1–2): the payload is valid "
+                     "matchertext, so its quote or `<` is ordinary data read to the matched "
+                     f"close. The {co('rejected')} case is LDAP/PDF (§4.7.3–4): the native "
+                     "delimiter is already a matcher, so the real payload carries the unmatched "
+                     "one it would break out with, and VERIFY rejects it. A verdict is empty "
+                     "only where matchertext structurally cannot help — execution/semantic "
+                     f"sinks ({co('template')}, {co('eval')}, {co('javascript:')} URLs) or "
+                     "non-matcher-delimited contexts (shell, CR/LF, XML angle brackets)."),
                    table)
 
 
@@ -291,7 +315,13 @@ def run(args):
     groups = q("""SELECT syntax_type, skeleton, MIN(example), COUNT(*) c
                   FROM syntactic_group GROUP BY group_id ORDER BY c DESC""")
     grouped = sum(n for *_, n in groups)
-    prev_cves = sum(n for s, sk, _e, n in groups if matchertext.assess(s, sk)[1])
+    mech_counts = {"inert": 0, "reject": 0}
+    prev_cves = 0
+    for s, sk, _e, n in groups:
+        ok, mech, _ = matchertext.assess(s, sk)
+        if ok:
+            prev_cves += n
+            mech_counts[mech] += n
 
     kpis = "".join(
         f'<div class="kpi"><div class="kv">{v}</div><div class="kl">{l}</div>'
@@ -315,7 +345,7 @@ def run(args):
         families(q, related),
         syntax_types(q, related),
         syntactic_groups(q, groups),
-        matchertext_section(q, groups, prev_cves, grouped, related),
+        matchertext_section(q, groups, mech_counts, prev_cves, grouped, related),
         subclass_section(q, related),
         payload_samples(con, q, rng, args.samples),
     ])
@@ -372,17 +402,21 @@ td.skel{max-width:340px}td.verdict{max-width:460px;font-size:13px}
 padding:1px 9px;font-size:12px;white-space:nowrap}
 .badge{display:inline-block;border-radius:6px;padding:1px 8px;font-size:12px;font-weight:600;margin-right:6px}
 .badge.yes{background:var(--good-bg);color:var(--good-ink);border:1px solid var(--good-line)}
+.badge.rej{background:color-mix(in srgb,var(--accent) 16%,var(--panel));color:var(--accent);
+border:1px solid var(--accent)}
 .badge.no{background:var(--pill);color:var(--mut)}
 tr.prevent{box-shadow:inset 3px 0 var(--good-ink)}
+tr.reject{box-shadow:inset 3px 0 var(--accent)}
 tr.noprevent td{color:var(--mut)}
 .callouts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
 @media (max-width:640px){.callouts{grid-template-columns:1fr}}
 .callout{display:flex;align-items:center;gap:16px;background:var(--good-bg);
 border:1px solid var(--good-line);border-radius:12px;padding:14px 18px;margin:0}
 .callout .big{font-size:34px;font-weight:800;color:var(--good-ink);line-height:1;white-space:nowrap}
-.callout.proj{background:color-mix(in srgb,var(--accent) 12%,var(--panel));border-color:var(--accent)}
-.callout.proj .big{color:var(--accent)}
-.callout.proj .bar>span{background:var(--accent)}
+.callout.proj,.callout.rejalt{background:color-mix(in srgb,var(--accent) 12%,var(--panel));
+border-color:var(--accent)}
+.callout.proj .big,.callout.rejalt .big{color:var(--accent)}
+.callout.proj .bar>span,.callout.rejalt .bar>span{background:var(--accent)}
 .cbody{min-width:0}.clabel{font-weight:600;font-size:14px}
 .csub{font-size:12.5px;color:var(--mut);margin:2px 0 8px}
 .callout .bar{width:100%}
