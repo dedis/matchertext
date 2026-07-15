@@ -34,13 +34,15 @@ We make three contributions:
 	each injection CVE by weakness family and by the embedded
 	\emph{syntax} it targets, and a syntactic-skeleton grouping that
 	clusters attacks by structural shape (\cref{sec:results}).
-\item	An empirical test of matchertext prevention (\cref{sec:prevent}):
+\item	An empirical measurement of matchertext's structural reach (\cref{sec:prevent}):
 	each skeleton is rewritten to its matchertext-equivalent and checked
-	for breakout, yielding both a verified figure over payload-backed CVEs
+	for breakout, yielding both a measured figure over payload-backed CVEs
 	and a projection over the full injection corpus.
 \end{itemize}
 
-The analysis is deliberately conservative: we count a vulnerability as
-preventable only where the mechanism holds structurally, and we report the
-payload-backed and projected figures separately so the coverage of each claim
-is explicit.
+The analysis is deliberately conservative in what it counts: a vulnerability is
+tallied as structurally containable only where the mechanism holds structurally,
+and we report the payload-backed and projected figures separately so the coverage
+of each claim is explicit.
+Both figures assume a matchertext-aware host and characterize attack structure,
+not a deployed defense.

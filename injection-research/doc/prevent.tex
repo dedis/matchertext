@@ -1,10 +1,11 @@
-\section{Measuring matchertext prevention}
+\section{Measuring matchertext containment}
 \label{sec:prevent}
 
-\Cref{sec:resist} argues that matchertext prevents an injection under two
-conditions: the untrusted value lands in a slot a matchertext-aware host delimits
-with a matcher pair, and the value is itself valid matchertext, checked by the
-passive \textsc{Verify} scan rather than by escaping.
+\Cref{sec:resist} argues that matchertext contains an injection under the model
+of \cref{sec:threat}, chiefly two conditions: the untrusted value lands in a slot
+a matchertext-aware host delimits with a matcher pair, and the value is itself
+valid matchertext, checked by the passive \textsc{Verify} scan rather than by
+escaping.
 An attack then fails one of two ways, by \emph{inert embedding} or by
 \emph{rejection}, and which route a real attack takes is a property of the
 payload we can measure, so we now put the argument to the corpus.
@@ -16,6 +17,9 @@ whether the target syntax is one a matchertext host can delimit with a matcher
 pair, and, if so, whether the skeleton passes \textsc{Verify}.
 A passing skeleton is contained by \emph{inert embedding}; a failing one is
 stopped by \emph{rejection}.
+This test characterizes the structure of each recorded payload under a
+matchertext-aware host; it does not exercise a deployed host parser, which we
+leave to future implementation work.
 
 \begin{table}[t]
 \centering
@@ -38,12 +42,10 @@ target context a matchertext host can delimit.}
 \end{table}
 
 \paragraph{Results.}
-Of the 5{,}763 payload-backed injection CVEs, \textbf{4{,}749} (\textbf{82\%})
-land in a matcher-delimited slot their payload cannot escape.
-\Cref{tab:mech} shows that this containment splits exactly as the paper's
-argument predicts: \textbf{93\%} of prevented attacks are neutralized by inert
-embedding and \textbf{7\%} by rejection, and which mechanism applies is
-determined by the host language's native delimiter.
+Of the 5{,}763 payload-backed injection CVEs, the recorded payloads of
+\textbf{4{,}749} (\textbf{82\%}) are contained by a matcher-delimited slot that a
+matchertext-aware host reads to matcher balance, assuming no intervening
+decoding; the split turns on the host's native delimiter.
 LDAP is the pure case of rejection: its search filters are already
 parenthesis-delimited, so the classic \verb|*)(uid=*| breakout carries an
 unmatched \verb|)| and every real LDAP payload in the corpus fails
@@ -68,10 +70,11 @@ the angle brackets of XML/XXE, none of which are matcher characters.
 \paragraph{Projection.}
 A payload is required to classify the mechanism, but the \emph{context}
 condition can be read from the syntax label alone.
-Projecting it onto the full corpus, \textbf{73{,}246} of the \textbf{91{,}760}
-injection CVEs (\textbf{80\%}) target a matchertext-hostable syntax.
-This is a mild upper bound (a fraction of HTML/DOM cases are the
+Projecting it onto the full corpus, at most \textbf{73{,}246} of the
+\textbf{91{,}760} injection CVEs (\textbf{80\%}) target a matcher-delimitable
+syntax.
+This is a loose upper bound (a fraction of HTML/DOM cases are the
 \verb|javascript:| semantic sinks above), but it bounds the reach of the
 discipline from below at the fragment level and from above at the syntax level,
 and the gap between 5{,}763 and 91{,}760 is payload availability, not a
-prevention failure.
+containment failure.

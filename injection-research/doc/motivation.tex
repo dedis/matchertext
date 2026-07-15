@@ -63,10 +63,12 @@ and was eventually deprecated~\cite{php_magicquotes}.
 What unites the largest of these cases is structural:
 content meant to be inert data is read as syntax
 because a bracket or quote within it escapes its intended region.
-That is exactly the failure a matcher-balance discipline is built to prevent,
-and because it recurs across the injection, template, and markup attacks above
+That is exactly the failure a matcher-balance discipline is built to resist,
+and because it recurs across the injection and markup attacks above
 rather than in any single language pair,
-one structural guarantee can address all of them at once.
+one structural discipline can address the breakout-based members at once---as
+distinct from the execution and algorithmic members (template evaluation, ReDoS,
+entity expansion) it cannot.
 
 
 \subsection{The prevalence and cost of injection failures}

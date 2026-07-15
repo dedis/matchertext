@@ -56,10 +56,13 @@ The failure mode is therefore benign: an encoder bug yields mis-encoded
 \emph{data}, never a breakout, where in conventional escaping one missed case
 \emph{is} the injection.
 
-Matchertext offers a \emph{structural} guarantee: no untrusted value, in any
-position, can escape its delimiters or alter the surrounding query structure,
-which eliminates the entire class of injection that depends on breaking out of a
+Under a matchertext-aware host that ends each value by matcher balance,
+matchertext offers a \emph{structural} property: no valid-matchertext value, in
+any position, can escape its delimiters or alter the surrounding query structure,
+closing off the sub-class of injection that depends on breaking out of a
 delimiter.
+This is a syntactic-closure property; it does not by itself establish that later
+decoding, reparsing, or execution of the contained value is safe.
 It does not adjudicate whether a well-formed value is \emph{authorized}, which
 remains a matter of access control, and it complements rather than replaces
 parameterized queries where those already suffice.
