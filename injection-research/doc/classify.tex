@@ -1,0 +1,42 @@
+\section{Classification}
+\label{sec:classify}
+
+We classify each injection CVE along two axes: the \emph{weakness family}
+(rooted in the CWE taxonomy) and the injection \emph{syntax type}: the
+embedded language the attack targets, such as SQL, HTML, shell, or LDAP.
+The syntax axis is the one that matters for matchertext, because prevention
+depends on how the untrusted value is delimited in the target language, not on
+how the weakness is categorized.
+
+\paragraph{Injection gate.}
+A CVE is treated as injection-related if it carries any CWE in the
+\mbox{CWE-74} (``Injection'') subtree (computed from the CWE ChildOf
+hierarchy across all enrichment sources) or if its description matches a
+phrase rule for a known injection class.
+This yields \textbf{91{,}760} injection CVEs, \textbf{26.4\%} of published
+records, spanning 351 distinct CWEs.
+
+\paragraph{Layered labeling.}
+Each CVE's syntax type is resolved by a fallback chain, ordered from most to
+least reliable, mirroring the content-classifier methodology of the matchertext
+empirical study~\cite{matchertext}:
+(1) a deterministic map from specific CWEs (\eg \mbox{CWE-89}$\rightarrow$SQL,
+\mbox{CWE-79}$\rightarrow$HTML, \mbox{CWE-78}$\rightarrow$shell);
+(2) phrase rules over the CNA description (``SQL injection'', ``cross-site
+scripting'', ``command injection'', \dots);
+(3) a character-trigram naive-Bayes classifier trained on the CWE- and
+rule-labeled set, applied to the still-unlabeled remainder above a confidence
+margin; and
+(4) an explicit \texttt{unknown} bucket.
+Of the injection CVEs, 82{,}817 (90\%) are labeled deterministically from CWEs,
+7{,}657 from phrase rules, 1{,}160 from naive Bayes, and only 126 remain
+unknown, so the classification rests overwhelmingly on the deterministic
+layers.
+
+\paragraph{Weakness families.}
+Aggregated to families, the corpus is dominated by rendering injection
+(primarily cross-site scripting) and query injection (majority of SQL),
+followed by command injection and code/expression injection.
+Because family and syntax are distinct axes (CRLF header injection and XSS
+share the rendering family but differ sharply in matchertext-hostability), the
+prevention analysis works from the finer syntax axis throughout.

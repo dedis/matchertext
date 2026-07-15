@@ -1,0 +1,46 @@
+\section{Introduction}
+\label{sec:intro}
+
+Injection vulnerabilities arise when untrusted data crosses a language boundary
+and is misinterpreted as structure rather than as inert content: a quote that
+closes a SQL string literal, an angle bracket that opens an HTML tag, a
+semicolon that starts a new shell command.
+Despite decades of mitigations (parameterized queries, context-sensitive
+output encoding, allowlisting), injection continues to dominate vulnerability
+disclosures, because each defense is specific to one host language and one
+syntactic context, and each is applied by hand at the point of use.
+
+The \emph{matchertext} discipline~\cite{matchertext} proposes a single,
+language-independent structural rule: the ASCII matcher pairs \verb|()|,
+\verb|[]|, and \verb|{}| must always match.
+Under this rule, a host language can delimit an untrusted value with a matcher
+pair and read it to matcher balance; to escape its slot the value would have to
+emit an unmatched matcher, which is not valid matchertext and is escaped on the
+way in.
+The canonical injection \verb|' OR '1'='1| illustrates the mechanism: hosted as
+\verb|WHERE name = [| \emph{value} \verb|]|, the quote that would have closed
+the string literal is now ordinary text inside the matched region, and the
+tautology cannot break out.
+
+This paper asks how much of the real injection landscape such a discipline could
+actually address.
+We make three contributions:
+\begin{itemize}
+\item	A reproducible, snapshot-pinned corpus (\cref{sec:data}) that unifies
+	the official CVE record with normalized enrichment and four
+	proof-of-concept databases, so that classification, exploitation
+	signals, and real attack payloads can be joined on a common key.
+\item	A two-axis, multi-source classifier (\cref{sec:classify}) that labels
+	each injection CVE by weakness family and by the embedded
+	\emph{syntax} it targets, and a syntactic-skeleton grouping that
+	clusters attacks by structural shape (\cref{sec:results}).
+\item	An empirical test of matchertext prevention (\cref{sec:prevent}):
+	each skeleton is rewritten to its matchertext-equivalent and checked
+	for breakout, yielding both a verified figure over payload-backed CVEs
+	and a projection over the full injection corpus.
+\end{itemize}
+
+The analysis is deliberately conservative: we count a vulnerability as
+preventable only where the mechanism holds structurally, and we report the
+payload-backed and projected figures separately so the coverage of each claim
+is explicit.

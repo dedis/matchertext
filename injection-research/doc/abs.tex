@@ -1,0 +1,32 @@
+\begin{abstract}
+Injection remains one of the most persistent classes of software
+vulnerability, and the \emph{matchertext} discipline has been proposed as a
+structural defense: by requiring that the ASCII matcher pairs \verb|()|,
+\verb|[]|, and \verb|{}| always match, untrusted input delimited by a matcher
+pair cannot break out of its slot without producing an unmatched matcher.
+This paper grounds that proposal in evidence.
+We assemble a reproducible corpus from thirteen public vulnerability and
+proof-of-concept (PoC) sources, anchored on the MITRE CVE List and enriched
+with NVD, CISA Vulnrichment, KEV, EPSS, CWE, GitHub/Red~Hat/Debian advisories,
+and four PoC databases (Exploit-DB, Nuclei, Metasploit, and PoC-in-GitHub).
+From roughly 348k published CVEs we identify \textbf{91{,}760} injection
+vulnerabilities and classify each along two axes (weakness family and
+injection \emph{syntax} type) using a layered CWE-hierarchy, phrase-rule,
+and naive-Bayes classifier.
+For the subset carrying an extractable PoC payload, we reduce each attack to a
+\emph{syntactic skeleton} and group vulnerabilities by structural shape.
+Finally, we test each skeleton against the two conditions under which matchertext
+prevents injection (that the value sits in a matcher-delimited slot and is
+itself valid matchertext) using the passive \textsc{Verify} check rather than
+escaping.
+We find that \textbf{82\%} of payload-backed injection CVEs land in a slot their
+payload cannot escape, and that this containment splits exactly as the paper's
+argument predicts: \textbf{93\%} are neutralized because the payload is valid
+matchertext and embeds as inert data, and \textbf{7\%} because it carries an
+unmatched matcher and is rejected outright, with the mechanism determined by
+whether the host's native delimiter is a nonmatcher (the SQL quote) or a matcher
+(the LDAP parenthesis).
+Projected across all injection CVEs, \textbf{80\%} target a matchertext-hostable
+syntax, the residue being execution/semantic sinks and non-matcher-delimited
+contexts the discipline provably cannot address.
+\end{abstract}

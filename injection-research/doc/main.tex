@@ -1,0 +1,57 @@
+\documentclass[fullpage,twocolumn]{article}
+\pdfoutput=1
+
+\usepackage{times}
+\usepackage{xspace}
+\usepackage{cite} % sort citation numbers
+\usepackage[hyperindex,breaklinks,colorlinks,
+	    linkcolor=blue,citecolor=blue,urlcolor=black]{hyperref}
+\usepackage{cleveref}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xurl} % allow long URLs in the bibliography to break anywhere
+\usepackage[T1]{fontenc}
+
+%%%%%%%%%%%%%%%%%%%%%%
+
+% Select one or other if want to see comments.
+\long\def\com#1{}
+%\long\def\com#1{{\bf \sc comment: }{\small [#1]}{\bf \sc\ endcomment}\newline}
+
+\newcommand{\xxx}[1]{}
+%\newcommand{\xxx}[1]{{\color{red} {\bf XXX }{\small [#1]}}}
+
+% Common abbreviations
+\newcommand{\ie}{{\em i.e.},\xspace}
+\newcommand{\eg}{{\em e.g.},\xspace}
+
+%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+\title{Matchertext: An Empirical Analysis of Injection Vulnerabilities \\
+	\Large{%
+	~\\
+	\url{https://github.com/dedis/matchertext}}}
+
+\author{Antoine Bastide \\ EPFL}
+
+\maketitle
+
+\input{abs}
+
+\tableofcontents
+
+\input{intro}
+\input{motivation}
+\input{data}
+\input{classify}
+\input{results}
+\input{resist}
+\input{prevent}
+\input{concl}
+
+\bibliographystyle{plain}
+\bibliography{refs}
+
+\end{document}
