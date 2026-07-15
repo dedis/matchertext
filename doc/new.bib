@@ -1,0 +1,264 @@
+% Bibliography for new/uncategorized entries not yet filed into the topic
+% databases (lang.bib, net.bib, sec.bib, soc.bib).
+%
+% These entries cover the injection/security citations used by host.tex on the
+% thesis-injection and thesis-narrative branches. Metadata transcribed from the
+% reference list of the authoritative main.pdf build.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Standards and specifications
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+@techreport{rfc4515,
+	author = {Mark Smith and Tim Howes},
+	title = {Lightweight Directory Access Protocol ({LDAP}):
+		String Representation of Search Filters},
+	type = {RFC},
+	number = {4515},
+	institution = {Internet Engineering Task Force (IETF)},
+	year = {2006},
+	month = jun,
+}
+
+@techreport{iso32000,
+	author = {{ISO}},
+	title = {Document Management, Portable Document Format, Part 1: {PDF} 1.7},
+	type = {Standard},
+	number = {ISO 32000-1:2008},
+	institution = {International Organization for Standardization},
+	year = {2008},
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Academic papers
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+@inproceedings{alonso08ldap,
+	author = {Jos{\'e} Mar{\'i}a Alonso and Antonio Guzm{\'a}n
+		and Marta Beltr{\'a}n and Rodolfo Bord{\'o}n},
+	title = {{LDAP} Injection \& Blind {LDAP} Injection in Web Applications},
+	booktitle = {Black Hat Europe},
+	year = {2008},
+}
+
+@inproceedings{heiderich13mxss,
+	author = {Mario Heiderich and J{\"o}rg Schwenk and others},
+	title = {{mXSS} Attacks: Attacking Well-Secured Web-Applications
+		by Using {innerHTML} Mutations},
+	booktitle = {ACM Conference on Computer and Communications Security (CCS)},
+	year = {2013},
+}
+
+@inproceedings{khodayari23clobbering,
+	author = {Soheil Khodayari and Giancarlo Pellegrino},
+	title = {It's ({DOM}) Clobbering Time: Attack Techniques, Prevalence, and Defenses},
+	booktitle = {IEEE Symposium on Security and Privacy (S\&P)},
+	year = {2023},
+}
+
+@inproceedings{momot16langsec,
+	author = {Falcon Darkstar Momot and Sergey Bratus and Sven M. Hallberg
+		and Meredith L. Patterson},
+	title = {The Seven Turrets of Babel: A Taxonomy of {LangSec} Errors
+		and How to Expunge Them},
+	booktitle = {IEEE Cybersecurity Development Conference (SecDev)},
+	year = {2016},
+}
+
+@inproceedings{samuel11csas,
+	author = {Mike Samuel and Prateek Saxena and Dawn Song and Pongsin Poosankam},
+	title = {Context-Sensitive Auto-Sanitization in Web Templating Languages
+		Using Type Qualifiers},
+	booktitle = {ACM Conference on Computer and Communications Security (CCS)},
+	year = {2011},
+}
+
+@inproceedings{weinberger11xss,
+	author = {Joel Weinberger and Prateek Saxena and Devdatta Akhawe
+		and Matthew Finifter and Richard Shin and Dawn Song},
+	title = {A Systematic Analysis of {XSS} Sanitization
+		in Web Application Frameworks},
+	booktitle = {European Symposium on Research in Computer Security (ESORICS)},
+	year = {2011},
+}
+
+@misc{klein24parsing,
+	author = {David Klein and Krzysztof Kotowicz and Martin Johns},
+	title = {Bypassing {HTML} Sanitizer via Parsing Differentials},
+	howpublished = {Preprint,
+		\url{https://www.ias.cs.tu-bs.de/publications/parsing_differentials.pdf}},
+	year = {2024},
+}
+
+@misc{dennis24sql,
+	author = {Dennis and others},
+	title = {Large-Scale Analysis of {GitHub} and {CVEs} to Determine
+		Prevalence of {SQL} Concatenations},
+	howpublished = {SciTePress,
+		\url{https://www.scitepress.org/publishedPapers/2024/128352/pdf/index.html}},
+	year = {2024},
+}
+
+@misc{wijayarathna18esapi,
+	author = {Chamila Wijayarathna and Nalin A. G. Arachchilage},
+	title = {Fighting Against {XSS} Attacks: A Usability Evaluation
+		of {OWASP} {ESAPI} Output Encoding},
+	howpublished = {arXiv:1810.01017, \url{https://arxiv.org/abs/1810.01017}},
+	year = {2018},
+}
+
+@article{sullivan09xml,
+	author = {Bryan Sullivan},
+	title = {{XML} Denial of Service Attacks and Defenses},
+	journal = {MSDN Magazine},
+	year = {2009},
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Vulnerability databases, advisories, and industry reports
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+@misc{cve2021log4shell,
+	author = {{MITRE}},
+	title = {Apache {Log4j2} Remote Code Execution via {JNDI} Lookup},
+	howpublished = {CVE-2021-44228,
+		\url{https://nvd.nist.gov/vuln/detail/CVE-2021-44228}},
+	year = {2021},
+}
+
+@misc{cwe_top25_2025,
+	author = {{MITRE}},
+	title = {2025 {CWE} Top 25 Most Dangerous Software Weaknesses},
+	howpublished = {MITRE,
+		\url{https://cwe.mitre.org/top25/archive/2025/2025_cwe_top25.html}},
+	year = {2025},
+}
+
+@misc{owasp_top10_2021,
+	author = {{OWASP}},
+	title = {{A03:2021} Injection},
+	howpublished = {OWASP Top 10:2021,
+		\url{https://owasp.org/Top10/A03_2021-Injection/}},
+	year = {2021},
+}
+
+@misc{owasp_top10_2025,
+	author = {{OWASP}},
+	title = {{A05:2025} Injection},
+	howpublished = {OWASP Top 10:2025,
+		\url{https://owasp.org/Top10/A05_2025-Injection/}},
+	year = {2025},
+}
+
+@misc{owasp_parameterization,
+	author = {{OWASP}},
+	title = {Query Parameterization Cheat Sheet},
+	howpublished = {OWASP Cheat Sheet Series,
+		\url{https://cheatsheetseries.owasp.org/cheatsheets/Query_Parameterization_Cheat_Sheet.html}},
+}
+
+@misc{owasp_cmdinjection,
+	author = {{OWASP}},
+	title = {Command Injection},
+	howpublished = {OWASP Community,
+		\url{https://owasp.org/www-community/attacks/Command_Injection}},
+}
+
+@misc{owasp_redos,
+	author = {{OWASP}},
+	title = {Regular Expression Denial of Service ({ReDoS})},
+	howpublished = {OWASP Community,
+		\url{https://owasp.org/www-community/attacks/Regular_expression_Denial_of_Service_-_ReDoS}},
+}
+
+@misc{portswigger_ssti,
+	author = {{PortSwigger}},
+	title = {Server-Side Template Injection},
+	howpublished = {Web Security Academy,
+		\url{https://portswigger.net/web-security/server-side-template-injection}},
+}
+
+@misc{dompurify_advisories,
+	author = {{cure53}},
+	title = {Security Advisories for {DOMPurify}},
+	howpublished = {GitHub,
+		\url{https://github.com/cure53/DOMPurify/security/advisories}},
+}
+
+@misc{rails_sanitizer_cves,
+	author = {Mike Dalessio},
+	title = {{rails-html-sanitizer} 1.6.1 Addresses Multiple {CVEs}},
+	howpublished = {Ruby on Rails Security Announcements,
+		\url{https://discuss.rubyonrails.org/t/rails-html-sanitizer-v1-6-1-addresses-multiple-cves/88092}},
+	year = {2024},
+}
+
+@misc{php_magicquotes,
+	author = {{The PHP Group}},
+	title = {Magic Quotes},
+	howpublished = {PHP Manual,
+		\url{https://www.php.net/manual/en/security.magicquotes.php}},
+}
+
+@misc{ico_talktalk,
+	author = {{Information Commissioner's Office}},
+	title = {{TalkTalk} Cyber Attack: How the {ICO} Investigation Unfolded},
+	howpublished = {ICO,
+		\url{https://ico.org.uk/about-the-ico/media-centre/talktalk-cyber-attack-how-the-ico-investigation-unfolded/}},
+	year = {2016},
+}
+
+@misc{veracode_soss,
+	author = {{Veracode}},
+	title = {State of Software Security, Volume 11},
+	howpublished = {Veracode},
+	year = {2020},
+}
+
+@misc{edgescan25,
+	author = {{Edgescan}},
+	title = {2025 Vulnerability Statistics Report},
+	howpublished = {Edgescan},
+	year = {2025},
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Practitioner write-ups
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+@misc{heyes20mxss,
+	author = {Gareth Heyes},
+	title = {Bypassing {DOMPurify} Again with Mutation {XSS}},
+	howpublished = {PortSwigger Research,
+		\url{https://portswigger.net/research/bypassing-dompurify-again-with-mutation-xss}},
+	year = {2020},
+}
+
+@misc{heyes20pdf,
+	author = {Gareth Heyes},
+	title = {Portable Data exFiltration: {XSS} for {PDFs}},
+	howpublished = {PortSwigger Research,
+		\url{https://portswigger.net/research/portable-data-exfiltration}},
+	year = {2020},
+}
+
+@misc{gietzen18csv,
+	author = {Spencer Gietzen},
+	title = {Cloud Security Risks: {Azure} {CSV} Injection Vulnerability},
+	howpublished = {Rhino Security Labs},
+	year = {2018},
+}
+
+@misc{oconnor23yaml,
+	author = {Colm O'Connor},
+	title = {The {Norway} Problem: Why {StrictYAML} Refuses to Do Implicit Typing},
+	howpublished = {StrictYAML documentation},
+	year = {2023},
+}
+
+@misc{peguero16angular,
+	author = {Ksenia Peguero},
+	title = {An Escape Room Called the {AngularJS} Sandbox},
+	howpublished = {Synopsys},
+	year = {2016},
+}
