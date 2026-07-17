@@ -21,9 +21,11 @@ scanning for its native closer; (ii) the \textsc{Verify} recognizer that decides
 membership in the matchertext language $L$; and (iii) the total encoder
 \textsc{ToMatchertext} and its inverse, used on free-form fields.
 \textsc{Verify} is small and host-independent and is the only component the
-argument adds to the host, but the boundary-locating step of (i) is the
-operationally load-bearing part: we assume it correct here, and note that its
-mechanization remains open in the underlying formalism~\cite{matchertext}.
+argument adds to the host.
+The boundary-locating step of (i) is the operationally load-bearing part; we
+discharge it below as premise L1, machine-checked in Lean
+(\cref{sec:appendix:lean}), so what the host must still be trusted for is the
+\emph{implementation} of that step rather than its principle.
 
 \paragraph{Attacker.}
 The attacker supplies $v$ and may choose \emph{arbitrary} bytes, character
@@ -47,9 +49,44 @@ This is strictly stronger than the closure property $s_o\|v\|s_c\in L$ that
 theorem~\cite{matchertext}: closure states that the \emph{delimited string
 remains valid matchertext}, whereas inertness states that the \emph{host parser
 treats the delimited content as data}.
-Closure is a lemma toward inertness, not inertness itself; bridging the two needs
-an explicit host-parser and interpreter model, which we leave to the
-implementation work of \cref{sec:concl} and treat as an assumption here.
+Closure is a lemma toward inertness, not inertness itself: it constrains the
+\emph{string}, not the host \emph{parser}.
+
+\paragraph{From closure to inertness.}
+We model the aware host of A1 as a grammar $G$ with one distinguished production
+$\mathit{hole}\rightarrow s_o\,\mathit{content}\,s_c$, where $\mathit{content}$ is
+recovered by the matcher-balance locator and enters $G$ as a single terminal
+whose lexeme is the value in its canonical, fully-decoded form (A3).
+Inertness then rests on three premises, each separately dischargeable:
+\begin{itemize}
+\item[\textbf{L1}] \emph{Boundary.} Reading to matcher balance ends the
+	embedding at the intended position. We prove this
+	(\cref{sec:appendix:lean}): for a matcher-pair-delimited hole and a valid
+	matchertext value $v$, every prefix of $v$ has non-negative matcher depth,
+	$v$ itself returns to depth zero, and the context closer is the first
+	character to drive the depth negative---so the balance boundary is exactly
+	$|v|$. The result is host-\emph{independent} and machine-checked; what
+	remains is the engineering step of verifying a concrete locator
+	implementation (Algorithm~2 of~\cite{matchertext}) against it.
+\item[\textbf{L2}] \emph{Parse inertness.} In $G$ the hole derives exactly one
+	terminal with that lexeme, and no other production derives structure from
+	within it: the parser does not re-enter $G$ on hole content. Reparse-based
+	breakouts such as mutation XSS are exactly L2 violations.
+\item[\textbf{L3}] \emph{Interpreter inertness.} The interpreter binds that
+	terminal as a data value and never re-lexes, reparses, or executes its
+	bytes.
+\end{itemize}
+The chain is then immediate: closure~\cite{matchertext} keeps $P[v]$ a balanced
+matchertext document, so the locator operates on valid input; L1 fixes the hole's
+extent; L2 makes the structural skeleton of $\mathrm{parse}(P[v])$ independent of
+$v$; and L3 carries that independence through to execution.
+Hence $\mathrm{closure}\wedge\mathrm{L1}\wedge\mathrm{L2}\wedge\mathrm{L3}\Rightarrow$
+inertness.
+Closure and the correctness of \textsc{Verify} are machine-checked in the
+underlying formalism~\cite{matchertext}, and we discharge L1 here, once for all
+hosts (\cref{sec:appendix:lean}).
+L2 and L3 are the residual obligations, both per host, and are what the
+implementation work of \cref{sec:concl} must supply.
 
 \paragraph{Deployment premises.}
 Inertness holds under four assumptions, each necessary:
