@@ -7,7 +7,7 @@ valid matchertext, checked by the passive \textsc{Verify} scan rather than by
 escaping.
 An attack then fails one of two ways, by \emph{inert embedding} or by
 \emph{rejection}, and which route a real attack takes is a property of the
-payload we can measure, so we now put the argument to the corpus.
+payload, and so measurable against the corpus.
 
 \paragraph{Method.}
 For each of the 5{,}025 payload-backed CVEs we reuse its syntactic skeleton and decide two things:
@@ -56,7 +56,7 @@ Of the 5{,}025 payload-backed injection CVEs, the recorded payloads of
 \textbf{4{,}111} (\textbf{82\%}) are contained by a matcher-delimited slot that a
 matchertext-aware host reads to matcher balance, assuming no intervening
 decoding; the split turns on the host's native delimiter.
-The corpus bears out the per-syntax mechanisms of \cref{sec:resist}.
+The per-syntax mechanisms of \cref{sec:resist} appear directly in the corpus.
 LDAP is the pure rejection case: every real LDAP payload fails \textsc{Verify}
 (0 inert, 3 rejected), its parenthesis breakout carrying an unmatched \verb|)|.
 SQL and XSS, breaking out on nonmatchers, are overwhelmingly valid matchertext
@@ -70,8 +70,8 @@ Containment is unaffected, since both routes hold the value, but the split
 itself is a property of the recorded corpus rather than of an adaptive attacker.
 
 \paragraph{Where matchertext cannot help.}
-The remaining 914 payload-backed CVEs are outside both conditions, and the
-boundary is precise rather than incidental.
+The remaining 914 payload-backed CVEs are outside both conditions, and divide
+along the two conditions they fail.
 545 target execution/semantic sinks (server-side templates, expression
 languages, code evaluation, spreadsheet formulas, and \verb|javascript:| URLs)
 where the host runs the contained value by design, so delimiting cannot stop
