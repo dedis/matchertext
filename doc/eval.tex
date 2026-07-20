@@ -354,6 +354,42 @@ and ordinary prose in C++ and Java.
 The intrinsically bracket-heavy mini-languages, regular expressions,
 shell, and CSS, are the ones that recur as embeddings across hosts,
 whereas the bulk categories differ between hosts mainly in volume.
+\Cref{tab:eval:embeddings} makes this per-host,
+listing the top embedded content types
+for each of the highest-volume host languages.
+The ordering is similar but not identical across them:
+format strings, regular expressions, shell fragments, and URLs recur almost
+everywhere, but the leading type shifts with the host's role,
+from markup in JavaScript to regular expressions in C\#,
+URLs in TypeScript, and format strings across the C family
+(91\% of C's embeddings).
+The syntaxes matchertext most directly concerns, SQL and HTML,
+appear for most hosts but rarely at the top.
+
+\begin{table}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2.5pt}
+\begin{tabular}{c|cccccccc}
+\hline
+Rank & \shortstack{JS\\\textit{13\%}} & \shortstack{Java\\\textit{12\%}} & \shortstack{C++\\\textit{17\%}} & \shortstack{Go\\\textit{16\%}} & \shortstack{Py\\\textit{14\%}} & \shortstack{C\#\\\textit{10\%}} & \shortstack{C\\\textit{36\%}} & \shortstack{TS\\\textit{5\%}} \\
+\hline
+1 & \shortstack{HTML\\29\%} & \shortstack{Fmt\\41\%} & \shortstack{Fmt\\78\%} & \shortstack{Fmt\\52\%} & \shortstack{Fmt\\36\%} & \shortstack{Regex\\35\%} & \shortstack{Fmt\\91\%} & \shortstack{URL\\35\%} \\[2pt]
+2 & \shortstack{Shell\\22\%} & \shortstack{Regex\\13\%} & \shortstack{URL\\5\%} & \shortstack{Go\\28\%} & \shortstack{Regex\\19\%} & \shortstack{URL\\28\%} & \shortstack{Asm\\5\%} & \shortstack{Shell\\18\%} \\[2pt]
+3 & \shortstack{Regex\\17\%} & \shortstack{HTML\\12\%} & \shortstack{Asm\\5\%} & \shortstack{URL\\6\%} & \shortstack{Shell\\9\%} & \shortstack{Shell\\15\%} & \shortstack{SQL\\2\%} & \shortstack{HTML\\16\%} \\[2pt]
+4 & \shortstack{URL\\10\%} & \shortstack{SQL\\10\%} & \shortstack{Shell\\4\%} & \shortstack{SQL\\5\%} & \shortstack{YAML\\9\%} & \shortstack{HTML\\6\%} & \shortstack{Shell\\1\%} & \shortstack{Fmt\\5\%} \\[2pt]
+5 & \shortstack{Fmt\\8\%} & \shortstack{URL\\8\%} & \shortstack{Regex\\3\%} & \shortstack{Regex\\3\%} & \shortstack{SQL\\8\%} & \shortstack{SQL\\5\%} & \shortstack{URL\\$<$1\%} & \shortstack{JSON\\5\%} \\
+\hline
+\end{tabular}
+\caption{Top five inferred embedded-content types per host language, by share of
+that host's embeddings (descending). The italic figure under each host is the
+fraction of all its string literals that are embeddings; non-embedding categories
+(plain text, identifiers, file paths, binary/hex, and pseudo buckets) are
+excluded from the per-cell shares. \emph{Fmt} abbreviates format string and
+\emph{Asm} inline assembly; content types are heuristically inferred
+(\cref{sec:eval:methodology}).}
+\label{tab:eval:embeddings}
+\end{table}
 
 Two caveats bound these readings.
 The classification is content-based and best-effort,
