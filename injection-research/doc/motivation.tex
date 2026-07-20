@@ -169,11 +169,15 @@ whereas a sanitizer must shadow the host language's parser and its quirks;
 the security literature has repeatedly reached the analogous conclusion,
 favoring safety by construction, typed template contexts,
 and parameterized queries over ad-hoc escaping~\cite{samuel11csas,momot16langsec,owasp_parameterization}.
-The contrast could hardly be sharper:
-a few lines of uniform, host-independent balance-checking
+The check itself is a few lines of uniform, host-independent balance-counting,
 against tens of thousands of lines of parser-shadowing transformation
 that must be re-synchronized with every browser it shadows.
-Shrinking the trusted checkpoint to that structural check
-is exactly what matchertext's preference for verification over transformation
-offers.
+The check is not the whole trusted base.
+A matchertext host must also end an embedded value by matcher balance
+and suppress its own decoding inside the hole,
+and the write path adds an encoder and its inverse (\cref{sec:threat}).
+Matchertext thus relocates trust rather than eliminating it:
+what must hold uniformly across languages shrinks to a small host-independent
+check, and what remains per host is a bounded change to a parser the host
+already owns, not a new artifact shadowing one it does not.
 

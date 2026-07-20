@@ -62,6 +62,12 @@ LDAP is the pure rejection case: every real LDAP payload fails \textsc{Verify}
 SQL and XSS, breaking out on nonmatchers, are overwhelmingly valid matchertext
 and embed inertly; the 322 SQL rejections additionally carry an unbalanced
 function or subquery parenthesis.
+The ratio between the two mechanisms is descriptive, not predictive.
+These payloads were written against quote and tag-delimited sinks; an attacker
+aware of a matcher-delimited slot would balance the matchers, shifting cases
+from rejection to inert embedding.
+Containment is unaffected, since both routes hold the value, but the split
+itself is a property of the recorded corpus rather than of an adaptive attacker.
 
 \paragraph{Where matchertext cannot help.}
 The remaining 914 payload-backed CVEs are outside both conditions, and the
@@ -81,8 +87,14 @@ condition can be read from the syntax label alone.
 Projecting it onto the full corpus, at most \textbf{73{,}246} of the
 \textbf{91{,}760} injection CVEs (\textbf{80\%}) target a matcher-delimitable
 syntax.
-This is a loose upper bound (a fraction of HTML/DOM cases are the
-\verb|javascript:| semantic sinks above), but it bounds the reach of the
-discipline from below at the fragment level and from above at the syntax level,
-and the gap between 5{,}025 and 91{,}760 is payload availability, not a
-containment failure.
+This is an upper bound, since a fraction of HTML/DOM cases are the
+\verb|javascript:| semantic sinks above, and the payload-backed subset puts a
+number on that fraction: 219 of the 3{,}004 HTML/DOM CVEs carrying a payload are
+such sinks, a rate of \textbf{7.3\%}.
+Applying it to the 50{,}884 HTML/DOM CVEs removes an estimated 3{,}710, for a
+central estimate of \textbf{69{,}536} (\textbf{76\%}) against the 80\% ceiling.
+The estimate assumes payload-backed CVEs carry sinks at the same rate as the
+rest, which their skew toward exploitable web bugs may not warrant.
+The reach of the discipline is thus bounded from below at the fragment level and
+from above at the syntax level, and the gap between 5{,}025 and 91{,}760 is
+payload availability, not a containment failure.
