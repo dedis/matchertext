@@ -22,9 +22,9 @@ The canonical injection \verb|' OR '1'='1| illustrates the mechanism: hosted as
 the string literal is now ordinary text inside the matched region, and the
 tautology cannot break out.
 
-This paper asks how much of the real injection landscape such a discipline could
-actually address.
-We make three contributions:
+This paper asks what a matchertext-based defense would guarantee, under what
+assumptions, and how much of the real injection landscape it could reach.
+We make four contributions:
 \begin{itemize}
 \item	A reproducible, snapshot-pinned corpus (\cref{sec:data}) that unifies
 	the official CVE record with normalized enrichment and four
@@ -34,6 +34,11 @@ We make three contributions:
 	each injection CVE by weakness family and by the embedded
 	\emph{syntax} it targets, and a syntactic-skeleton grouping that
 	clusters attacks by structural shape (\cref{sec:results}).
+\item	A precise threat model and security property (\cref{sec:threat}) that
+    states the guarantee as an \emph{inertness} invariant, distinguishes it
+    from the weaker closure theorem it is easily conflated with, and reduces
+    it to three named premises; the load-bearing boundary premise we
+    discharge with a machine-checked Lean proof (\cref{sec:appendix:lean}).
 \item	An empirical measurement of matchertext's structural reach (\cref{sec:prevent}):
 	each skeleton is rewritten to its matchertext-equivalent and checked
 	for breakout, yielding both a measured figure over payload-backed CVEs

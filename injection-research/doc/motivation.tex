@@ -1,4 +1,4 @@
-\section{Motivation: the injection problem}
+\section{Background and motivation}
 \label{sec:motivation}
 
 Injection remains among the most damaging and persistent classes of software
@@ -11,10 +11,8 @@ the motivation for the structural approach this thesis evaluates.
 \label{sec:bg:hazards}
 
 SQL injection and XSS are only the most familiar members
-of a much larger family of failures with a single root cause:
-untrusted content escaping the syntactic context it was meant to occupy,
-because a delimiter in the content collides with one in the host language.
-The same failure recurs across many language pairs,
+of a much larger family that share the boundary-crossing cause of \cref{sec:intro}.
+The same failure recurs across many more language pairs than those two,
 and produces symptoms well beyond information disclosure.
 
 Several are, like SQL injection, outright remote compromises.

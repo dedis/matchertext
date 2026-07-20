@@ -1,15 +1,14 @@
 \section{Threat model and security property}
 \label{sec:threat}
 
-The claims of \cref{sec:resist,sec:prevent} are conditional, and this section
+All the current claims are purely conditional, and this section
 makes the conditions explicit: what is trusted, what the attacker controls, the
 property that is meant to hold, and the deployment premises it requires. We state
 the property as an invariant rather than rely on the informal ``cannot break
-out,'' because the closure theorem the argument inherits~\cite{matchertext} and
-the property a security claim actually needs are not the same statement.
+out''.
 
 \paragraph{Protected asset.}
-The host program's parse structure. For a host program with a hole $P[\cdot]$
+For a host program with a hole $P[\cdot]$
 into which an untrusted value $v$ is placed, the asset is the invariant that the
 \emph{structure} of the host's parse of $P[v]$ is independent of the content of
 $v$: the value occupies a single data position and contributes no host syntax.
@@ -20,11 +19,8 @@ with a matcher pair and ends the embedded value by matcher balance rather than b
 scanning for its native closer; (ii) the \textsc{Verify} recognizer that decides
 membership in the matchertext language $L$; and (iii) the total encoder
 \textsc{ToMatchertext} and its inverse, used on free-form fields.
-\textsc{Verify} is small and host-independent and is the only component the
-argument adds to the host.
 The boundary-locating step of (i) is the operationally load-bearing part; we
-discharge it below as premise L1, machine-checked in Lean
-(\cref{sec:appendix:lean}), so what the host must still be trusted for is the
+discharge it below as premise L1 (machine checked), so what the host must still be trusted for is the
 \emph{implementation} of that step rather than its principle.
 
 \paragraph{Attacker.}
@@ -33,7 +29,7 @@ encodings, Unicode, length, and matcher-nesting depth, and may submit strings
 that are \emph{not} valid matchertext.
 Following Kerckhoffs, the attacker knows the discipline, which delimiter kind
 guards the hole, and where the hole boundaries lie, and crafts $v$ \emph{against}
-the matcher-delimited slot---not the legacy quote- or tag-delimited sink that the
+the matcher-delimited slot, not the legacy quote or tag-delimited sink that the
 recorded corpus payloads (\cref{sec:results}) target.
 The attacker does not control the host source, the configuration $(\Sigma,\Pi)$,
 or the trusted components above.
@@ -52,6 +48,46 @@ treats the delimited content as data}.
 Closure is a lemma toward inertness, not inertness itself: it constrains the
 \emph{string}, not the host \emph{parser}.
 
+\paragraph{Deployment premises.}
+Inertness holds under four assumptions, each necessary:
+\begin{itemize}
+\item[\textbf{A1}] \emph{Aware host.} The sink is a matchertext-aware host that
+	ends the value by matcher balance rather than at its native closer.
+\item[\textbf{A2}] \emph{Delimited context.} Every untrusted value is routed
+	into a matcher-delimited hole; a value concatenated into host syntax
+	outside a hole is unprotected, exactly as with any point-of-use defense.
+\item[\textbf{A3}] \emph{Canonicalize, then verify.} \textsc{Verify} runs on the
+	\emph{fully decoded and normalized} value, at the last transform boundary
+	before it enters the hole, and the host reads that same representation to
+	matcher balance, performing no further decoding, normalization, or
+	reparsing of the hole contents.
+	Writing $\mathrm{canon}(v)$ for the composition of every decode and
+	normalization the pipeline applies, the obligation is
+	$\textsc{Verify}(\mathrm{canon}(v))$ with the host parsing
+	$\mathrm{canon}(v)$; \textsc{Verify} then only needs to track the six literal
+	matcher code points.
+	A check on any earlier, still-encoded representation is unsound: a value
+	valid at that point can acquire an unmatched matcher after a later decode
+	(\eg \verb|%5D|$\rightarrow$\verb|]|) and break out.\footnote{%
+	Making \textsc{Verify} itself robust to \emph{transport} encodings
+	(percent, entity, backslash, \dots) is not viable: those forms compose to
+	unbounded depth and vary by pipeline, reintroducing the parser-shadowing
+	burden matchertext avoids (\cref{sec:bg:sanitizer}).
+	Unicode normalization is the one transform with a finite preimage: exactly
+	20 code points normalize to a \emph{lone} matcher (fullwidth, small,
+	presentation-form, and super/subscript brackets, \eg
+	\texttt{U+FF3B}$\rightarrow$\texttt{[}), while the rest of the preimage
+	normalizes to balanced pairs (\texttt{U+2474}$\rightarrow$\texttt{(1)}) and
+	cannot create an imbalance.
+	Because that set is fixed, canonicalization eliminates it outright, which is
+	why A3 places normalization before the check rather than asking
+	\textsc{Verify} to model it.}
+\item[\textbf{A4}] \emph{Not a semantic sink.} The host does not execute the
+	contained value by design (server-side templates, expression languages,
+	code evaluation, \verb|javascript:| URLs); delimiting confines structure,
+	not meaning.
+\end{itemize}
+
 \paragraph{From closure to inertness.}
 We model the aware host of A1 as a grammar $G$ with one distinguished production
 $\mathit{hole}\rightarrow s_o\,\mathit{content}\,s_c$, where $\mathit{content}$ is
@@ -64,7 +100,7 @@ Inertness then rests on three premises, each separately dischargeable:
 	(\cref{sec:appendix:lean}): for a matcher-pair-delimited hole and a valid
 	matchertext value $v$, every prefix of $v$ has non-negative matcher depth,
 	$v$ itself returns to depth zero, and the context closer is the first
-	character to drive the depth negative---so the balance boundary is exactly
+	character to drive the depth negative, so the balance boundary is exactly
 	$|v|$. The result is host-\emph{independent} and machine-checked; what
 	remains is the engineering step of verifying a concrete locator
 	implementation (Algorithm~2 of~\cite{matchertext}) against it.
@@ -88,45 +124,8 @@ hosts (\cref{sec:appendix:lean}).
 L2 and L3 are the residual obligations, both per host, and are what the
 implementation work of \cref{sec:concl} must supply.
 
-\paragraph{Deployment premises.}
-Inertness holds under four assumptions, each necessary:
-\begin{itemize}
-\item[\textbf{A1}] \emph{Aware host.} The sink is a matchertext-aware host that
-	ends the value by matcher balance rather than at its native closer.
-\item[\textbf{A2}] \emph{Delimited context.} Every untrusted value is routed
-	into a matcher-delimited hole; a value concatenated into host syntax
-	outside a hole is unprotected, exactly as with any point-of-use defense.
-\item[\textbf{A3}] \emph{Canonicalize, then verify.} \textsc{Verify} runs on the
-	\emph{fully decoded and normalized} value, at the last transform boundary
-	before it enters the hole, and the host reads that same representation to
-	matcher balance, performing no further decoding, normalization, or
-	reparsing of the hole contents.
-	Writing $\mathrm{canon}(v)$ for the composition of every decode and
-	normalization the pipeline applies, the obligation is
-	$\textsc{Verify}(\mathrm{canon}(v))$ with the host parsing
-	$\mathrm{canon}(v)$; \textsc{Verify} then need track only the six literal
-	matcher code points.
-	A check on any earlier, still-encoded representation is unsound: a value
-	valid at that point can acquire an unmatched matcher after a later decode
-	(\eg \verb|%5D|$\rightarrow$\verb|]|) and break out.\footnote{%
-	Making \textsc{Verify} itself robust to \emph{transport} encodings
-	(percent, entity, backslash, \dots) is not viable: those forms compose to
-	unbounded depth and vary by pipeline, reintroducing the parser-shadowing
-	burden matchertext avoids (\cref{sec:bg:sanitizer}).
-	Unicode normalization is the one bounded case: the NFKC/NFKD preimage of the
-	six matchers---fullwidth, small-form, and presentation variants such as
-	\texttt{U+FF3B}$\rightarrow$\texttt{[}---is a finite, UCD-derived set of a
-	few dozen code points that \textsc{Verify} may additionally fold or reject
-	as a belt-and-suspenders guard against normalization applied after the
-	check.}
-\item[\textbf{A4}] \emph{Not a semantic sink.} The host does not execute the
-	contained value by design (server-side templates, expression languages,
-	code evaluation, \verb|javascript:| URLs); delimiting confines structure,
-	not meaning.
-\end{itemize}
-
 \paragraph{Scope.}
-In scope is \emph{structural} injection: an attacker-controlled value that alters
+\emph{structural} injection are in scope: an attacker-controlled value that alters
 the host parse by escaping its region.
 Out of scope, and excluded from the containment claims throughout, are:
 execution and semantic sinks (A4); contexts delimited by non-matchers with no
@@ -136,5 +135,3 @@ access-control question; algorithmic denial of service (regular-expression
 backtracking, entity expansion), which is not a breakout; and second-order
 injection in which stored input is reinterpreted later in a different context,
 unless it is re-checked under A3 at that later sink.
-\cref{sec:prevent} measures the in-scope fraction and reports the out-of-scope
-residue explicitly.

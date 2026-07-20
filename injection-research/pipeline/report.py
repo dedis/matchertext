@@ -47,12 +47,27 @@ _SIGNS = {
 SIGNS = {s: [re.compile(p, re.I | re.S) for p in ps] for s, ps in _SIGNS.items()}
 
 
+# Metavariable placeholders mark *where* to inject; they are not attack payloads.
+# Exploit-DB entries derived from SecurityFocus write the injection point as
+# "[SQL]", Nuclei templates use variables like "{{BaseURL}}", and Metasploit
+# modules carry un-interpolated Ruby source such as "`#{cmd}`". Accepting these
+# yields payloads that are trivially valid matchertext and would bias the
+# containment measurement. The bare-identifier restriction keeps genuine
+# expression payloads such as "{{7*7}}", which are not placeholders.
+_PLACEHOLDER = re.compile(
+    r"^(?:\[[A-Za-z_][A-Za-z0-9_ ]*\]|\{\{[A-Za-z_][A-Za-z0-9_-]*\}\})$")
+
+
+def is_placeholder(frag):
+    return bool(_PLACEHOLDER.match(frag)) or "#{" in frag
+
+
 def extract_payload(text, syn):
     for rx in SIGNS.get(syn, ()):
         m = rx.search(text)
         if m:
             frag = " ".join(m.group(0).split())
-            if 3 <= len(frag) <= 200:
+            if 3 <= len(frag) <= 200 and not is_placeholder(frag):
                 return frag
     return None
 

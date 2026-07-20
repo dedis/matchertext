@@ -20,15 +20,20 @@ records, spanning 351 distinct CWEs.
 Each CVE's syntax type is resolved by a fallback chain, ordered from most to
 least reliable, mirroring the content-classifier methodology of the matchertext
 empirical study~\cite{matchertext}:
+
 (1) a deterministic map from specific CWEs (\eg \mbox{CWE-89}$\rightarrow$SQL,
 \mbox{CWE-79}$\rightarrow$HTML, \mbox{CWE-78}$\rightarrow$shell);
+
 (2) phrase rules over the CNA description (``SQL injection'', ``cross-site
 scripting'', ``command injection'', \dots);
+
 (3) a character-trigram naive-Bayes classifier trained on the CWE- and
 rule-labeled set, applied to the still-unlabeled remainder above a confidence
 margin; and
+
 (4) an explicit \texttt{unknown} bucket.
-Of the injection CVEs, 82{,}817 (90\%) are labeled deterministically from CWEs,
+
+\noindent Of the injection CVEs, 82{,}817 (90\%) are labeled deterministically from CWEs,
 7{,}657 from phrase rules, 1{,}160 from naive Bayes, and only 126 remain
 unknown, so the classification rests overwhelmingly on the deterministic
 layers.

@@ -1,8 +1,7 @@
 \section{Measuring matchertext containment}
 \label{sec:prevent}
 
-\Cref{sec:resist} argues that matchertext contains an injection under the model
-of \cref{sec:threat}, chiefly two conditions: the untrusted value lands in a slot
+Matchertext contains an injection under mainly two conditions: the untrusted value lands in a slot
 a matchertext-aware host delimits with a matcher pair, and the value is itself
 valid matchertext, checked by the passive \textsc{Verify} scan rather than by
 escaping.
@@ -11,8 +10,7 @@ An attack then fails one of two ways, by \emph{inert embedding} or by
 payload we can measure, so we now put the argument to the corpus.
 
 \paragraph{Method.}
-For each of the 5{,}763 payload-backed CVEs we reuse its syntactic skeleton
-(\cref{sec:results}) and decide two things:
+For each of the 5{,}025 payload-backed CVEs we reuse its syntactic skeleton and decide two things:
 whether the target syntax is one a matchertext host can delimit with a matcher
 pair, and, if so, whether the skeleton passes \textsc{Verify}.
 A passing skeleton is contained by \emph{inert embedding}; a failing one is
@@ -24,46 +22,56 @@ leave to future implementation work.
 \begin{table}[t]
 \centering
 \small
-\begin{tabular}{lrr}
+\begin{tabular}{lrrr}
 \toprule
-Syntax & Inert embed & Rejected \\
+Syntax & Inert embed & Rejected & Outside \\
 \midrule
-HTML / DOM (XSS) & 2{,}775 &  13 \\
-SQL              & 1{,}632 & 325 \\
-LDAP             &     0 &   3 \\
-NoSQL            &     1 &   0 \\
+HTML / DOM (XSS)    & 2{,}772 &  13 & 219 \\
+SQL                 & 1{,}000 & 322 &   0 \\
+LDAP                &       0 &   3 &   0 \\
+NoSQL               &       1 &   0 &   0 \\
 \midrule
-Total            & 4{,}408 & 341 \\
+Shell command       & --- & --- & 333 \\
+Code / eval         & --- & --- & 301 \\
+CRLF / header       & --- & --- &  29 \\
+Formula (CSV)       & --- & --- &  17 \\
+Template            & --- & --- &   5 \\
+XML                 & --- & --- &   4 \\
+Argument            & --- & --- &   3 \\
+Expression language & --- & --- &   3 \\
+\midrule
+Total               & 3{,}773 & 338 & 914 \\
 \bottomrule
 \end{tabular}
-\caption{Prevention mechanism by syntax, over the payload-backed CVEs whose
-target context a matchertext host can delimit.}
+\caption{Containment outcome by syntax over all \(5{,}025\) payload-backed CVEs.
+Contexts a matchertext host can delimit (upper block) are contained by inert
+embedding or by rejection; the \emph{Outside} column counts CVEs failing a
+condition of \cref{sec:threat}, either an execution sink (the HTML/DOM entries
+are \texttt{javascript:} URLs) or a context whose delimiters are not matchers.}
 \label{tab:mech}
 \end{table}
 
 \paragraph{Results.}
-Of the 5{,}763 payload-backed injection CVEs, the recorded payloads of
-\textbf{4{,}749} (\textbf{82\%}) are contained by a matcher-delimited slot that a
+Of the 5{,}025 payload-backed injection CVEs, the recorded payloads of
+\textbf{4{,}111} (\textbf{82\%}) are contained by a matcher-delimited slot that a
 matchertext-aware host reads to matcher balance, assuming no intervening
 decoding; the split turns on the host's native delimiter.
-LDAP is the pure case of rejection: its search filters are already
-parenthesis-delimited, so the classic \verb|*)(uid=*| breakout carries an
-unmatched \verb|)| and every real LDAP payload in the corpus fails
-\textsc{Verify} (0 inert, 3 rejected).
-SQL and XSS break out on nonmatchers (the quote, the angle bracket), so their
-payloads are overwhelmingly valid matchertext and embed inertly; the SQL
-rejections (325) are payloads that additionally carry an unbalanced function or
-subquery parenthesis.
+The corpus bears out the per-syntax mechanisms of \cref{sec:resist}.
+LDAP is the pure rejection case: every real LDAP payload fails \textsc{Verify}
+(0 inert, 3 rejected), its parenthesis breakout carrying an unmatched \verb|)|.
+SQL and XSS, breaking out on nonmatchers, are overwhelmingly valid matchertext
+and embed inertly; the 322 SQL rejections additionally carry an unbalanced
+function or subquery parenthesis.
 
 \paragraph{Where matchertext cannot help.}
-The remaining 1{,}014 payload-backed CVEs are outside both conditions, and the
+The remaining 914 payload-backed CVEs are outside both conditions, and the
 boundary is precise rather than incidental.
-595 target execution/semantic sinks (server-side templates, expression
+545 target execution/semantic sinks (server-side templates, expression
 languages, code evaluation, spreadsheet formulas, and \verb|javascript:| URLs)
 where the host runs the contained value by design, so delimiting cannot stop
 it: the template payload \verb|{{7*7}}| is already valid matchertext yet is
 still executed.
-The other 419 target contexts delimited by non-matchers with no matcher hosting:
+The other 369 target contexts delimited by non-matchers with no matcher hosting:
 shell command separators (\verb|;|~\verb-|-~\verb|&|), CR/LF header breaks, and
 the angle brackets of XML/XXE, none of which are matcher characters.
 
@@ -76,5 +84,5 @@ syntax.
 This is a loose upper bound (a fraction of HTML/DOM cases are the
 \verb|javascript:| semantic sinks above), but it bounds the reach of the
 discipline from below at the fragment level and from above at the syntax level,
-and the gap between 5{,}763 and 91{,}760 is payload availability, not a
+and the gap between 5{,}025 and 91{,}760 is payload availability, not a
 containment failure.
