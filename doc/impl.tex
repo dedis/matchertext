@@ -12,22 +12,15 @@ for several languages and embedding-oriented syntaxes is underway,
 and this section is intended to be expanded
 as we gain experience implementing and using them.
 
-For those wishing to help with implementation and experimentation,
-the following are some of the key work items
-enabling us to start experimenting with matchertext in the context
-of any particular language of interest:
-\begin{itemize}
-\item	An implementation of those extensions for hosting and/or embedding,
-	selectively enabled via configuration parameters
-	for backward compatibility,
-	in some mature processor for the language of interest
-	(\eg a compiler, interpreter, or library implementation).
-\item	A configurable extension to the language processor
-	that optionally causes it
-	to check and enforce the matchertext discipline
-	in processed text:
-	\ie to verify that matchers match in source files or strings.
-\end{itemize}
+Applying matchertext to a particular language is future work of a standard shape, in two parts.
+The first is an implementation of the hosting and embedding extensions of \cref{sec:host} in a
+mature processor for that language, a compiler, interpreter, or library, selectively enabled
+through configuration parameters so that previously valid code is unaffected.
+The second is a configurable mode in the same processor that checks and enforces the matchertext
+discipline, verifying that matchers match in the source files or strings it handles.
+Carried out across enough languages, and converging on a shared configuration, these steps are what
+would turn matchertext from a per-language extension into the standardized, cross-language discipline
+this paper proposes.
 
 
 \subsection{A compiler grammar for matchertext}
