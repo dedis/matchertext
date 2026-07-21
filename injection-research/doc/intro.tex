@@ -26,23 +26,25 @@ This paper asks what a matchertext-based defense would guarantee, under what
 assumptions, and how much of the real injection landscape it could reach.
 We make four contributions:
 \begin{itemize}
-\item	A reproducible, snapshot-pinned corpus (\cref{sec:data}) that unifies
-	the official CVE record with normalized enrichment and four
-	proof-of-concept databases, so that classification, exploitation
-	signals, and real attack payloads can be joined on a common key.
-\item	A two-axis, multi-source classifier (\cref{sec:classify}) that labels
-	each injection CVE by weakness family and by the embedded
-	\emph{syntax} it targets, and a syntactic-skeleton grouping that
-	clusters attacks by structural shape (\cref{sec:results}).
+\item	A security reading of the matchertext discipline
+	(\cref{sec:relevance}), which develops what the rule is, why a
+	discipline designed for verbatim embedding bears on injection at all,
+	and what would have to hold for it to help.
 \item	A precise threat model and security property (\cref{sec:threat}) that
-    states the guarantee as an \emph{inertness} invariant, distinguishes it
-    from the weaker closure theorem it is easily conflated with, and reduces
-    it to three named premises; the load-bearing boundary premise we
-    discharge with a machine-checked Lean proof (\cref{sec:appendix:lean}).
-\item	An empirical measurement of matchertext's structural reach (\cref{sec:prevent}):
-	each skeleton is rewritten to its matchertext-equivalent and checked
-	for breakout, yielding both a measured figure over payload-backed CVEs
-	and a projection over the full injection corpus.
+	states the guarantee as an \emph{inertness} invariant, distinguishes it
+	from the weaker closure theorem it is easily conflated with, and reduces
+	it to three named premises; the load-bearing boundary premise we
+	discharge with a machine-checked Lean proof (\cref{sec:appendix:lean}).
+\item	A structural argument (\cref{sec:resist}) that matcher-delimiting
+	untrusted input resists injection across SQL, HTML, LDAP, and PDF, with
+	the options for fitting the discipline into existing languages and how
+	it compares with the defenses already deployed.
+\item	An empirical measurement of its structural reach
+	(\cref{sec:prevent}), over a reproducible, snapshot-pinned corpus
+	(\cref{sec:corpus}) that unifies the official CVE record with normalized
+	enrichment and four proof-of-concept databases, classified by weakness
+	family and by the embedded \emph{syntax} each attack targets
+	(\cref{sec:results}).
 \end{itemize}
 
 A vulnerability is tallied as structurally containable only where the mechanism
