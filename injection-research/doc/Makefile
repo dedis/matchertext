@@ -24,8 +24,5 @@ clean:
 	$(RM) -r $(BUILD)
 	$(RM) *.aux *.bak *~
 
-distclean: clean
-	$(RM) $(FILE).pdf
-	$(RM) $(FILE).ps
-	$(RM) $(FILE).dvi
-	$(RM) *.d
+open:
+	open $(FILE).pdf
