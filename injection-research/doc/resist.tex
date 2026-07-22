@@ -244,10 +244,10 @@ since a marker abutting a quote is input their grammars already reject, so it ca
 ship behind a flag without endangering existing code.
 
 
-Neither premise removes the parser from the trusted base.
-A1 relocates a bounded part of the sink's parser, and A2 adds a lexical form to
-the application language; together they replace an obligation on the programmer
-at every use site with an obligation on two parsers
+Together the two premises replace an obligation on the programmer at every use
+site with an obligation on two parsers: A1 relocates a bounded part of the sink's
+parser, and A2 adds a lexical form to the application language.
+Neither removes a parser from the trusted base, and neither is meant to
 (\cref{sec:bg:sanitizer}).
 
 \subsection{Comparison with existing defenses}
