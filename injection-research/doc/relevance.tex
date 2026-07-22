@@ -1,12 +1,114 @@
 \section{Matchertext and its security relevance}
 \label{sec:relevance}
 
+The narrow waist of \cref{sec:bg:waist} is a claim about \emph{embedding},
+not about security.
+Matchertext was designed so that a string in one language can be placed in another
+verbatim, without escaping; its stated benefit is that the writer of embedded text
+need reason about only one language's rules at a time~\cite{matchertext}.
+That is a usability argument.
+This section states the discipline precisely enough to reason about, explains why
+a property invented for embedding bears on injection at all, and sets out the
+questions the rest of the paper answers.
+
 \subsection{The discipline}
 \label{sec:relevance:discipline}
+
+Matchertext is a purely syntactic rule over an alphabet $\Sigma$ and a set $\Pi$
+of open/close character pairs: the \emph{matchers} must match.
+Writing $O$ and $C$ for the openers and closers of $\Pi$, and \emph{nonmatchers}
+for every other character, the language $L$ of matchertext strings is defined
+inductively: any string of nonmatchers is in $L$, and if $m_1,m_2,m_3\in L$ and
+$(o,c)\in\Pi$ then $m_1\,o\,m_2\,c\,m_3\in L$.
+The concrete configuration takes $\Sigma$ to be Unicode and $\Pi$ to be the three
+ASCII pairs \verb|()|, \verb|[]|, and \verb|{}|; the angle brackets are excluded
+because they are used unmatched as inequality operators far too often to
+constrain~\cite{matchertext}.
+Nothing else is fixed: the discipline assigns no meaning to any character and is
+deliberately oblivious to the syntax of any particular language.
+
+Three results carry over from the original development, and the rest of this paper
+uses only these.
+First, \emph{closure}, also called always-embeddability: if $m\in L$ and
+$(s_o,s_c)$ is a matched delimiter pair, then $s_o\,m\,s_c\in L$.
+A valid matchertext string placed inside matched delimiters therefore yields a
+valid matchertext string, at any nesting depth and with no escaping or expansion.
+Second, membership in $L$ is decided by a single linear scan, the \textsc{Verify}
+recognizer, which maintains a stack of unclosed openers and accepts exactly when
+every closer matches its opener and the stack ends empty.
+Third, a total encoder \textsc{ToMatchertext} maps \emph{any} string into $L$ by
+escaping only its unmatched matchers, so free-form input that legitimately
+contains an unmatched bracket need not be rejected.
+Closure and the correctness of \textsc{Verify} are machine-checked;
+\textsc{ToMatchertext} is specified but not yet formalized, a gap we return to in
+\cref{sec:discussion}.
+For the rationale behind $\Pi$, the hosting syntaxes, and the empirical
+compliance study, see~\cite{matchertext}.
 
 \subsection{From embedding to security}
 \label{sec:relevance:security}
 
+Verbatim embedding and injection resistance are not the same property, and the
+paper's claim turns on the difference between them.
+
+Injection, as \cref{sec:motivation} describes it, is a boundary failure: a value
+meant to occupy one syntactic region escapes it, because a delimiter inside the
+value collides with the delimiter that was supposed to contain it.
+Conventional defenses attack the \emph{collision}, transforming the value so that
+its dangerous characters can no longer be confused with the host's, which is why
+they must know the host's syntax and why there is a different one for every
+host and context.
+Matchertext attacks the \emph{boundary} instead.
+If a host delimits an untrusted value with a matcher pair and finds the end of
+that value by counting matchers rather than by scanning for a terminator, then
+escaping the region requires emitting an unmatched matcher, and by closure no
+valid matchertext string contains one.
+The characters that drive the classic breakouts, the quote in SQL and the angle
+bracket in HTML, are nonmatchers: the discipline leaves them entirely
+unconstrained, and they become ordinary data inside a matched region that can't break out,
+even when converted to nonmatchers under the closure theorem.
+
+Two consequences follow, and they are the reason this is a security question
+rather than a syntactic one.
+The check is \emph{host-independent}: \textsc{Verify} inspects only the six
+matcher characters and knows nothing about SQL, HTML, or LDAP, so the same
+recognizer serves every host, which is exactly what a sanitizer cannot do.
+And the check is a \emph{verification} rather than a transformation, so its failure
+mode is benign: a rejected value is data that does not embed, whereas a missed case
+in an escaping routine \emph{is} the injection.
+Together these are the narrow waist applied to security: one uniform obligation on
+the value, in place of one bespoke transformation per host-context pair.
+
 \subsection{What must hold, and what we ask}
 \label{sec:relevance:questions}
 
+Closure constrains \emph{strings}, whereas security is a claim about
+\emph{parsers}, and the second does not follow from the first without assumptions
+about the host.
+\Cref{sec:threat} states those assumptions; three questions organize the rest of
+the paper.
+
+\paragraph{Q1: what is actually guaranteed, and under what assumptions?}
+Delimiting a value is not by itself a security property, and ``cannot break out''
+is not a specification.
+\Cref{sec:threat} states the guarantee as an \emph{inertness} invariant on the
+host's parse, separates it from the weaker closure property it is easily
+conflated with, and reduces it to a small set of named premises about the host
+parser, the interpreter, and the pipeline that reaches them.
+
+\paragraph{Q2: can a real language adopt this, and at what cost?}
+The guarantee assumes a matchertext-aware host, and no mainstream language is one
+today.
+\Cref{sec:resist} develops the argument for the syntaxes where injection actually
+occurs, then asks what adopting it costs: which hosting options deliver the
+property, what each adds to the trusted computing base, and how the result
+compares with the defenses already deployed for these sinks.
+
+\paragraph{Q3: how much of the real injection landscape could this reach?}
+Even granting the property and its adoption, the discipline addresses only
+injections that are structural breakouts from matcher-delimitable contexts, and
+that is a proper subset of what the term covers.
+\Cref{sec:corpus,sec:results,sec:prevent} measure the subset against a corpus of
+recorded vulnerabilities, and \cref{sec:prevent} reports both what fraction of
+attacks with a recoverable payload would be contained and what fraction of the
+landscape is out of reach in principle.
