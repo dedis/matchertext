@@ -253,3 +253,45 @@ at every use site with an obligation on two parsers
 \subsection{Comparison with existing defenses}
 \label{sec:resist:baselines}
 
+\Cref{sec:bg:sanitizer} contrasts matchertext with hand-escaping and sanitizers.
+The strongest defenses for these sinks are not sanitizers, however, and
+matchertext should be measured against those instead.
+
+\emph{Parameterized queries} are the strongest of them.
+A prepared statement fixes the query structure before any value is bound, so no
+value can alter it, and it holds today with no change to the language.
+It binds \emph{values}, however, and only values: a table or column name cannot
+be a placeholder, so identifier positions fall back to ad-hoc allow-listing,
+which is the construction \cref{sec:resist:sql} covers directly with
+\verb|FROM [|\textit{table}\verb|]|.
+\emph{Contextual auto-escaping} and typed template contexts do the same work for
+markup, selecting the escaper from the syntactic context rather than leaving the
+choice to the programmer, and browser-side mechanisms such as Trusted Types
+enforce a related discipline at the sink.
+\emph{Taint tracking} is orthogonal to all of these: it decides \emph{which}
+values are untrusted, not what happens when one reaches a hole.
+
+Matchertext differs from all of them in what it is a defense \emph{of}.
+Each baseline is a mechanism for one sink: prepared statements know SQL,
+auto-escapers know markup, and neither transfers to LDAP filters, PDF strings, or
+URIs, each of which needs a defense written and maintained separately.
+Inertness is stated over a hole rather than over a value, and \textsc{Verify}
+inspects six characters and knows nothing about the language around them, so one
+check serves every sink and covers identifier positions as readily as values.
+That is the narrow waist of \cref{sec:bg:waist} claimed as a security property:
+$N$ sinks need $N$ defenses today, and one discipline instead of $N$ is the
+distinctive claim.
+Two consequences follow.
+Correctness stops depending on a per-context choice, removing the failure mode
+that defeated every participant in the study of \cref{sec:bg:prevalence}; and
+because the obligation is a check rather than a transformation, a bug in it
+rejects data instead of admitting a breakout.
+
+The cost is where the obligation lands.
+The baselines ask for a library; matchertext asks the sink to read to matcher
+balance, which \cref{tab:resist:a1} shows is free where the format already
+delimits with matchers, as in LDAP and PDF, and a parser change where it does
+not.
+The two also compose: nothing in \cref{sec:threat} prevents a parameterized query
+from carrying a matcher-delimited identifier, which is the combination neither
+mechanism reaches alone.
