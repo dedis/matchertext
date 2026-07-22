@@ -1,0 +1,98 @@
+\documentclass[fullpage,twocolumn]{article}
+\pdfoutput=1
+
+\usepackage{times}
+\usepackage{xspace}
+\usepackage{cite} % sort citation numbers
+\usepackage[hyperindex,breaklinks,colorlinks,
+	    linkcolor=blue,citecolor=blue,urlcolor=black]{hyperref}
+\usepackage{cleveref}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xurl} % allow long URLs in the bibliography to break anywhere
+\usepackage[T1]{fontenc}
+\usepackage{listings}
+\lstdefinelanguage{Lean}{
+  morekeywords={inductive,theorem,def,where,variable,import,Prop,Set,List,Type,noncomputable,open},
+  morecomment=[l]{--},
+  morecomment=[s]{/-}{-/},
+  sensitive=true,
+}
+\lstset{
+  language=Lean,
+  basicstyle=\ttfamily\scriptsize,
+  commentstyle=\itshape,
+  columns=fullflexible,
+  keepspaces=true,
+  extendedchars=true,
+  breaklines=true,
+  showstringspaces=false,
+  literate=
+    {α}{{$\alpha$}}1
+    {Σ}{{$\Sigma$}}1
+    {Π}{{$\Pi$}}1
+    {∃}{{$\exists$}}1
+    {∈}{{$\in$}}1
+    {∨}{{$\lor$}}1
+    {∧}{{$\land$}}1
+    {¬}{{$\lnot$}}1
+    {×}{{$\times$}}1
+    {→}{{$\to$}}1
+    {∀}{{$\forall$}}1
+    {≤}{{$\leq$}}1
+    {≥}{{$\geq$}}1
+    {₁}{{$_1$}}1
+    {₂}{{$_2$}}1
+    {₃}{{$_3$}}1
+}
+\usepackage{upquote}
+
+%%%%%%%%%%%%%%%%%%%%%%
+
+% Select one or other if want to see comments.
+\long\def\com#1{}
+%\long\def\com#1{{\bf \sc comment: }{\small [#1]}{\bf \sc\ endcomment}\newline}
+
+\newcommand{\xxx}[1]{}
+%\newcommand{\xxx}[1]{{\color{red} {\bf XXX }{\small [#1]}}}
+
+% Common abbreviations
+\newcommand{\ie}{{\em i.e.},\xspace}
+\newcommand{\eg}{{\em e.g.},\xspace}
+
+%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+\title{Matchertext: An Empirical Analysis of Injection Vulnerabilities \\
+	\Large{%
+	~\\
+	\url{https://github.com/dedis/matchertext}}}
+
+\author{Bryan Ford, Antoine Bastide \\ EPFL}
+
+\maketitle
+
+\input{abs}
+
+\tableofcontents
+
+\input{intro}
+\input{motivation}
+\input{data}
+\input{classify}
+\input{results}
+\input{threat}
+\input{resist}
+\input{prevent}
+\input{concl}
+
+\appendix
+\onecolumn
+\input{appendix}
+\twocolumn
+
+\bibliographystyle{plain}
+\bibliography{refs}
+
+\end{document}

@@ -1,0 +1,73 @@
+\section{Results}
+\label{sec:results}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lrr}
+\toprule
+Injection syntax & CVEs & with PoC \\
+\midrule
+HTML / DOM (XSS)    & 50{,}884 & 5{,}207 \\
+SQL                 & 22{,}225 & 5{,}545 \\
+Shell command       &  9{,}672 & 1{,}013 \\
+Code / eval         &  6{,}666 & 1{,}699 \\
+CRLF / header       &    656 &    73 \\
+Argument            &    430 &    39 \\
+\bottomrule
+\end{tabular}
+\caption{Largest injection syntax types, of \(91{,}760\) injection CVEs, with
+the count carrying at least one linked proof-of-concept.}
+\label{tab:syntax}
+\end{table}
+
+\paragraph{Syntax distribution.}
+\Cref{tab:syntax} shows that injection is overwhelmingly concentrated in two
+syntaxes (HTML/DOM and SQL together account for four in five injection CVEs)
+with a long tail of shell, code-eval, header, template, LDAP, XML, and
+formula contexts.
+This concentration matters directly for \cref{sec:prevent}: the two dominant
+syntaxes are exactly the ones a matchertext host can delimit with a matcher pair.
+Exploitation signals are sparse but consistent with severity: 345 injection CVEs
+appear in the CISA Known-Exploited catalog, and command injection, though
+only a tenth of the corpus, carries a disproportionate share of them.
+
+\paragraph{Proof-of-concept coverage.}
+\textbf{13{,}691} injection CVEs (15\%) carry at least one linked PoC.
+The four PoC databases overlap, so unifying them raises payload coverage well
+above any single source. Of these, \textbf{5{,}025} yield an extractable payload; the remainder
+are links only or exploits from which no literal attack string can be recovered, such as modules
+that construct their payload programmatically. This linkage is what makes the prevention analysis
+of \cref{sec:prevent} possible, since it supplies the real attack strings.
+
+\paragraph{Sub-classification.}
+Beyond the two primary axes, each injection CVE is labelled on orthogonal
+facets, each from its strongest available signal, and stored in long form so a
+CVE can carry one label per dimension at once.
+The CVSS vector yields reachability for free: \textbf{50{,}607} injection CVEs
+are exploitable pre-authentication, 28{,}471 require low privilege, and 11{,}085
+high privilege.
+Finer \emph{technique} labels come from PoC payloads and descriptions where
+present: SQL injections resolve into blind-boolean (866), union-based (621),
+blind-time (372), and authentication-bypass (201) attacks, while XSS resolves
+into stored (15{,}559), reflected (6{,}337), and DOM-based (1{,}610).
+
+\paragraph{Syntactic groups.}
+For the \textbf{5{,}025} injection CVEs with an extractable PoC payload, we
+reduce each payload to a \emph{syntactic skeleton}: string literals, numbers,
+and identifiers are abstracted to placeholders (\verb|<q>|, \verb|<n>|,
+\verb|<id>|) while the structural grammar (matchers, operators, tags, and a
+curated set of injection keywords) is preserved.
+Grouping by identical skeleton yields \textbf{2{,}143} distinct groups
+(1{,}817 of them singletons), so specific values never split a group but a
+different breakout structure always does.
+The largest groups are recognizable attack families: the XSS skeletons
+\verb|<TAG>ALERT(DOCUMENT.<id>)</TAG>| (453 CVEs) and its
+\verb|DOCUMENT.COOKIE| variant (231), and the code-eval fragment
+\verb|<? <id>| (110).
+The tail is long: the singletons are 85\% of groups but only 36\% of CVEs, and
+they collapse to fifteen distinct verdicts, since the skeleton preserves tags and
+operators that the containment test does not depend on.
+Because the skeleton preserves exactly the matcher structure while discarding
+values, it is the natural unit on which to test matchertext prevention next: the
+verdict depends only on that structure, so it is shared by every CVE in a group.
