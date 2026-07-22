@@ -15,8 +15,8 @@ document format, whose literal strings already require matcher balance.
 \subsection{Preventing SQL injection}
 \label{sec:resist:sql}
 
-The discipline is worth making concrete in the setting that most sharply
-motivates it, untrusted input embedded into a query language such as SQL.
+Take the setting that most sharply motivates the discipline: untrusted input
+embedded into a query language such as SQL.
 Recall the classic vulnerability of \cref{sec:intro}: a server composes a clause
 like \verb|"WHERE name = '"+userName+"'"|, and a \verb|userName| containing a
 quote closes the literal early and appends attacker-controlled
@@ -165,6 +165,90 @@ where the reported attacks overwhelmingly live.
 
 \subsection{Fitting matchertext into existing languages}
 \label{sec:resist:fitting}
+
+\begin{table*}[t]
+\centering
+\small
+\begin{tabular}{llllll}
+\hline
+Route & Example & Changes & New syntax & Compatibility & Trusted delta \\
+\hline
+Reuse native matchers & \verb|(uid=|$v$\verb|)|, \verb|/URI (|$v$\verb|)| & nothing & none & full & none \\
+Extend the sink grammar & \verb|WHERE name = [|$v$\verb|]| & sink parser & hole form & per sink & boundary reader \\
+Replace the sink language & MinML for markup & sink parser & wholly new & none & whole parser \\
+\hline
+\end{tabular}
+\caption{Routes to premise A1, an aware sink. \emph{Trusted delta} is what each
+adds to the trusted computing base of \cref{sec:threat} beyond the parser the
+sink already has.}
+\label{tab:resist:a1}
+\end{table*}
+
+\begin{table*}[t]
+\centering
+\small
+\begin{tabular}{llll}
+\hline
+Route & Example & Guarantees A2? & Cost \\
+\hline
+String concatenation & \verb|"... = [" + v + "]"| & no, by inspection only & none \\
+Matchertext literal & \verb|M"(WHERE name = [|$v$\verb|])"| & lexer reads to balance & literal form \\
+Structural interpolation & \verb|M{}"(WHERE name = [{v}])"| & holes fixed before binding & literal + interpolation \\
+\hline
+\end{tabular}
+\caption{Routes to premise A2, the value reaching a hole. Only the interpolating
+form makes the template's structure independent of $v$ at composition time.}
+\label{tab:resist:a2}
+\end{table*}
+
+Adoption is two problems, not one, and the hosting syntaxes
+of~\cite{matchertext} answer only the second.
+Premise A1 of \cref{sec:threat} constrains the \emph{sink}: the SQL engine, HTML
+parser, or directory server that interprets the composed text must end the
+embedded value by matcher balance.
+Premise A2 constrains the \emph{application} that composes it: the untrusted value
+must reach a matcher-delimited hole rather than be concatenated in beside one.
+The two are discharged by changes to different languages, by different people,
+and are worth separating.
+
+\paragraph{Making the sink aware (A1).}
+\Cref{tab:resist:a1} compares the routes.
+Reusing a construct the format \emph{already} delimits with matchers is free:
+LDAP search filters and PDF literal strings
+(\cref{sec:resist:ldap,sec:resist:pdf}) are parenthesis-delimited by definition,
+so the discipline coincides with the format, and A1 costs no new syntax and no
+new trusted code.
+It also reaches only the formats built that way.
+Extending a sink's grammar with a hole form reaches the syntaxes where injection
+actually concentrates, at the price of a change inside the sink's parser, and the
+change is not always conservative: T-SQL already gives \verb|[|$\dots$\verb|]| a
+meaning as a delimited identifier, so a hole form for SQL must either pick
+different delimiters or accept that it is not backward-compatible in the way
+\cite{matchertext}'s \verb|M"|$\dots$\verb|"| literal is for C.
+Replacing the sink language obtains A1 by construction and reaches everything it
+covers, but only for new deployments, since nothing previously written parses.
+
+
+\paragraph{Making the composition safe (A2).}
+A1 is worth nothing if the value never reaches the hole, and today that is left to
+developer discipline: nothing stops a programmer from concatenating into the query
+around a hole rather than into it.
+This is where the source-level syntaxes of~\cite{matchertext} earn their place in
+a security argument, and \cref{tab:resist:a2} sets them against the status quo.
+A matchertext literal with structural interpolation makes the template's holes
+explicit and its structure fixed, so an interpolated value cannot alter the
+surrounding query no matter what it contains, an application of the discipline
+that~\cite{matchertext} identifies as its security-relevant use of interpolation.
+The literal form is a conservative extension for mainstream C-like languages,
+since a marker abutting a quote is input their grammars already reject, so it can
+ship behind a flag without endangering existing code.
+
+
+Neither premise removes the parser from the trusted base.
+A1 relocates a bounded part of the sink's parser, and A2 adds a lexical form to
+the application language; together they replace an obligation on the programmer
+at every use site with an obligation on two parsers
+(\cref{sec:bg:sanitizer}).
 
 \subsection{Comparison with existing defenses}
 \label{sec:resist:baselines}
