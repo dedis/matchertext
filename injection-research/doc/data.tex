@@ -1,0 +1,55 @@
+\section{Data sources}
+\label{sec:data}
+
+Every source is keyed on the CVE identifier, so no vulnerability is duplicated;
+each additional database contributes enrichment or PoC rows rather than a second
+copy of the record.
+All sources are snapshot-pinned by git commit or content hash in a manifest, so
+the corpus is reproducible.
+
+\paragraph{Identity and enrichment.}
+The \href{https://github.com/CVEProject/cvelistV5}{MITRE CVE List}
+(\texttt{cvelistV5}) is the canonical record of identity, CNA provenance, and
+description.
+\href{https://nvd.nist.gov/vuln/data-feeds}{NVD} supplies normalized CWE, CPE,
+and CVSS; \href{https://github.com/cisagov/vulnrichment}{CISA Vulnrichment}
+backfills recent CWE/CVSS via its ADP container;
+\href{https://github.com/cisagov/kev-data}{CISA KEV} marks known-exploited CVEs;
+\href{https://www.first.org/epss/}{FIRST EPSS} supplies exploit-likelihood
+scores; and the \href{https://cwe.mitre.org/}{MITRE CWE list} provides the
+weakness hierarchy used for classification.
+\href{https://github.com/github/advisory-database}{GitHub Security Advisories},
+\href{https://access.redhat.com/security/data}{Red~Hat}, and
+\href{https://security-tracker.debian.org/tracker/}{Debian} add further CWE,
+CVSS, severity, and fix-state signals through their CVE aliases.
+Because the same CVE can carry different weakness labels from different sources,
+enrichment is kept \emph{source-separated}: each CWE or CVSS row is tagged with
+its origin rather than merged, which both preserves provenance and lets us
+measure cross-source disagreement.
+
+\paragraph{Proof-of-concept payloads.}
+Four PoC databases supply real attack strings:
+\href{https://gitlab.com/exploit-database/exploitdb}{Exploit-DB}, the
+\href{https://github.com/projectdiscovery/nuclei-templates}{Nuclei detection
+templates}, the
+\href{https://github.com/rapid7/metasploit-framework}{Metasploit Framework}
+modules, and the
+\href{https://github.com/nomi-sec/PoC-in-GitHub}{nomi-sec PoC-in-GitHub} index.
+The first three are cloned locally so that a payload can be extracted from the
+exploit file; the last contributes links only.
+PoC references are unified in a single table, with a local path where a payload
+is extractable.
+Because exploit code is dual-use, the corpus stores only links, identifiers, and
+locally-extracted payload fragments; no exploit files are redistributed.
+
+\paragraph{Scale.}
+The pinned snapshot comprises \textbf{365{,}310} CVE records
+(\textbf{347{,}651} in the \texttt{PUBLISHED} state).
+Across all categories the PoC databases link to 25{,}041 CVEs (Exploit-DB),
+8{,}975 (PoC-in-GitHub), 4{,}256 (Nuclei), and 3{,}106 (Metasploit); their
+coverage of the injection subset is reported with the results in
+\cref{sec:results}.
+A key methodological caveat is that these sources have different, sometimes
+mutable, update cadences (NVD in particular re-scores CVEs continuously), so
+the analysis fixes a dated snapshot and treats ``field missing in source'' as
+distinct from ``property absent in the vulnerability.''

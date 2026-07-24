@@ -1,0 +1,21 @@
+\section{Conclusion}
+\label{sec:concl}
+
+Measured against a reproducible corpus of 91{,}760 injection vulnerabilities,
+the matchertext discipline is structurally applicable to a large and
+concentrated majority of the injection landscape: the recorded payloads of 82\%
+of attacks for which we could recover one are contained by a matcher-delimited
+slot under a matchertext-aware host, and at most 80\% of all injection CVEs
+target a syntax such a host can delimit.
+The corpus also shows the shape of the containment, not only its size: it
+divides into inert embedding and outright rejection along the host language's
+native delimiter, the division \cref{sec:resist} derives, though the ratio
+between the two is a property of these recorded payloads rather than of an
+adaptive attacker.
+The residue falls along the two conditions of \cref{sec:threat}: execution sinks,
+where the host runs the value by design, and contexts whose delimiters are not
+matchers, neither of which any delimiting discipline can reach.
+The pipeline, corpus manifest, and per-skeleton rewrites are the concrete basis
+for extending this measurement beyond the sources studied here and for pairing
+the structural argument with the usability questions that adoption ultimately
+turns on.
