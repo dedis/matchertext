@@ -5,6 +5,37 @@ All the current claims are purely conditional, and this section
 makes the conditions explicit: what is trusted, what the attacker controls, the
 property that is meant to hold, and the deployment premises it requires.
 The property is stated below as an invariant on the host's parse.
+\Cref{fig:threat:pipeline} shows the path an untrusted value takes and where each
+premise binds.
+
+\begin{figure*}[t]
+\footnotesize
+\begin{verbatim}
+  UNTRUSTED  │                           TRUSTED COMPUTING BASE
+─────────────┼──────────────────────────────────────────────────────────────────────────────────
+             │
+  attacker   │   canon(v)   ──►   VERIFY   ──►  s_o[ v ]s_c  ──►  host parser  ──►  interpreter
+     │       │   decode &         v ∈ L ?       value placed      ends value        binds the
+     └─ v ───┼─► normalize          │           in the hole       by matcher        terminal
+             │                    fail                            balance           as data
+  arbitrary  │                      │
+  bytes,     │                      ▼
+  encodings, │              ToMatchertext(v)
+  may be     │              escape unmatched
+  invalid    │              matchers, re-embed
+             │
+─────────────┼──────────────────────────────────────────────────────────────────────────────────
+  binds:     │      A3            (TCB ii)          A2            A1 · L1 · L2      L3 · A4
+\end{verbatim}
+\caption{Where each premise binds. The attacker chooses $v$ and nothing else;
+everything right of the boundary must be correct for inertness to hold. A value
+failing \textsc{Verify} is not embedded, but is escaped by \textsc{ToMatchertext}
+and re-enters at the hole. Note that A3 binds at the first stage while its
+violation surfaces at the last: a value that is still encoded when checked, such
+as \texttt{\%5D}, passes \textsc{Verify} and only becomes an unmatched matcher
+once the parser reads it.}
+\label{fig:threat:pipeline}
+\end{figure*}
 
 \paragraph{Protected asset.}
 For a host program with a hole $P[\cdot]$

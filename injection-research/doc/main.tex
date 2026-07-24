@@ -9,6 +9,20 @@
 \usepackage{cleveref}
 \usepackage{graphicx}
 \usepackage{tikz}
+\usepackage{pmboxdraw} % box-drawing glyphs for the ASCII figures under pdflatex
+\usepackage{amssymb}
+% Glyphs the ASCII figures use that pmboxdraw does not cover. Each is set in a
+% box exactly one character cell wide, as pmboxdraw itself does, so that they sit
+% on the monospace grid and do not shift the rest of their line.
+\newlength{\pmbdcell}
+\newcommand{\pmbdglyph}[1]{%
+	\settowidth{\pmbdcell}{0}%
+	\makebox[\pmbdcell][c]{\ensuremath{#1}}%
+}
+\DeclareUnicodeCharacter{25BC}{\pmbdglyph{\blacktriangledown}}
+\DeclareUnicodeCharacter{25BA}{\pmbdglyph{\blacktriangleright}}
+\DeclareUnicodeCharacter{2208}{\pmbdglyph{\in}}
+\DeclareUnicodeCharacter{00B7}{\pmbdglyph{\cdot}}
 \usepackage{booktabs}
 \usepackage{xurl} % allow long URLs in the bibliography to break anywhere
 \usepackage[T1]{fontenc}

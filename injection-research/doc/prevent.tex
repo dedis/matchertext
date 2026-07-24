@@ -9,6 +9,28 @@ An attack then fails one of two ways, by \emph{inert embedding} or by
 \emph{rejection}, and which route a real attack takes is a property of the
 payload, and so measurable against the corpus.
 
+\begin{figure*}[t]
+\footnotesize
+\begin{verbatim}
+                        5,025 payload-backed CVEs
+                    ┌──────────────┴──────────────┐
+                   yes                            no
+       matcher-delimitable context?            OUTSIDE
+               4,111 (82%)                     914 (18%)
+        ┌───────────┴───────────┐        ┌──────────┴──────────┐
+      pass                    fail      545                   369
+    VERIFY(v)               VERIFY(v)  execution sinks       non-matcher delimiters
+        ▼                       ▼      templates, eval,      shell ; | &
+   INERT EMBED              REJECTED   javascript:           CR/LF, XML <>
+   3,773 (92%)               338 (8%)     (A4)
+\end{verbatim}
+\caption{Containment outcome as two decisions. The context condition is tested
+first, so the 914 outside are never candidates rather than escapes; the value
+condition then separates inert embedding from rejection. The leaves reconcile
+with \cref{tab:mech}.}
+\label{fig:prevent:tree}
+\end{figure*}
+
 \paragraph{Method.}
 For each of the 5{,}025 payload-backed CVEs we reuse its syntactic skeleton and decide two things:
 whether the target syntax is one a matchertext host can delimit with a matcher
