@@ -1,0 +1,68 @@
+\section{Machine-checked Lean development}
+\label{app:lean}
+
+The declaration heads below summarize the Lean~4 development in
+\texttt{doc/proof.lean} that establishes \cref{thm:design:embed}
+(there named \texttt{embedding\_closed\_under\_context}),
+faithful to the abstract definitions of \cref{sec:design:abstract}.
+The disjointness of openers and closers assumed there ($O \cap C = \emptyset$)
+appears as the premise \texttt{hdisj};
+tactic proof bodies are elided and given in full in the source file.
+
+\begin{lstlisting}
+import Mathlib
+
+variable {α : Type*}         -- the alphabet
+variable (Pi : Set (α × α))  -- the set of pairs
+
+def Opener     (x : α) : Prop := ∃ y, (x, y) ∈ Pi
+def Closer     (x : α) : Prop := ∃ y, (y, x) ∈ Pi
+def Matcher    (x : α) : Prop := Opener Pi x ∨ Closer Pi x
+def Nonmatcher (x : α) : Prop := ¬ Matcher Pi x
+
+-- Lemma: no character is both an opener and a closer.
+theorem disjoint (h : ∀ x y z, (x, y) ∈ Pi → (z, x) ∈ Pi → False)
+    (x : α) : ¬ (Opener Pi x ∧ Closer Pi x) := by ...
+
+-- The language of matchertext strings,
+-- one constructor per clause of the inductive definition.
+inductive MT (Pi : Set (α × α)) : List α → Prop where
+  | flat (n : List α) (h : ∀ x ∈ n, Nonmatcher Pi x) : MT Pi n
+  | nest (m₁ m₂ m₃ : List α) (o c : α) (hp : (o, c) ∈ Pi)
+         (h₁ : MT Pi m₁) (h₂ : MT Pi m₂) (h₃ : MT Pi m₃) :
+      MT Pi (m₁ ++ [o] ++ m₂ ++ [c] ++ m₃)
+
+-- Lemma: the empty string is matchertext.
+theorem mt_nil : MT Pi ([] : List α) := by ...
+
+-- Lemma: the language is closed under concatenation.
+theorem mt_append {a b : List α} (ha : MT Pi a) (hb : MT Pi b) :
+    MT Pi (a ++ b) := by ...
+
+-- Lemma: wrapping a matchertext string in a single matched pair.
+theorem mt_wrap {m : List α} (hm : MT Pi m) {o c : α} (hp : (o, c) ∈ Pi) :
+    MT Pi ([o] ++ m ++ [c]) := by ...
+
+-- Matched delimiter contexts: nested matcher pairs
+-- with nonmatchers interspersed freely on either side.
+inductive AllMatch (Pi : Set (α × α)) :
+    List α → List α → Prop where
+  | nil : AllMatch Pi [] []
+  | cons (o c : α) (s_o' s_c' : List α) (hp : (o, c) ∈ Pi)
+         (rest : AllMatch Pi s_o' s_c') :
+      AllMatch Pi (o :: s_o') (s_c' ++ [c])
+  | nonmatch_o (x : α) (s_o' s_c' : List α) (hx : Nonmatcher Pi x)
+         (rest : AllMatch Pi s_o' s_c') :
+      AllMatch Pi (x :: s_o') s_c'
+  | nonmatch_c (y : α) (s_o' s_c' : List α) (hy : Nonmatcher Pi y)
+         (rest : AllMatch Pi s_o' s_c') :
+      AllMatch Pi s_o' (s_c' ++ [y])
+
+-- Theorem (always-embeddability): embedding a matchertext
+-- string in a matched context always yields matchertext.
+theorem embedding_closed_under_context
+    (hdisj : ∀ x y z, (x, y) ∈ Pi → (z, x) ∈ Pi → False)
+    {m : List α} (hm : MT Pi m)
+    {s_o s_c : List α} (hs : AllMatch Pi s_o s_c) :
+    MT Pi (s_o ++ m ++ s_c) := by ...
+\end{lstlisting}

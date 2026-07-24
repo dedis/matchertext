@@ -65,10 +65,6 @@ both matchers and nonmatchers --
 are deliberately left entirely open
 for any particular ``matchertext-aware'' language to define.
 
-\xxx{ formally prove
-Always-embeddability property given that embedded string is valid matchertext.
-}
-
 \subsubsection{Escapeless embedding in matchertext}
 \label{sec:design:abstract:embed}
 
@@ -118,6 +114,267 @@ not to be meddled in by a host language.
 While exceptions to this rule may sometimes be justified
 as we discuss below in \cref{sec:design:concrete:variations},
 any exceptions inevitably reduce verbatim embedding compatibility.
+
+
+\subsubsection{A formal guarantee of embeddability}
+\label{sec:design:abstract:formal}
+
+The reasoning above can be proven with the \href{https://lean-lang.org}{Lean~4} proof assistant
+using its \href{https://leanprover-community.github.io}{Mathlib} library,
+included as \texttt{doc/proof.lean} in the project repository.\footnote{%
+	The development relies only on the standard axioms
+	\texttt{propext} and \texttt{Quot.sound}.}
+Appendix~\ref{app:lean} reproduces the complete specification
+the theorems are stated against.
+We summarize the result here;
+it concerns the abstract matchertext language $L$
+defined inductively in \cref{sec:design:abstract}.
+
+Two closure properties of $L$ do the work.
+
+\begin{lemma}[Concatenation closure]
+\label{lem:design:concat}
+If $a \in L$ and $b \in L$, then $a || b \in L$.
+\end{lemma}
+
+\begin{proof}[Proof sketch]
+By induction on the derivation of $a \in L$.
+If $a$ is a string of nonmatchers,
+a second induction on the derivation of $b \in L$
+either extends that nonmatcher string, when $b$ is also flat,
+or splits off the outermost matched pair of $b$
+and reattaches $a$ on its left via the nesting rule.
+If $a$ itself has the form $a_1||o||a_2||c||a_3$,
+then $a||b = a_1||o||a_2||c||(a_3||b)$,
+which lies in $L$ by the induction hypothesis on $a_3$
+and one application of the nesting rule.
+\end{proof}
+
+\begin{lemma}[Wrapping]
+\label{lem:design:wrap}
+If $m \in L$ and $(o,c) \in \Pi$, then $o||m||c \in L$.
+\end{lemma}
+
+\begin{proof}[Proof sketch]
+Immediate from the nesting rule of \cref{sec:design:abstract}
+with $m_1$ and $m_3$ both empty and $m_2 = m$.
+\end{proof}
+
+To capture exactly which delimiter strings $s_o,s_c$
+the embedding rule of \cref{sec:design:abstract:embed} admits,
+we define a \emph{matched delimiter pair} inductively:
+
+\begin{definition}[Matched delimiter pair]
+\label{def:design:delim}
+The pair $(s_o,s_c)$ is \emph{matched} if it can be formed by these rules:
+\begin{itemize}
+\item	$(\epsilon,\epsilon)$ is matched;
+\item	if $(s_o,s_c)$ is matched and $(o,c) \in \Pi$,
+	then $(o||s_o,\; s_c||c)$ is matched; and
+\item	if $(s_o,s_c)$ is matched and $x \in N$ is a nonmatcher,
+	then both $(x||s_o,\;s_c)$ and $(s_o,\;s_c||x)$ are matched.
+\end{itemize}
+\end{definition}
+
+Intuitively, $s_o$ supplies a sequence of open matchers
+and $s_c$ the corresponding close matchers in properly-nested order,
+with nonmatcher characters interspersed freely,
+exactly the shape of practical delimiters such as
+the \texttt{M} and \texttt{"} surrounding the parenthesis
+in \verb|M"(|$\dots$\verb|)"|.
+
+\begin{theorem}[Always-embeddability]
+\label{thm:design:embed}
+If $m \in L$ and $(s_o,s_c)$ is a matched delimiter pair,
+then $s_o||m||s_c \in L$.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+By induction on the derivation that $(s_o,s_c)$ is matched
+(\cref{def:design:delim}).
+The base case is $m$ itself.
+A matcher step wraps the induction hypothesis
+using \cref{lem:design:wrap};
+a nonmatcher step prepends or appends a single-character
+nonmatcher string (which is in $L$ by the flat rule)
+using \cref{lem:design:concat}.
+\end{proof}
+
+\Cref{thm:design:embed} establishes the compositional core
+of escapeless embedding:
+for \emph{any} valid matchertext $m$, with no exceptions,
+the delimited result $s_o||m||s_c$ is \emph{itself} valid matchertext.
+It can therefore be embedded again, to any depth,
+with no escaping and no expansion of the inner string,
+the property that distinguishes matchertext
+from the quoting and escaping mechanisms surveyed in \cref{sec:bg}.
+The complementary claim of \cref{sec:design:abstract:embed},
+that a host parser scanning left-to-right can \emph{unambiguously}
+locate the terminating $s_c$,
+follows from the same balanced structure;
+we make it operational in \cref{sec:design:abstract:findend}
+and leave its full mechanization to future work.
+
+
+\subsubsection{Deciding matchertext}
+\label{sec:design:abstract:verify}
+
+Whereas \cref{thm:design:embed} shows that embedding \emph{produces}
+valid matchertext,
+a host language, or a checkpoint guarding against untrusted input
+(\cref{sec:bg}),
+must also be able to \emph{recognize} it.
+Membership in the language $L$ of \cref{sec:design:abstract}
+is decided by a single linear scan,
+shown as \cref{alg:design:verify}.
+The stack holds the openers seen so far that are not yet matched;
+each closer must pop the opener of its own pair,
+and the string is matchertext exactly when
+the scan finishes with an empty stack.
+
+\begin{algorithm}[!b]
+\caption{Deciding whether a string $s$ is matchertext,
+	for a configuration $(\Sigma,\Pi,$O$,$C$)$.}
+\label{alg:design:verify}
+\begin{algorithmic}[1]
+\Function{Verify}{$s$}
+	\State $st \gets$ empty stack
+	\For{each character $c$ in $s$}
+		\If{$c \in O$}
+			\State push $c$ onto $st$
+		\ElsIf{$c \in C$}
+			\If{$st$ is empty}
+				\State \Return \textsc{false}
+			\EndIf
+			\State $o \gets \textsc{Pop}(st)$
+			\If{$(o,c) \notin \Pi$}
+				\State \Return \textsc{false}
+			\EndIf
+		\EndIf
+	\EndFor
+	\State \Return whether $st$ is empty
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
+\begin{theorem}[Correctness of \textsc{Verify}]
+\label{thm:design:verify}
+For every string $s$,
+\cref{alg:design:verify} returns \textsc{true} if and only if $s \in L$.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Nonmatcher characters are skipped by the scan and,
+by the flat rule of \cref{sec:design:abstract},
+never affect membership in $L$,
+so it suffices to consider the subsequence of matchers.
+A straightforward induction on the scan shows that the stack always holds,
+from bottom to top, exactly the currently-unmatched openers.
+A closer meeting an empty stack, or one whose popped opener
+is not its partner in $\Pi$, is therefore an unmatched or mismatched matcher,
+and \textsc{Verify} rejects;
+a leftover opener at end of input is likewise unmatched,
+so a non-empty final stack is rejected.
+Conversely, if every matcher is correctly paired
+no rejection fires and the stack ends empty,
+which is exactly the condition under which the matchers of $s$
+can be generated by the nesting rule.
+\end{proof}
+
+The procedure runs in $O(n)$ time on an input of length $n$
+(one pass with $O(1)$ work per character)
+and uses $O(d)$ additional space,
+where $d$ is the maximum matcher-nesting depth reached;
+\cref{sec:eval:nesting} finds $d$ is almost always tiny in practice.
+This is the concrete basis for the security argument of \cref{sec:bg}:
+admitting untrusted embedded content requires only this passive linear check
+\footnote{%
+    Detecting the matcher characters that drive the loop
+    is a data-parallel operation that a SIMD-aware implementation
+    can accelerate substantially
+    if verification of very large inputs ever becomes a bottleneck.}
+that matchers match,
+rather than a content-modifying transformation
+that must anticipate every sequence sensitive to the host language.
+It is also exactly the check that our empirical analysis (\cref{sec:eval})
+applies to every string literal and comment in the corpus;
+dropping the pair-kind test $(o,c) \in \Pi$
+yields the \emph{relaxed} variant reported there,
+which tolerates a wrong-kind closer.
+
+
+\subsubsection{Locating the end of an embedding}
+\label{sec:design:abstract:findend}
+
+\Cref{thm:design:embed} shows that a delimited embedding $s_o || m || s_c$
+is valid matchertext;
+a host must also recover the extent of that embedding operationally,
+scanning left to right without being misled
+by matcher characters occurring inside $m$.
+\Cref{alg:design:findend} approaches this
+with the same stack discipline as \cref{alg:design:verify}.
+A first pass replays the opening delimiter $s_o$
+and records the openers it leaves unmatched as the target context $st_0$ --
+the openers that the closers in $s_c$ must eventually balance.
+A second pass then scans the following text $s$,
+maintaining the stack and reporting the first position
+at which a closer drops it below $st_0$,
+the terminating closer of $s_c$ that,
+as \cref{sec:design:abstract:embed} observes,
+must be unmatched within $m$;
+a closer that meets an empty stack or a wrong-kind opener
+signals that $s$ is not a valid embedding.
+Both passes are single linear scans.
+Establishing that the reported position coincides with the end
+of the embedding for every valid $s_o || m || s_c$,
+and mechanizing it alongside \cref{thm:design:embed},
+remains future work.
+
+\begin{algorithm}[!ht]
+\caption{Locating the end of an embedding $s_o || m || s_c$:
+	given the text $s$ following an opening delimiter $s_o$,
+	returns the length consumed when a closer first drops
+	the stack below the delimiter context of $s_o$,
+	for a configuration $(\Sigma,\Pi,$O$,$C$)$.}
+\label{alg:design:findend}
+\begin{algorithmic}[1]
+\Function{FindEmbedEnd}{$s, s_o$}
+	\State $st \gets$ empty stack
+	\For{each character $c$ in $s_o$}
+		\If{$c \in O$}
+			\State push $c$ onto $st$
+		\ElsIf{$c \in C$}
+			\If{$st$ is empty}
+				\State \Return \textsc{fail}
+			\EndIf
+			\State $o \gets \textsc{Pop}(st)$
+			\If{$(o,c) \notin \Pi$}
+				\State \Return \textsc{fail}
+			\EndIf
+		\EndIf
+	\EndFor
+	\State $st_0 \gets$ copy of $st$
+	\For{$i \gets 0$ to $|s| - 1$}
+		\State $c \gets s[i]$
+		\If{$c \in O$}
+			\State push $c$ onto $st$
+		\ElsIf{$c \in C$}
+			\If{$st$ is empty}
+				\State \Return \textsc{fail}
+			\EndIf
+			\State $o \gets \textsc{Pop}(st)$
+			\If{$(o,c) \notin \Pi$}
+				\State \Return \textsc{fail}
+			\EndIf
+		\EndIf
+		\If{$|st| < |st_0|$}
+			\State \Return $i + 1$
+		\EndIf
+	\EndFor
+	\State \Return \textsc{fail}
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
 
 
 \subsection{Concrete matchertext in practice}
