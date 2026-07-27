@@ -1,4 +1,4 @@
-import Core
+import core
 
 variable {α : Type*}
 variable (Pi : Set (α × α))

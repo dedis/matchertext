@@ -39,8 +39,9 @@ every closer matches its opener and the stack ends empty.
 Third, a total encoder \textsc{ToMatchertext} maps \emph{any} string into $L$ by
 escaping only its unmatched matchers, so free-form input that legitimately
 contains an unmatched bracket need not be rejected.
-Closure and the correctness of \textsc{Verify} are machine-checked;
-\textsc{ToMatchertext} is specified but not yet formalized.
+Closure and the correctness of \textsc{Verify} are machine-checked; so is
+\textsc{ToMatchertext}'s landing in $L$ on every input
+(\cref{sec:appendix:tomatchertext}), leaving only its decoder round-trip informal.
 For the rationale behind $\Pi$, the hosting syntaxes, and the empirical
 compliance study, see~\cite{matchertext}.
 

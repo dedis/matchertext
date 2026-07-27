@@ -48,7 +48,9 @@ The guarantee rests on (i) a \emph{matchertext-aware host} that delimits the hol
 with a matcher pair and ends the embedded value by matcher balance rather than by
 scanning for its native closer; (ii) the \textsc{Verify} recognizer that decides
 membership in the matchertext language $L$; and (iii) the total encoder
-\textsc{ToMatchertext} and its inverse, used on free-form fields.
+\textsc{ToMatchertext} and its inverse, used on free-form fields; its
+output-in-$L$ obligation is discharged in \cref{sec:appendix:tomatchertext},
+narrowing~(iii) to the decoder round-trip.
 The boundary-locating step of (i) is the operationally load-bearing part; we
 discharge it below as premise L1 (machine checked), so what the host must still be trusted for is the
 \emph{implementation} of that step rather than its principle.

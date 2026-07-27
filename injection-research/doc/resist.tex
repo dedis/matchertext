@@ -50,8 +50,8 @@ escapes only the \emph{unmatched} matchers in $v$~\cite{matchertext}, and decode
 on read.
 Defined on every input, it never rejects, and because its escapes are themselves
 balanced its output is always valid matchertext, its sole and host-independent
-obligation, checkable in isolation by the \textsc{Verify} scan and saying nothing
-about SQL.
+obligation (\cref{sec:appendix:tomatchertext}), checkable in isolation by the
+\textsc{Verify} scan and saying nothing about SQL.
 The failure mode is therefore benign: an encoder bug yields mis-encoded
 \emph{data}, never a breakout, where in conventional escaping one missed case
 \emph{is} the injection.
