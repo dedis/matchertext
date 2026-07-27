@@ -1,14 +1,18 @@
-.PHONY: FORCE lenny all clean distclean
+.PHONY: FORCE all fast link clean open
 
 FILE=main
+BUILD=build
 
 all: $(FILE).pdf
 
-%.pdf: %.tex FORCE
-	latexmk -pdf $<
+$(FILE).pdf: $(FILE).tex FORCE
+	latexmk -pdf -outdir=$(BUILD) $(FILE).tex
+	cp $(BUILD)/$(FILE).pdf $@
 
 fast:
-	pdflatex $(FILE)
+	mkdir -p $(BUILD)
+	pdflatex -output-directory=$(BUILD) $(FILE)
+	cp $(BUILD)/$(FILE).pdf $(FILE).pdf
 
 link:
 	rm -f *.bib
@@ -17,15 +21,8 @@ link:
 	done
 
 clean:
-	for ext in aux log toc lof lot lol dlog bbl \
-		nav snm fls vrb blg out tpt fdb_latexmk; \
-	do \
-		$(RM) $(FILE).$$ext ; \
-	done
+	$(RM) -r $(BUILD)
 	$(RM) *.aux *.bak *~
 
-distclean: clean
-	$(RM) $(FILE).pdf
-	$(RM) $(FILE).ps
-	$(RM) $(FILE).dvi
-	$(RM) *.d
+open:
+	open $(FILE).pdf

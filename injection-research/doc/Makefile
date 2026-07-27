@@ -1,4 +1,4 @@
-.PHONY: FORCE lenny all clean distclean
+.PHONY: FORCE all fast link clean open
 
 FILE=main
 BUILD=build

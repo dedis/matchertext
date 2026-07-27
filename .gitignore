@@ -61,3 +61,6 @@ dev/tree-sitter/dist/
 
 dev/tree-sitter/src
 dev/tree-sitter/build
+
+# Lean artifacts
+lean/.lake/
