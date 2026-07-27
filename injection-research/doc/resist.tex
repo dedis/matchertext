@@ -56,6 +56,29 @@ The failure mode is therefore benign: an encoder bug yields mis-encoded
 \emph{data}, never a breakout, where in conventional escaping one missed case
 \emph{is} the injection.
 
+Reading inverts the encoder.
+Assume \textsc{esc} is uniquely decodable: injective, with a reserved introducer
+so that its outputs are recognizable in the surrounding text, as any
+backslash-style escape is.
+Then \textsc{FromMatchertext} scans the balance-delimited region once, mapping
+each \textsc{esc}$(c)$ back to its matcher $c$ and copying every other character,
+so that $\textsc{FromMatchertext}(\textsc{ToMatchertext}(v)) = v$ for every $v$:
+\begin{verbatim}
+FromMatchertext(m):
+  out = []; i = 0
+  while i < |m|:
+    if m[i..] begins with esc(c):
+      out += c;    i += |esc(c)|
+    else:
+      out += m[i]; i += 1
+  return out
+\end{verbatim}
+This round-trip is a data-fidelity property, argued here rather than proved: it is
+no part of the inertness claim, which rests only on output $\in L$
+(\cref{sec:appendix:tomatchertext}).
+A decoder bug corrupts a value; it cannot manufacture a breakout, since the region
+is already inertly delimited before decoding begins.
+
 Under a matchertext-aware host that ends each value by matcher balance,
 matchertext offers a \emph{structural} property: no valid-matchertext value, in
 any position, can escape its delimiters or alter the surrounding query structure,
