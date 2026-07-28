@@ -88,3 +88,22 @@ rest, which their skew toward exploitable web bugs may not warrant.
 The reach of the discipline is thus bounded from below at the fragment level and
 from above at the syntax level, and the gap between \dataPayloadBackedCVEs and \dataInjectionCVEs is
 payload availability, not a containment failure.
+
+\paragraph{What payload availability bounds.}
+That gap is a property of the disclosure ecosystem rather than of our
+extraction.
+Most CVEs never receive a public proof of concept at all: Mandiant finds that
+\textbf{51\%} of vulnerabilities disclosed in 2021 and 2022 eventually acquired
+public exploit or proof-of-concept code~\cite{mandiant23tte}, and VulnCheck
+reports \textbf{26\%} of CVEs carrying 2025 identifiers had such code by the end
+of that year, a share that grows as a vulnerability
+ages~\cite{vulncheck26exploit}.
+Our corpus agrees from the other direction: \dataInjectionWithPoc injection CVEs
+(\dataInjectionWithPocShare) carry any proof-of-concept reference whatsoever, so
+for the remainder there is no artifact to recover, from this pipeline or any
+other.
+A literal attack string is a stricter requirement still, since a proof of
+concept that constructs its payload at run time exposes none.
+The measurable population is therefore roughly half the corpus rather than all
+of it, and the fragment-level bound should be read against that population, not
+against \dataInjectionCVEs.
