@@ -181,6 +181,36 @@ def fetch_blobs(items):
     return out
 
 
+def subdir_paths(repos_dirs):
+    """List one level down, for repos whose root documents yielded nothing.
+
+    items: [((owner, name), dirname), ...] -> {(key, dirname): [file names]}
+    """
+    if not repos_dirs:
+        return {}
+    q = ["query {"]
+    for i, ((o, n), d) in enumerate(repos_dirs):
+        q.append(f"  d{i}: repository(owner:{json.dumps(o)}, name:{json.dumps(n)}) {{"
+                 f" object(expression:{json.dumps('HEAD:' + d)})"
+                 f" {{ ... on Tree {{ entries {{ name type }} }} }} }}")
+    q.append("}")
+    data = _gql("\n".join(q))
+    out = {}
+    for i, key_dir in enumerate(repos_dirs):
+        node = (data.get(f"d{i}") or {}).get("object") or {}
+        out[key_dir] = [e.get("name") for e in (node.get("entries") or ())
+                        if e.get("type") == "blob"]
+    return out
+
+
+# Directories worth descending into when the root turned up nothing. Anchored on
+# name segments: an unanchored "doc" matches docker and an unanchored "report"
+# matches aj-report, neither of which holds a write-up.
+DIR_HINT = re.compile(
+    r"(?:^|[-_.])(?:pocs?|exploits?|payloads?|vulns?|attacks?|docs?|"
+    r"writeups?|reports?|cve)(?:$|[-_.])", re.I)
+
+
 def doc_paths(entries, limit):
     """Root-level files worth reading, READMEs first.
 
@@ -270,7 +300,10 @@ def one(item, sha=None):
 def run(args):
     con = sqlite3.connect(DB)
     con.executescript(DDL)
-    done = {c for (c,) in con.execute("SELECT cve_id FROM remote_payload")}
+    keep = "" if args.retry else ""
+    done = {c for (c,) in con.execute(
+        "SELECT cve_id FROM remote_payload" if not args.retry else
+        "SELECT cve_id FROM remote_payload WHERE payload IS NOT NULL OR status='gone'")}
     todo = candidates(con, args.max_fanout, done)
     if args.n:
         random.Random(args.seed).shuffle(todo)
@@ -306,16 +339,43 @@ def run(args):
                              "status": "payload"})
                 continue
             paths = [p for p in doc_paths(entries, args.docs) if p != "README.md"]
-            if paths:
-                wanted.append((cve, syn, key, sha, paths))
-            else:
-                rows.append({"cve_id": cve, "repo": "/".join(key), "sha": sha,
-                             "file": None, "payload": None, "status": "no_payload"})
-        blobs = fetch_blobs([(key, p) for _, _, key, _, ps in wanted for p in ps])
-        for cve, syn, key, sha, paths in wanted:
+            wanted.append((cve, syn, key, sha, paths, entries))
+        blobs = fetch_blobs([(key, p) for _, _, key, _, ps, _ in wanted for p in ps])
+        deep, resolved_rows = [], []
+        for cve, syn, key, sha, paths, entries in wanted:
             hit = hitfile = None
             for p in paths:
                 text = blobs.get((key, p))
+                hit = extract_payload(text, syn) if text else None
+                if hit:
+                    hitfile = p
+                    break
+            if hit or not args.deep:
+                resolved_rows.append({"cve_id": cve, "repo": "/".join(key), "sha": sha,
+                                      "file": hitfile, "payload": hit,
+                                      "status": "payload" if hit else "no_payload"})
+            else:
+                dirs = [n for n, t in entries
+                        if t == "tree" and n and not n.startswith(".") and DIR_HINT.search(n)]
+                deep.append((cve, syn, key, sha, dirs[:args.dirs]))
+        rows.extend(resolved_rows)
+
+        # Second pass: the write-up is sometimes filed under docs/ or poc/
+        # rather than at the root.
+        listing = subdir_paths([(key, d) for _, _, key, _, ds in deep for d in ds])
+        deep_want = []
+        for cve, syn, key, sha, dirs in deep:
+            paths = []
+            for d in dirs:
+                for name in listing.get((key, d), ())[:args.docs]:
+                    if eligible(name) and not name.startswith("."):
+                        paths.append(f"{d}/{name}")
+            deep_want.append((cve, syn, key, sha, paths[:args.docs]))
+        blobs2 = fetch_blobs([(key, p) for _, _, key, _, ps in deep_want for p in ps])
+        for cve, syn, key, sha, paths in deep_want:
+            hit = hitfile = None
+            for p in paths:
+                text = blobs2.get((key, p))
                 hit = extract_payload(text, syn) if text else None
                 if hit:
                     hitfile = p
@@ -357,8 +417,14 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("-n", type=int, help="sample this many instead of the full set")
     ap.add_argument("--seed", type=int, default=17)
+    ap.add_argument("--retry", action="store_true",
+                    help="re-process repos previously found to have no payload")
     ap.add_argument("--workers", type=int, default=8,
                     help="concurrent archive downloads; the work is I/O bound,\nso this is the lever, not core count")
+    ap.add_argument("--deep", action="store_true",
+                    help="descend one level into doc/poc directories")
+    ap.add_argument("--dirs", type=int, default=3,
+                    help="subdirectories to descend into per repo")
     ap.add_argument("--docs", type=int, default=4,
                     help="root-level documents to read per repo")
     ap.add_argument("--gql-batch", type=int, default=25,

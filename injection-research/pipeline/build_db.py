@@ -403,6 +403,35 @@ def load_debian(con):
     con.commit()
 
 
+EDB_ID_RE = re.compile(r"(?:exploits?|/)(\d{3,6})")
+
+
+def link_exploitdb_ids(con):
+    """Join Exploit-DB *links* to the exploit files already cloned locally.
+
+    load_exploitdb maps CVEs through the `codes` column of files_exploits.csv.
+    Where that column is blank the mapping is lost, even though other sources
+    link the CVE to the very same EDB entry and the file is already on disk.
+    Recovering those costs no network at all. Must run after the link-only
+    sources, since it reads their refs.
+    """
+    csv_path = RAW / "exploitdb" / "files_exploits.csv"
+    if not csv_path.exists():
+        return
+    files = {}
+    with open(csv_path, encoding="utf-8", errors="replace", newline="") as f:
+        for r in csv.DictReader(f):
+            files[r["id"]] = (r["file"], r.get("type"))
+    rows = []
+    for cve, ref in con.execute(
+            "SELECT cve_id, ref FROM poc WHERE ref LIKE '%exploit-db.com%'"):
+        m = EDB_ID_RE.search(ref)
+        if m and m.group(1) in files:
+            path, kind = files[m.group(1)]
+            rows.append((cve, "exploitdb", m.group(1), "exploitdb/" + path, kind))
+    _poc(con, rows)
+
+
 def load_trickest(con):
     """trickest/cve: per-CVE markdown whose POC section lists exploit links.
 
@@ -552,6 +581,7 @@ def run(args):
                      ("metasploit", load_metasploit), ("poc_github", load_poc_github),
                      ("trickest", load_trickest), ("vulhub", load_vulhub),
                      ("ghsa", load_ghsa), ("redhat", load_redhat), ("debian", load_debian),
+                     ("edb_links", link_exploitdb_ids),
                      ("vedas", load_vedas), ("payloads", load_payloads),
                      ("ground_truth", load_ground_truth)):
         print(name, flush=True)

@@ -29,7 +29,11 @@ _SIGNS = {
             # precisely the unmatched-closer case the containment split turns on.
             r"'\)?\s*(?:OR|AND)\s*'?\d+'?\s*=\s*'?\d+[^\n]*",
             r"'\)?\s*(?:OR|AND)\b[^\n]*--", r"\bAND\s+\d+=\d+[^\n]*", r"';?\s*WAITFOR\s+DELAY[^\n]*",
-            r"\bextractvalue\s*\([^\n]*", r"\bSLEEP\s*\(\d+\)[^\n]*", r"\[sql\]"],
+            r"\bextractvalue\s*\([^\n]*",
+            # Stops at the closing paren: running to end of line dragged in the
+            # enclosing query's closers, as in `SLEEP(5)))vltp)`, whose stray
+            # `)`s turn a balanced payload into an apparent rejection.
+            r"\bSLEEP\s*\(\d+\)", r"\[sql\]"],
     # A bare <script> tag is not a payload. In curated exploit files that was
     # harmless, but a linked repo is often the vulnerable application itself,
     # whose own source is full of benign script tags and jQuery includes. Require
@@ -171,10 +175,10 @@ _JS_STUB = re.compile(r"^javascript:.{0,4}$", re.I)
 _URL_PARAM = re.compile(r"^[&;|]\w+=")
 
 
-def _accept(frag):
+def _accept(frag, truncation_check=True):
     return (3 <= len(frag) <= 200
             and not is_placeholder(frag)
-            and not is_truncated(frag)
+            and not (truncation_check and is_truncated(frag))
             and not _MD_SPAN.match(frag)
             and not _JS_STUB.match(frag)
             and not _URL_PARAM.match(frag))
@@ -195,7 +199,43 @@ def extend_balance(text, end, frag, limit=8):
     return frag
 
 
-def extract_payload(text, syn):
+# Exploit-DB write-ups and sqlmap transcripts often label the payload outright.
+# The label is a locator the per-syntax signatures cannot supply: it marks a
+# string as the attack even when that string uses a command or sink the
+# signatures do not enumerate, as in `...&currentTSREmailTo=|date>/tmp/x`.
+_LABELLED = [
+    re.compile(r"^[ \t]*#?[ \t]*Payload[ \t]*:[ \t]*(\S.{4,180})$", re.I | re.M),
+    re.compile(r"^[ \t]*#?[ \t]*(?:PoC|Proof of Concept)[ \t]*:[ \t]*(\S.{4,180})$", re.I | re.M),
+    re.compile(r"^[ \t]*(?:GET|POST)[ \t]+(\S{8,180})[ \t]+HTTP", re.M),
+]
+# Trusting a label still needs the value to look like an attack rather than a
+# bare path or a separator line: it must carry a delimiter, metacharacter or
+# escape, and it must not be only structure.
+_ATTACKISH = re.compile(r"""['"<>;|`]|\$\(|%[0-9A-Fa-f]{2}|&&|\|\||[(){}\[\]]""")
+_ONLY_PUNCT = re.compile(r"^[\W_]+$")
+
+
+def extract_labelled(text, syn):
+    for rx in _LABELLED:
+        for m in rx.finditer(text):
+            raw = " ".join(m.group(1).split())
+            # The whole labelled value is preferred over a signature match inside
+            # it: a signature would capture some suffix such as `SLEEP(5)))vltp)`,
+            # whose stray closers make a balanced payload look like a rejection.
+            # is_truncated is skipped here for the same reason it exists -- it
+            # detects a regex stopping mid-expression, and a labelled line is a
+            # delimited whole, so a trailing `{` in `'};alert(1);{'` is the real
+            # payload rather than a cut.
+            if (_accept(raw, truncation_check=False) and _ATTACKISH.search(raw)
+                    and not _ONLY_PUNCT.match(raw) and "=" in raw):
+                return raw
+            inner = extract_payload(raw, syn, labelled=False)
+            if inner:
+                return inner
+    return None
+
+
+def extract_payload(text, syn, labelled=True):
     for rx in SIGNS.get(syn, ()):
         m = rx.search(text)
         if m:
@@ -210,7 +250,7 @@ def extract_payload(text, syn):
             frag = " ".join(urlform_decode(m.group(0)).split())
             if _accept(frag):
                 return frag
-    return None
+    return extract_labelled(text, syn) if labelled else None
 
 
 def sample_payloads(con, syn, n, rng):
