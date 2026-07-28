@@ -25,12 +25,14 @@ Usage:
 import argparse
 import io
 import json
+import queue
 import random
 import re
 import sqlite3
 import subprocess
 import sys
 import tarfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -98,7 +100,10 @@ def candidates(con, max_fanout, done):
 
 
 def resolve_sha(owner, repo):
-    """Resolve HEAD to a commit SHA over the git protocol, not the REST API."""
+    """Resolve HEAD to a commit SHA over the git protocol, not the REST API.
+
+    Fallback for when the batched GraphQL path is unavailable.
+    """
     try:
         out = subprocess.run(
             ["git", "ls-remote", f"https://github.com/{owner}/{repo}", "HEAD"],
@@ -109,6 +114,84 @@ def resolve_sha(owner, repo):
     if out.returncode != 0 or not out.stdout.strip():
         return None, "gone"
     return out.stdout.split()[0], None
+
+
+def _gql(query):
+    """Run one GraphQL query. gh exits non-zero when any alias 404s, but the
+    surviving aliases are still in `data`, so parse regardless of exit code."""
+    try:
+        out = subprocess.run(["gh", "api", "graphql", "-f", "query=" + query],
+                             capture_output=True, text=True, timeout=180)
+        return (json.loads(out.stdout) or {}).get("data") or {}
+    except Exception:                                           # noqa: BLE001
+        return {}
+
+
+def resolve_batch(repos):
+    """SHA, root file listing and README text for many repos in one request.
+
+    Downloading whole archives turned out to be bandwidth-bound: 24 concurrent
+    codeload fetches saturated the link at ~283 KB/s, which no amount of
+    threading or cores can fix. The tree gives the filenames for a few KB, so
+    only the handful of documents worth reading are ever transferred.
+
+    Returns {(owner, name): (sha_or_None, [entry names], readme_text_or_None)}.
+    A deleted repo yields (None, [], None) without failing the batch.
+    """
+    q = ["query {"]
+    for i, (o, n) in enumerate(repos):
+        q.append(f"  r{i}: repository(owner:{json.dumps(o)}, name:{json.dumps(n)}) {{"
+                 f" defaultBranchRef {{ target {{ ... on Commit {{ oid }} }} }}"
+                 f" tree: object(expression:\"HEAD:\") {{ ... on Tree {{ entries {{ name type }} }} }}"
+                 f" readme: object(expression:\"HEAD:README.md\") {{ ... on Blob {{ text }} }} }}")
+    q.append("}")
+    data = _gql("\n".join(q))
+    result = {}
+    for i, key in enumerate(repos):
+        node = data.get(f"r{i}")
+        if not node:
+            result[key] = (None, [], None)
+            continue
+        target = (node.get("defaultBranchRef") or {}).get("target") or {}
+        tree = node.get("tree") or {}
+        entries = [(e.get("name"), e.get("type")) for e in (tree.get("entries") or ())]
+        result[key] = (target.get("oid"), entries,
+                       (node.get("readme") or {}).get("text"))
+    return result
+
+
+def fetch_blobs(items):
+    """Fetch specific file contents in one request.
+
+    items: [((owner, name), path), ...]. Returns {(key, path): text_or_None}.
+    """
+    if not items:
+        return {}
+    q = ["query {"]
+    for i, ((o, n), path) in enumerate(items):
+        q.append(f"  b{i}: repository(owner:{json.dumps(o)}, name:{json.dumps(n)}) {{"
+                 f" object(expression:{json.dumps('HEAD:' + path)})"
+                 f" {{ ... on Blob {{ text }} }} }}")
+    q.append("}")
+    data = _gql("\n".join(q))
+    out = {}
+    for i, key_path in enumerate(items):
+        node = data.get(f"b{i}") or {}
+        out[key_path] = ((node.get("object") or {}).get("text"))
+    return out
+
+
+def doc_paths(entries, limit):
+    """Root-level files worth reading, READMEs first.
+
+    Dotfiles are skipped: they are extensionless, so they satisfy DOC_EXT and
+    would otherwise spend the per-repo budget on .gitattributes rather than the
+    write-up.
+    """
+    names = [n for n, t in entries
+             if t == "blob" and n and not n.startswith(".") and eligible(n)]
+    names.sort(key=lambda n: (0 if "readme" in n.lower() else 1, n))
+    return names[:limit]
 
 
 def fetch(owner, repo, sha):
@@ -166,13 +249,14 @@ def scan(blob, syn):
     return None, None
 
 
-def one(item):
+def one(item, sha=None):
     cve, syn, (owner, repo) = item
     slug = f"{owner}/{repo}"
-    sha, err = resolve_sha(owner, repo)
+    if sha is None:
+        sha, err = resolve_sha(owner, repo)
     if sha is None:
         return {"cve_id": cve, "repo": slug, "sha": None,
-                "file": None, "payload": None, "status": err}
+                "file": None, "payload": None, "status": "gone"}
     blob, err = fetch(owner, repo, sha)
     if blob is None:
         return {"cve_id": cve, "repo": slug, "sha": sha,
@@ -205,17 +289,59 @@ def run(args):
         PINS.write_text(json.dumps(pins, indent=1, sort_keys=True))
         batch.clear()
 
+    def do_chunk(chunk):
+        """Two requests per chunk: listing, then the documents worth reading."""
+        resolved = resolve_batch([r for _, _, r in chunk])
+        rows, wanted = [], []
+        for cve, syn, key in chunk:
+            sha, entries, readme = resolved.get(key, (None, [], None))
+            if sha is None:
+                rows.append({"cve_id": cve, "repo": "/".join(key), "sha": None,
+                             "file": None, "payload": None, "status": "gone"})
+                continue
+            payload = extract_payload(readme, syn) if readme else None
+            if payload:
+                rows.append({"cve_id": cve, "repo": "/".join(key), "sha": sha,
+                             "file": "README.md", "payload": payload,
+                             "status": "payload"})
+                continue
+            paths = [p for p in doc_paths(entries, args.docs) if p != "README.md"]
+            if paths:
+                wanted.append((cve, syn, key, sha, paths))
+            else:
+                rows.append({"cve_id": cve, "repo": "/".join(key), "sha": sha,
+                             "file": None, "payload": None, "status": "no_payload"})
+        blobs = fetch_blobs([(key, p) for _, _, key, _, ps in wanted for p in ps])
+        for cve, syn, key, sha, paths in wanted:
+            hit = hitfile = None
+            for p in paths:
+                text = blobs.get((key, p))
+                hit = extract_payload(text, syn) if text else None
+                if hit:
+                    hitfile = p
+                    break
+            rows.append({"cve_id": cve, "repo": "/".join(key), "sha": sha,
+                         "file": hitfile, "payload": hit,
+                         "status": "payload" if hit else "no_payload"})
+        return rows
+
+    # Whole-archive downloads were bandwidth-bound; reading only the listed
+    # documents removes the transfer from the critical path, so chunks can just
+    # run concurrently with no producer/consumer machinery.
+    chunks = [todo[i:i + args.gql_batch] for i in range(0, len(todo), args.gql_batch)]
+    seen = 0
     with ThreadPoolExecutor(max_workers=args.workers) as ex:
-        for i, r in enumerate(ex.map(one, todo), 1):
-            batch.append(r)
-            if r["sha"]:
-                pins[r["repo"]] = r["sha"]
-            if i % 200 == 0 or i == len(todo):
-                flush()
-                got = con.execute("SELECT COUNT(*) FROM remote_payload "
-                                  "WHERE payload IS NOT NULL").fetchone()[0]
-                print(f"  {i}/{len(todo)}  payloads={got}  "
-                      f"{i / max(time.time() - t0, 1):.1f}/s", file=sys.stderr, flush=True)
+        for rows in ex.map(do_chunk, chunks):
+            for r in rows:
+                batch.append(r)
+                if r["sha"]:
+                    pins[r["repo"]] = r["sha"]
+            seen += len(rows)
+            flush()
+            got = con.execute("SELECT COUNT(*) FROM remote_payload "
+                              "WHERE payload IS NOT NULL").fetchone()[0]
+            print(f"  {seen}/{len(todo)}  payloads={got}  "
+                  f"{seen / max(time.time() - t0, 1):.1f}/s", file=sys.stderr, flush=True)
     if batch:
         flush()
 
@@ -231,7 +357,14 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("-n", type=int, help="sample this many instead of the full set")
     ap.add_argument("--seed", type=int, default=17)
-    ap.add_argument("--workers", type=int, default=12)
+    ap.add_argument("--workers", type=int, default=8,
+                    help="concurrent archive downloads; the work is I/O bound,\nso this is the lever, not core count")
+    ap.add_argument("--docs", type=int, default=4,
+                    help="root-level documents to read per repo")
+    ap.add_argument("--gql-batch", type=int, default=25,
+                    help="repos per batched GraphQL request")
+    ap.add_argument("--no-gql", dest="gql", action="store_false",
+                    help="skip GraphQL batching, resolve each SHA with git ls-remote")
     ap.add_argument("--max-fanout", type=int, default=20,
                     help="drop repos linked from more CVEs than this (aggregators)")
     run(ap.parse_args())
