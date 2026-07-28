@@ -24,8 +24,11 @@ OUT = ROOT / "data" / "exports" / "report.html"
 # Per-syntax payload signatures, ordered most-specific first. Applied to the
 # text of a linked exploit file to pull out the actual injection string.
 _SIGNS = {
-    "sql": [r"UNION(?:\s+ALL)?\s+SELECT\b[^\n]*", r"'\s*(?:OR|AND)\s*'?\d+'?\s*=\s*'?\d+[^\n]*",
-            r"'\s*(?:OR|AND)\b[^\n]*--", r"\bAND\s+\d+=\d+[^\n]*", r"';?\s*WAITFOR\s+DELAY[^\n]*",
+    "sql": [r"UNION(?:\s+ALL)?\s+SELECT\b[^\n]*",
+            # \)? catches the paren-breakout form `admin') OR '1'='1`, which is
+            # precisely the unmatched-closer case the containment split turns on.
+            r"'\)?\s*(?:OR|AND)\s*'?\d+'?\s*=\s*'?\d+[^\n]*",
+            r"'\)?\s*(?:OR|AND)\b[^\n]*--", r"\bAND\s+\d+=\d+[^\n]*", r"';?\s*WAITFOR\s+DELAY[^\n]*",
             r"\bextractvalue\s*\([^\n]*", r"\bSLEEP\s*\(\d+\)[^\n]*", r"\[sql\]"],
     "html_dom": [r"<script\b[^>]*>.*?</script>", r"<img[^>]*onerror\s*=[^\n]*?>",
                  r"<svg[^>]*on\w+\s*=[^\n]*?>", r'"><script[^\n]*', r"javascript:\S+",
@@ -80,7 +83,7 @@ _URL_SIGNS = {
             rf"{_W}(?:and|or){_SEP}+\d+{_SEP}*={_SEP}*\d+{_TAIL}",
             rf"{_W}(?:and|or){_SEP}*\((?:ascii|substring|substr|length|count){_TAIL}",
             rf"%27{_TAIL}(?:union|select|or|and){_TAIL}",
-            rf"{_W}(?:sleep|benchmark|pg_sleep)(?:%28|\()\d+",
+            rf"{_W}(?:sleep|benchmark|pg_sleep)(?:%28|\()\d+(?:%29|\))",
             rf"{_W}concat_ws(?:%28|\(){_TAIL}"],
     "html_dom": [r"[\"'][^\"'\n]{0,24}\son\w+\s*=\s*(?:alert|prompt|confirm)\([^)\n]*\)[^\n]{0,40}",
                  r"[\"']\s*;\s*(?:alert|prompt|confirm)\([^)\n]*\)\s*;?\s*(?://|<)",
@@ -119,8 +122,44 @@ def urlform_decode(frag, rounds=2):
     return re.sub(r"/\*\*?/", " ", frag).replace("+", " ")
 
 
+_PAIR = {")": "(", "]": "[", "}": "{"}
+
+
+def is_truncated(frag):
+    """Did the signature cut the payload mid-expression?
+
+    A breakout emits an unmatched *closer*: closing the slot early is the whole
+    manoeuvre, so `'r0t')</script>` is a real payload. An unmatched *opener* left
+    at the tail is the regex stopping inside a function call instead, as in
+    `ASCII(SUBSTRING(passwd,`. Keeping those would count a regex artifact as a
+    VERIFY rejection -- they accounted for 37% of all rejections before this
+    check -- so treat them as failed extractions rather than payloads.
+    """
+    stack = []
+    for ch in frag:
+        if ch in "([{":
+            stack.append(ch)
+        elif ch in _PAIR and stack and stack[-1] == _PAIR[ch]:
+            stack.pop()
+    return bool(stack)
+
+
+# Markdown prose yields false positives that exploit files did not: a README
+# writes `deviceList` as an inline code span, which the shell backtick signature
+# reads as a command substitution. Require something command-like inside.
+_MD_SPAN = re.compile(r"^`[\w.@/ -]+`$")
+_JS_STUB = re.compile(r"^javascript:.{0,4}$", re.I)
+# `&id=62` is a URL parameter named id, not the id command.
+_URL_PARAM = re.compile(r"^[&;|]\w+=")
+
+
 def _accept(frag):
-    return 3 <= len(frag) <= 200 and not is_placeholder(frag)
+    return (3 <= len(frag) <= 200
+            and not is_placeholder(frag)
+            and not is_truncated(frag)
+            and not _MD_SPAN.match(frag)
+            and not _JS_STUB.match(frag)
+            and not _URL_PARAM.match(frag))
 
 
 def extract_payload(text, syn):
