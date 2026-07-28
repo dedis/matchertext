@@ -30,13 +30,28 @@ _SIGNS = {
             r"'\)?\s*(?:OR|AND)\s*'?\d+'?\s*=\s*'?\d+[^\n]*",
             r"'\)?\s*(?:OR|AND)\b[^\n]*--", r"\bAND\s+\d+=\d+[^\n]*", r"';?\s*WAITFOR\s+DELAY[^\n]*",
             r"\bextractvalue\s*\([^\n]*", r"\bSLEEP\s*\(\d+\)[^\n]*", r"\[sql\]"],
-    "html_dom": [r"<script\b[^>]*>.*?</script>", r"<img[^>]*onerror\s*=[^\n]*?>",
-                 r"<svg[^>]*on\w+\s*=[^\n]*?>", r'"><script[^\n]*', r"javascript:\S+",
+    # A bare <script> tag is not a payload. In curated exploit files that was
+    # harmless, but a linked repo is often the vulnerable application itself,
+    # whose own source is full of benign script tags and jQuery includes. Require
+    # the body to actually do something an attack does.
+    "html_dom": [r"<script\b[^>]*>[^<]{0,150}?(?:alert|prompt|confirm|eval"
+                 r"|document\s*\.\s*(?:cookie|domain|location|write))\s*[({][^<]{0,120}?</script>",
+                 r"<img[^>]*onerror\s*=[^\n]*?>",
+                 r"<svg[^>]*on\w+\s*=[^\n]*?>",
+                 # Both of these fired on ordinary page source: `"><script` on an
+                 # attribute boundary, `javascript:` on a benign inline handler.
+                 r'"><script[^\n]{0,120}?(?:alert|prompt|confirm|eval|document\s*\.)',
+                 r"javascript:\s*(?:alert|prompt|confirm|eval|document\s*\.)\S{0,80}",
                  r"%3[Cc]script[^\n]*"],
     "shell_command": [r"[;&|]\s*(?:cat|id|whoami|ping|curl|wget|sleep|uname|nc|bash|sh)\b[^\n]*",
                       r"\$\([^)\n]+\)", r"`[^`\n]+`"],
-    "code_eval": [r"<\?php\b[^\n]*", r"\beval\s*\([^\n)]+\)[^\n]*", r"\bsystem\s*\([^\n)]+\)[^\n]*",
-                  r"\bpassthru\s*\([^\n)]+\)[^\n]*", r"\bassert\s*\([^\n)]+\)[^\n]*"],
+    # These once matched any call named system()/eval(); in prose and diagrams
+    # that is a false positive, so require the argument to look like an injected
+    # command or a variable rather than an identifier.
+    "code_eval": [r"<\?php\b[^\n]{0,140}?(?:system|exec|eval|passthru|shell_exec|assert|\$_)[^\n]{0,60}",
+                  r"\b(?:eval|system|passthru|assert|shell_exec|popen)\s*\(\s*"
+                  r"(?:[\"'`]?\s*(?:cat|ls|id|whoami|uname|curl|wget|nc|sh|bash|echo|ping|dir|type|net)\b"
+                  r"|\$|`|base64_decode)[^\n)]{0,80}\)"],
     "crlf_header": [r"(?:%0[dD]%0[aA]|\\r\\n)\S+"],
     "ldap": [r"\*\)\([^\n]*", r"\)\(\w+=[^\n]*"],
     "xpath_xquery": [r"'?\s*or\s*'?1'?\s*=\s*'?1[^\n]*", r"count\(/[^\n]*", r"//\*[^\n]*"],
@@ -45,7 +60,10 @@ _SIGNS = {
     "formula_csv": [r"[=+@\-](?:cmd|CMD|SUM|HYPERLINK|WEBSERVICE)[^\n]*", r"=\d+[+\-*][^\n]*"],
     "nosql": [r"\{\s*[\"']?\$(?:gt|ne|where|regex)[^\n]*", r"\[\$ne\][^\n]*"],
     "xml": [r"<!DOCTYPE[^\n]*\[[^\n]*", r"<!ENTITY\b[^\n]*", r"SYSTEM\s+[\"']file:[^\n]*"],
-    "argument": [r"-[A-Za-z][\w-]*=`[^\n]*", r"-o\w+=\S[^\n]*", r"-[A-Za-z][\w-]*=\S+"],
+    # A bare `-flag=value` is just a command line. Argument injection needs the
+    # value to carry a command substitution or separator.
+    "argument": [r"-[A-Za-z][\w-]*=`[^\n]*", r"-[A-Za-z][\w-]*=\$\([^\n]*",
+                 r"-[A-Za-z][\w-]*=[^\s\n]*[;|&][^\n]*"],
 }
 SIGNS = {s: [re.compile(p, re.I | re.S) for p in ps] for s, ps in _SIGNS.items()}
 
@@ -147,7 +165,7 @@ def is_truncated(frag):
 # Markdown prose yields false positives that exploit files did not: a README
 # writes `deviceList` as an inline code span, which the shell backtick signature
 # reads as a command substitution. Require something command-like inside.
-_MD_SPAN = re.compile(r"^`[\w.@/ -]+`$")
+_MD_SPAN = re.compile(r"^`[\w.@/ ()\[\]-]*`$")
 _JS_STUB = re.compile(r"^javascript:.{0,4}$", re.I)
 # `&id=62` is a URL parameter named id, not the id command.
 _URL_PARAM = re.compile(r"^[&;|]\w+=")
@@ -162,11 +180,26 @@ def _accept(frag):
             and not _URL_PARAM.match(frag))
 
 
+def extend_balance(text, end, frag, limit=8):
+    """Reclaim closers a regex could not count.
+
+    A pattern cannot match nested parentheses, so `eval(base64_decode($x))` is
+    captured one `)` short and the truncation guard would throw it away. If the
+    characters immediately following the match are closing matchers, they belong
+    to the payload: append them until it balances.
+    """
+    while is_truncated(frag) and limit and end < len(text) and text[end] in ")]}":
+        frag += text[end]
+        end += 1
+        limit -= 1
+    return frag
+
+
 def extract_payload(text, syn):
     for rx in SIGNS.get(syn, ()):
         m = rx.search(text)
         if m:
-            frag = " ".join(m.group(0).split())
+            frag = " ".join(extend_balance(text, m.end(), m.group(0)).split())
             if _accept(frag):
                 return frag
     # Literal forms first, so an unencoded payload is never routed through the

@@ -169,6 +169,13 @@ def run(args):
         if cid in syn_of:
             poc_paths[cid].append(lp)
     vectors = best_vectors(con)
+    # Same fallback as syntactic_group: local file first, then a payload
+    # recovered from a linked GitHub repo.
+    remote = dict(con.execute(
+        "SELECT cve_id, payload FROM remote_payload WHERE payload IS NOT NULL")
+        if con.execute("""SELECT COUNT(*) FROM sqlite_master
+                          WHERE type='table' AND name='remote_payload'""").fetchone()[0]
+        else ())
 
     rows = []
     for cid, syn in syn_of.items():
@@ -181,6 +188,7 @@ def run(args):
                 payload = None
             if payload:
                 break
+        payload = payload or remote.get(cid)
         blob = f"{payload or ''} {desc}"
 
         for dim, label in cvss_facets(vectors.get(cid, "")).items():

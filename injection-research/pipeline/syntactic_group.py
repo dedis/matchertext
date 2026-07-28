@@ -92,15 +92,25 @@ def representative_payload(con):
                                   ORDER BY cve_id, source, ref"""):
         if cid in syn_of:
             paths[cid].append(lp)
+    # Payloads recovered from linked GitHub repos, which have no local file.
+    # Local files win: they are pinned in the corpus snapshot, whereas a remote
+    # payload depends on a repo that may since have vanished.
+    remote = dict(con.execute(
+        "SELECT cve_id, payload FROM remote_payload WHERE payload IS NOT NULL")
+        if con.execute("""SELECT COUNT(*) FROM sqlite_master
+                          WHERE type='table' AND name='remote_payload'""").fetchone()[0]
+        else ())
     for cid, syn in syn_of.items():
+        found = None
         for lp in paths.get(cid, ()):
             try:
-                p = extract_payload((RAW / lp).read_text(encoding="utf-8", errors="replace"), syn)
+                found = extract_payload((RAW / lp).read_text(encoding="utf-8", errors="replace"), syn)
             except OSError:
-                p = None
-            if p:
-                yield cid, syn, p
+                found = None
+            if found:
                 break
+        if found or (found := remote.get(cid)):
+            yield cid, syn, found
 
 
 def run(args):
