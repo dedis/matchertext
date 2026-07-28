@@ -171,11 +171,15 @@ def run(args):
     vectors = best_vectors(con)
     # Same fallback as syntactic_group: local file first, then a payload
     # recovered from a linked GitHub repo.
+    def _table(name):
+        return con.execute("""SELECT COUNT(*) FROM sqlite_master
+                              WHERE type='table' AND name=?""", (name,)).fetchone()[0]
     remote = dict(con.execute(
         "SELECT cve_id, payload FROM remote_payload WHERE payload IS NOT NULL")
-        if con.execute("""SELECT COUNT(*) FROM sqlite_master
-                          WHERE type='table' AND name='remote_payload'""").fetchone()[0]
-        else ())
+        if _table("remote_payload") else ())
+    web = dict(con.execute(
+        "SELECT cve_id, payload FROM web_payload WHERE payload IS NOT NULL")
+        if _table("web_payload") else ())
 
     rows = []
     for cid, syn in syn_of.items():
@@ -188,7 +192,7 @@ def run(args):
                 payload = None
             if payload:
                 break
-        payload = payload or remote.get(cid)
+        payload = payload or remote.get(cid) or web.get(cid)
         blob = f"{payload or ''} {desc}"
 
         for dim, label in cvss_facets(vectors.get(cid, "")).items():

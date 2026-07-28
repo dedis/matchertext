@@ -95,11 +95,17 @@ def representative_payload(con):
     # Payloads recovered from linked GitHub repos, which have no local file.
     # Local files win: they are pinned in the corpus snapshot, whereas a remote
     # payload depends on a repo that may since have vanished.
+    def _table(name):
+        return con.execute("""SELECT COUNT(*) FROM sqlite_master
+                              WHERE type='table' AND name=?""", (name,)).fetchone()[0]
     remote = dict(con.execute(
         "SELECT cve_id, payload FROM remote_payload WHERE payload IS NOT NULL")
-        if con.execute("""SELECT COUNT(*) FROM sqlite_master
-                          WHERE type='table' AND name='remote_payload'""").fetchone()[0]
-        else ())
+        if _table("remote_payload") else ())
+    # Advisory pages are the last resort: unlike a pinned commit they can be
+    # edited in place, so they are only consulted when nothing else has one.
+    web = dict(con.execute(
+        "SELECT cve_id, payload FROM web_payload WHERE payload IS NOT NULL")
+        if _table("web_payload") else ())
     for cid, syn in syn_of.items():
         found = None
         for lp in paths.get(cid, ()):
@@ -109,7 +115,7 @@ def representative_payload(con):
                 found = None
             if found:
                 break
-        if found or (found := remote.get(cid)):
+        if found or (found := remote.get(cid)) or (found := web.get(cid)):
             yield cid, syn, found
 
 
