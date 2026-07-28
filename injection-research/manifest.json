@@ -1,13 +1,33 @@
 {
+  "BenchmarkJava": {
+    "commit": "79b9bd6177e07991a9c11dc19e457c840e229931",
+    "fetched": "2026-07-28",
+    "url": "https://github.com/OWASP-Benchmark/BenchmarkJava.git"
+  },
+  "PayloadsAllTheThings": {
+    "commit": "434cc897f9b1e561f3804631e40643e6c82c3d14",
+    "fetched": "2026-07-28",
+    "url": "https://github.com/swisskyrepo/PayloadsAllTheThings.git"
+  },
   "PoC-in-GitHub": {
     "commit": "c27b1516f2f40af43ae8114264f8330e84ce4a6f",
     "fetched": "2026-07-13",
     "url": "https://github.com/nomi-sec/PoC-in-GitHub.git"
   },
+  "SecLists": {
+    "commit": "aeb36e9df937d1b77042e5667780e8156cd419f7",
+    "fetched": "2026-07-28",
+    "url": "https://github.com/danielmiessler/SecLists.git"
+  },
   "advisory-database": {
     "commit": "79c2cf4630fcc44f2632735de08432a07cfaf204",
     "fetched": "2026-07-13",
     "url": "https://github.com/github/advisory-database.git"
+  },
+  "cve-scores": {
+    "commit": "eef9ab5b2a334e83b23dc90f1d12fd280866e1d8",
+    "fetched": "2026-07-28",
+    "url": "https://github.com/ARPSyndicate/cve-scores.git"
   },
   "cvelistV5": {
     "commit": "92d64b4c9b3c5a0ce1fd1e5f8c017b9772e0139b",
@@ -34,6 +54,21 @@
     "commit": "6a57361db10b709c4b4f339c09ee250acc2d8aac",
     "fetched": "2026-07-13",
     "url": "https://gitlab.com/exploit-database/exploitdb.git"
+  },
+  "fuzzdb": {
+    "commit": "5656ab25dc6bb43bae32236fab775658a90d7380",
+    "fetched": "2026-07-28",
+    "url": "https://github.com/fuzzdb-project/fuzzdb.git"
+  },
+  "juliet-c": {
+    "fetched": "2026-07-28",
+    "sha256": "ada9d7e1c323d283446df3f55bdee0d00bda1fed786785fe98764d58688f38eb",
+    "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip"
+  },
+  "juliet-java": {
+    "fetched": "2026-07-28",
+    "sha256": "d985f4177c2bcd7b03455a05c1c8f2e755f55c9eb250accd052f05f877347e60",
+    "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-java-v1-3.zip"
   },
   "kev": {
     "fetched": "2026-07-13",
@@ -179,6 +214,16 @@
     "fetched": "2026-07-13",
     "sha256": "a96a85a365ea3ada08220bd748bc5921f60f4b63feb8e33c27da73c8d65c2084",
     "url": "https://access.redhat.com/hydra/rest/securitydata/cve.json"
+  },
+  "trickest-cve": {
+    "commit": "b3a270a001a31742516eaea5c494f365de9d3c80",
+    "fetched": "2026-07-28",
+    "url": "https://github.com/trickest/cve.git"
+  },
+  "vulhub": {
+    "commit": "aeaf65793f147f29bd50841ef77f4e9cad07ecc7",
+    "fetched": "2026-07-28",
+    "url": "https://github.com/vulhub/vulhub.git"
   },
   "vulnrichment": {
     "commit": "3d48581d1262450948913da31a996c293c65dc6d",

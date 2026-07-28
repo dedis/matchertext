@@ -62,21 +62,93 @@ def is_placeholder(frag):
     return bool(_PLACEHOLDER.match(frag)) or "#{" in frag
 
 
+# Payloads recorded as URLs are the single largest extraction gap: the literal
+# signatures above require real whitespace, so `union+select`, `UNION/**/SELECT`
+# and `%20UNION%20SELECT` all miss. These match the URL forms, and their matches
+# are decoded before use, because a percent-escape is only a percent-escape in
+# transit -- the web server decodes it, so the SQL or HTML parser really does see
+# `(` where the recorded PoC wrote `%28`. Skeletonizing the undecoded form would
+# hide matchers that are genuinely present and bias the containment split toward
+# inert embedding.
+_SEP = r"(?:%20|\+|/\*\*?/|\s)"
+_TAIL = r"[^\s\"'<>\n]*"
+# \b is wrong here: after a percent-escape the preceding character is a digit
+# (the `0` of %20), so \bunion never fires on %20UNION. Guard on letters only.
+_W = r"(?<![A-Za-z_])"
+_URL_SIGNS = {
+    "sql": [rf"{_W}union{_SEP}+(?:all{_SEP}+)?select{_TAIL}",
+            rf"{_W}(?:and|or){_SEP}+\d+{_SEP}*={_SEP}*\d+{_TAIL}",
+            rf"{_W}(?:and|or){_SEP}*\((?:ascii|substring|substr|length|count){_TAIL}",
+            rf"%27{_TAIL}(?:union|select|or|and){_TAIL}",
+            rf"{_W}(?:sleep|benchmark|pg_sleep)(?:%28|\()\d+",
+            rf"{_W}concat_ws(?:%28|\(){_TAIL}"],
+    "html_dom": [r"[\"'][^\"'\n]{0,24}\son\w+\s*=\s*(?:alert|prompt|confirm)\([^)\n]*\)[^\n]{0,40}",
+                 r"[\"']\s*;\s*(?:alert|prompt|confirm)\([^)\n]*\)\s*;?\s*(?://|<)",
+                 r"%22[^\n]{0,60}?on\w+\s*(?:%3[Dd]|=)\s*(?:alert|prompt|confirm)[^\n]{0,40}",
+                 rf"%3[Cc](?:script|img|svg){_TAIL}",
+                 r"&#x?\d+;[^\n]{0,60}(?:script|onerror|alert)[^\n]{0,40}"],
+    # Balancing the non-hostable syntaxes matters for the containment measure:
+    # improving extraction only for SQL and XSS would skew the payload-backed
+    # set toward matcher-hostable contexts and inflate the contained share.
+    "shell_command": [
+        rf"(?:%3[Bb]|%7[Cc]|%26){_SEP}*(?:echo|cat|id|whoami|ping|curl|wget|uname|nc|ls|dir|sleep){_TAIL}",
+        r"%24(?:%28|\()[^\n]{0,60}",
+        r"%60[^\n]{0,60}%60"],
+    "code_eval": [
+        r"T\(java\.lang\.Runtime\)[^\n]{0,80}",
+        r"\bgetRuntime\(\)\s*\.\s*exec\([^\n)]{0,60}\)",
+        rf"%3[Cc]%3[Ff]php{_TAIL}",
+        rf"[?&]\w+=https?(?::|%3[Aa])(?://|%2[Ff]%2[Ff]){_TAIL}\.(?:txt|php)\?"],
+}
+URL_SIGNS = {s: [re.compile(p, re.I) for p in ps] for s, ps in _URL_SIGNS.items()}
+_PCT = re.compile(r"%([0-9A-Fa-f]{2})")
+
+
+def urlform_decode(frag, rounds=2):
+    """Undo the transport encoding a recorded URL payload carries.
+
+    Two rounds because double-encoding (%2527 -> %27 -> ') is common in the
+    corpus; `+` is a query-string space, and an emptied SQL comment (/**/) is a
+    whitespace substitute used to evade naive filters.
+    """
+    for _ in range(rounds):
+        decoded = _PCT.sub(lambda m: chr(int(m.group(1), 16)), frag)
+        if decoded == frag:
+            break
+        frag = decoded
+    return re.sub(r"/\*\*?/", " ", frag).replace("+", " ")
+
+
+def _accept(frag):
+    return 3 <= len(frag) <= 200 and not is_placeholder(frag)
+
+
 def extract_payload(text, syn):
     for rx in SIGNS.get(syn, ()):
         m = rx.search(text)
         if m:
             frag = " ".join(m.group(0).split())
-            if 3 <= len(frag) <= 200 and not is_placeholder(frag):
+            if _accept(frag):
+                return frag
+    # Literal forms first, so an unencoded payload is never routed through the
+    # decoder; only fall back to the URL forms when nothing else matched.
+    for rx in URL_SIGNS.get(syn, ()):
+        m = rx.search(text)
+        if m:
+            frag = " ".join(urlform_decode(m.group(0)).split())
+            if _accept(frag):
                 return frag
     return None
 
 
 def sample_payloads(con, syn, n, rng):
+    # Seeding rng only makes the sample reproducible if the list it shuffles has
+    # a fixed order to begin with, hence the ORDER BY.
     links = con.execute(
         """SELECT DISTINCT c.cve_id, p.source, p.local_path FROM poc p
            JOIN classification c USING(cve_id)
-           WHERE c.syntax_type=? AND p.local_path IS NOT NULL""", (syn,)).fetchall()
+           WHERE c.syntax_type=? AND p.local_path IS NOT NULL
+           ORDER BY c.cve_id, p.source, p.local_path""", (syn,)).fetchall()
     rng.shuffle(links)
     out, seen = [], set()
     for cve_id, source, rel in links:

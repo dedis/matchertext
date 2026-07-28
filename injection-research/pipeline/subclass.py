@@ -160,7 +160,12 @@ def run(args):
     desc_of = dict(con.execute("""SELECT cve_id, COALESCE(description, '') FROM cve
                                   WHERE cve_id IN (SELECT cve_id FROM classification)"""))
     poc_paths = defaultdict(list)
-    for cid, lp in con.execute("SELECT cve_id, local_path FROM poc WHERE local_path IS NOT NULL"):
+    # Ordered so the representative payload per CVE is a property of the data,
+    # not of physical row order: without it, ingesting a new PoC source silently
+    # reshuffles which file each CVE's payload is extracted from.
+    for cid, lp in con.execute("""SELECT cve_id, local_path FROM poc
+                                  WHERE local_path IS NOT NULL
+                                  ORDER BY cve_id, source, ref"""):
         if cid in syn_of:
             poc_paths[cid].append(lp)
     vectors = best_vectors(con)

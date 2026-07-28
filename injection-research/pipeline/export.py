@@ -120,6 +120,12 @@ def coverage(con):
                                     WHERE cve_id IN (SELECT cve_id FROM classification)""")],
         ["sanity_xss_n", q("SELECT COUNT(*) FROM classification WHERE syntax_type='html_dom'")],
         ["sanity_sqli_n", q("SELECT COUNT(*) FROM classification WHERE syntax_type='sql'")],
+        ["corpus_payloads", q("SELECT COUNT(*) FROM payload")],
+        ["corpus_payloads_hostable", q(
+            "SELECT COUNT(*) FROM payload_assessment WHERE preventable=1")],
+        ["ground_truth_cases", q("SELECT COUNT(*) FROM ground_truth")],
+        ["published_with_vedas", q("""SELECT COUNT(*) FROM cve v JOIN exploit_score USING(cve_id)
+                                      WHERE v.state='PUBLISHED'""")],
     ]
     write("coverage.csv", ["metric", "value"], rows)
 

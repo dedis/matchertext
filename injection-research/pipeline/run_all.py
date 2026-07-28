@@ -11,8 +11,10 @@ import build_db
 import classify
 import export
 import fetch
+import latex
 import subclass
 import syntactic_group
+import validate
 
 
 def main():
@@ -29,7 +31,9 @@ def main():
     classify.run(args)
     subclass.run(args)
     syntactic_group.run(args)
+    validate.run(args)
     export.run(args)
+    latex.run(args)
 
 
 if __name__ == "__main__":

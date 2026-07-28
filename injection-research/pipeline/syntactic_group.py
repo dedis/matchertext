@@ -86,7 +86,10 @@ def skeleton(payload):
 def representative_payload(con):
     syn_of = dict(con.execute("SELECT cve_id, syntax_type FROM classification"))
     paths = defaultdict(list)
-    for cid, lp in con.execute("SELECT cve_id, local_path FROM poc WHERE local_path IS NOT NULL"):
+    # See subclass.py: ordered so payload selection is stable across ingestions.
+    for cid, lp in con.execute("""SELECT cve_id, local_path FROM poc
+                                  WHERE local_path IS NOT NULL
+                                  ORDER BY cve_id, source, ref"""):
         if cid in syn_of:
             paths[cid].append(lp)
     for cid, syn in syn_of.items():

@@ -27,9 +27,30 @@ GIT_REPOS = {
     "metasploit-framework": "https://github.com/rapid7/metasploit-framework.git",
     "advisory-database": "https://github.com/github/advisory-database.git",
     "PoC-in-GitHub": "https://github.com/nomi-sec/PoC-in-GitHub.git",
+    # PoC linkage and exploit-availability scoring
+    "trickest-cve": "https://github.com/trickest/cve.git",
+    "cve-scores": "https://github.com/ARPSyndicate/cve-scores.git",
+    "vulhub": "https://github.com/vulhub/vulhub.git",
+    # Payload corpora: the attack strings themselves, per sink type. These drive
+    # the matchertext-prevention measurement, which needs payloads rather than
+    # CVE metadata.
+    "PayloadsAllTheThings": "https://github.com/swisskyrepo/PayloadsAllTheThings.git",
+    "fuzzdb": "https://github.com/fuzzdb-project/fuzzdb.git",
+    "SecLists": "https://github.com/danielmiessler/SecLists.git",
+    # Labeled ground truth: injection cases with known CWE and known verdict.
+    "BenchmarkJava": "https://github.com/OWASP-Benchmark/BenchmarkJava.git",
 }
 REDHAT_URL = "https://access.redhat.com/hydra/rest/securitydata/cve.json"
 DEBIAN_URL = "https://security-tracker.debian.org/tracker/data/json"
+# NIST SARD Juliet suites: synthetic cases whose paths encode the CWE, giving a
+# CWE-labeled corpus independent of the CVE record.
+SARD_SUITES = {
+    "juliet-java": "https://samate.nist.gov/SARD/downloads/test-suites/"
+                   "2017-10-01-juliet-test-suite-for-java-v1-3.zip",
+    "juliet-c": "https://samate.nist.gov/SARD/downloads/test-suites/"
+                "2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+}
+FREEZE = False
 
 
 def sha256(path):
@@ -52,6 +73,11 @@ def download(url, dest):
 
 def pin(manifest, key, url, dest, today, **extra):
     prev = manifest.get(key, {}).get("sha256")
+    # --freeze keeps an already-pinned rolling feed at its recorded revision, so a
+    # corpus change can be attributed to newly added sources rather than to
+    # upstream drift in the old ones.
+    if FREEZE and dest.exists() and prev:
+        return
     # These HTTP endpoints serve mutable "latest"/rolling feeds (NVD re-scores
     # CVEs, CWE/Debian/Red Hat track head), so a drifted local copy means the
     # upstream moved: re-fetch and re-pin rather than aborting.
@@ -66,6 +92,8 @@ def pin(manifest, key, url, dest, today, **extra):
 
 
 def run(args):
+    global FREEZE
+    FREEZE = getattr(args, "freeze", False)
     manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {}
     today = datetime.datetime.now(datetime.UTC).date()
 
@@ -95,6 +123,9 @@ def run(args):
         RAW / "epss" / f"epss_scores-{date}.csv.gz", today, date=date)
 
     pin(manifest, "cwe", CWE_URL, RAW / "cwe" / "cwec_latest.xml.zip", today)
+
+    for name, url in SARD_SUITES.items():
+        pin(manifest, name, url, RAW / "sard" / f"{name}.zip", today)
 
     fetch_redhat(manifest, today)
     pin(manifest, "debian", DEBIAN_URL, RAW / "debian" / "debian_security.json", today)
@@ -130,4 +161,6 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--years", type=int, nargs="*", help="restrict NVD feeds to these years")
     ap.add_argument("--epss-date", help="EPSS snapshot date YYYY-MM-DD (default: yesterday)")
+    ap.add_argument("--freeze", action="store_true",
+                    help="keep already-pinned rolling feeds at their recorded revision")
     run(ap.parse_args())
