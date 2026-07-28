@@ -18,6 +18,7 @@ import sqlite3
 from collections import defaultdict
 from pathlib import Path
 
+import export
 import matchertext
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -245,6 +246,12 @@ def run(args):
     n_groups = q("SELECT COUNT(DISTINCT group_id) FROM syntactic_group")
     singletons = q("""SELECT COUNT(*) FROM
         (SELECT group_id FROM syntactic_group GROUP BY 1 HAVING COUNT(*)=1)""")
+    # How few containment outcomes the long tail of one-off skeletons reduces to.
+    singleton_verdicts = len({
+        (s, matchertext.assess(s, sk)[1] or "outside")
+        for s, sk in con.execute("""SELECT syntax_type, skeleton FROM syntactic_group
+            WHERE group_id IN (SELECT group_id FROM syntactic_group
+                               GROUP BY 1 HAVING COUNT(*)=1)""")})
 
     vals = [
         ("PublishedCVEs", num(published)),
@@ -270,6 +277,11 @@ def run(args):
         ("NbRecallHtmlDom", f"{float(per['html_dom']['recall']):.2f}"),
         ("NbPrecisionSql", f"{float(per['sql']['precision']):.2f}"),
         ("NbRecallSql", f"{float(per['sql']['recall']):.2f}"),
+        ("NbPrecisionCodeEval", f"{float(per['code_eval']['precision']):.2f}"),
+        ("NbRecallCodeEval", f"{float(per['code_eval']['recall']):.2f}"),
+        ("MethodDeterministicShare",
+         pct((methods.get("cwe", 0) + methods.get("rule", 0)) / injection, 1)),
+        ("AuditPerMethod", num(export.AUDIT_PER_METHOD)),
         ("InjectionWithPoc", num(with_poc)),
         ("InjectionWithPocShare", pct(with_poc / injection)),
         ("PocRows", num(q("SELECT COUNT(*) FROM poc"))),
@@ -285,6 +297,10 @@ def run(args):
         ("SingletonGroups", num(singletons)),
         ("SingletonGroupShare", pct(singletons / n_groups)),
         ("SingletonCVEShare", pct(singletons / grouped)),
+        ("SingletonVerdicts", num(singleton_verdicts)),
+        # The two dominant syntaxes, quoted in results.tex as a share.
+        ("TopTwoShare", pct(q("""SELECT COUNT(*) FROM classification
+                                 WHERE syntax_type IN ('html_dom','sql')""") / injection)),
         # Counts for the three largest groups the text names, looked up by their
         # exact skeleton so a changed skeleton shows up as 0 rather than silently
         # keeping a stale number.

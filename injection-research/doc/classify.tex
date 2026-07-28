@@ -45,11 +45,11 @@ CVEs it reaches a weighted precision of \textbf{\dataNbPrecision} and recall of
 \textbf{\dataNbRecall} at \dataNbCoverage coverage, and it is strongest exactly where the
 prevention analysis is most sensitive (HTML/DOM \dataNbPrecisionHtmlDom/\dataNbRecallHtmlDom, SQL \dataNbPrecisionSql/\dataNbRecallSql),
 weakest on the small execution-sink classes it labels least often
-(code/eval 0.56/0.74).
-The deterministic layers carry the remaining 98\% of labels and rest on the
+(code/eval \dataNbPrecisionCodeEval/\dataNbRecallCodeEval).
+The deterministic layers carry the remaining \dataMethodDeterministicShare of labels and rest on the
 CWE-to-syntax map, whose accuracy we do not independently validate.
 Since that map dominates the syntax labels the projection of \cref{sec:prevent}
-is computed from, we export an audit sample of 75 CVEs from each labeling layer,
+is computed from, we export an audit sample of \dataAuditPerMethod CVEs from each labeling layer,
 over-sampling the rare and least reliable ones.
 
 \paragraph{Weakness families.}

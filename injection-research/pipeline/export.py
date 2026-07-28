@@ -14,6 +14,10 @@ ROOT = Path(__file__).resolve().parents[1]
 DB = ROOT / "data" / "cve.db"
 EXPORTS = ROOT / "data" / "exports"
 
+# Quoted in classify.tex, so latex.py reads it from here rather than
+# repeating the value.
+AUDIT_PER_METHOD = 75
+
 YEAR = "COALESCE(NULLIF(substr(v.published_at,1,4),''), substr(v.cve_id,5,4))"
 
 
@@ -92,7 +96,7 @@ def cwe_disagreement(con):
           ["cve_id", "cna_family", "adp_family", "nvd_family"], sorted(rows))
 
 
-def audit_sample(con, per_method=75):
+def audit_sample(con, per_method=AUDIT_PER_METHOD):
     rows = []
     for (method,) in con.execute("SELECT DISTINCT method FROM classification ORDER BY method"):
         sample = sorted(
