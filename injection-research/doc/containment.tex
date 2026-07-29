@@ -85,9 +85,19 @@ Applying it to the \dataHtmlDomCVEs HTML/DOM CVEs removes an estimated \dataJsSi
 central estimate of \textbf{\dataCentralEstimate} (\textbf{\dataCentralShare}) against the \dataHostableShare ceiling.
 The estimate assumes payload-backed CVEs carry sinks at the same rate as the
 rest, which their skew toward exploitable web bugs may not warrant.
-The reach of the discipline is thus bounded from below at the fragment level and
-from above at the syntax level, and the gap between \dataPayloadBackedCVEs and \dataInjectionCVEs is
-payload availability, not a containment failure.
+Read against a single denominator, the full \dataInjectionCVEs injection CVEs,
+the reach of the discipline runs from a floor of \textbf{\dataFloorShare} to a
+ceiling of \textbf{\dataHostableShare}, with \dataCentralShare as the central
+estimate.
+The floor counts only the \dataContained CVEs whose recorded payload we verified
+as contained, and treats every CVE without a recoverable payload as uncontained;
+it is therefore a hard lower bound rather than an estimate.
+The \dataContainedShare reported above is a different quantity, the contained
+share \emph{within} the payload-backed subset, and does not sit on this scale:
+it answers what happens once a payload is known, not how much of the corpus that
+covers.
+The gap between \dataPayloadBackedCVEs and \dataInjectionCVEs is payload
+availability, not a containment failure.
 
 \paragraph{What payload availability bounds.}
 That gap is a property of the disclosure ecosystem rather than of our

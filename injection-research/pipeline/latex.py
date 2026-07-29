@@ -315,6 +315,12 @@ def run(args):
                                         GROUP BY 1,2""")],
         ("Contained", num(contained)),
         ("ContainedShare", pct(contained / grouped)),
+        # The floor on the same denominator as the ceiling. ContainedShare is a
+        # share of the payload-backed subset, so quoting it beside HostableShare
+        # compares two different populations and makes the floor look larger than
+        # the ceiling. This counts every CVE without a recoverable payload as
+        # uncontained, which makes it a hard lower bound rather than an estimate.
+        ("FloorShare", pct(contained / injection, 1)),
         ("InertCVEs", num(sum(inert.values()))),
         ("RejectedCVEs", num(sum(reject.values()))),
         ("OutsideCVEs", num(sum(outside.values()))),
