@@ -78,13 +78,37 @@ Projecting it onto the full corpus, at most \textbf{\dataHostableCVEs} of the
 \textbf{\dataInjectionCVEs} injection CVEs (\textbf{\dataHostableShare}) target a matcher-delimitable
 syntax.
 This is an upper bound, since a fraction of HTML/DOM cases are the
-\verb|javascript:| semantic sinks above, and the payload-backed subset puts a
-number on that fraction: \dataHtmlDomJsSinks of the \dataHtmlDomBacked HTML/DOM CVEs carrying a payload are
-such sinks, a rate of \textbf{\dataJsSinkRate}.
-Applying it to the \dataHtmlDomCVEs HTML/DOM CVEs removes an estimated \dataJsSinkRemoved, for a
-central estimate of \textbf{\dataCentralEstimate} (\textbf{\dataCentralShare}) against the \dataHostableShare ceiling.
-The estimate assumes payload-backed CVEs carry sinks at the same rate as the
-rest, which their skew toward exploitable web bugs may not warrant.
+\verb|javascript:| semantic sinks above: \dataHtmlDomJsSinks of the
+\dataHtmlDomBacked HTML/DOM CVEs carrying a payload are such sinks, a rate of
+\textbf{\dataJsSinkRate}.
+
+Turning the measured rate into a corpus estimate needs care, because
+payload-backed CVEs are not a random sample.
+A SQL injection payload is a literal string a write-up can quote, whereas
+code-eval and argument payloads are usually built at run time and never appear
+verbatim, so payload availability correlates with syntax and specifically with
+matcher-hostable syntax.
+Applying the pooled \dataContainedShare to the whole corpus inherits that skew
+and yields \dataNaiveEstimate (\dataNaiveShare), too high by \dataSkewCost CVEs.
+We therefore estimate a containment rate per syntax and weight by the corpus
+counts (\cref{tab:strata}), the standard post-stratification correction, giving
+a central estimate of \textbf{\dataCentralEstimate}
+(\textbf{\dataCentralShare}) against the \dataHostableShare ceiling.
+Within a syntax the estimate still assumes payload-backed CVEs carry sinks at
+the same rate as the rest, which their skew toward exploitable web bugs may not
+warrant.
+
+\begin{table}[t]
+\centering
+\small
+\input{generated/tbl-strata}
+\caption{Post-stratification strata. The containment rate is measured on the
+payload-backed CVEs of each syntax and applied to that syntax's share of the
+corpus, so the estimate does not inherit the sampling skew of the subset.
+A dagger would mark a syntax with no payload-backed CVE, whose rate falls back
+to the structural rule of \cref{sec:threat}.}
+\label{tab:strata}
+\end{table}
 Read against a single denominator, the full \dataInjectionCVEs injection CVEs,
 the reach of the discipline runs from a floor of \textbf{\dataFloorShare} to a
 ceiling of \textbf{\dataHostableShare}, with \dataCentralShare as the central

@@ -71,6 +71,51 @@ def containment(con):
     return inert, reject, outside, semantic, nonmatcher
 
 
+def post_stratify(con, inert, reject, outside):
+    """Reweight the measured containment rate by the corpus syntax mix.
+
+    Payload-backed CVEs are not a random sample of the corpus. SQL is 1.7x
+    over-represented, because a SQL injection payload is a literal string a
+    write-up can quote, whereas code-eval and argument payloads are usually
+    built at run time and never appear verbatim. Payload availability therefore
+    correlates with syntax, and specifically with matcher-hostable syntax: 85%
+    of the payload-backed subset is hostable against 80% of the corpus.
+
+    Multiplying the pooled containment rate by the corpus inherits that skew and
+    overstates the result by roughly five thousand CVEs. Estimating a rate per
+    syntax and weighting by the corpus counts removes it, which is the standard
+    post-stratification correction.
+
+    A syntax with no payload-backed CVE has no measured rate and falls back to
+    the structural rule the model asserts: contained inside HOST, not outside.
+
+    Returns (estimate, [(syntax, corpus_n, backed_n, rate, basis)]).
+    """
+    corpus = dict(con.execute(
+        "SELECT syntax_type, COUNT(*) FROM classification GROUP BY 1"))
+    est, rows = 0.0, []
+    for syn, n in sorted(corpus.items(), key=lambda kv: -kv[1]):
+        backed = inert[syn] + reject[syn] + outside[syn]
+        if backed:
+            rate, basis = (inert[syn] + reject[syn]) / backed, "measured"
+        else:
+            rate, basis = (1.0 if syn in matchertext.HOST else 0.0), "structural"
+        est += n * rate
+        rows.append((syn, n, backed, rate, basis))
+    return est, rows
+
+
+def tbl_strata(rows, top=8):
+    lines = ["\\begin{tabular}{lrrr}", "\\toprule",
+             "Syntax & CVEs & Payload-backed & Contained \\\\", "\\midrule"]
+    for syn, n, backed, rate, basis in rows[:top]:
+        mark = "" if basis == "measured" else "$^{\\dagger}$"
+        lines.append(f"{DISPLAY.get(syn, syn):<19} & {num(n):>9} & {num(backed):>7}{mark} "
+                     f"& {rate * 100:.1f}\\% \\\\")
+    lines += ["\\bottomrule", "\\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
 def tbl_mech(inert, reject, outside):
     hosted = [s for s in DISPLAY if s in matchertext.HOST
               and (inert[s] or reject[s] or outside[s])]
@@ -215,7 +260,11 @@ def run(args):
     hd_backed = inert["html_dom"] + reject["html_dom"] + outside["html_dom"]
     js_rate = outside["html_dom"] / hd_backed if hd_backed else 0
     removed = round(htmldom * js_rate)
-    central = hostable - removed
+    # Post-stratified rather than the pooled rate applied to the whole corpus.
+    # The naive form is kept only so the paper can show what the skew costs.
+    strat, strata = post_stratify(con, inert, reject, outside)
+    central = round(strat)
+    naive = contained / grouped * injection
 
     corpus_n = q("SELECT COUNT(*) FROM payload_assessment")
     corpus_inert = q("SELECT COUNT(*) FROM payload_assessment WHERE mechanism='inert'")
@@ -338,6 +387,9 @@ def run(args):
         ("JsSinkRate", pct(js_rate, 1)),
         ("JsSinkRemoved", num(removed)),
         ("CentralEstimate", num(central)),
+        ("NaiveEstimate", num(round(naive))),
+        ("NaiveShare", pct(naive / injection)),
+        ("SkewCost", num(round(naive) - central)),
         ("CentralShare", pct(central / injection)),
         # payload corpora (fuzzdb / PayloadsAllTheThings / SecLists)
         ("CorpusPayloads", num(corpus_n)),
@@ -358,10 +410,11 @@ def run(args):
         grouped, contained, sum(inert.values()), sum(reject.values()),
         sum(outside.values()), semantic, nonmatcher))
     (OUT / "tbl-syntax.tex").write_text(HEADER + tbl_syntax(con))
+    (OUT / "tbl-strata.tex").write_text(HEADER + tbl_strata(strata))
     (OUT / "tbl-payload-corpus.tex").write_text(HEADER + tbl_payload_corpus(con))
     (OUT / "tbl-poc-sources.tex").write_text(HEADER + tbl_poc_sources(con))
     (OUT / "tbl-anchors.tex").write_text(HEADER + tbl_anchors(resolved))
-    print(f"wrote {len(vals)} macros and 5 tables to {OUT.relative_to(ROOT)}")
+    print(f"wrote {len(vals)} macros and 6 tables to {OUT.relative_to(ROOT)}")
     con.close()
 
 
