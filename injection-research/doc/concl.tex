@@ -1,7 +1,7 @@
 \section{Conclusion}
 \label{sec:concl}
 
-Injection is defended today one sink at a time, and each defense knows the syntax
+Injection is defended today one host at a time, and each defense knows the syntax
 it protects.
 This paper argues that a single host-independent check can stand in for that
 collection, and measures how far it would reach.
@@ -12,7 +12,7 @@ Naming those assumptions reduces inertness to three premises, of which the
 load-bearing one, that reading to matcher balance ends an embedded value where it
 should, is discharged here by a machine-checked proof
 (\cref{sec:appendix:lean}); the two that remain are properties of a host parser
-and its interpreter, and are per-sink rather than per-context.
+and its interpreter, and are per-host rather than per-context.
 Adoption is correspondingly bounded: where a format already delimits with
 matchers, as LDAP filters and PDF strings do, the discipline costs nothing at all.
 
@@ -26,7 +26,7 @@ divides into inert embedding and outright rejection along the host language's
 native delimiter, the division \cref{sec:resist} derives, though the ratio
 between the two is a property of these recorded payloads rather than of an
 adaptive attacker.
-The residue falls along the two conditions of \cref{sec:threat}: execution sinks,
+The residue falls along the two premises of \cref{sec:threat}: execution sinks,
 where the host runs the value by design, and contexts whose delimiters are not
 matchers, neither of which any delimiting discipline can reach.
 The pipeline, corpus manifest, and per-skeleton rewrites are the concrete basis
