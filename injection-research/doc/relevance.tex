@@ -65,8 +65,8 @@ escaping the region requires emitting an unmatched matcher, and by closure no
 valid matchertext string contains one.
 The characters that drive the classic breakouts, the quote in SQL and the angle
 bracket in HTML, are nonmatchers: the discipline leaves them entirely
-unconstrained, and they become ordinary data inside a matched region that can't break out,
-even when converted to nonmatchers under the closure theorem.
+unconstrained, and they become ordinary data inside a matched region, which
+closure keeps balanced whatever nonmatchers the value carries.
 
 Two consequences follow, and they are the reason this is a security question
 rather than a syntactic one.
@@ -102,7 +102,7 @@ today.
 \Cref{sec:resist} develops the argument for the syntaxes where injection actually
 occurs, then asks what adopting it costs: which hosting options deliver the
 property, what each adds to the trusted computing base, and how the result
-compares with the defenses already deployed for these sinks.
+compares with the defenses already deployed for these hosts.
 
 \paragraph{Q3: how much of the real injection landscape could this reach?}
 Even granting the property and its adoption, the discipline addresses only

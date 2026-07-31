@@ -197,13 +197,13 @@ where the reported attacks overwhelmingly live.
 Route & Example & Changes & New syntax & Compatibility & Trusted delta \\
 \hline
 Reuse native matchers & \verb|(uid=|$v$\verb|)|, \verb|/URI (|$v$\verb|)| & nothing & none & full & none \\
-Extend the sink grammar & \verb|WHERE name = [|$v$\verb|]| & sink parser & hole form & per sink & boundary reader \\
-Replace the sink language & MinML for markup & sink parser & wholly new & none & whole parser \\
+Extend the host grammar & \verb|WHERE name = [|$v$\verb|]| & host parser & hole form & per host & boundary reader \\
+Replace the host language & MinML for markup & host parser & wholly new & none & whole parser \\
 \hline
 \end{tabular}
-\caption{Routes to premise A1, an aware sink. \emph{Trusted delta} is what each
+\caption{Routes to premise A1, an aware host. \emph{Trusted delta} is what each
 adds to the trusted computing base of \cref{sec:threat} beyond the parser the
-sink already has.}
+host already has.}
 \label{tab:resist:a1}
 \end{table*}
 
@@ -226,7 +226,7 @@ form makes the template's structure independent of $v$ at composition time.}
 
 Adoption is two problems, not one, and the hosting syntaxes
 of~\cite{matchertext} answer only the second.
-Premise A1 of \cref{sec:threat} constrains the \emph{sink}: the SQL engine, HTML
+Premise A1 of \cref{sec:threat} constrains the \emph{host}: the SQL engine, HTML
 parser, or directory server that interprets the composed text must end the
 embedded value by matcher balance.
 Premise A2 constrains the \emph{application} that composes it: the untrusted value
@@ -234,7 +234,7 @@ must reach a matcher-delimited hole rather than be concatenated in beside one.
 The two are discharged by changes to different languages, by different people,
 and are worth separating.
 
-\paragraph{Making the sink aware (A1).}
+\paragraph{Making the host aware (A1).}
 \Cref{tab:resist:a1} compares the routes.
 Reusing a construct the format \emph{already} delimits with matchers is free:
 LDAP search filters and PDF literal strings
@@ -242,13 +242,13 @@ LDAP search filters and PDF literal strings
 so the discipline coincides with the format, and A1 costs no new syntax and no
 new trusted code.
 It also reaches only the formats built that way.
-Extending a sink's grammar with a hole form reaches the syntaxes where injection
-actually concentrates, at the price of a change inside the sink's parser, and the
+Extending a host's grammar with a hole form reaches the syntaxes where injection
+actually concentrates, at the price of a change inside the host's parser, and the
 change is not always conservative: T-SQL already gives \verb|[|$\dots$\verb|]| a
 meaning as a delimited identifier, so a hole form for SQL must either pick
 different delimiters or accept that it is not backward-compatible in the way
 \cite{matchertext}'s \verb|M"|$\dots$\verb|"| literal is for C.
-Replacing the sink language obtains A1 by construction and reaches everything it
+Replacing the host language obtains A1 by construction and reaches everything it
 covers, but only for new deployments, since nothing previously written parses.
 
 
@@ -268,7 +268,7 @@ ship behind a flag without endangering existing code.
 
 
 Together the two premises replace an obligation on the programmer at every use
-site with an obligation on two parsers: A1 relocates a bounded part of the sink's
+site with an obligation on two parsers: A1 relocates a bounded part of the host's
 parser, and A2 adds a lexical form to the application language.
 Neither removes a parser from the trusted base, and neither is meant to
 (\cref{sec:bg:sanitizer}).
@@ -277,7 +277,7 @@ Neither removes a parser from the trusted base, and neither is meant to
 \label{sec:resist:baselines}
 
 \Cref{sec:bg:sanitizer} contrasts matchertext with hand-escaping and sanitizers.
-The strongest defenses for these sinks are not sanitizers, however, and
+The strongest defenses for these hosts are not sanitizers, however, and
 matchertext should be measured against those instead.
 
 \emph{Parameterized queries} are the strongest of them.
@@ -290,19 +290,19 @@ which is the construction \cref{sec:resist:sql} covers directly with
 \emph{Contextual auto-escaping} and typed template contexts do the same work for
 markup, selecting the escaper from the syntactic context rather than leaving the
 choice to the programmer, and browser-side mechanisms such as Trusted Types
-enforce a related discipline at the sink.
+enforce a related discipline at the host.
 \emph{Taint tracking} is orthogonal to all of these: it decides \emph{which}
 values are untrusted, not what happens when one reaches a hole.
 
 Matchertext differs from all of them in what it is a defense \emph{of}.
-Each baseline is a mechanism for one sink: prepared statements know SQL,
+Each baseline is a mechanism for one host: prepared statements know SQL,
 auto-escapers know markup, and neither transfers to LDAP filters, PDF strings, or
 URIs, each of which needs a defense written and maintained separately.
 Inertness is stated over a hole rather than over a value, and \textsc{Verify}
 inspects six characters and knows nothing about the language around them, so one
-check serves every sink and covers identifier positions as readily as values.
+check serves every host and covers identifier positions as readily as values.
 That is the narrow waist of \cref{sec:bg:waist} claimed as a security property:
-$N$ sinks need $N$ defenses today, and one discipline instead of $N$ is the
+$N$ hosts need $N$ defenses today, and one discipline instead of $N$ is the
 distinctive claim.
 Two consequences follow.
 Correctness stops depending on a per-context choice, removing the failure mode
@@ -311,7 +311,7 @@ because the obligation is a check rather than a transformation, a bug in it
 rejects data instead of admitting a breakout.
 
 The cost is where the obligation lands.
-The baselines ask for a library; matchertext asks the sink to read to matcher
+The baselines ask for a library; matchertext asks the host to read to matcher
 balance, which \cref{tab:resist:a1} shows is free where the format already
 delimits with matchers, as in LDAP and PDF, and a parser change where it does
 not.
