@@ -375,3 +375,163 @@ func TestBuildsWithoutTheFlag(t *testing.T) {
 		t.Errorf("unexpected warnings with the flag off:\n%s", out)
 	}
 }
+
+func encodeCmd(b []byte) string { return "C " + hex.EncodeToString(b) }
+func decodeCmd(b []byte) string { return "D " + hex.EncodeToString(b) }
+
+func unhex(t *testing.T, s string) []byte {
+	t.Helper()
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		t.Fatalf("driver returned %q, which is not hex", s)
+	}
+	return b
+}
+
+// TestEncodeIsTotal is the property that makes the encoder worth having, and
+// it is the C counterpart of toMatchertext_mt in to_matchertext.lean: whatever
+// the input, the output is matchertext. VERIFY refuses; this cannot.
+//
+// The two further properties are what a caller relies on. Decoding an encoded
+// value returns the original, byte for byte, so nothing is lost by passing a
+// free-form field through the hole. And a value that is already matchertext
+// and holds no backslash is left alone, which is what keeps the ordinary case
+// legible in the SQL text.
+func TestEncodeIsTotal(t *testing.T) {
+	rng := rand.New(rand.NewSource(3))
+	n := fuzzCount(5000, 100000)
+
+	inputs := make([][]byte, n)
+	cmds := make([]string, 0, 2*n)
+	for i := range inputs {
+		inputs[i] = randCase(rng, verifyAlphabet, 12)
+		// A backslash has to appear, since escaping it is what makes the
+		// encoding injective.
+		if rng.Intn(4) == 0 {
+			inputs[i] = append(inputs[i], '\\')
+		}
+		cmds = append(cmds, encodeCmd(inputs[i]))
+	}
+	enc := run(t, cmds)
+
+	// Round trip each encoding back.
+	back := make([]string, n)
+	for i := range enc {
+		back[i] = decodeCmd(unhex(t, enc[i]))
+	}
+	dec := run(t, back)
+
+	nUntouched, nGrew := 0, 0
+	for i, in := range inputs {
+		e := unhex(t, enc[i])
+		if !oracleVerify(e) {
+			t.Fatalf("encode(%q) = %q, which the oracle says is not matchertext", in, e)
+		}
+		if d := unhex(t, dec[i]); !bytes.Equal(d, in) {
+			t.Fatalf("round trip lost data: encode(%q) = %q, decode = %q", in, e, d)
+		}
+		if bytes.Equal(e, in) {
+			nUntouched++
+			if !oracleVerify(in) || bytes.ContainsRune(in, '\\') {
+				t.Fatalf("encode(%q) left it alone but it needed escaping", in)
+			}
+		} else {
+			nGrew++
+		}
+	}
+	if nUntouched == 0 || nGrew == 0 {
+		t.Fatalf("degenerate sample: %d untouched, %d rewritten", nUntouched, nGrew)
+	}
+	t.Logf("%d cases, %d already embeddable and left alone, %d escaped", n, nUntouched, nGrew)
+}
+
+// TestEncodeGoldenCases pins the escape alphabet itself. The escapes carry no
+// matcher, which is the hypothesis hesc that to_matchertext.lean proves the
+// output-is-matchertext theorem from.
+func TestEncodeGoldenCases(t *testing.T) {
+	cases := []struct{ name, in, want string }{
+		{"empty", "", ""},
+		{"no matchers", "hello", "hello"},
+		{"balanced is untouched", "a(b)c", "a(b)c"},
+		{"all three pairs balanced", "([{}])", "([{}])"},
+		{"lone open paren", "(", `\o()`},
+		{"lone close paren", ")", `\c()`},
+		{"lone open bracket", "[", `\o[]`},
+		{"lone close bracket", "]", `\c[]`},
+		{"lone open brace", "{", `\o{}`},
+		{"lone close brace", "}", `\c{}`},
+		{"backslash doubles", `\`, `\\`},
+		{"wrong kind escapes both", "(]", `\o()\c[]`},
+		{"only the unmatched one", "(a)b)", `(a)b\c()`},
+		{"emoticon", "smile :]", `smile :\c[]`},
+		// The parenthesis, bracket and parenthesis here cross rather than nest,
+		// so none of the three is matched and all three are escaped. Proper
+		// nesting is the rule, not mere counting.
+		{"crossed, so all escape", `printf("[")`, `printf\o()"\o[]"\c()`},
+		{"nested properly, none escape", `printf("(x)")`, `printf("(x)")`},
+		{"looks like an escape", `\o()`, `\\o()`},
+	}
+
+	cmds := make([]string, len(cases))
+	for i, c := range cases {
+		cmds[i] = encodeCmd([]byte(c.in))
+	}
+	got := run(t, cmds)
+
+	for i, c := range cases {
+		g := string(unhex(t, got[i]))
+		if g != c.want {
+			t.Errorf("%s: encode(%q) = %q, want %q", c.name, c.in, g, c.want)
+		}
+		if !oracleVerify([]byte(g)) {
+			t.Errorf("%s: encode(%q) = %q, which is not matchertext", c.name, c.in, g)
+		}
+	}
+}
+
+// TestEncodeRespectsDepthLimit pins totality against the host's depth limit,
+// not just against the unbounded language: the C scanner rejects nesting past
+// SQLITE_MAX_MATCHER_DEPTH, so the encoder must never emit it. It caps real
+// nesting one level below the limit, because an escape carries one balanced
+// pair of its own, and escapes whatever would nest deeper. The check that
+// matters is the C VERIFY accepting the encoder's output.
+func TestEncodeRespectsDepthLimit(t *testing.T) {
+	const limit = 1000 // SQLITE_MAX_MATCHER_DEPTH at its default
+	nest := func(d int) []byte {
+		b := make([]byte, 0, 2*d)
+		for i := 0; i < d; i++ {
+			b = append(b, '(')
+		}
+		for i := 0; i < d; i++ {
+			b = append(b, ')')
+		}
+		return b
+	}
+
+	for _, tc := range []struct {
+		name string
+		d    int
+	}{
+		{"one below the limit", limit - 1},
+		{"at the limit", limit},
+		{"past the limit", limit + 1},
+		{"far past the limit", 2 * limit},
+	} {
+		in := nest(tc.d)
+		res := run(t, []string{encodeCmd(in)})
+		enc := unhex(t, res[0])
+		res = run(t, []string{verifyCmd(enc), decodeCmd(enc)})
+		if res[0] != "1" {
+			t.Errorf("%s: the C scanner rejects encode's output", tc.name)
+		}
+		if !bytes.Equal(unhex(t, res[1]), in) {
+			t.Errorf("%s: round trip lost data", tc.name)
+		}
+		if tc.d < limit && !bytes.Equal(enc, in) {
+			t.Errorf("%s: input below the cap was rewritten", tc.name)
+		}
+		if tc.d >= limit && bytes.Equal(enc, in) {
+			t.Errorf("%s: input at or past the cap passed through", tc.name)
+		}
+	}
+}
