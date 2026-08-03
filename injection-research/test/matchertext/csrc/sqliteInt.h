@@ -27,6 +27,7 @@
 #define sqlite3_malloc64(n)  malloc((size_t)(n))
 #define sqlite3_free(p)      free(p)
 typedef unsigned long long int sqlite3_uint64;
+typedef long long int sqlite3_int64;   /* used by the public wrappers */
 
 typedef long long int i64;
 typedef unsigned long long int u64;

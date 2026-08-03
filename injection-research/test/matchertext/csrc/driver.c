@@ -12,7 +12,8 @@
 **   V <hex>   print sqlite3MatchertextVerify(value, length)
 **   E <hex>   print sqlite3MatchertextEnd(value), a zero byte appended
 **   C <hex>   print sqlite3MatchertextEncode(value) as hex
-**   D <hex>   print sqlite3MatchertextDecode(value) as hex
+**   D <hex>   print sqlite3MatchertextDecodeInPlace(value) as hex, over the
+**             full escape alphabet, which is the value hole's
 **
 ** Each command prints one decimal result.  A malformed command is a harness
 ** bug, not a test failure, so the driver exits non-zero and says so.
