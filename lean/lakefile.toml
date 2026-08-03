@@ -11,4 +11,4 @@ version = "git#master"
 
 [[lean_lib]]
 name = "Matchertext"
-globs = ["Core", "always_embeddable", "embed_boundary", "to_matchertext"]
+globs = ["core", "always_embeddable", "embed_boundary", "to_matchertext"]
