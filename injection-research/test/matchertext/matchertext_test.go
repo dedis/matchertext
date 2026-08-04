@@ -85,6 +85,7 @@ func buildDriver(dir, name string, cflags ...string) (string, string, error) {
 	args = append(args,
 		"-I", dir,
 		"-DSQLITE_ENABLE_MATCHERTEXT",
+		"-DSQLITE_MATCHERTEXT_SCANNER_ONLY",
 		"-o", bin,
 		filepath.Join(dir, "matchertext.c"),
 		filepath.Join("csrc", "driver.c"),
