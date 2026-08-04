@@ -242,24 +242,27 @@ def tbl_anchors(rows):
 # caller would write today, what the discipline offers, and what each premise
 # costs when it is not met.
 SQLI_ARMS = [
-    ("mtv",      "Value \\texttt{?V} (raw)",     "mt"),
-    ("mtv_enc",  "Value \\texttt{?V} (encoded)", "mt"),
-    ("mti",      "Identifier \\texttt{?I}",      "mt"),
-    ("legacy_v", "Value, raw \\texttt{prepare\\_v2}",      "legacy"),
-    ("legacy_i", "Identifier, raw \\texttt{prepare\\_v2}", "legacy"),
+    ("concat",       "Concatenated into a quote", "control"),
+    ("ident_concat", "Concatenated as a name",    "control"),
+    ("quote",        "\\texttt{\\%Q} escaping",    "legacy"),
+    ("escape",       "\\texttt{\\%q} escaping",    "legacy"),
+    ("bind",         "Bound parameter",           "legacy"),
+    ("mt",           "\\texttt{M'(\\ldots)'} value hole", "mt"),
+    ("mt_strict",    "\\texttt{M'(\\%M)'} verified",      "mt"),
+    ("ident_mt",     "\\texttt{[\\ldots]} name hole",     "mt"),
 ]
 
 
 def tbl_sqli_arms(con):
-    """Verdict counts per arm over the whole driver experiment. The value never
-    enters the SQL text: ?V binds it, ?I delimits it, and the raw entry point
-    is refused, so no arm has a breakout column that is anything but zero."""
+    """Verdict counts per arm over the effective set (payloads that break out
+    undefended). The matcher-delimited holes contain every one; the controls
+    break out; the fragments that never parse are excluded as not attacks."""
     rows = {a: tuple(r) for a, *r in con.execute(
-        """SELECT arm, SUM(n_inert), SUM(n_rejected), SUM(n_refused),
-                  SUM(n_breakout), SUM(n_malformed)
+        """SELECT arm, SUM(n_inert), SUM(n_breakout), SUM(n_rejected),
+                  SUM(n_malformed)
            FROM mt_sqli_combo GROUP BY arm""")}
-    lines = ["\\begin{tabular}{lrrrrr}", "\\toprule",
-             "Delivery & Inert & Rejected & Refused & Broke out & Malformed \\\\"]
+    lines = ["\\begin{tabular}{lrrrr}", "\\toprule",
+             "Delivery & Inert & Broke out & Refused & Not SQL \\\\"]
     last = None
     for arm, label, group in SQLI_ARMS:
         if arm not in rows:
@@ -267,7 +270,7 @@ def tbl_sqli_arms(con):
         if group != last:
             lines.append("\\midrule")
             last = group
-        lines.append(f"{label:32} & " + " & ".join(num(v) for v in rows[arm]) + " \\\\")
+        lines.append(f"{label:34} & " + " & ".join(num(v) for v in rows[arm]) + " \\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
     return "\n".join(lines) + "\n"
 
@@ -281,27 +284,26 @@ def sqli_macros(con):
     def col(c):
         return {a: n for a, n in con.execute(
             f"SELECT arm, SUM({c}) FROM mt_sqli_combo GROUP BY arm")}
-    tot, brk = col("n"), col("n_breakout")
-    rej, ref = col("n_rejected"), col("n_refused")
-    mtv_pass = q("""SELECT SUM(n_inert) FROM mt_sqli_combo WHERE arm='mtv'""")
+    brk, effb = col("n_breakout"), col("n_eff_breakout")
+    eff = q("""SELECT COUNT(DISTINCT v.value) FROM mt_sqli_value v
+               JOIN mt_sqli_case c USING(value_id) WHERE c.effective=1""")
     vals = [
         ("SqliCases", num(q("SELECT COUNT(*) FROM mt_sqli_case"))),
         ("SqliPayloads", num(q("SELECT COUNT(*) FROM mt_sqli_value"))),
         ("SqliFamilies", num(q("SELECT COUNT(DISTINCT family) FROM mt_sqli_value"))),
-        # every matchertext arm, zero breakouts
-        ("SqliMtvBreakout", num(brk.get("mtv", 0))),
-        ("SqliMtvEncBreakout", num(brk.get("mtv_enc", 0))),
-        ("SqliMtiBreakout", num(brk.get("mti", 0))),
-        # the total encoder accepts everything
-        ("SqliMtvEncInert", num(q("""SELECT SUM(n_inert) FROM mt_sqli_combo
-                                     WHERE arm='mtv_enc'""") or 0)),
-        ("SqliMtvEncRejected", num(rej.get("mtv_enc", 0))),
-        # the raw path is refused wholesale
-        ("SqliLegacyRefused", num(ref.get("legacy_v", 0) + ref.get("legacy_i", 0))),
-        ("SqliLegacyBreakout", num(brk.get("legacy_v", 0) + brk.get("legacy_i", 0))),
-        # the ?V verify gate: how many recorded payloads pass as-is
-        ("SqliValueVerifyPass", num(mtv_pass or 0)),
-        ("SqliValueVerifyFail", num(rej.get("mtv", 0))),
+        ("SqliEffective", num(eff)),
+        # the matchertext holes: zero breakouts
+        ("SqliMtBreakout", num(brk.get("mt", 0))),
+        ("SqliMtStrictBreakout", num(brk.get("mt_strict", 0))),
+        ("SqliIdentMtBreakout", num(brk.get("ident_mt", 0))),
+        # the controls, over the effective set
+        ("SqliConcatBreakout", num(effb.get("concat", 0))),
+        ("SqliIdentConcatBreakout", num(effb.get("ident_concat", 0))),
+        # legacy value defences also hold
+        ("SqliQuoteBreakout", num(brk.get("quote", 0))),
+        ("SqliBindBreakout", num(brk.get("bind", 0))),
+        ("SqliMtStrictRejected", num(q("""SELECT SUM(n_rejected) FROM mt_sqli_combo
+                                          WHERE arm='mt_strict'""") or 0)),
     ]
     sab = EXPORTS / "sqli_sabotage.csv"
     if sab.exists():

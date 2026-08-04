@@ -1,13 +1,14 @@
 /*
-** Drive the matchertext SQLite through an attack corpus, in the model the
-** fork now enforces: external SQL enters only through
-** sqlite3_matchertext_prepare_v3(), the untrusted value never appears in the
-** SQL text, and the legacy raw entry points are refused outright.
+** Drive the matchertext SQLite through an attack corpus, in the additive
+** in-band model the paper describes: each untrusted value is placed into the
+** SQL text inside a matcher-delimited hole, an M'(...)' literal for a value or
+** [...] for an identifier, and the statement is prepared through the ordinary
+** sqlite3_prepare_v2().  The naive path, concatenation into a quote, stays
+** available and is the breakout control.
 **
-** A template carries one ?V (a bound value) or ?I (a delimited identifier).
-** Each payload is delivered as that one argument and the composed statement is
-** compared against the same template holding a benign argument.  All judgement
-** lives in the Python stage: this prints measurements.
+** One value goes into one hole by one arm, and the compiled statement is
+** compared against the same hole holding a benign value.  All judgement lives
+** in the Python stage: this prints measurements.
 **
 ** Commands, one per line on stdin, one result line each.  Values are hex
 ** encoded so any byte survives the trip.
@@ -18,15 +19,14 @@
 **   R          run every legal pair for the current value
 **   C <h> <a>  run one pair
 **
-** Result fields: outcome rc skel ro nrow name err
-**   outcome  ok | rejected (a checked input the API refused) |
-**            legacy (a raw entry point refused by the migration gate) |
-**            error (composed but failed for another reason)
+** Result fields: outcome rc skel ro tail nrow name err
+**   outcome  ok | rejected (%M refused the piece) | parse (prepare failed)
 **   skel     16 hex digits, FNV-1a of the EXPLAIN listing sans p4, or "-"
 **   ro       sqlite3_stmt_readonly, or "-"
+**   tail     non-whitespace bytes left after the first statement (stacked query)
 **   nrow     rows the non-EXPLAIN run returned, or "-"
-**   name     the identifier SQLite settled on (from "no such column: X"), or "-"
-**   err      the error text, hex, truncated, or "-"
+**   name     identifier the parser settled on (from "no such column: X"), or "-"
+**   err      error text, hex, truncated, or "-"
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,49 +35,44 @@
 
 typedef sqlite3_int64 i64;
 typedef unsigned long long u64;
-typedef sqlite3_matchertext_arg Arg;
 
 #define HOLE_VALUE 1
 #define HOLE_IDENT 2
 
 #define MAX_LINE (1<<20)
 
-/* How the payload is delivered. */
-enum { D_V, D_V_ENC, D_I, D_LEGACY };
+/* How an arm fills the hole. */
+enum { C_CONCAT, C_QUOTE, C_ESCAPE, C_BIND, C_MT, C_MTSTRICT,
+       C_IDENT_CONCAT, C_IDENT_MT };
 
 typedef struct Host {
-  const char *zName;    /* stable id, appears in the CSV */
-  const char *zTmpl;    /* prepare_v3 template, with one ?V or ?I */
-  const char *zRawPre;  /* for the legacy arm: SQL before the raw hole */
-  const char *zRawPost; /* and after */
-  const char *zBenign;  /* the benign argument */
-  int mHole;
-  int bEcho;            /* column 0 of the result is the argument itself */
+  const char *zName, *zPre, *zPost, *zBenign;
+  int mHole, bEcho;
 } Host;
 
 typedef struct Arm {
   const char *zName;
-  int mHole, eDeliver;
+  int mHole, eConv, bBind;
 } Arm;
 
-/* The legacy arms concatenate the payload into raw SQL and hand it to
-** sqlite3_prepare_v2, which the fork now refuses whatever the payload is.  The
-** quote here is only so the raw string is well formed; it is never reached. */
 static const Host aHost[] = {
-  {"value_eq",    "SELECT id FROM t1 WHERE name = ?V", "SELECT id FROM t1 WHERE name = '", "'", "alice", HOLE_VALUE, 0},
-  {"value_like",  "SELECT id FROM t1 WHERE name LIKE ?V", "SELECT id FROM t1 WHERE name LIKE '", "'", "alice", HOLE_VALUE, 0},
-  {"value_insert","INSERT INTO t1(name) VALUES(?V)", "INSERT INTO t1(name) VALUES('", "')", "alice", HOLE_VALUE, 0},
-  {"value_echo",  "SELECT ?V", "SELECT '", "'", "alice", HOLE_VALUE, 1},
-  {"ident_order", "SELECT id FROM t1 ORDER BY ?I", "SELECT id FROM t1 ORDER BY ", "", "name", HOLE_IDENT, 0},
-  {"ident_col",   "SELECT ?I FROM t1 ORDER BY 1", "SELECT ", " FROM t1 ORDER BY 1", "name", HOLE_IDENT, 0},
+  {"value_eq",    "SELECT id FROM t1 WHERE name = ", "",                        "alice", HOLE_VALUE, 0},
+  {"value_like",  "SELECT id FROM t1 WHERE name LIKE ", "",                     "alice", HOLE_VALUE, 0},
+  {"value_insert","INSERT INTO t1(name) VALUES(",     ")",                      "alice", HOLE_VALUE, 0},
+  {"value_echo",  "SELECT ",                          "",                       "alice", HOLE_VALUE, 1},
+  {"ident_order", "SELECT id FROM t1 ORDER BY ",      "",                       "name",  HOLE_IDENT, 0},
+  {"ident_col",   "SELECT ",                          " FROM t1 ORDER BY 1",    "name",  HOLE_IDENT, 0},
 };
 
 static const Arm aArm[] = {
-  {"mtv",      HOLE_VALUE, D_V},       /* value, raw, through ?V */
-  {"mtv_enc",  HOLE_VALUE, D_V_ENC},   /* value, encoded first, through ?V */
-  {"mti",      HOLE_IDENT, D_I},       /* identifier, raw, through ?I */
-  {"legacy_v", HOLE_VALUE, D_LEGACY},  /* value, concatenated, raw prepare */
-  {"legacy_i", HOLE_IDENT, D_LEGACY},  /* identifier, concatenated, raw prepare */
+  {"concat",       HOLE_VALUE, C_CONCAT,       0},  /* '<v>'  naive, control */
+  {"quote",        HOLE_VALUE, C_QUOTE,        0},  /* %Q     escaping baseline */
+  {"escape",       HOLE_VALUE, C_ESCAPE,       0},  /* '%q'   escaping baseline */
+  {"bind",         HOLE_VALUE, C_BIND,         1},  /* ?      prepared statement */
+  {"mt",           HOLE_VALUE, C_MT,           0},  /* %m  -> M'(...)' value hole */
+  {"mt_strict",    HOLE_VALUE, C_MTSTRICT,     0},  /* M'(%M)' verify-or-reject */
+  {"ident_concat", HOLE_IDENT, C_IDENT_CONCAT, 0},  /* <v>    naive, control */
+  {"ident_mt",     HOLE_IDENT, C_IDENT_MT,     0},  /* [<enc>] matchertext name hole */
 };
 
 #define NHOST ((int)(sizeof(aHost)/sizeof(aHost[0])))
@@ -85,10 +80,10 @@ static const Arm aArm[] = {
 
 static sqlite3 *gDb;
 static i64 gnReset;
-static char gName[512];       /* identifier SQLite settled on */
+static char gName[512];
 static char zLine[MAX_LINE];
 static char zVal[MAX_LINE/2 + 1];
-static i64 gnVal;             /* true byte length of zVal, which may span a NUL */
+static i64 gnVal;
 
 static void die(const char *zMsg){
   fprintf(stderr, "sqli_driver: %s: %s\n", zMsg, gDb ? sqlite3_errmsg(gDb) : "");
@@ -107,33 +102,44 @@ static u64 fnvInt(u64 h, i64 v){
   return h;
 }
 
-/* Compose EXPLAIN <tmpl> with the one argument and hash the bytecode, skipping
-** p4 (the only operand a value can occupy) and the comment. */
-static int explainSkel(const char *zTmpl, const Arg *pArg, u64 *pOut){
-  char *zX = sqlite3_mprintf("EXPLAIN %s", zTmpl);
-  sqlite3_stmt *p = 0;
-  u64 h = 1469598103934665603ULL;
-  int rc;
-  if( zX==0 ) return SQLITE_NOMEM;
-  rc = sqlite3_matchertext_prepare_v3(gDb, zX, -1, 0, pArg, 1, &p);
-  sqlite3_free(zX);
-  if( rc!=SQLITE_OK ){ sqlite3_finalize(p); return rc; }
-  while( sqlite3_step(p)==SQLITE_ROW ){
-    h = fnvInt(h, sqlite3_column_int64(p, 0));
-    h = fnvStr(h, (const char*)sqlite3_column_text(p, 1));
-    h = fnvInt(h, sqlite3_column_int64(p, 2));
-    h = fnvInt(h, sqlite3_column_int64(p, 3));
-    h = fnvInt(h, sqlite3_column_int64(p, 4));
-    h = fnvInt(h, sqlite3_column_int64(p, 6));
+/* Collapse the p4 operand to one sentinel when it is exactly the value (or its
+** decoded form), so the value is the only thing p4 may differ by; the rest of
+** p4 stays under the comparison. */
+static u64 fnvRedact(u64 h, const char *z, const char *zA, const char *zB){
+  if( z==0 ) return fnvByte(h, 0xff);
+  if( (zA && strcmp(z, zA)==0) || (zB && strcmp(z, zB)==0) ){
+    return fnvByte(fnvByte(h, 0x01), 0);
   }
-  rc = sqlite3_finalize(p);
-  *pOut = h;
-  return rc;
+  return fnvStr(h, z);
+}
+
+/* Build the hole text for one arm.  Returns a sqlite3_malloc string, or 0 when
+** the arm refuses the value (%M on an unbalanced piece).  bBind arms render a
+** single '?'. */
+static char *renderHole(int eConv, const char *z){
+  switch( eConv ){
+    case C_CONCAT:       return sqlite3_mprintf("'%s'", z);
+    case C_QUOTE:        return sqlite3_mprintf("%Q", z);
+    case C_ESCAPE:       return sqlite3_mprintf("'%q'", z);
+    case C_BIND:         return sqlite3_mprintf("?");
+    case C_MT:           return sqlite3_mprintf("%m", z);
+    case C_MTSTRICT:     return sqlite3_mprintf("M'(%M)'", z);
+    case C_IDENT_CONCAT: return sqlite3_mprintf("%s", z);
+    case C_IDENT_MT: {
+      char *zEnc = sqlite3_matchertext_encode(z, gnVal, 0);
+      char *zOut;
+      if( zEnc==0 ) return 0;
+      zOut = sqlite3_mprintf("[%s]", zEnc);
+      sqlite3_free(zEnc);
+      return zOut;
+    }
+  }
+  return 0;
 }
 
 typedef struct Result {
   const char *zOutcome;
-  int rc, ro, nrow;
+  int rc, ro, tail, nrow;
   u64 skel;
   int hasSkel;
   char zErr[200];
@@ -150,14 +156,46 @@ static void emit(const Result *p){
   printf("%s %d ", p->zOutcome, p->rc);
   if( p->hasSkel ) printf("%016llx ", p->skel); else printf("- ");
   if( p->ro>=0 ) printf("%d ", p->ro); else printf("- ");
+  if( p->tail>=0 ) printf("%d ", p->tail); else printf("- ");
   if( p->nrow>=0 ) printf("%d ", p->nrow); else printf("- ");
   printHex(p->zName, (int)sizeof(p->zName)); printf(" ");
   printHex(p->zErr, 120);
   printf("\n");
 }
 
-/* "no such column: X" -> copy X into gName, so the settled identifier can be
-** compared against the argument even when the statement did not prepare. */
+/* Hash EXPLAIN <sql>, skipping p4 (redacted against the value) and comment. */
+static int explainHash(const char *zSql, const char *zHide, u64 *pOut){
+  char *zX = sqlite3_mprintf("EXPLAIN %s", zSql);
+  char *zDec = sqlite3_matchertext_decode(zHide, gnVal, 0);
+  sqlite3_stmt *p = 0;
+  u64 h = 1469598103934665603ULL;
+  int rc;
+  if( zX==0 ){ sqlite3_free(zDec); return SQLITE_NOMEM; }
+  rc = sqlite3_prepare_v2(gDb, zX, -1, &p, 0);
+  sqlite3_free(zX);
+  if( rc!=SQLITE_OK ){ sqlite3_finalize(p); sqlite3_free(zDec); return rc; }
+  while( sqlite3_step(p)==SQLITE_ROW ){
+    h = fnvInt(h, sqlite3_column_int64(p, 0));
+    h = fnvStr(h, (const char*)sqlite3_column_text(p, 1));
+    h = fnvInt(h, sqlite3_column_int64(p, 2));
+    h = fnvInt(h, sqlite3_column_int64(p, 3));
+    h = fnvInt(h, sqlite3_column_int64(p, 4));
+    h = fnvRedact(h, (const char*)sqlite3_column_text(p, 5), zHide, zDec);
+    h = fnvInt(h, sqlite3_column_int64(p, 6));
+  }
+  rc = sqlite3_finalize(p);
+  sqlite3_free(zDec);
+  *pOut = h;
+  return rc;
+}
+
+static int tailLen(const char *z){
+  int n = 0;
+  if( z==0 ) return 0;
+  for(; *z; z++) if( *z!=' ' && *z!='\t' && *z!='\n' && *z!='\r' ) n++;
+  return n;
+}
+
 static void captureName(const char *zMsg){
   static const char zPfx[] = "no such column: ";
   if( strncmp(zMsg, zPfx, sizeof(zPfx)-1)==0 ){
@@ -165,24 +203,10 @@ static void captureName(const char *zMsg){
   }
 }
 
-/* Classify a prepare error. The fork's own messages are intent, not accident:
-** a refused checked input and a refused legacy call are both by design. */
-static const char *classify(const char *zMsg){
-  if( strstr(zMsg, "matchertext requires") ) return "legacy";
-  if( strstr(zMsg, "is not valid matchertext")
-   || strstr(zMsg, "must be non-NULL")
-   || strstr(zMsg, "must contain one SQL statement")
-   || strstr(zMsg, "template is not valid matchertext")
-   || strstr(zMsg, "composed SQL is not valid matchertext") ) return "rejected";
-  return "error";
-}
-
 static int fixtureIntact(void){
   sqlite3_stmt *p = 0;
   int ok = 0;
-  Arg a; a.type = SQLITE_MATCHERTEXT_IDENTIFIER; a.data = "t1"; a.size = 2;
-  if( sqlite3_matchertext_prepare_v3(gDb,
-        "SELECT count(*) FROM ?I", -1, 0, &a, 1, &p)==SQLITE_OK
+  if( sqlite3_prepare_v2(gDb, "SELECT count(*) FROM t1", -1, &p, 0)==SQLITE_OK
    && sqlite3_step(p)==SQLITE_ROW ){
     ok = sqlite3_column_int(p, 0)==2;
   }
@@ -203,71 +227,51 @@ static void runCase(int iHost, int iArm, const char *zValue, i64 nValue,
                     Result *pOut){
   const Host *pH = &aHost[iHost];
   const Arm *pA = &aArm[iArm];
-  Arg arg;
-  char *zEnc = 0;
+  char *zHole, *zSql;
+  const char *zTail = 0;
   sqlite3_stmt *pStmt = 0;
   int rc;
 
   memset(pOut, 0, sizeof(*pOut));
-  pOut->ro = pOut->nrow = -1;
+  pOut->ro = pOut->tail = pOut->nrow = -1;
   gName[0] = 0;
+  gnVal = nValue;               /* renderHole/explainHash use the true length */
 
-  /* Legacy arm: concatenate into raw SQL and hand it to the old entry point,
-  ** which the fork refuses whatever the payload is. */
-  if( pA->eDeliver==D_LEGACY ){
-    char *zSql = sqlite3_mprintf("%s%s%s", pH->zRawPre, zValue, pH->zRawPost);
-    if( zSql==0 ) die("oom");
-    rc = sqlite3_prepare_v2(gDb, zSql, -1, &pStmt, 0);
-    pOut->rc = rc;
-    if( rc==SQLITE_OK ){
-      pOut->zOutcome = "ok";  /* a breakout: the raw path let it through */
-      pOut->ro = sqlite3_stmt_readonly(pStmt);
-    }else{
-      const char *zMsg = sqlite3_errmsg(gDb);
-      pOut->zOutcome = classify(zMsg);
-      sqlite3_snprintf(sizeof(pOut->zErr), pOut->zErr, "%s", zMsg);
-    }
-    sqlite3_finalize(pStmt);
-    sqlite3_free(zSql);
+  zHole = renderHole(pA->eConv, zValue);
+  if( zHole==0 ){
+    pOut->zOutcome = "rejected";   /* %M refused the piece */
     return;
   }
+  zSql = sqlite3_mprintf("%s%s%s", pH->zPre, zHole, pH->zPost);
+  sqlite3_free(zHole);
+  if( zSql==0 ) die("oom");
 
-  /* Matchertext arms: the argument is checked, then composed. */
-  arg.type = (pA->mHole==HOLE_IDENT) ? SQLITE_MATCHERTEXT_IDENTIFIER
-                                     : SQLITE_MATCHERTEXT_VALUE;
-  if( pA->eDeliver==D_V_ENC ){
-    i64 nEnc = 0;
-    zEnc = sqlite3_matchertext_encode(zValue, nValue, &nEnc);
-    if( zEnc==0 ) die("encode oom");
-    arg.data = zEnc; arg.size = (sqlite3_uint64)nEnc;
-  }else{
-    arg.data = zValue; arg.size = (sqlite3_uint64)nValue;
-  }
-
-  if( explainSkel(pH->zTmpl, &arg, &pOut->skel)==SQLITE_OK ) pOut->hasSkel = 1;
-
-  rc = sqlite3_matchertext_prepare_v3(gDb, pH->zTmpl, -1, 0, &arg, 1, &pStmt);
+  rc = sqlite3_prepare_v2(gDb, zSql, -1, &pStmt, &zTail);
   pOut->rc = rc;
   if( rc!=SQLITE_OK ){
     const char *zMsg = sqlite3_errmsg(gDb);
     captureName(zMsg);
-    pOut->zOutcome = classify(zMsg);
+    pOut->zOutcome = "parse";
     sqlite3_snprintf(sizeof(pOut->zErr), pOut->zErr, "%s", zMsg);
     sqlite3_snprintf(sizeof(pOut->zName), pOut->zName, "%s", gName);
     sqlite3_finalize(pStmt);
-    sqlite3_free(zEnc);
+    sqlite3_free(zSql);
     return;
   }
   pOut->zOutcome = "ok";
   pOut->ro = sqlite3_stmt_readonly(pStmt);
+  pOut->tail = tailLen(zTail);
+  if( explainHash(zSql, zValue, &pOut->skel)==SQLITE_OK ) pOut->hasSkel = 1;
 
-  sqlite3_matchertext_exec(gDb, "SAVEPOINT s", -1, 0, 0, 0, 0, 0);
+  sqlite3_exec(gDb, "SAVEPOINT s", 0, 0, 0);
+  if( pA->bBind ) sqlite3_bind_text(pStmt, 1, zValue, (int)nValue, SQLITE_STATIC);
   pOut->nrow = 0;
   while( sqlite3_step(pStmt)==SQLITE_ROW ) pOut->nrow++;
+  sqlite3_snprintf(sizeof(pOut->zName), pOut->zName, "%s", gName);
   sqlite3_finalize(pStmt);
-  sqlite3_matchertext_exec(gDb, "ROLLBACK TO s; RELEASE s", -1, 0, 0, 0, 0, 0);
+  sqlite3_exec(gDb, "ROLLBACK TO s; RELEASE s", 0, 0, 0);
   if( !fixtureIntact() ) resetDb();
-  sqlite3_free(zEnc);
+  sqlite3_free(zSql);
 }
 
 static int legal(int iHost, int iArm){
@@ -295,45 +299,35 @@ static i64 decodeHex(const char *z, char *aOut){
 }
 
 static void openDb(void){
-  static const char *azSetup[] = {
-    "CREATE TABLE ?I(name TEXT, id INTEGER)",
-    "INSERT INTO t1(name,id) VALUES(?V,?V)",  /* alice,1 */
-    "INSERT INTO t1(name,id) VALUES(?V,?V)",  /* bob,2 */
-  };
-  Arg t1[1] = {{SQLITE_MATCHERTEXT_IDENTIFIER, "t1", 2}};
-  Arg a1[2] = {{SQLITE_MATCHERTEXT_VALUE, "alice", 5}, {SQLITE_MATCHERTEXT_VALUE, "1", 1}};
-  Arg b1[2] = {{SQLITE_MATCHERTEXT_VALUE, "bob", 3}, {SQLITE_MATCHERTEXT_VALUE, "2", 1}};
-  const Arg *aa[] = {t1, a1, b1};
-  int an[] = {1, 2, 2};
-  int i;
+  char *zErr = 0;
   if( sqlite3_open(":memory:", &gDb)!=SQLITE_OK ) die("open");
-  for(i=0; i<(int)(sizeof(azSetup)/sizeof(azSetup[0])); i++){
-    char *zErr = 0;
-    if( sqlite3_matchertext_exec(gDb, azSetup[i], -1, aa[i], an[i], 0, 0, &zErr)
-        != SQLITE_OK ){
-      fprintf(stderr, "sqli_driver: setup %d: %s\n", i, zErr);
-      exit(1);
-    }
+  if( sqlite3_exec(gDb,
+        "CREATE TABLE t1(name TEXT, id INTEGER);"
+        "INSERT INTO t1 VALUES('alice',1),('bob',2);", 0, 0, &zErr)!=SQLITE_OK ){
+    fprintf(stderr, "sqli_driver: setup: %s\n", zErr);
+    exit(1);
   }
 }
 
 static void dumpTables(void){
   int i;
-  Arg vbad[1] = {{SQLITE_MATCHERTEXT_VALUE, ")' OR 1=1 --", 12}};
   sqlite3_stmt *p = 0;
-  int rcLegacy, rcCheck;
+  char *zM;
+  int rcConcat, rcMt;
   for(i=0; i<NHOST; i++)
     printf("host %d %s %d %d\n", i, aHost[i].zName, aHost[i].mHole, aHost[i].bEcho);
   for(i=0; i<NARM; i++)
-    printf("arm %d %s %d %d\n", i, aArm[i].zName, aArm[i].mHole, aArm[i].eDeliver);
-  /* Self-check reported to Python: the legacy path must be refused, and a
-  ** known unbalanced value must be refused by the checked path. */
-  rcLegacy = sqlite3_prepare_v2(gDb, "SELECT 1", -1, &p, 0);
+    printf("arm %d %s %d %d\n", i, aArm[i].zName, aArm[i].mHole, aArm[i].eConv);
+  /* Self-check: legacy concatenation must prepare (additive build), and a %m
+  ** hole must contain the canonical breakout. */
+  rcConcat = sqlite3_prepare_v2(gDb,
+      "SELECT id FROM t1 WHERE name = 'x' OR '1'='1'", -1, &p, 0);
   sqlite3_finalize(p); p = 0;
-  rcCheck = sqlite3_matchertext_prepare_v3(gDb,
-      "SELECT id FROM t1 WHERE name = ?V", -1, 0, vbad, 1, &p);
+  zM = sqlite3_mprintf("SELECT id FROM t1 WHERE name = %m", "' OR '1'='1");
+  rcMt = zM ? sqlite3_prepare_v2(gDb, zM, -1, &p, 0) : SQLITE_NOMEM;
   sqlite3_finalize(p);
-  printf("selfcheck legacy_rc=%d check_rc=%d\n", rcLegacy, rcCheck);
+  sqlite3_free(zM);
+  printf("selfcheck concat_rc=%d mt_rc=%d\n", rcConcat, rcMt);
   printf("resets %lld\n", (long long)gnReset);
   printf("end\n");
 }

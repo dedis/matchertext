@@ -1,27 +1,25 @@
 """Stage 3e: run the SQL attack corpus through the matchertext SQLite driver.
 
-The fork now enforces one mode. External SQL enters only through
-sqlite3_matchertext_prepare_v3(): a template carries ?V for a bound value and
-?I for a delimited identifier, each argument is checked before composition, and
-the legacy raw entry points (sqlite3_prepare_v2, sqlite3_exec) are refused with
-a migration error. The untrusted value therefore never appears in the SQL text
-at all.
+The driver is an additive matchertext build: each untrusted value is placed
+into the SQL text inside a matcher-delimited hole, an M'(...)' literal for a
+value or [...] for an identifier, and the statement is prepared through the
+ordinary sqlite3_prepare_v2(). Naive concatenation into a quote stays available
+and is the breakout control.
 
-That inverts the old question. There is no in-band hole to break out of, so the
-measurement is no longer "does the payload escape its delimiter" but "what does
-the checked API do with each recorded attack string":
+This exercises the deployed parser that doc/threat.tex leaves to implementation
+work, and it does so on the paper's own in-band holes rather than by
+simulation. Arms:
 
-  mtv       the value through ?V, unchanged. Bound as a parameter if it is
-            valid matchertext, refused otherwise.
-  mtv_enc   the value through ?V after sqlite3_matchertext_encode. The encoder
-            is total, so every payload is accepted and bound as data.
-  mti       the value through ?I, unchanged. Verified, then delimited by SQLite
-            as one identifier, or refused.
-  legacy_v  the value concatenated into raw SQL and handed to
-  legacy_i   sqlite3_prepare_v2, which the fork refuses whatever the payload is.
+  concat / ident_concat   the value spliced into a quote / an identifier, raw.
+                          The control: a real attack breaks out here.
+  quote / escape / bind   the legacy value defences (%Q, %q, a bound ?).
+  ident_dq                the legacy quoted identifier ("%w").
+  mt                      the value hole, %m -> M'(...)'.
+  mt_strict               the verify-or-refuse route, M'(%M)'.
+  ident_mt                the name hole, [...] over the encoded identifier.
 
-The validate.py containment number is a simulation on skeletons; this exercises
-the deployed parser, which is what doc/threat.tex leaves to implementation work.
+A payload counts against a defence only where the control actually breaks out
+(the effective set); a fragment that never parses is not an attack.
 """
 import argparse
 import os
@@ -42,12 +40,14 @@ AMALG = ROOT / "sqlite" / "sqlite3.c"
 SRC = ROOT / "test" / "matchertext" / "csrc" / "sqli_driver.c"
 BIN = BUILD / "sqli_driver"
 
-# Driver result fields, in order.
-FIELDS = ("outcome", "rc", "skel", "ro", "nrow", "name", "err")
+FIELDS = ("outcome", "rc", "skel", "ro", "tail", "nrow", "name", "err")
 IDX = {name: i for i, name in enumerate(FIELDS)}
+# The value/identifier is the only thing p4 may differ by; every other signal
+# must match the benign baseline for the parse to be inert.
+STRUCTURAL = ("skel", "ro")
 
-MT_ARMS = ("mtv", "mtv_enc", "mti")
-LEGACY_ARMS = ("legacy_v", "legacy_i")
+MT_ARMS = ("mt", "mt_strict", "ident_mt")
+CONTROL_ARMS = ("concat", "ident_concat")
 
 PAIR = {")": "(", "]": "[", "}": "{"}
 OPEN = {v: k for k, v in PAIR.items()}
@@ -56,7 +56,6 @@ UNESCAPE = {v: k for k, v in ESCAPE_OF.items()}
 
 
 def verify(s):
-    """VERIFY over raw bytes, the check the ?V and ?I gates apply."""
     stack = []
     for ch in s:
         if ch in OPEN:
@@ -68,10 +67,8 @@ def verify(s):
 
 
 def name_decode(s):
-    """A [...] identifier is read with the name alphabet: the six matcher
-    escapes decode, every other byte (backslash included) is verbatim. This is
-    what a raw ?I argument becomes as a name, and it equals the payload unless
-    the payload spells a matcher with an escape."""
+    """A [...] identifier is read with the name alphabet: matcher escapes decode,
+    every other byte (backslash included) is verbatim."""
     out, i = [], 0
     while i < len(s):
         if s[i] == "\\" and s[i + 1:i + 4] in UNESCAPE:
@@ -81,6 +78,30 @@ def name_decode(s):
             out.append(s[i])
             i += 1
     return "".join(out)
+
+
+def mt_encode(s):
+    """TOMATCHERTEXT: escape the unmatched matchers and double every backslash."""
+    esc, stack = [False] * len(s), []
+    for i, ch in enumerate(s):
+        if ch in OPEN:
+            stack.append(i)
+        elif ch in PAIR:
+            if stack and s[stack[-1]] == PAIR[ch]:
+                stack.pop()
+            else:
+                esc[i] = True
+    for i in stack:
+        esc[i] = True
+    return "".join("\\" + ESCAPE_OF[c] if e else ("\\\\" if c == "\\" else c)
+                   for c, e in zip(s, esc))
+
+
+def ident_name(s):
+    """The name a [...] hole yields for a value put through the public encoder:
+    matcher escapes round-trip, but the encoder's doubled backslash is not
+    undone by the name alphabet, so a backslash comes back doubled."""
+    return name_decode(mt_encode(s))
 
 
 def build_driver():
@@ -102,9 +123,7 @@ def build_driver():
         sys.exit(f"cannot build the driver:\n{r.stderr}")
 
 
-# Deliberate breakages of the scanner, to measure whether the oracle can see a
-# failure at all. A suite that reports no breakout against a broken build is
-# evidence of blindness, not of containment.
+# Deliberately broken scanners, to prove the oracle can see a defect at all.
 SABOTAGE = {
     "end_scans_to_first_closer": (
         "SQLITE_PRIVATE i64 sqlite3MatchertextEnd(const unsigned char *z){",
@@ -145,8 +164,6 @@ def build_sabotage(name):
 
 
 class Driver:
-    """One process for the whole sweep, results streamed back."""
-
     def __init__(self, binary=None, selfcheck=True):
         self.p = subprocess.Popen([str(binary or BIN)], stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE, text=True, bufsize=1 << 20)
@@ -162,14 +179,12 @@ class Driver:
             elif f[0] == "arm":
                 self.arms[int(f[1])] = (f[2], int(f[3]), int(f[4]))
             elif f[0] == "selfcheck":
-                # The legacy path must be refused and a known unbalanced value
-                # must be refused by the checked path, or the build is not the
-                # one this stage measures. A stale binary silently invalidated a
-                # whole run once; hence the check rather than the assumption.
-                legacy, check = (int(x.split("=")[1]) for x in f[1:3])
-                if not (legacy != 0 and (check != 0 or not selfcheck)):
-                    sys.exit(f"driver self-check failed (legacy_rc={legacy}, "
-                             f"check_rc={check}); rebuild it")
+                # The additive build must prepare legacy concatenation and the
+                # %m hole; a stale or misconfigured binary invalidates the run.
+                concat, mt = (int(x.split("=")[1]) for x in f[1:3])
+                if selfcheck and (concat != 0 or mt != 0):
+                    sys.exit(f"driver self-check failed (concat_rc={concat}, "
+                             f"mt_rc={mt}); rebuild it")
         self.arm_id = {v[0]: k for k, v in self.arms.items()}
         self.host_id = {v[0]: k for k, v in self.hosts.items()}
 
@@ -205,51 +220,40 @@ def unhex(s):
     return bytes.fromhex(s).decode("utf-8", "surrogateescape") if s != "-" else ""
 
 
-def verdict(arm, res, base, payload):
-    """INERT / REJECTED / BREAKOUT / REFUSED / MALFORMED.
+def verdict(arm, res, base, payload, is_ident):
+    """INERT / BREAKOUT / REJECTED / MALFORMED.
 
-    REFUSED is the legacy migration gate; REJECTED is a checked input the API
-    declined. Both are safe by design and kept apart because they answer
-    different questions: one is "you cannot use the unsafe entry point", the
-    other is "this value did not pass verification".
+    A breakout is a prepared statement whose parse differs from the benign
+    baseline in structure, leaves SQL after the first statement (a stacked
+    query), or returns more rows than the baseline. REJECTED is %M refusing an
+    unbalanced piece. For a name hole an identifier that resolves nowhere is
+    inert when the whole payload became that name.
     """
     outcome = res[IDX["outcome"]]
-    if arm in LEGACY_ARMS:
-        return "BREAKOUT" if outcome == "ok" else "REFUSED"
     if outcome == "rejected":
         return "REJECTED"
-    if outcome == "legacy":
-        return "REFUSED"
-    if arm == "mti":
-        # A ?I argument is verified, then composed as one bracketed identifier,
-        # then the composed SQL is verified again. So a statement that prepares
-        # is inert by construction: it resolved to a single column reference.
-        # Naming a different real column than the benign baseline (OID, say)
-        # compiles differently and is still one identifier, so the skeleton is
-        # not the oracle here -- preparing at all is.
-        if outcome == "ok":
-            # Prepared, so it resolved to a single column reference. Trust that
-            # only with an independent check: a scanner defect that let the
-            # identifier close its bracket and append SQL would change the row
-            # count or turn the read into a writer, so require both to match the
-            # benign baseline before calling it inert.
-            if (res[IDX["ro"]] == base[IDX["ro"]]
-                    and res[IDX["nrow"]] == base[IDX["nrow"]]):
+    if outcome == "parse":
+        # A name hole that resolves nowhere is contained when the whole payload
+        # became that one name. ident_mt encodes first, so its expected name is
+        # the encoder round-trip; ident_concat's is the payload itself.
+        if is_ident and res[IDX["name"]] != "-":
+            got = unhex(res[IDX["name"]])
+            if got in (payload, name_decode(payload), ident_name(payload)):
                 return "INERT"
-            return "BREAKOUT"
-        # It named no column: contained, provided the whole payload became that
-        # name (the six matcher escapes decode under the name alphabet). A NUL
-        # in the argument is rejected upstream now, so no truncation case here.
-        got = unhex(res[IDX["name"]])
-        if got and got in (payload, name_decode(payload)):
-            return "INERT"
         return "MALFORMED"
-    if outcome == "ok":
-        # A bound value: the parse must match the benign baseline, which for ?V
-        # is always the same composed "?" -- a difference would mean the value
-        # reached the SQL text, which is what must never happen.
-        return "INERT" if res[IDX["skel"]] == base[IDX["skel"]] else "BREAKOUT"
-    return "MALFORMED"
+    if is_ident:
+        # A name that resolves is one identifier by construction; naming a
+        # different real column than the baseline compiles differently, so the
+        # skeleton is not the oracle. Row count and no tail carry it.
+        if res[IDX["tail"]] == "0" and res[IDX["nrow"]] == base[IDX["nrow"]] \
+           and res[IDX["ro"]] == base[IDX["ro"]]:
+            return "INERT"
+        return "BREAKOUT"
+    if any(res[IDX[k]] != base[IDX[k]] for k in STRUCTURAL):
+        return "BREAKOUT"
+    if int(res[IDX["tail"]]) > 0 or int(res[IDX["nrow"]]) > int(base[IDX["nrow"]]):
+        return "BREAKOUT"
+    return "INERT"
 
 
 def load_payloads(con, limit=None):
@@ -274,20 +278,21 @@ DROP TABLE IF EXISTS mt_sqli_arm;
 DROP TABLE IF EXISTS mt_sqli_value;
 DROP TABLE IF EXISTS mt_sqli_case;
 DROP TABLE IF EXISTS mt_sqli_combo;
-DROP TABLE IF EXISTS mt_sqli_baseline;
-
 CREATE TABLE mt_sqli_host(host_id INTEGER PRIMARY KEY, name TEXT, hole INTEGER,
                           is_echo INTEGER);
 CREATE TABLE mt_sqli_arm(arm_id INTEGER PRIMARY KEY, name TEXT, hole INTEGER,
-                         deliver INTEGER);
+                         conv INTEGER);
 CREATE TABLE mt_sqli_value(value_id INTEGER PRIMARY KEY, source TEXT, family TEXT,
                            value TEXT, is_mt INTEGER);
 CREATE TABLE mt_sqli_case(value_id INTEGER, host_id INTEGER, arm_id INTEGER,
-                          verdict TEXT, outcome TEXT, nrow INTEGER, name TEXT);
+                          verdict TEXT, outcome TEXT, tail INTEGER, nrow INTEGER,
+                          effective INTEGER);
 CREATE TABLE mt_sqli_combo(host TEXT, arm TEXT, source TEXT, n INTEGER,
-                           n_inert INTEGER, n_rejected INTEGER, n_refused INTEGER,
-                           n_breakout INTEGER, n_malformed INTEGER);
+                           n_inert INTEGER, n_breakout INTEGER, n_rejected INTEGER,
+                           n_malformed INTEGER, n_eff INTEGER, n_eff_breakout INTEGER);
 """
+
+VMAP = {"INERT": 0, "BREAKOUT": 1, "REJECTED": 2, "MALFORMED": 3}
 
 
 def run(args):
@@ -301,6 +306,8 @@ def run(args):
 
     drv = Driver()
     base = drv.baselines()
+    control = {drv.arm_id["concat"], drv.arm_id["ident_concat"]}
+    ident_hosts = {h for h, (_, hole, _) in drv.hosts.items() if hole == 2}
 
     con.executescript(DDL)
     con.executemany("INSERT INTO mt_sqli_host VALUES(?,?,?,?)",
@@ -311,36 +318,51 @@ def run(args):
                     [(i, s, family(p), p, int(verify(p)))
                      for i, (s, p) in enumerate(payloads)])
 
-    combo = defaultdict(lambda: [0] * 6)
     guard = Counter()
-    cases, disagree = [], []
-    IDXV = {"INERT": 0, "REJECTED": 1, "REFUSED": 2, "BREAKOUT": 3, "MALFORMED": 4}
+    raw, eff_pairs = [], set()   # raw: (idx,h,a,verdict,outcome,tail,nrow)
+    pending, cur = {}, -1
+
+    def flush_value(idx, rows):
+        o = payloads[idx][1]
+        for (h, a), r in rows.items():
+            v = verdict(drv.arms[a][0], r, base[(h, a)], o, h in ident_hosts)
+            if a in control and v == "BREAKOUT":
+                eff_pairs.add((h, o))
+            guard[(drv.arms[a][0], v)] += 1
+            raw.append((idx, h, a, v, r[IDX["outcome"]],
+                        int(r[IDX["tail"]]) if r[IDX["tail"]] != "-" else None,
+                        int(r[IDX["nrow"]]) if r[IDX["nrow"]] != "-" else None))
 
     for i, h, a, r in drv.sweep(p for _, p in payloads):
-        arm = drv.arms[a][0]
-        src, payload = payloads[i]
-        v = verdict(arm, r, base[(h, a)], payload)
-        # The ?V gate refuses exactly what Python VERIFY rejects; a disagreement
-        # is a bug in one side, not a property of the payload.
-        if arm == "mtv":
-            if (r[IDX["outcome"]] == "rejected") == verify(payload):
-                disagree.append(payload)
-        guard[(arm, v)] += 1
-        c = combo[(drv.hosts[h][0], arm, src)]
-        c[0] += 1
-        c[1 + IDXV[v]] += 1
-        cases.append((i, h, a, v, r[IDX["outcome"]],
-                      int(r[IDX["nrow"]]) if r[IDX["nrow"]] != "-" else None,
-                      unhex(r[IDX["name"]]) or None))
+        if i != cur:
+            if cur >= 0:
+                flush_value(cur, pending)
+            cur, pending = i, {}
+        pending[(h, a)] = r
+    if cur >= 0:
+        flush_value(cur, pending)
 
-    con.executemany("INSERT INTO mt_sqli_case VALUES(?,?,?,?,?,?,?)", cases)
-    con.executemany("INSERT INTO mt_sqli_combo VALUES(?,?,?,?,?,?,?,?,?)",
-                    [(host, arm, src, c[0], c[1], c[2], c[3], c[4], c[5])
-                     for (host, arm, src), c in sorted(combo.items())])
+    # Combo and case rows need the final effective set, known only after every
+    # control has been seen.
+    # c = [n, inert, breakout, rejected, malformed, effective, eff_breakout]
+    combo = defaultdict(lambda: [0] * 7)
+    cases = []
+    for idx, h, a, v, outcome, tail, nrow in raw:
+        eff = int((h, payloads[idx][1]) in eff_pairs)
+        c = combo[(drv.hosts[h][0], drv.arms[a][0], payloads[idx][0])]
+        c[0] += 1
+        c[1 + VMAP[v]] += 1
+        c[5] += eff
+        c[6] += int(v == "BREAKOUT" and eff)
+        cases.append((idx, h, a, v, outcome, tail, nrow, eff))
+
+    con.executemany("INSERT INTO mt_sqli_case VALUES(?,?,?,?,?,?,?,?)", cases)
+    con.executemany("INSERT INTO mt_sqli_combo VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    [(host, arm, src, *c) for (host, arm, src), c in sorted(combo.items())])
     con.commit()
 
     export(con)
-    fail = report(guard, disagree, payloads, len(cases))
+    fail = report(guard, eff_pairs, payloads, len(cases))
     if not getattr(args, "skip_sabotage", False):
         fail += run_sabotage(payloads[:args.sabotage_n])
     if fail:
@@ -350,21 +372,22 @@ def run(args):
 
 def export(con):
     write("sqli_arm_outcomes.csv",
-          ["host", "arm", "source", "n", "inert", "rejected", "refused",
-           "breakout", "malformed"],
-          con.execute("""SELECT host, arm, source, n, n_inert, n_rejected,
-                                n_refused, n_breakout, n_malformed
+          ["host", "arm", "source", "n", "inert", "breakout", "rejected",
+           "malformed", "effective", "eff_breakout"],
+          con.execute("""SELECT host, arm, source, n, n_inert, n_breakout,
+                                n_rejected, n_malformed, n_eff, n_eff_breakout
                          FROM mt_sqli_combo ORDER BY arm, host, source"""))
     write("sqli_by_arm.csv",
-          ["arm", "n", "inert", "rejected", "refused", "breakout", "malformed"],
-          con.execute("""SELECT arm, SUM(n), SUM(n_inert), SUM(n_rejected),
-                                SUM(n_refused), SUM(n_breakout), SUM(n_malformed)
+          ["arm", "n", "inert", "breakout", "rejected", "malformed",
+           "effective", "eff_breakout"],
+          con.execute("""SELECT arm, SUM(n), SUM(n_inert), SUM(n_breakout),
+                                SUM(n_rejected), SUM(n_malformed), SUM(n_eff),
+                                SUM(n_eff_breakout)
                          FROM mt_sqli_combo GROUP BY arm ORDER BY arm"""))
     write("sqli_exemplars.csv",
-          ["arm", "host", "verdict", "source", "value", "settled_name"],
-          con.execute("""SELECT a.name, h.name, c.verdict, v.source, v.value, c.name
-                         FROM mt_sqli_case c
-                         JOIN mt_sqli_value v USING(value_id)
+          ["arm", "host", "verdict", "source", "value"],
+          con.execute("""SELECT a.name, h.name, c.verdict, v.source, v.value
+                         FROM mt_sqli_case c JOIN mt_sqli_value v USING(value_id)
                          JOIN mt_sqli_arm a USING(arm_id)
                          JOIN mt_sqli_host h USING(host_id)
                          WHERE c.verdict IN ('BREAKOUT','MALFORMED')
@@ -374,28 +397,35 @@ def export(con):
 def verdicts_for(payloads, binary=None, selfcheck=True):
     drv = Driver(binary, selfcheck)
     base = drv.baselines()
-    out = {}
+    ident_hosts = {h for h, (_, hole, _) in drv.hosts.items() if hole == 2}
+    out, pending, cur = {}, {}, -1
+
+    def score(idx, rows):
+        o = payloads[idx][1]
+        for (h, a), r in rows.items():
+            arm = drv.arms[a][0]
+            if arm in MT_ARMS:
+                out[(idx, h, arm)] = verdict(arm, r, base[(h, a)], o, h in ident_hosts)
+
     for i, h, a, r in drv.sweep(p for _, p in payloads):
-        arm = drv.arms[a][0]
-        if arm in MT_ARMS:
-            out[(i, h, arm)] = verdict(arm, r, base[(h, a)], payloads[i][1])
+        if i != cur:
+            if cur >= 0:
+                score(cur, pending)
+            cur, pending = i, {}
+        pending[(h, a)] = r
+    if cur >= 0:
+        score(cur, pending)
     return out
 
 
-# Identifiers whose [...] boundary is decided by matcher balance, not by the
-# first closer. The corpus almost never nests brackets, so without these the
-# FINDEMBEDEND sabotage would exercise nothing and pass unseen. Each is valid
-# matchertext, so it clears the ?I gate and reaches the boundary scan.
-SABOTAGE_PROBES = ["a[b]", "x[]y", "id[z]", "p[q[r]s]", "n[a[m]e]", "[[]]",
-                   "a[b]c[d]", "t1[()]"]
+# Identifiers whose [...] boundary is decided by matcher balance, so the
+# FINDEMBEDEND sabotage has something to change. The corpus rarely nests
+# brackets, so these are supplied explicitly.
+SABOTAGE_PROBES = ["a[b]", "x[]y", "id[z]", "p[q[r]s]", "n[a[m]e]", "a[b]c[d]"]
 
 
 def run_sabotage(payloads):
-    """G1. Break the scanner and require the checked path to notice. Detection
-    is a changed verdict on the identifier arm, which is the one whose safety
-    rides on the scanner; a bound value stays a bound value even when VERIFY is
-    disabled, so it cannot witness the break. Scanner-exercising identifiers are
-    added so the boundary break has something to act on."""
+    """G1. Break the scanner and require the matchertext arms to change verdict."""
     payloads = [("probe", p) for p in SABOTAGE_PROBES] + list(payloads)
     honest = verdicts_for(payloads)
     rows, fail = [], []
@@ -413,7 +443,7 @@ def run_sabotage(payloads):
           ["sabotage", "arm", "cases", "changed_verdict", "detection_rate"], rows)
     print("\nG1 sabotage: a deliberately broken scanner must change the verdict")
     for name, arm, n, d, rate in rows:
-        print(f"  {name:28} {arm:8} {d:>7,}/{n:<8,} {rate:>7.1%}")
+        print(f"  {name:28} {arm:10} {d:>7,}/{n:<8,} {rate:>7.1%}")
     for name in SABOTAGE:
         if not any(r[3] for r in rows if r[0] == name):
             fail.append(f"sabotage {name} went unnoticed")
@@ -421,42 +451,27 @@ def run_sabotage(payloads):
     return fail
 
 
-def report(guard, disagree, payloads, ncase):
+def report(guard, eff_pairs, payloads, ncase):
     print(f"\nsqli sweep: {ncase:,} cases over {len(payloads):,} distinct payloads")
-    arms = ["mtv", "mtv_enc", "mti", "legacy_v", "legacy_i"]
-    print(f"\n{'arm':10} {'inert':>8} {'rejected':>9} {'refused':>8} "
-          f"{'breakout':>9} {'malformed':>10}")
+    print(f"effective set: {len({p for _, p in eff_pairs}):,} payloads break out undefended")
+    arms = ["concat", "quote", "escape", "bind", "mt", "mt_strict",
+            "ident_concat", "ident_mt"]
+    print(f"\n{'arm':13} {'inert':>8} {'breakout':>9} {'rejected':>9} {'malformed':>10}")
     for a in arms:
-        print(f"{a:10} " + "".join(
+        print(f"{a:13} " + "".join(
             f"{guard[(a, v)]:>{w},}" for v, w in
-            (("INERT", 9), ("REJECTED", 10), ("REFUSED", 9),
-             ("BREAKOUT", 10), ("MALFORMED", 11))))
-    print(f"\nVERIFY cross-check: C and Python agree on "
-          f"{'every value' if not disagree else f'all but {len(disagree)}'}")
-
+            (("INERT", 9), ("BREAKOUT", 10), ("REJECTED", 10), ("MALFORMED", 11))))
     fail = []
-    for v in disagree[:5]:
-        fail.append(f"VERIFY disagreement on {v!r}")
-    for a in MT_ARMS + LEGACY_ARMS:
+    if guard[("concat", "BREAKOUT")] == 0:
+        fail.append("the control never broke out; the harness is blind")
+    for a in MT_ARMS:
         if guard[(a, "BREAKOUT")]:
             fail.append(f"{a} produced {guard[(a, 'BREAKOUT')]:,} breakouts")
-    # The total encoder must never refuse, and the legacy gate must never let a
-    # statement through.
-    if guard[("mtv_enc", "REJECTED")]:
-        fail.append(f"mtv_enc refused {guard[('mtv_enc', 'REJECTED')]:,} "
-                    "values, but the encoder is total")
-    for a in LEGACY_ARMS:
-        n = sum(guard[(a, v)] for v in IDXV_KEYS)
-        if n and guard[(a, "REFUSED")] != n:
-            fail.append(f"{a} did not refuse every call")
     if fail:
         print("\nGUARD FAILURES")
         for f in fail:
             print("  " + f)
     return fail
-
-
-IDXV_KEYS = ("INERT", "REJECTED", "REFUSED", "BREAKOUT", "MALFORMED")
 
 
 if __name__ == "__main__":
