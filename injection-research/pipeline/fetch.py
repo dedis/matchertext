@@ -39,6 +39,30 @@ GIT_REPOS = {
     "SecLists": "https://github.com/danielmiessler/SecLists.git",
     # Labeled ground truth: injection cases with known CWE and known verdict.
     "BenchmarkJava": "https://github.com/OWASP-Benchmark/BenchmarkJava.git",
+    # Additional public CVE PoC collections and link indexes. Repositories with
+    # no open-source license remain research inputs; their terms are recorded in
+    # the manifest and their files stay below data/raw, which is not exported.
+    "awesome-poc": "https://github.com/Threekiii/Awesome-POC.git",
+    "wy876-poc": "https://github.com/wy876/POC.git",
+    "penetration-testing-poc": "https://github.com/Mr-xn/Penetration_Testing_POC.git",
+    "some-poc-or-exp": "https://github.com/coffeehb/Some-PoC-oR-ExP.git",
+    "peiqi-wiki": "https://github.com/PeiQi0/PeiQi-WIKI-Book.git",
+    "poc-lab": "https://github.com/Unclecheng-li/poc-lab.git",
+    "xray": "https://github.com/chaitin/xray.git",
+    "0xmarcio-cve": "https://github.com/0xMarcio/cve.git",
+    "zulloper-cve-poc": "https://github.com/zulloper/cve-poc.git",
+}
+SOURCE_METADATA = {
+    "awesome-poc": {"license": "NOASSERTION", "use": "research-only"},
+    "wy876-poc": {"license": "NOASSERTION", "use": "repository terms apply"},
+    "penetration-testing-poc": {"license": "Apache-2.0"},
+    "some-poc-or-exp": {"license": "NOASSERTION", "use": "research-only"},
+    "peiqi-wiki": {"license": "NOASSERTION", "use": "authorized research only"},
+    "poc-lab": {"license": "MIT"},
+    "xray": {"license": "LicenseRef-xray",
+             "use": "attribution and disclaimer acceptance required"},
+    "0xmarcio-cve": {"license": "MIT"},
+    "zulloper-cve-poc": {"license": "NOASSERTION"},
 }
 REDHAT_URL = "https://access.redhat.com/hydra/rest/securitydata/cve.json"
 DEBIAN_URL = "https://security-tracker.debian.org/tracker/data/json"
@@ -101,11 +125,21 @@ def run(args):
         dest = RAW / name
         if not dest.exists():
             print(f"cloning {name} ...", flush=True)
-            subprocess.run(["git", "clone", "--depth", "1", url, str(dest)], check=True)
+            clone = subprocess.run(["git", "clone", "--depth", "1", url, str(dest)])
+            if clone.returncode:
+                if name not in SOURCE_METADATA:
+                    clone.check_returncode()
+                manifest[name] = {"url": url, "fetched": str(today),
+                                  "status": "unavailable", **SOURCE_METADATA.get(name, {})}
+                print(f"{name}: unavailable, skipping", flush=True)
+                continue
         head = subprocess.run(["git", "-C", str(dest), "rev-parse", "HEAD"],
                               capture_output=True, text=True, check=True).stdout.strip()
-        manifest[name] = {"url": url, "commit": head,
-                          "fetched": manifest.get(name, {}).get("fetched", str(today))}
+        entry = {**manifest.get(name, {}), "url": url, "commit": head,
+                 "fetched": manifest.get(name, {}).get("fetched", str(today)),
+                 **SOURCE_METADATA.get(name, {})}
+        entry.pop("status", None)
+        manifest[name] = entry
         print(f"{name}: {head}")
 
     years = getattr(args, "years", None)

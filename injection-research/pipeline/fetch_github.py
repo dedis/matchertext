@@ -21,6 +21,9 @@ CVE, which sweeps in bulk mirrors -- one nuclei-templates fork is linked from
 Usage:
   python3 pipeline/fetch_github.py            # full run, resumable
   python3 pipeline/fetch_github.py -n 500     # sample, for measurement
+  python3 pipeline/fetch_github.py --retry --archives  # recursively retry misses
+  python3 pipeline/fetch_github.py --trees    # scan oversized repos file by file
+  python3 pipeline/fetch_github.py --fanout-trees  # exact CVE paths in collections
 """
 import argparse
 import io
@@ -35,8 +38,9 @@ import tarfile
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from report import extract_payload
@@ -46,6 +50,7 @@ DB = ROOT / "data" / "cve.db"
 PINS = ROOT / "data" / "github_pins.json"
 
 CODELOAD = "https://codeload.github.com/{owner}/{repo}/tar.gz/{ref}"
+RAW_URL = "https://raw.githubusercontent.com/{owner}/{repo}/{sha}/{path}"
 REPO_RE = re.compile(r"https?://(?:www\.)?github\.com/([\w.-]+)/([\w.-]+)", re.I)
 # A linked repo is often the vulnerable application itself, not a proof of
 # concept, and its own source is full of benign script tags, jQuery includes and
@@ -59,6 +64,9 @@ CODE_EXT = {".py", ".php", ".rb", ".sh", ".js", ".go", ".java", ".pl", ".html",
 POC_HINT = re.compile(r"(?:poc|exploit|payload|vuln|attack|cve-\d)", re.I)
 MAX_MEMBER = 256 << 10
 MAX_ARCHIVE = 25 << 20
+MAX_SCAN = 8 << 20
+MAX_FILES = 2000
+MAX_TREE_FILES = 64
 TIMEOUT = 25
 
 DDL = """
@@ -268,7 +276,11 @@ def scan(blob, syn):
     # exploit script, which usually builds it at runtime.
     members.sort(key=lambda m: (0 if "readme" in Path(m.name).name.lower() else 1,
                                 m.name))
-    for m in members:
+    scanned = 0
+    for m in members[:MAX_FILES]:
+        if scanned + m.size > MAX_SCAN:
+            continue
+        scanned += m.size
         try:
             text = tf.extractfile(m).read().decode("utf-8", "replace")
         except Exception:                                       # noqa: BLE001
@@ -277,6 +289,133 @@ def scan(blob, syn):
         if payload:
             return payload, m.name
     return None, None
+
+
+def recursive_tree(owner, repo, sha):
+    """List all files at one pinned commit through GitHub's tree API."""
+    try:
+        out = subprocess.run(
+            ["gh", "api", f"repos/{owner}/{repo}/git/trees/{sha}?recursive=1"],
+            capture_output=True, text=True, timeout=TIMEOUT)
+        if out.returncode:
+            return None, False, "tree_api_error"
+        data = json.loads(out.stdout)
+        return data.get("tree") or [], bool(data.get("truncated")), None
+    except (subprocess.TimeoutExpired, json.JSONDecodeError):
+        return None, False, "tree_api_error"
+
+
+def fetch_text(owner, repo, sha, path):
+    url = RAW_URL.format(owner=owner, repo=repo, sha=sha,
+                         path=urllib.parse.quote(path, safe="/"))
+    req = urllib.request.Request(url, headers={"User-Agent": "matchertext-research"})
+    try:
+        with urllib.request.urlopen(req, timeout=12) as r:
+            blob = r.read(MAX_MEMBER + 1)
+        return None if len(blob) > MAX_MEMBER else blob.decode("utf-8", "replace")
+    except Exception:                                           # noqa: BLE001
+        return None
+
+
+def scan_tree(item, sha):
+    cve, syn, (owner, repo) = item
+    entries, truncated, err = recursive_tree(owner, repo, sha)
+    if entries is None:
+        return {"cve_id": cve, "repo": f"{owner}/{repo}", "sha": sha,
+                "file": None, "payload": None, "status": err}
+    files = [e for e in entries if e.get("type") == "blob"
+             and (e.get("size") or 0) <= MAX_MEMBER and eligible(e.get("path", ""))]
+    files.sort(key=lambda e: (
+        0 if POC_HINT.search(e["path"]) else 1,
+        0 if "readme" in Path(e["path"]).name.lower() else 1,
+        0 if Path(e["path"]).suffix.lower() in DOC_EXT else 1, e["path"]))
+    scanned = 0
+    for e in files[:MAX_TREE_FILES]:
+        size = e.get("size") or 0
+        if scanned + size > MAX_SCAN:
+            continue
+        scanned += size
+        text = fetch_text(owner, repo, sha, e["path"])
+        payload = extract_payload(text, syn) if text else None
+        if payload:
+            return {"cve_id": cve, "repo": f"{owner}/{repo}", "sha": sha,
+                    "file": e["path"], "payload": payload, "status": "payload"}
+    status = "tree_truncated" if truncated else "tree_no_payload"
+    return {"cve_id": cve, "repo": f"{owner}/{repo}", "sha": sha,
+            "file": None, "payload": None, "status": status}
+
+
+def scan_fanout_group(group):
+    """Scan one multi-CVE repository without crossing CVE file boundaries."""
+    (owner, repo), items = group
+    sha = items[0][2]
+    entries, truncated, err = recursive_tree(owner, repo, sha)
+    if entries is None:
+        return [{"cve_id": cve, "repo": f"{owner}/{repo}", "sha": sha,
+                 "file": None, "payload": None, "status": "fanout_api_error"}
+                for cve, _, _ in items]
+    blobs = [e for e in entries if e.get("type") == "blob"
+             and (e.get("size") or 0) <= MAX_MEMBER and eligible(e.get("path", ""))]
+    rows, cache = [], {}
+    for cve, syn, _ in items:
+        needle = cve.lower()
+        files = [e for e in blobs
+                 if needle in e["path"].replace("_", "-").lower()]
+        files.sort(key=lambda e: (
+            0 if "readme" in Path(e["path"]).name.lower() else 1,
+            0 if Path(e["path"]).suffix.lower() in DOC_EXT else 1, e["path"]))
+        hit = where = None
+        scanned = 0
+        for e in files[:16]:
+            size = e.get("size") or 0
+            if scanned + size > (2 << 20):
+                continue
+            scanned += size
+            path = e["path"]
+            if path not in cache:
+                cache[path] = fetch_text(owner, repo, sha, path)
+            text = cache[path]
+            hit = extract_payload(text, syn) if text else None
+            if hit:
+                where = path
+                break
+        status = ("payload" if hit else "fanout_no_payload" if files
+                  else "fanout_no_path")
+        if truncated and not files:
+            status = "fanout_truncated"
+        rows.append({"cve_id": cve, "repo": f"{owner}/{repo}", "sha": sha,
+                     "file": where, "payload": hit, "status": status})
+    return rows
+
+
+def run_fanout(con, args):
+    groups = {}
+    for cve, syn, repo, sha in con.execute("""
+            SELECT r.cve_id, c.syntax_type, r.repo, r.sha
+            FROM remote_payload r JOIN classification c USING(cve_id)
+            WHERE r.status IN ('no_payload','fanout_api_error') AND r.sha IS NOT NULL
+            ORDER BY r.repo, r.cve_id"""):
+        parts = repo.split("/", 1)
+        if len(parts) == 2:
+            groups.setdefault(tuple(parts), []).append((cve, syn, sha))
+    work = sorted(groups.items())
+    if args.n:
+        random.Random(args.seed).shuffle(work)
+        work = work[:args.n]
+    total = sum(len(items) for _, items in work)
+    print(f"{len(work)} repositories; {total} CVEs to scan", file=sys.stderr, flush=True)
+    seen = 0
+    with ThreadPoolExecutor(max_workers=args.workers) as ex:
+        futures = [ex.submit(scan_fanout_group, group) for group in work]
+        for future in as_completed(futures):
+            rows = future.result()
+            con.executemany("""INSERT OR REPLACE INTO remote_payload
+                VALUES(:cve_id, 'github', :repo, :sha, :file, :payload, :status)""", rows)
+            con.commit()
+            seen += len(rows)
+            got = con.execute("SELECT COUNT(*) FROM remote_payload "
+                              "WHERE payload IS NOT NULL").fetchone()[0]
+            print(f"  {seen}/{total}  payloads={got}", file=sys.stderr, flush=True)
 
 
 def one(item, sha=None):
@@ -300,11 +439,34 @@ def one(item, sha=None):
 def run(args):
     con = sqlite3.connect(DB)
     con.executescript(DDL)
-    keep = "" if args.retry else ""
-    done = {c for (c,) in con.execute(
-        "SELECT cve_id FROM remote_payload" if not args.retry else
-        "SELECT cve_id FROM remote_payload WHERE payload IS NOT NULL OR status='gone'")}
-    todo = candidates(con, args.max_fanout, done)
+    if args.fanout_trees:
+        run_fanout(con, args)
+        con.close()
+        return
+    tree_shas = {}
+    if args.trees:
+        todo = []
+        for cve, syn, repo, sha in con.execute("""
+                SELECT r.cve_id, c.syntax_type, r.repo, r.sha
+                FROM remote_payload r JOIN classification c USING(cve_id)
+                WHERE r.status='oversize' AND r.sha IS NOT NULL
+                ORDER BY r.cve_id"""):
+            parts = repo.split("/", 1)
+            if len(parts) == 2:
+                todo.append((cve, syn, tuple(parts)))
+                tree_shas[cve] = sha
+        done = set()
+    elif args.archives:
+        done_sql = ("SELECT cve_id FROM remote_payload WHERE payload IS NOT NULL "
+                    "OR status IN ('gone','deep_no_payload','oversize','http_404')")
+    elif args.retry:
+        done_sql = ("SELECT cve_id FROM remote_payload WHERE payload IS NOT NULL "
+                    "OR status='gone'")
+    else:
+        done_sql = "SELECT cve_id FROM remote_payload"
+    if not args.trees:
+        done = {c for (c,) in con.execute(done_sql)}
+        todo = candidates(con, args.max_fanout, done)
     if args.n:
         random.Random(args.seed).shuffle(todo)
         todo = sorted(todo[:args.n])
@@ -321,6 +483,69 @@ def run(args):
         con.commit()
         PINS.write_text(json.dumps(pins, indent=1, sort_keys=True))
         batch.clear()
+
+    if args.trees:
+        seen = 0
+        with ThreadPoolExecutor(max_workers=args.workers) as ex:
+            futures = [ex.submit(scan_tree, item, tree_shas[item[0]]) for item in todo]
+            for future in as_completed(futures):
+                row = future.result()
+                batch.append(row)
+                seen += 1
+                if len(batch) >= 25:
+                    flush()
+                if seen % 25 == 0 or seen == len(todo):
+                    got = con.execute("SELECT COUNT(*) FROM remote_payload "
+                                      "WHERE payload IS NOT NULL").fetchone()[0]
+                    print(f"  {seen}/{len(todo)}  payloads={got}  "
+                          f"{seen / max(time.time() - t0, 1):.1f}/s",
+                          file=sys.stderr, flush=True)
+        if batch:
+            flush()
+        total = con.execute("SELECT COUNT(*) FROM remote_payload").fetchone()[0]
+        print(f"\nfetched {total} repos; pins in {PINS.relative_to(ROOT)}")
+        for st, n in con.execute("""SELECT status, COUNT(*) FROM remote_payload
+                                    GROUP BY 1 ORDER BY 2 DESC"""):
+            print(f"  {st:20} {n}")
+        con.close()
+        return
+
+    if args.archives:
+        stored = dict(con.execute(
+            "SELECT repo, sha FROM remote_payload WHERE sha IS NOT NULL"))
+
+        def archive_one(item):
+            owner, repo = item[2]
+            slug = f"{owner}/{repo}"
+            row = one(item, pins.get(slug) or stored.get(slug))
+            if row["status"] == "no_payload":
+                row["status"] = "deep_no_payload"
+            return row
+
+        seen = 0
+        with ThreadPoolExecutor(max_workers=args.workers) as ex:
+            for row in ex.map(archive_one, todo):
+                batch.append(row)
+                if row["sha"]:
+                    pins[row["repo"]] = row["sha"]
+                seen += 1
+                if len(batch) >= 50:
+                    flush()
+                if seen % 50 == 0 or seen == len(todo):
+                    got = con.execute("SELECT COUNT(*) FROM remote_payload "
+                                      "WHERE payload IS NOT NULL").fetchone()[0]
+                    print(f"  {seen}/{len(todo)}  payloads={got}  "
+                          f"{seen / max(time.time() - t0, 1):.1f}/s",
+                          file=sys.stderr, flush=True)
+        if batch:
+            flush()
+        total = con.execute("SELECT COUNT(*) FROM remote_payload").fetchone()[0]
+        print(f"\nfetched {total} repos; pins in {PINS.relative_to(ROOT)}")
+        for st, n in con.execute("""SELECT status, COUNT(*) FROM remote_payload
+                                    GROUP BY 1 ORDER BY 2 DESC"""):
+            print(f"  {st:12} {n}")
+        con.close()
+        return
 
     def do_chunk(chunk):
         """Two requests per chunk: listing, then the documents worth reading."""
@@ -419,6 +644,13 @@ if __name__ == "__main__":
     ap.add_argument("--seed", type=int, default=17)
     ap.add_argument("--retry", action="store_true",
                     help="re-process repos previously found to have no payload")
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--archives", action="store_true",
+                      help="recursively scan pinned repository archives")
+    mode.add_argument("--trees", action="store_true",
+                      help="scan oversized repositories through pinned Git trees")
+    mode.add_argument("--fanout-trees", action="store_true",
+                      help="scan exact CVE paths in multi-CVE repositories")
     ap.add_argument("--workers", type=int, default=8,
                     help="concurrent archive downloads; the work is I/O bound,\nso this is the lever, not core count")
     ap.add_argument("--deep", action="store_true",

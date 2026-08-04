@@ -16,8 +16,10 @@ from pathlib import Path
 
 csv.field_size_limit(1 << 24)
 CVE_RE = re.compile(r"CVE-\d{4}-\d+")
+CVE_ANY_RE = re.compile(r"CVE-\d{4}-\d+", re.I)
 CWE_RE = re.compile(r"CWE-(\d+)")
 MSF_CVE_RE = re.compile(r"""['"]CVE['"]\s*,\s*['"](\d{4}-\d+)['"]""")
+URL_RE = re.compile(r"https?://[^\s<>\])}\"']+")
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data" / "raw"
@@ -101,6 +103,27 @@ PAYLOAD_SOURCES = [
 # Same bounds as report.extract_payload, so corpus and PoC-derived payloads are
 # measured on comparable strings.
 PAYLOAD_MIN, PAYLOAD_MAX = 3, 200
+
+# File-bearing collections are scanned for CVE-tagged documents or scripts.
+# Index-only repositories are kept as links, so their catalogue pages cannot be
+# mistaken for attack payloads by later stages.
+POC_COLLECTIONS = {
+    "awesome-poc": "awesome-poc",
+    "wy876-poc": "wy876-poc",
+    "penetration-testing-poc": "penetration-testing-poc",
+    "some-poc-or-exp": "some-poc-or-exp",
+    "peiqi-wiki": "peiqi-wiki",
+    "poc-lab": "poc-lab",
+    "xray": "xray",
+}
+POC_INDEXES = {
+    "0xmarcio-cve": "0xmarcio-cve",
+    "zulloper-cve-poc": "zulloper-cve-poc",
+}
+POC_TEXT_EXT = {".c", ".cpp", ".go", ".html", ".java", ".js", ".json", ".md",
+                ".php", ".pl", ".py", ".rb", ".rst", ".sh", ".txt", ".xml",
+                ".yaml", ".yml"}
+POC_MAX_FILE = 1 << 20
 
 CVSS_KEYS = ("cvssV4_0", "cvssV3_1", "cvssV3_0", "cvssV2_0")
 
@@ -482,6 +505,69 @@ def load_vulhub(con):
     _poc(con, rows)
 
 
+def _poc_text_files(base):
+    for f in base.rglob("*"):
+        if (f.is_file() and f.suffix.lower() in POC_TEXT_EXT
+                and ".git" not in f.relative_to(base).parts):
+            try:
+                if f.stat().st_size <= POC_MAX_FILE:
+                    yield f
+            except OSError:
+                continue
+
+
+def _cve_ids(value):
+    return {cid.upper() for cid in CVE_ANY_RE.findall(value)}
+
+
+def load_poc_collections(con):
+    """Load CVE-specific files from heterogeneous PoC collections."""
+    for source, dirname in POC_COLLECTIONS.items():
+        base = RAW / dirname
+        if not base.exists():
+            print(f"{source}: not fetched, skipping")
+            continue
+        rows = []
+        for f in _poc_text_files(base):
+            rel_repo = f.relative_to(base)
+            path_ids = _cve_ids(str(rel_repo))
+            try:
+                text = f.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            ids = path_ids or _cve_ids(text)
+            # A file that names many CVEs is a catalogue, not one CVE's PoC.
+            if not ids or (not path_ids and len(ids) > 10):
+                continue
+            kind = "writeup" if f.suffix.lower() in {".md", ".rst", ".txt"} else "exploit"
+            local = str(f.relative_to(RAW))
+            ref = str(rel_repo)
+            rows.extend((cid, source, ref, local, kind) for cid in ids)
+        _poc(con, rows)
+
+
+def load_poc_indexes(con):
+    """Load same-line CVE-to-URL mappings without treating indexes as payloads."""
+    for source, dirname in POC_INDEXES.items():
+        base = RAW / dirname
+        if not base.exists():
+            print(f"{source}: not fetched, skipping")
+            continue
+        rows = []
+        for f in _poc_text_files(base):
+            try:
+                text = f.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            for line in text.splitlines():
+                ids = _cve_ids(line)
+                if not ids:
+                    continue
+                for url in URL_RE.findall(line):
+                    rows.extend((cid, source, url.rstrip(".,;"), None, "repo") for cid in ids)
+        _poc(con, rows)
+
+
 def load_vedas(con):
     path = RAW / "cve-scores" / "cve-scores.csv"
     if not path.exists():
@@ -580,6 +666,8 @@ def run(args):
     for name, fn in (("exploitdb", load_exploitdb), ("nuclei", load_nuclei),
                      ("metasploit", load_metasploit), ("poc_github", load_poc_github),
                      ("trickest", load_trickest), ("vulhub", load_vulhub),
+                     ("poc_collections", load_poc_collections),
+                     ("poc_indexes", load_poc_indexes),
                      ("ghsa", load_ghsa), ("redhat", load_redhat), ("debian", load_debian),
                      ("edb_links", link_exploitdb_ids),
                      ("vedas", load_vedas), ("payloads", load_payloads),
