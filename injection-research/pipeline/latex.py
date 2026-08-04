@@ -253,24 +253,47 @@ SQLI_ARMS = [
 ]
 
 
+# The strict build has no in-band holes: the value hole's strict form is the
+# typed ?V parameter (mt_v) and the name hole's is ?I (ident_i). Every other
+# delivery path splices text through the refused legacy prepare.
+STRICT_OF = {"mt": "mt_v", "mt_strict": "mt_v", "ident_mt": "ident_i"}
+
+
 def tbl_sqli_arms(con):
-    """Verdict counts per arm over the effective set (payloads that break out
-    undefended). The matcher-delimited holes contain every one; the controls
-    break out; the fragments that never parse are excluded as not attacks."""
-    rows = {a: tuple(r) for a, *r in con.execute(
+    """Verdict counts per delivery path, additive build beside strict. In the
+    additive default the matcher-delimited holes contain every payload and the
+    controls break out. Under strict the legacy prepare is refused, so the typed
+    ?V and ?I API is the only path; it contains every payload the same way, and
+    every text-splicing path is refused wholesale."""
+    add = {a: r for a, *r in con.execute(
         """SELECT arm, SUM(n_inert), SUM(n_breakout), SUM(n_rejected),
-                  SUM(n_malformed)
-           FROM mt_sqli_combo GROUP BY arm""")}
-    lines = ["\\begin{tabular}{lrrrr}", "\\toprule",
-             "Delivery & Inert & Broke out & Refused & Not SQL \\\\"]
+                  SUM(n_malformed) FROM mt_sqli_combo GROUP BY arm""")}
+    strict = {a: r for a, *r in con.execute(
+        """SELECT arm, inert, breakout, rejected, refused, malformed
+           FROM mt_sqli_strict""")} \
+        if con.execute("""SELECT COUNT(*) FROM sqlite_master
+                          WHERE type='table' AND name='mt_sqli_strict'""").fetchone()[0] \
+        else {}
+    lines = ["\\begin{tabular}{l rrrr rrrr}", "\\toprule",
+             "& \\multicolumn{4}{c}{Additive} & \\multicolumn{4}{c}{Strict} \\\\",
+             "\\cmidrule(lr){2-5} \\cmidrule(lr){6-9}",
+             "Delivery & Inert & Broke out & Refused & Not SQL"
+             " & Inert & Broke out & Refused & Not SQL \\\\"]
     last = None
     for arm, label, group in SQLI_ARMS:
-        if arm not in rows:
+        if arm not in add:
             continue
         if group != last:
             lines.append("\\midrule")
             last = group
-        lines.append(f"{label:34} & " + " & ".join(num(v) for v in rows[arm]) + " \\\\")
+        src = STRICT_OF.get(arm)
+        if src and src in strict:
+            si, sb, sr, _, sm = strict[src]      # ?V / ?I: inert, breakout, rejected, malformed
+            scells = [si, sb, sr, sm]
+        else:                                    # legacy path: refused before the parser
+            scells = [0, 0, strict.get(arm, [0, 0, 0, 0, 0])[3], 0]
+        cells = list(add[arm]) + scells
+        lines.append(f"{label:34} & " + " & ".join(num(v) for v in cells) + " \\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
     return "\n".join(lines) + "\n"
 
@@ -305,6 +328,24 @@ def sqli_macros(con):
         ("SqliMtStrictRejected", num(q("""SELECT SUM(n_rejected) FROM mt_sqli_combo
                                           WHERE arm='mt_strict'""") or 0)),
     ]
+    if con.execute("""SELECT COUNT(*) FROM sqlite_master
+                      WHERE type='table' AND name='mt_sqli_strict'""").fetchone()[0]:
+        s = {a: r for a, *r in con.execute(
+            """SELECT arm, inert, breakout, rejected, refused
+               FROM mt_sqli_strict""")}
+        v = s.get("mt_v", [0, 0, 0, 0])
+        i = s.get("ident_i", [0, 0, 0, 0])
+        # the strict typed API: contains every payload, zero breakouts
+        vals += [
+            ("SqliStrictValueInert", num(v[0])),
+            ("SqliStrictValueRejected", num(v[2])),
+            ("SqliStrictValueBreakout", num(v[1])),
+            ("SqliStrictIdentInert", num(i[0])),
+            ("SqliStrictIdentRejected", num(i[2])),
+            ("SqliStrictIdentBreakout", num(i[1])),
+            # every text-splicing path is refused, the same count per delivery
+            ("SqliStrictRefused", num(s.get("concat", [0, 0, 0, 0])[3])),
+        ]
     sab = EXPORTS / "sqli_sabotage.csv"
     if sab.exists():
         with open(sab, newline="") as f:

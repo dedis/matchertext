@@ -39,6 +39,7 @@ BUILD = ROOT / "data" / "build"
 AMALG = ROOT / "sqlite" / "sqlite3.c"
 SRC = ROOT / "test" / "matchertext" / "csrc" / "sqli_driver.c"
 BIN = BUILD / "sqli_driver"
+BIN_STRICT = BUILD / "sqli_driver_strict"
 
 FIELDS = ("outcome", "rc", "skel", "ro", "tail", "nrow", "name", "err")
 IDX = {name: i for i, name in enumerate(FIELDS)}
@@ -47,6 +48,11 @@ IDX = {name: i for i, name in enumerate(FIELDS)}
 STRUCTURAL = ("skel", "ro")
 
 MT_ARMS = ("mt", "mt_strict", "ident_mt")
+TYPED_ARMS = ("mt_v", "ident_i")           # the strict-mode ?V / ?I paths
+# Arms whose inertness rests on the scanner, so a broken scanner must flip them.
+# mt_v is a bound parameter, safe like the additive bind arm, so it is excluded.
+SCORE_ARMS = MT_ARMS + ("ident_i",)
+LEGACY_ARMS = ("concat", "quote", "escape", "bind", "ident_concat")
 CONTROL_ARMS = ("concat", "ident_concat")
 
 PAIR = {")": "(", "]": "[", "}": "{"}
@@ -104,23 +110,31 @@ def ident_name(s):
     return name_decode(mt_encode(s))
 
 
+def _compile(binary, extra):
+    cc = os.environ.get("CC", "cc")
+    cmd = [cc, "-O2", "-o", str(binary), str(SRC), str(AMALG), "-I", str(AMALG.parent),
+           "-DSQLITE_ENABLE_MATCHERTEXT", *extra, "-DSQLITE_THREADSAFE=1",
+           "-DHAVE_USLEEP=1", "-DSQLITE_OMIT_LOAD_EXTENSION", "-lm", "-lpthread"]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode:
+        sys.exit(f"cannot build {binary.name}:\n{r.stderr}")
+
+
 def build_driver():
+    """Build both the additive (default) driver and the strict driver, the
+    latter to measure that the same delivery paths are refused wholesale."""
     BUILD.mkdir(parents=True, exist_ok=True)
     if not AMALG.exists():
         sys.exit(f"missing {AMALG}\nregenerate with:\n"
                  f"  cd {AMALG.parent} && make sqlite3.h sqlite3.c "
                  f'OPTS="-DSQLITE_ENABLE_MATCHERTEXT"')
-    if BIN.exists() and BIN.stat().st_mtime > max(SRC.stat().st_mtime,
-                                                  AMALG.stat().st_mtime):
-        return
-    cc = os.environ.get("CC", "cc")
-    cmd = [cc, "-O2", "-o", str(BIN), str(SRC), str(AMALG), "-I", str(AMALG.parent),
-           "-DSQLITE_ENABLE_MATCHERTEXT", "-DSQLITE_THREADSAFE=1",
-           "-DHAVE_USLEEP=1", "-DSQLITE_OMIT_LOAD_EXTENSION", "-lm", "-lpthread"]
-    print("building sqli_driver ...", flush=True)
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode:
-        sys.exit(f"cannot build the driver:\n{r.stderr}")
+    fresh = max(SRC.stat().st_mtime, AMALG.stat().st_mtime)
+    if not (BIN.exists() and BIN.stat().st_mtime > fresh):
+        print("building sqli_driver ...", flush=True)
+        _compile(BIN, [])
+    if not (BIN_STRICT.exists() and BIN_STRICT.stat().st_mtime > fresh):
+        print("building sqli_driver (strict) ...", flush=True)
+        _compile(BIN_STRICT, ["-DSQLITE_MATCHERTEXT_STRICT"])
 
 
 # Deliberately broken scanners, to prove the oracle can see a defect at all.
@@ -164,7 +178,7 @@ def build_sabotage(name):
 
 
 class Driver:
-    def __init__(self, binary=None, selfcheck=True):
+    def __init__(self, binary=None, selfcheck=True, strict=False):
         self.p = subprocess.Popen([str(binary or BIN)], stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE, text=True, bufsize=1 << 20)
         self.hosts, self.arms = {}, {}
@@ -180,11 +194,13 @@ class Driver:
                 self.arms[int(f[1])] = (f[2], int(f[3]), int(f[4]))
             elif f[0] == "selfcheck":
                 # The additive build must prepare legacy concatenation and the
-                # %m hole; a stale or misconfigured binary invalidates the run.
+                # %m hole; the strict build must refuse both (rc 21). A stale or
+                # misconfigured binary invalidates the run.
                 concat, mt = (int(x.split("=")[1]) for x in f[1:3])
-                if selfcheck and (concat != 0 or mt != 0):
-                    sys.exit(f"driver self-check failed (concat_rc={concat}, "
-                             f"mt_rc={mt}); rebuild it")
+                want = 21 if strict else 0
+                if selfcheck and (concat != want or mt != want):
+                    sys.exit(f"driver self-check failed (strict={strict}, "
+                             f"concat_rc={concat}, mt_rc={mt}); rebuild it")
         self.arm_id = {v[0]: k for k, v in self.arms.items()}
         self.host_id = {v[0]: k for k, v in self.hosts.items()}
 
@@ -256,6 +272,70 @@ def verdict(arm, res, base, payload, is_ident):
     return "INERT"
 
 
+def strict_sweep(con, payloads):
+    """Run the corpus through the strict build. There the legacy prepare is
+    refused, so the typed API is the only admitted path: a value goes to ?V,
+    verified then bound as a parameter, and an identifier to ?I, verified then
+    delimited by the host as [ ] read to matcher balance
+    (sqlite3_matchertext_prepare_v3). Measure that this path contains every
+    payload, exactly as the additive holes do, and that every text-splicing
+    path is refused wholesale. Stores per-arm (inert, breakout, rejected,
+    refused, malformed)."""
+    drv = Driver(BIN_STRICT, strict=True)
+    base = drv.baselines()
+    ident_hosts = {h for h, (_, hole, _) in drv.hosts.items() if hole == 2}
+    tally = defaultdict(lambda: [0, 0, 0, 0, 0])  # inert, breakout, rejected, refused, malformed
+    pending, cur = {}, -1
+
+    def score(idx, rows):
+        o = payloads[idx][1]
+        for (h, a), r in rows.items():
+            arm = drv.arms[a][0]
+            if arm in TYPED_ARMS:
+                v = verdict(arm, r, base[(h, a)], o, h in ident_hosts)
+                tally[arm][{"INERT": 0, "BREAKOUT": 1, "REJECTED": 2,
+                            "MALFORMED": 4}[v]] += 1
+            else:
+                tally[arm][3] += 1        # legacy path: refused before the parser
+
+    for i, h, a, r in drv.sweep(p for _, p in payloads):
+        if i != cur:
+            if cur >= 0:
+                score(cur, pending)
+            cur, pending = i, {}
+        pending[(h, a)] = r
+    if cur >= 0:
+        score(cur, pending)
+
+    con.executescript("""DROP TABLE IF EXISTS mt_sqli_strict;
+        CREATE TABLE mt_sqli_strict(arm TEXT PRIMARY KEY, inert INTEGER,
+            breakout INTEGER, rejected INTEGER, refused INTEGER, malformed INTEGER);""")
+    con.executemany("INSERT INTO mt_sqli_strict VALUES(?,?,?,?,?,?)",
+                    [(a, *c) for a, c in tally.items()])
+    con.commit()
+
+    print("\nstrict build: the typed ?V/?I API is the only admitted path")
+    for arm in TYPED_ARMS:
+        i, b, rej, _, m = tally[arm]
+        print(f"  {arm:13} inert={i:>7,}  breakout={b:>7,}  rejected={rej:>7,}"
+              f"  malformed={m:>6,}")
+    print("  legacy paths, all refused before the parser:")
+    for arm in LEGACY_ARMS:
+        print(f"  {arm:13} refused={tally[arm][3]:>7,}")
+
+    fail = []
+    for arm in TYPED_ARMS:
+        if tally[arm][1]:
+            fail.append(f"strict {arm} produced {tally[arm][1]:,} breakouts")
+    for arm in LEGACY_ARMS:
+        admitted = tally[arm][0] + tally[arm][1]
+        if admitted:
+            fail.append(f"strict build admitted {admitted:,} {arm} cases")
+    for f in fail:
+        print("  GUARD: " + f)
+    return fail
+
+
 def load_payloads(con, limit=None):
     rows = [("corpus", p) for (p,) in con.execute(
         "SELECT DISTINCT payload FROM payload WHERE syntax_type='sql'")]
@@ -325,6 +405,8 @@ def run(args):
     def flush_value(idx, rows):
         o = payloads[idx][1]
         for (h, a), r in rows.items():
+            if drv.arms[a][0] in TYPED_ARMS:
+                continue          # the strict paths are measured by strict_sweep
             v = verdict(drv.arms[a][0], r, base[(h, a)], o, h in ident_hosts)
             if a in control and v == "BREAKOUT":
                 eff_pairs.add((h, o))
@@ -363,6 +445,7 @@ def run(args):
 
     export(con)
     fail = report(guard, eff_pairs, payloads, len(cases))
+    fail += strict_sweep(con, payloads)
     if not getattr(args, "skip_sabotage", False):
         fail += run_sabotage(payloads[:args.sabotage_n])
     if fail:
@@ -404,7 +487,7 @@ def verdicts_for(payloads, binary=None, selfcheck=True):
         o = payloads[idx][1]
         for (h, a), r in rows.items():
             arm = drv.arms[a][0]
-            if arm in MT_ARMS:
+            if arm in SCORE_ARMS:
                 out[(idx, h, arm)] = verdict(arm, r, base[(h, a)], o, h in ident_hosts)
 
     for i, h, a, r in drv.sweep(p for _, p in payloads):
@@ -436,7 +519,7 @@ def run_sabotage(payloads):
             c = per_arm[key[2]]
             c[0] += 1
             c[1] += int(broken.get(key, v) != v)
-        for arm in MT_ARMS:
+        for arm in SCORE_ARMS:
             n, d = per_arm[arm]
             rows.append((name, arm, n, d, round(d / n, 4) if n else 0))
     write("sqli_sabotage.csv",

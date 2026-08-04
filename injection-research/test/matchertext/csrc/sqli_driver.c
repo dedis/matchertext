@@ -4,7 +4,11 @@
 ** SQL text inside a matcher-delimited hole, an M'(...)' literal for a value or
 ** [...] for an identifier, and the statement is prepared through the ordinary
 ** sqlite3_prepare_v2().  The naive path, concatenation into a quote, stays
-** available and is the breakout control.
+** available and is the breakout control.  Two further arms, mt_v and ident_i,
+** carry the strict-mode typed API instead: the value or identifier is passed
+** separately to sqlite3_matchertext_prepare_v3() as a ?V or ?I argument.  Built
+** with -DSQLITE_MATCHERTEXT_STRICT, prepare_v2() is refused and those two are
+** the only admitted paths.
 **
 ** One value goes into one hole by one arm, and the compiled statement is
 ** compared against the same hole holding a benign value.  All judgement lives
@@ -20,7 +24,7 @@
 **   C <h> <a>  run one pair
 **
 ** Result fields: outcome rc skel ro tail nrow name err
-**   outcome  ok | rejected (%M refused the piece) | parse (prepare failed)
+**   outcome  ok | rejected (%M or ?V/?I refused the value) | parse (prepare failed)
 **   skel     16 hex digits, FNV-1a of the EXPLAIN listing sans p4, or "-"
 **   ro       sqlite3_stmt_readonly, or "-"
 **   tail     non-whitespace bytes left after the first statement (stacked query)
@@ -43,7 +47,7 @@ typedef unsigned long long u64;
 
 /* How an arm fills the hole. */
 enum { C_CONCAT, C_QUOTE, C_ESCAPE, C_BIND, C_MT, C_MTSTRICT,
-       C_IDENT_CONCAT, C_IDENT_MT };
+       C_IDENT_CONCAT, C_IDENT_MT, C_MT_V, C_IDENT_I };
 
 typedef struct Host {
   const char *zName, *zPre, *zPost, *zBenign;
@@ -52,7 +56,7 @@ typedef struct Host {
 
 typedef struct Arm {
   const char *zName;
-  int mHole, eConv, bBind;
+  int mHole, eConv, bBind, bTyped;
 } Arm;
 
 static const Host aHost[] = {
@@ -65,14 +69,18 @@ static const Host aHost[] = {
 };
 
 static const Arm aArm[] = {
-  {"concat",       HOLE_VALUE, C_CONCAT,       0},  /* '<v>'  naive, control */
-  {"quote",        HOLE_VALUE, C_QUOTE,        0},  /* %Q     escaping baseline */
-  {"escape",       HOLE_VALUE, C_ESCAPE,       0},  /* '%q'   escaping baseline */
-  {"bind",         HOLE_VALUE, C_BIND,         1},  /* ?      prepared statement */
-  {"mt",           HOLE_VALUE, C_MT,           0},  /* %m  -> M'(...)' value hole */
-  {"mt_strict",    HOLE_VALUE, C_MTSTRICT,     0},  /* M'(%M)' verify-or-reject */
-  {"ident_concat", HOLE_IDENT, C_IDENT_CONCAT, 0},  /* <v>    naive, control */
-  {"ident_mt",     HOLE_IDENT, C_IDENT_MT,     0},  /* [<enc>] matchertext name hole */
+  {"concat",       HOLE_VALUE, C_CONCAT,       0, 0},  /* '<v>'  naive, control */
+  {"quote",        HOLE_VALUE, C_QUOTE,        0, 0},  /* %Q     escaping baseline */
+  {"escape",       HOLE_VALUE, C_ESCAPE,       0, 0},  /* '%q'   escaping baseline */
+  {"bind",         HOLE_VALUE, C_BIND,         1, 0},  /* ?      prepared statement */
+  {"mt",           HOLE_VALUE, C_MT,           0, 0},  /* %m  -> M'(...)' value hole */
+  {"mt_strict",    HOLE_VALUE, C_MTSTRICT,     0, 0},  /* M'(%M)' verify-or-reject */
+  {"ident_concat", HOLE_IDENT, C_IDENT_CONCAT, 0, 0},  /* <v>    naive, control */
+  {"ident_mt",     HOLE_IDENT, C_IDENT_MT,     0, 0},  /* [<enc>] matchertext name hole */
+  /* The strict-mode typed API: the only value and identifier paths a strict
+  ** build admits, exercised through sqlite3_matchertext_prepare_v3(). */
+  {"mt_v",         HOLE_VALUE, C_MT_V,         0, 1},  /* ?V  verified, bound */
+  {"ident_i",      HOLE_IDENT, C_IDENT_I,      0, 1},  /* ?I  verified [ ] name */
 };
 
 #define NHOST ((int)(sizeof(aHost)/sizeof(aHost[0])))
@@ -133,8 +141,28 @@ static char *renderHole(int eConv, const char *z){
       sqlite3_free(zEnc);
       return zOut;
     }
+    case C_MT_V:         return sqlite3_mprintf("?V");
+    case C_IDENT_I:      return sqlite3_mprintf("?I");
   }
   return 0;
+}
+
+/* Prepare/exec a driver-owned statement that carries no untrusted value.  The
+** strict build refuses the legacy entry points, so route these through the
+** matchertext API there; the additive build uses the ordinary ones. */
+static int prepPlain(const char *zSql, sqlite3_stmt **pp){
+#ifdef SQLITE_MATCHERTEXT_STRICT
+  return sqlite3_matchertext_prepare_v3(gDb, zSql, -1, 0, 0, 0, pp);
+#else
+  return sqlite3_prepare_v2(gDb, zSql, -1, pp, 0);
+#endif
+}
+static void execPlain(const char *zSql){
+#ifdef SQLITE_MATCHERTEXT_STRICT
+  sqlite3_matchertext_exec(gDb, zSql, -1, 0, 0, 0, 0, 0);
+#else
+  sqlite3_exec(gDb, zSql, 0, 0, 0);
+#endif
 }
 
 typedef struct Result {
@@ -189,6 +217,37 @@ static int explainHash(const char *zSql, const char *zHide, u64 *pOut){
   return rc;
 }
 
+/* Skeleton for a typed arm: EXPLAIN the template through the matchertext API so
+** a ?V value is bound (never in the SQL) and a ?I identifier is delimited by the
+** host, then hash as above.  This is the strict path's own compiler, not a
+** legacy prepare, so it works under a strict build too. */
+static int typedExplainHash(const char *zTmpl, const sqlite3_matchertext_arg *pArg,
+                            const char *zHide, i64 nHide, u64 *pOut){
+  char *zX = sqlite3_mprintf("EXPLAIN %s", zTmpl);
+  char *zDec;
+  sqlite3_stmt *p = 0;
+  u64 h = 1469598103934665603ULL;
+  int rc;
+  if( zX==0 ) return SQLITE_NOMEM;
+  zDec = sqlite3_matchertext_decode(zHide, nHide, 0);
+  rc = sqlite3_matchertext_prepare_v3(gDb, zX, -1, 0, pArg, 1, &p);
+  sqlite3_free(zX);
+  if( rc!=SQLITE_OK ){ sqlite3_finalize(p); sqlite3_free(zDec); return rc; }
+  while( sqlite3_step(p)==SQLITE_ROW ){
+    h = fnvInt(h, sqlite3_column_int64(p, 0));
+    h = fnvStr(h, (const char*)sqlite3_column_text(p, 1));
+    h = fnvInt(h, sqlite3_column_int64(p, 2));
+    h = fnvInt(h, sqlite3_column_int64(p, 3));
+    h = fnvInt(h, sqlite3_column_int64(p, 4));
+    h = fnvRedact(h, (const char*)sqlite3_column_text(p, 5), zHide, zDec);
+    h = fnvInt(h, sqlite3_column_int64(p, 6));
+  }
+  rc = sqlite3_finalize(p);
+  sqlite3_free(zDec);
+  *pOut = h;
+  return rc;
+}
+
 static int tailLen(const char *z){
   int n = 0;
   if( z==0 ) return 0;
@@ -206,7 +265,7 @@ static void captureName(const char *zMsg){
 static int fixtureIntact(void){
   sqlite3_stmt *p = 0;
   int ok = 0;
-  if( sqlite3_prepare_v2(gDb, "SELECT count(*) FROM t1", -1, &p, 0)==SQLITE_OK
+  if( prepPlain("SELECT count(*) FROM t1", &p)==SQLITE_OK
    && sqlite3_step(p)==SQLITE_ROW ){
     ok = sqlite3_column_int(p, 0)==2;
   }
@@ -246,30 +305,60 @@ static void runCase(int iHost, int iArm, const char *zValue, i64 nValue,
   sqlite3_free(zHole);
   if( zSql==0 ) die("oom");
 
-  rc = sqlite3_prepare_v2(gDb, zSql, -1, &pStmt, &zTail);
-  pOut->rc = rc;
-  if( rc!=SQLITE_OK ){
-    const char *zMsg = sqlite3_errmsg(gDb);
-    captureName(zMsg);
-    pOut->zOutcome = "parse";
-    sqlite3_snprintf(sizeof(pOut->zErr), pOut->zErr, "%s", zMsg);
-    sqlite3_snprintf(sizeof(pOut->zName), pOut->zName, "%s", gName);
-    sqlite3_finalize(pStmt);
-    sqlite3_free(zSql);
-    return;
+  if( pA->bTyped ){
+    /* The strict-mode path: the value or identifier is passed separately to
+    ** sqlite3_matchertext_prepare_v3(), which verifies it, then binds a value
+    ** as a parameter or delimits an identifier as [ ].  A verify failure is a
+    ** refusal, not a parse error. */
+    sqlite3_matchertext_arg arg;
+    arg.type = pH->mHole==HOLE_IDENT ? SQLITE_MATCHERTEXT_IDENTIFIER
+                                     : SQLITE_MATCHERTEXT_VALUE;
+    arg.data = zValue;
+    arg.size = (sqlite3_uint64)nValue;
+    rc = sqlite3_matchertext_prepare_v3(gDb, zSql, -1, 0, &arg, 1, &pStmt);
+    pOut->rc = rc;
+    if( rc!=SQLITE_OK ){
+      const char *zMsg = sqlite3_errmsg(gDb);
+      captureName(zMsg);
+      pOut->zOutcome = strstr(zMsg, "not valid matchertext") ? "rejected" : "parse";
+      sqlite3_snprintf(sizeof(pOut->zErr), pOut->zErr, "%s", zMsg);
+      sqlite3_snprintf(sizeof(pOut->zName), pOut->zName, "%s", gName);
+      sqlite3_finalize(pStmt);
+      sqlite3_free(zSql);
+      return;
+    }
+    pOut->zOutcome = "ok";
+    pOut->ro = sqlite3_stmt_readonly(pStmt);
+    pOut->tail = 0;               /* the API admits one statement only */
+    if( typedExplainHash(zSql, &arg, zValue, nValue, &pOut->skel)==SQLITE_OK )
+      pOut->hasSkel = 1;
+  }else{
+    rc = sqlite3_prepare_v2(gDb, zSql, -1, &pStmt, &zTail);
+    pOut->rc = rc;
+    if( rc!=SQLITE_OK ){
+      const char *zMsg = sqlite3_errmsg(gDb);
+      captureName(zMsg);
+      pOut->zOutcome = "parse";
+      sqlite3_snprintf(sizeof(pOut->zErr), pOut->zErr, "%s", zMsg);
+      sqlite3_snprintf(sizeof(pOut->zName), pOut->zName, "%s", gName);
+      sqlite3_finalize(pStmt);
+      sqlite3_free(zSql);
+      return;
+    }
+    pOut->zOutcome = "ok";
+    pOut->ro = sqlite3_stmt_readonly(pStmt);
+    pOut->tail = tailLen(zTail);
+    if( explainHash(zSql, zValue, &pOut->skel)==SQLITE_OK ) pOut->hasSkel = 1;
   }
-  pOut->zOutcome = "ok";
-  pOut->ro = sqlite3_stmt_readonly(pStmt);
-  pOut->tail = tailLen(zTail);
-  if( explainHash(zSql, zValue, &pOut->skel)==SQLITE_OK ) pOut->hasSkel = 1;
 
-  sqlite3_exec(gDb, "SAVEPOINT s", 0, 0, 0);
+  execPlain("SAVEPOINT s");
   if( pA->bBind ) sqlite3_bind_text(pStmt, 1, zValue, (int)nValue, SQLITE_STATIC);
   pOut->nrow = 0;
   while( sqlite3_step(pStmt)==SQLITE_ROW ) pOut->nrow++;
   sqlite3_snprintf(sizeof(pOut->zName), pOut->zName, "%s", gName);
   sqlite3_finalize(pStmt);
-  sqlite3_exec(gDb, "ROLLBACK TO s; RELEASE s", 0, 0, 0);
+  execPlain("ROLLBACK TO s");
+  execPlain("RELEASE s");
   if( !fixtureIntact() ) resetDb();
   sqlite3_free(zSql);
 }
@@ -301,33 +390,52 @@ static i64 decodeHex(const char *z, char *aOut){
 static void openDb(void){
   char *zErr = 0;
   if( sqlite3_open(":memory:", &gDb)!=SQLITE_OK ) die("open");
+#ifdef SQLITE_MATCHERTEXT_STRICT
+  /* Legacy exec is refused in strict mode, so build the fixture through the
+  ** checked API. The template carries no untrusted value, so it needs no
+  ** placeholder; one statement per call. */
+  if( sqlite3_matchertext_exec(gDb, "CREATE TABLE t1(name TEXT, id INTEGER)",
+                               -1, 0, 0, 0, 0, &zErr)!=SQLITE_OK
+   || sqlite3_matchertext_exec(gDb, "INSERT INTO t1 VALUES('alice',1),('bob',2)",
+                               -1, 0, 0, 0, 0, &zErr)!=SQLITE_OK ){
+    fprintf(stderr, "sqli_driver: setup: %s\n", zErr);
+    exit(1);
+  }
+#else
   if( sqlite3_exec(gDb,
         "CREATE TABLE t1(name TEXT, id INTEGER);"
         "INSERT INTO t1 VALUES('alice',1),('bob',2);", 0, 0, &zErr)!=SQLITE_OK ){
     fprintf(stderr, "sqli_driver: setup: %s\n", zErr);
     exit(1);
   }
+#endif
 }
 
 static void dumpTables(void){
   int i;
   sqlite3_stmt *p = 0;
   char *zM;
-  int rcConcat, rcMt;
+  int rcConcat, rcMt, rcTyped;
+  sqlite3_matchertext_arg arg;
   for(i=0; i<NHOST; i++)
     printf("host %d %s %d %d\n", i, aHost[i].zName, aHost[i].mHole, aHost[i].bEcho);
   for(i=0; i<NARM; i++)
     printf("arm %d %s %d %d\n", i, aArm[i].zName, aArm[i].mHole, aArm[i].eConv);
-  /* Self-check: legacy concatenation must prepare (additive build), and a %m
-  ** hole must contain the canonical breakout. */
+  /* Self-check: legacy concatenation and a %m hole go through prepare_v2, which
+  ** the additive build accepts and the strict build refuses; the strict-mode
+  ** typed ?V path must prepare in both. */
   rcConcat = sqlite3_prepare_v2(gDb,
       "SELECT id FROM t1 WHERE name = 'x' OR '1'='1'", -1, &p, 0);
   sqlite3_finalize(p); p = 0;
   zM = sqlite3_mprintf("SELECT id FROM t1 WHERE name = %m", "' OR '1'='1");
   rcMt = zM ? sqlite3_prepare_v2(gDb, zM, -1, &p, 0) : SQLITE_NOMEM;
+  sqlite3_finalize(p); p = 0;
+  arg.type = SQLITE_MATCHERTEXT_VALUE; arg.data = "alice"; arg.size = 5;
+  rcTyped = sqlite3_matchertext_prepare_v3(gDb,
+      "SELECT id FROM t1 WHERE name = ?V", -1, 0, &arg, 1, &p);
   sqlite3_finalize(p);
   sqlite3_free(zM);
-  printf("selfcheck concat_rc=%d mt_rc=%d\n", rcConcat, rcMt);
+  printf("selfcheck concat_rc=%d mt_rc=%d typed_rc=%d\n", rcConcat, rcMt, rcTyped);
   printf("resets %lld\n", (long long)gnReset);
   printf("end\n");
 }
