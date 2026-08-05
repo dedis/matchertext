@@ -453,7 +453,7 @@ def run(args):
         ("InjectionWithPocShare", pct(with_poc / injection)),
         ("PocRows", num(q("SELECT COUNT(*) FROM poc"))),
         # per-source PoC reach over the whole corpus, for \cref{sec:data}
-        *[(f"Poc{s.title().replace('-', '')}CVEs", num(n)) for s, n in con.execute(
+        *[(f"Poc{''.join(c for c in s.title() if c.isalpha())}CVEs", num(n)) for s, n in con.execute(
             "SELECT source, COUNT(DISTINCT cve_id) FROM poc GROUP BY 1 ORDER BY 2 DESC")],
         ("KevRows", num(q("SELECT COUNT(*) FROM kev"))),
         ("VedasScored", num(q("""SELECT COUNT(*) FROM cve v JOIN exploit_score USING(cve_id)
