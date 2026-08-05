@@ -26,8 +26,8 @@ pair, and, if so, whether the skeleton passes \textsc{Verify}.
 A passing skeleton is contained by \emph{inert embedding}; a failing one is
 stopped by \emph{rejection}.
 This test characterizes the structure of each recorded payload under a
-matchertext-aware host; it does not exercise a deployed host parser, which we
-leave to future implementation work.
+matchertext-aware host by simulation, then exercises a deployed host parser
+on the same payloads for the one syntax a matchertext host now implements.
 
 \begin{table}[t]
 \centering
@@ -141,3 +141,110 @@ concept that constructs its payload at run time exposes none.
 The measurable population is therefore roughly half the corpus rather than all
 of it, and the fragment-level bound should be read against that population, not
 against \dataInjectionCVEs.
+
+\subsection{An executed host}
+\label{sec:prevent:exec}
+
+The measurement above is a simulation: it runs \textsc{Verify} over a syntactic
+skeleton, never a payload through a parser.
+\Cref{sec:threat} names the two obligations a simulation cannot reach, parse
+inertness (L2) and interpreter inertness (L3), as per-host and left to
+implementation.
+We show them for one host, a matchertext-aware SQLite, executed over the
+same corpus.
+
+\paragraph{The deployed host.}
+The build realizes the discipline of \cref{sec:resist} directly: a value is
+placed in the SQL text inside an \verb|M'(...)'| literal, an identifier inside
+\verb|[|$\dots$\verb|]| read to matcher balance (A1), and the statement is
+prepared through the ordinary interface.
+The matcher-delimited hole is offered beside the legacy quote rather than
+replacing it, so existing SQL keeps working and adoption is incremental: this is
+the point-of-use character of A2, that a value the caller still concatenates
+into host syntax is unprotected, exactly as with an escape or a bound parameter.
+An opt-in strict mode additionally refuses the quoted-string entry points,
+turning A2 from a convention into an enforced invariant for callers who want it;
+the measurement below reports the additive default and this strict build side by
+side.
+
+\paragraph{Method.}
+Each of the \dataSqliPayloads distinct SQL payloads (\dataSqliFamilies families)
+is placed in each hole through every arm and compared against the same hole
+holding a benign value.
+The oracle is the compiled statement, not the string: the \textsc{Explain}
+bytecode with the value operand redacted, the read-only flag, whether any SQL is
+left after the first statement, and the rows returned, each read against the
+benign baseline.
+A payload counts against a defense only where the control, naive concatenation
+into a quote or a bare name, actually breaks out; most recorded payloads are
+fragments that never parse against SQLite and are not attacks here.
+That effective set is \dataSqliEffective payloads.
+
+\begin{table*}[t]
+\centering
+\small
+\input{generated/tbl-sqli-arms}
+\caption{Executed outcome by delivery path over the \dataSqliPayloads SQL
+payloads (\dataSqliCases cases), the additive default beside the opt-in strict
+build. Additive: the matcher-delimited holes (lower block) contain every
+payload, the escaping and bound-parameter defences hold too, and the same
+payloads break out when concatenated into a quote or a bare name (upper block);
+\emph{Not SQL} counts fragments that do not parse against SQLite. Strict has no
+in-band holes: the value hole's strict form is the typed \texttt{?V} parameter
+and the name hole's is \texttt{?I}, both passed to
+\texttt{sqlite3\_matchertext\_prepare\_v3()}, and those two are the only admitted
+paths. They contain every payload the same way, inert or refused with no
+breakout, while every text-splicing path, the in-band \texttt{M'(\ldots)'}
+included, is refused before the parser (\emph{Refused}).}
+\label{tab:sqli}
+\end{table*}
+
+\paragraph{Results.}
+Over the effective set no matchertext hole admitted a breakout (\cref{tab:sqli}):
+\dataSqliMtBreakout through the \verb|M'(...)'| value hole, \dataSqliMtStrictBreakout
+through the verified \verb|M'(%M)'| route, and \dataSqliIdentMtBreakout through the
+\verb|[|$\dots$\verb|]| name hole.
+The legacy value defences hold as well, \texttt{\%Q} and \texttt{\%q} escaping
+and a bound parameter, which is the honest baseline.
+Concatenation is the contrast: \dataSqliConcatBreakout breakouts of the value
+control and \dataSqliIdentConcatBreakout of the identifier control, on the very
+same payloads.
+That breakout is available only because the additive build leaves the legacy
+quote open.
+Recompiled in the opt-in strict mode, every text-splicing prepare, the
+concatenation and the in-band \verb|M'(...)'| alike, is refused before it reaches
+the parser (\cref{tab:sqli}, right), so the \dataSqliEffective effective-set
+attacks have no path at all and A2 holds by construction rather than by
+discipline.
+The only admitted paths are then the typed \texttt{?V} value and \texttt{?I}
+identifier parameters of \texttt{sqlite3\_matchertext\_prepare\_v3()}, and run
+over the SQL corpus they contain it exactly as the additive holes do:
+\dataSqliStrictValueBreakout value breakouts and \dataSqliStrictIdentBreakout
+identifier breakouts, the \texttt{?V} route binding each valid value and refusing
+the \dataSqliStrictValueRejected that are not matchertext, the \texttt{?I} route
+holding each as a single name.
+Short of strict mode, an application closes the same gap itself by carrying the
+two \textsc{Verify} checks of the discipline: that the input is valid
+matchertext, which admits it or routes it through the encoder, and that the
+input placed in its matcher-delimited hole leaves the assembled statement valid
+matchertext, the closure the host reads to matcher balance.
+The value-hole and name-hole rows are exactly those two checks applied by the
+driver; the concatenation control is their absence.
+The value hole embeds each payload inertly, its quotes and operators read as
+data; the verified route instead refuses the \dataSqliMtStrictRejected payloads
+that are not valid matchertext, so the two mechanisms of \cref{sec:resist},
+inert embedding and rejection, appear directly.
+The identifier hole holds each payload as a single name, which resolves or does
+not but never contributes syntax, and is the one position a bound parameter
+cannot fill.
+
+\paragraph{Falsifiability.}
+A zero is evidence only if the oracle could have reported a one.
+We rebuild the scanner deliberately broken, once so the boundary locator stops
+at the first closer and once so \textsc{Verify} always accepts, and rerun.
+Each broken build changes the verdict of the holes that rest on it, the value
+and name holes that end by matcher balance and the verified route that calls
+\textsc{Verify}, in up to \dataSqliSabotageDetect of cases, so the honest zero is
+read against demonstrated detection power rather than a blind harness.
+The C scanner and an independent implementation agree on \textsc{Verify} for
+every payload, and the run is deterministic.

@@ -289,9 +289,14 @@ def strict_sweep(con, payloads):
 
     def score(idx, rows):
         o = payloads[idx][1]
+        expected = verify(o)
         for (h, a), r in rows.items():
             arm = drv.arms[a][0]
             if arm in TYPED_ARMS:
+                accepted = r[IDX["outcome"]] != "rejected"
+                assert accepted == expected, (
+                    f"VERIFY mismatch for payload {idx} ({arm}/{drv.hosts[h][0]}): "
+                    f"python={expected} c={accepted} value={o[:160]!r}")
                 v = verdict(arm, r, base[(h, a)], o, h in ident_hosts)
                 tally[arm][{"INERT": 0, "BREAKOUT": 1, "REJECTED": 2,
                             "MALFORMED": 4}[v]] += 1
