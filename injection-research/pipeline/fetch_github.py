@@ -24,6 +24,7 @@ Usage:
   python3 pipeline/fetch_github.py --retry --archives  # recursively retry misses
   python3 pipeline/fetch_github.py --trees    # scan oversized repos file by file
   python3 pipeline/fetch_github.py --fanout-trees  # exact CVE paths in collections
+  python3 pipeline/fetch_github.py --alternates    # try another repo per miss
 """
 import argparse
 import io
@@ -73,6 +74,9 @@ DDL = """
 CREATE TABLE IF NOT EXISTS remote_payload(
     cve_id TEXT PRIMARY KEY, source TEXT, repo TEXT, sha TEXT,
     file TEXT, payload TEXT, status TEXT);
+CREATE TABLE IF NOT EXISTS remote_attempt(
+    cve_id TEXT, repo TEXT, sha TEXT, file TEXT, payload TEXT, status TEXT,
+    PRIMARY KEY(cve_id, repo));
 """
 
 
@@ -105,6 +109,35 @@ def candidates(con, max_fanout, done):
         if cve not in by_cve or fan[r] < fan[by_cve[cve][1]]:
             by_cve[cve] = (syn, r)
     return [(k, *by_cve[k]) for k in sorted(by_cve)]
+
+
+def alternate_candidates(con, max_fanout):
+    """Best untried repository for each unresolved CVE."""
+    rows = con.execute("""
+        SELECT cl.cve_id, cl.syntax_type, p.ref
+        FROM classification cl JOIN poc p USING(cve_id)
+        JOIN remote_payload r USING(cve_id)
+        LEFT JOIN syntactic_group s USING(cve_id)
+        WHERE r.payload IS NULL AND s.cve_id IS NULL
+          AND p.local_path IS NULL AND p.ref LIKE '%github.com/%'
+        ORDER BY CASE p.source WHEN 'github' THEN 0
+                     WHEN 'zulloper-cve-poc' THEN 1 ELSE 2 END, p.rowid""").fetchall()
+    tried = {(cve, repo.lower()) for cve, repo in con.execute(
+        "SELECT cve_id, repo FROM remote_attempt")}
+    ordered, fan = [], {}
+    for cve, syn, ref in rows:
+        repo = repo_of(ref)
+        if repo and (cve, f"{repo[0]}/{repo[1]}".lower()) not in tried:
+            ordered.append((cve, syn, repo))
+            fan[repo] = fan.get(repo, 0) + 1
+    best = {}
+    for rank, (cve, syn, repo) in enumerate(ordered):
+        if fan[repo] > max_fanout:
+            continue
+        score = fan[repo], rank
+        if cve not in best or score < best[cve][0]:
+            best[cve] = score, syn, repo
+    return [(cve, syn, repo) for cve, (_, syn, repo) in sorted(best.items())]
 
 
 def resolve_sha(owner, repo):
@@ -418,6 +451,44 @@ def run_fanout(con, args):
             print(f"  {seen}/{total}  payloads={got}", file=sys.stderr, flush=True)
 
 
+def run_alternates(con, args):
+    """Try one untested repository per unresolved CVE."""
+    todo = alternate_candidates(con, args.max_fanout)
+    if args.n:
+        random.Random(args.seed).shuffle(todo)
+        todo = todo[:args.n]
+    pins = json.loads(PINS.read_text()) if PINS.exists() else {}
+    print(f"{len(todo)} alternate repositories to scan", file=sys.stderr, flush=True)
+
+    def alternate_one(item):
+        slug = "/".join(item[2])
+        row = one(item, pins.get(slug))
+        if row["status"] == "oversize" and row["sha"]:
+            row = scan_tree(item, row["sha"])
+        elif row["status"] == "no_payload":
+            row["status"] = "deep_no_payload"
+        return row
+
+    found = 0
+    with ThreadPoolExecutor(max_workers=args.workers) as ex:
+        futures = [ex.submit(alternate_one, item) for item in todo]
+        for seen, future in enumerate(as_completed(futures), 1):
+            row = future.result()
+            con.execute("""INSERT OR REPLACE INTO remote_attempt
+                VALUES(:cve_id, :repo, :sha, :file, :payload, :status)""", row)
+            if row["payload"]:
+                con.execute("""INSERT OR REPLACE INTO remote_payload
+                    VALUES(:cve_id, 'github', :repo, :sha, :file, :payload, :status)""", row)
+                found += 1
+            con.commit()
+            if row["sha"]:
+                pins[row["repo"]] = row["sha"]
+            if seen % 25 == 0 or seen == len(todo):
+                print(f"  {seen}/{len(todo)}  new_payloads={found}",
+                      file=sys.stderr, flush=True)
+    PINS.write_text(json.dumps(pins, indent=1, sort_keys=True))
+
+
 def one(item, sha=None):
     cve, syn, (owner, repo) = item
     slug = f"{owner}/{repo}"
@@ -439,6 +510,14 @@ def one(item, sha=None):
 def run(args):
     con = sqlite3.connect(DB)
     con.executescript(DDL)
+    con.execute("""INSERT OR IGNORE INTO remote_attempt
+        SELECT cve_id, repo, sha, file, payload, status FROM remote_payload
+        WHERE repo IS NOT NULL""")
+    con.commit()
+    if args.alternates:
+        run_alternates(con, args)
+        con.close()
+        return
     if args.fanout_trees:
         run_fanout(con, args)
         con.close()
@@ -651,6 +730,8 @@ if __name__ == "__main__":
                       help="scan oversized repositories through pinned Git trees")
     mode.add_argument("--fanout-trees", action="store_true",
                       help="scan exact CVE paths in multi-CVE repositories")
+    mode.add_argument("--alternates", action="store_true",
+                      help="try one untested repository for each unresolved CVE")
     ap.add_argument("--workers", type=int, default=8,
                     help="concurrent archive downloads; the work is I/O bound,\nso this is the lever, not core count")
     ap.add_argument("--deep", action="store_true",

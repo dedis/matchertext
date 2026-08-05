@@ -35,6 +35,7 @@ DROP TABLE IF EXISTS nvd_status;
 DROP TABLE IF EXISTS cwe_hierarchy;
 DROP TABLE IF EXISTS poc;
 DROP TABLE IF EXISTS advisory;
+DROP TABLE IF EXISTS evidence_text;
 DROP TABLE IF EXISTS payload;
 DROP TABLE IF EXISTS ground_truth;
 DROP TABLE IF EXISTS exploit_score;
@@ -57,6 +58,10 @@ CREATE TABLE poc(cve_id TEXT, source TEXT, ref TEXT, local_path TEXT, kind TEXT,
 -- Per-source advisory metadata (severity / fix status) for breadth.
 CREATE TABLE advisory(cve_id TEXT, source TEXT, severity TEXT, status TEXT, ref TEXT,
                       UNIQUE(cve_id, source, ref));
+-- Pinned advisory prose can contain a literal PoC even when it has no exploit
+-- file. Keep it separate so it does not block GitHub-repository recovery.
+CREATE TABLE evidence_text(cve_id TEXT, source TEXT, ref TEXT, text TEXT,
+                           UNIQUE(cve_id, source, ref));
 -- Attack payloads by sink type, from the curated corpora. Independent of the CVE
 -- record: these are the strings themselves, which is what matchertext is
 -- assessed against.
@@ -361,7 +366,7 @@ def load_ghsa(con):
     if not base.exists():
         print("ghsa: not fetched, skipping")
         return
-    cwe_rows, cvss_rows, adv_rows = set(), [], []
+    cwe_rows, cvss_rows, adv_rows, text_rows = set(), [], [], []
     for f in base.rglob("GHSA-*.json"):
         try:
             d = json.loads(f.read_text(encoding="utf-8", errors="replace"))
@@ -371,6 +376,7 @@ def load_ghsa(con):
         if not cves:
             continue
         ghsa = d.get("id")
+        details = d.get("details")
         spec = d.get("database_specific") or {}
         for cid in cves:
             for n in _cwe_ints(",".join(spec.get("cwe_ids") or ())):
@@ -380,9 +386,12 @@ def load_ghsa(con):
                 ver = "4.0" if "CVSS:4.0" in vec else "3.1" if "CVSS:3" in vec else None
                 cvss_rows.append((cid, ver, None, vec, "ghsa"))
             adv_rows.append((cid, "ghsa", spec.get("severity"), None, ghsa))
+            if details:
+                text_rows.append((cid, "ghsa", ghsa, details))
     con.executemany("INSERT OR IGNORE INTO cwe_assignment VALUES(?,?,?)", cwe_rows)
     con.executemany("INSERT OR IGNORE INTO cvss VALUES(?,?,?,?,?)", cvss_rows)
     con.executemany("INSERT OR IGNORE INTO advisory VALUES(?,?,?,?,?)", adv_rows)
+    con.executemany("INSERT OR IGNORE INTO evidence_text VALUES(?,?,?,?)", text_rows)
     con.commit()
 
 
