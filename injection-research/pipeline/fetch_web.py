@@ -41,6 +41,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from report import extract_payload
@@ -61,10 +62,13 @@ DDL = """
 CREATE TABLE IF NOT EXISTS web_payload(
     cve_id TEXT PRIMARY KEY, source TEXT, url TEXT, sha256 TEXT,
     payload TEXT, status TEXT);
+CREATE TABLE IF NOT EXISTS ghsl_page(
+    url TEXT PRIMARY KEY, sha256 TEXT, status TEXT);
 """
 
 _TAG = re.compile(r"<(script|style)\b[^>]*>.*?</\1>", re.I | re.S)
 _ANY_TAG = re.compile(r"<[^>]+>")
+_CODE = re.compile(r"<code\b[^>]*>(.*?)</code>", re.I | re.S)
 _HOST = re.compile(r"https?://(?:www\.)?([^/]+)", re.I)
 # A block is served as HTTP 200 with a refusal page, so status codes alone do
 # not reveal it. Without this check a ban is silently recorded as "this advisory
@@ -75,6 +79,9 @@ _BLOCKED = re.compile(
     r"|rate limit exceeded|too many requests|temporarily blocked", re.I)
 # Consecutive blocks after which a site is abandoned for the rest of the run.
 BLOCK_LIMIT = 3
+GHSL_SITEMAP = "https://securitylab.github.com/sitemap.xml"
+GHSL_URL = re.compile(r"<loc>(https://securitylab\.github\.com/advisories/[^<]+)</loc>")
+CVE_RE = re.compile(r"CVE-\d{4}-\d+", re.I)
 
 
 class Throttle:
@@ -134,6 +141,11 @@ def to_text(raw):
     return html.unescape(_ANY_TAG.sub(" ", body))
 
 
+def code_text(raw):
+    return "\n".join(html.unescape(_ANY_TAG.sub(" ", part))
+                     for part in _CODE.findall(raw))
+
+
 def fetch_one(item, throttle, retries=2):
     cve, syn, url, source, host = item
     for attempt in range(retries + 1):
@@ -163,14 +175,84 @@ def fetch_one(item, throttle, retries=2):
         return {"cve_id": cve, "source": source, "url": url, "sha256": None,
                 "payload": None, "status": "blocked"}
     digest = hashlib.sha256(raw.encode("utf-8", "replace")).hexdigest()
-    payload = extract_payload(text, syn)
+    payload = extract_payload(text, syn, prefer_constructed=True)
     return {"cve_id": cve, "source": source, "url": url, "sha256": digest,
             "payload": payload, "status": "payload" if payload else "no_payload"}
+
+
+def run_ghsl(con, args):
+    """Crawl pinned Security Lab advisories from the published sitemap."""
+    req = urllib.request.Request(GHSL_SITEMAP, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=TIMEOUT) as response:
+        sitemap = response.read(2 << 20).decode("utf-8", "replace")
+    done = {url for (url,) in con.execute(
+        "SELECT url FROM ghsl_page WHERE sha256 IS NOT NULL")}
+    urls = sorted(set(GHSL_URL.findall(sitemap)) - done)
+    if args.n:
+        urls = urls[:args.n]
+    # Independent of derived groups: --refresh-ghsl deletes its own payload rows
+    # before the groups are rebuilt, so using the old groups would lose results.
+    syn_of = dict(con.execute("SELECT cve_id, syntax_type FROM classification"))
+    throttle = Throttle(args.delay)
+    print(f"{len(done)} GHSL pages already fetched; {len(urls)} to go",
+          file=sys.stderr, flush=True)
+
+    def fetch_page(url):
+        throttle.wait("securitylab")
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": UA})
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as response:
+                raw = response.read(2 << 20).decode("utf-8", "replace")
+        except urllib.error.HTTPError as error:
+            return (url, None, f"http_{error.code}"), []
+        except Exception as error:                              # noqa: BLE001
+            return (url, None, type(error).__name__), []
+        digest = hashlib.sha256(raw.encode("utf-8", "replace")).hexdigest()
+        text = to_text(raw)
+        ids = sorted(set(CVE_RE.findall(text)) & syn_of.keys())
+        if not ids:
+            return (url, digest, "no_injection_cve"), []
+        if len(ids) > 1:
+            return (url, digest, "ambiguous_cves"), []
+        cve = ids[0]
+        payload = (extract_payload(code_text(raw), syn_of[cve], prefer_constructed=True)
+                   or extract_payload(text, syn_of[cve], prefer_constructed=True))
+        status = "payload" if payload else "no_payload"
+        row = {"cve_id": cve, "source": "ghsl", "url": url,
+               "sha256": digest, "payload": payload, "status": status}
+        return (url, digest, status), [row] if payload else []
+
+    pages, hits = [], []
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        for seen, future in enumerate(as_completed(
+                [executor.submit(fetch_page, url) for url in urls]), 1):
+            page, rows = future.result()
+            pages.append(page)
+            hits.extend(rows)
+            if len(pages) >= 25 or seen == len(urls):
+                con.executemany("INSERT OR REPLACE INTO ghsl_page VALUES(?,?,?)", pages)
+                con.executemany("""INSERT OR REPLACE INTO web_payload
+                    VALUES(:cve_id,:source,:url,:sha256,:payload,:status)""", hits)
+                con.commit()
+                pages.clear()
+                hits.clear()
+            if seen % 50 == 0 or seen == len(urls):
+                got = con.execute("SELECT COUNT(*) FROM web_payload "
+                                  "WHERE source='ghsl' AND payload IS NOT NULL").fetchone()[0]
+                print(f"  {seen}/{len(urls)}  payloads={got}", file=sys.stderr, flush=True)
 
 
 def run(args):
     con = sqlite3.connect(DB)
     con.executescript(DDL)
+    if args.refresh_ghsl:
+        con.execute("DELETE FROM web_payload WHERE source='ghsl'")
+        con.execute("DELETE FROM ghsl_page")
+        con.commit()
+    if args.ghsl or args.refresh_ghsl:
+        run_ghsl(con, args)
+        con.close()
+        return
     done = {c for (c,) in con.execute("SELECT cve_id FROM web_payload")}
     todo = candidates(con, done)
     if args.n:
@@ -239,4 +321,8 @@ if __name__ == "__main__":
     ap.add_argument("-n", type=int, help="fetch only this many, for measurement")
     ap.add_argument("--delay", type=float, default=1.0,
                     help="minimum seconds between requests to the same host")
+    ap.add_argument("--ghsl", action="store_true",
+                    help="crawl GitHub Security Lab advisories from its sitemap")
+    ap.add_argument("--refresh-ghsl", action="store_true",
+                    help="replace the derived GHSL cache and payloads")
     run(ap.parse_args())

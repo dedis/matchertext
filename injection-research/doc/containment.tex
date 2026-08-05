@@ -36,7 +36,7 @@ leave to future implementation work.
 \caption{Containment outcome by syntax over all \dataPayloadBackedCVEs payload-backed CVEs.
 Contexts a matchertext host can delimit (upper block) are contained by inert
 embedding or by rejection; the \emph{Outside} column counts CVEs failing a
-condition of \cref{sec:threat}, either an execution sink (the HTML/DOM entries
+premise of \cref{sec:threat}, either an execution sink (the HTML/DOM entries
 are \texttt{javascript:} URLs) or a context whose delimiters are not matchers.}
 \label{tab:mech}
 \end{table}
@@ -53,7 +53,7 @@ SQL and XSS, breaking out on nonmatchers, are overwhelmingly valid matchertext
 and embed inertly; the \dataSqlRejected SQL rejections additionally carry an unbalanced
 function or subquery parenthesis.
 The ratio between the two mechanisms is descriptive, not predictive.
-These payloads were written against quote and tag-delimited sinks; an attacker
+These payloads were written against quote and tag-delimited hosts; an attacker
 aware of a matcher-delimited slot would balance the matchers, shifting cases
 from rejection to inert embedding.
 Containment is unaffected, since both routes hold the value, but the split
@@ -61,7 +61,7 @@ itself is a property of the recorded corpus rather than of an adaptive attacker.
 
 \paragraph{Where matchertext cannot help.}
 The remaining \dataOutsideCVEs payload-backed CVEs are outside both conditions, and divide
-along the two conditions they fail.
+by the premise of \cref{sec:threat} they fail.
 \dataOutsideSemantic target execution/semantic sinks (server-side templates, expression
 languages, code evaluation, spreadsheet formulas, and \verb|javascript:| URLs)
 where the host runs the contained value by design, so delimiting cannot stop
@@ -94,7 +94,7 @@ We therefore estimate a containment rate per syntax and weight by the corpus
 counts (\cref{tab:strata}), the standard post-stratification correction, giving
 a central estimate of \textbf{\dataCentralEstimate}
 (\textbf{\dataCentralShare}) against the \dataHostableShare ceiling.
-Within a syntax the estimate still assumes payload-backed CVEs carry sinks at
+Within a syntax the estimate still assumes payload-backed CVEs carry semantic sinks at
 the same rate as the rest, which their skew toward exploitable web bugs may not
 warrant.
 

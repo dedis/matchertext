@@ -61,7 +61,7 @@ encodings, Unicode, length, and matcher-nesting depth, and may submit strings
 that are \emph{not} valid matchertext.
 Following Kerckhoffs, the attacker knows the discipline, which delimiter kind
 guards the hole, and where the hole boundaries lie, and crafts $v$ \emph{against}
-the matcher-delimited slot, not the legacy quote or tag-delimited sink that the
+the matcher-delimited slot, not the legacy quote or tag-delimited host that the
 recorded corpus payloads (\cref{sec:results}) target.
 The attacker does not control the host source, the configuration $(\Sigma,\Pi)$,
 or the trusted components above.
@@ -81,10 +81,11 @@ Closure is a lemma toward inertness, not inertness itself: it constrains the
 \emph{string}, not the host \emph{parser}.
 
 \paragraph{Deployment premises.}
-Inertness holds under four assumptions, each necessary:
+Inertness holds under four premises, each necessary:
 \begin{itemize}
-\item[\textbf{A1}] \emph{Aware host.} The sink is a matchertext-aware host that
-	ends the value by matcher balance rather than at its native closer.
+\item[\textbf{A1}] \emph{Aware host.} The host that interprets the composed text
+	is matchertext-aware: it ends the value by matcher balance rather
+	than at its native closer.
 \item[\textbf{A2}] \emph{Delimited context.} Every untrusted value is routed
 	into a matcher-delimited hole; a value concatenated into host syntax
 	outside a hole is unprotected, exactly as with any point-of-use defense.
@@ -166,4 +167,4 @@ matcher hosting (shell separators, CR/LF header breaks, XML/XXE angle brackets);
 access-control question; algorithmic denial of service (regular-expression
 backtracking, entity expansion), which is not a breakout; and second-order
 injection in which stored input is reinterpreted later in a different context,
-unless it is re-checked under A3 at that later sink.
+unless it is re-checked under A3 at that later host.

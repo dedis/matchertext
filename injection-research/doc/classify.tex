@@ -4,7 +4,7 @@
 We classify each injection CVE along two axes: the \emph{weakness family}
 (rooted in the CWE taxonomy) and the injection \emph{syntax type}: the
 embedded language the attack targets, such as SQL, HTML, shell, or LDAP.
-The syntax axis is the one that matters for matchertext, because prevention
+The syntax axis is the one that matters for matchertext, because containment
 depends on how the untrusted value is delimited in the target language, not on
 how the weakness is categorized.
 
@@ -43,7 +43,7 @@ Only the naive-Bayes layer is statistical, and it is both the smallest (\dataMet
 labels) and the only one we can score directly: on a held-out set of \dataNbTestDocs
 CVEs it reaches a weighted precision of \textbf{\dataNbPrecision} and recall of
 \textbf{\dataNbRecall} at \dataNbCoverage coverage, and it is strongest exactly where the
-prevention analysis is most sensitive (HTML/DOM \dataNbPrecisionHtmlDom/\dataNbRecallHtmlDom, SQL \dataNbPrecisionSql/\dataNbRecallSql),
+containment analysis is most sensitive (HTML/DOM \dataNbPrecisionHtmlDom/\dataNbRecallHtmlDom, SQL \dataNbPrecisionSql/\dataNbRecallSql),
 weakest on the small execution-sink classes it labels least often
 (code/eval \dataNbPrecisionCodeEval/\dataNbRecallCodeEval).
 The deterministic layers carry the remaining \dataMethodDeterministicShare of labels and rest on the
@@ -58,4 +58,4 @@ Aggregated to families, the corpus is dominated by rendering injection
 followed by command injection and code/expression injection.
 Because family and syntax are distinct axes (CRLF header injection and XSS
 share the rendering family but differ sharply in matchertext-hostability), the
-prevention analysis works from the finer syntax axis throughout.
+containment analysis works from the finer syntax axis throughout.

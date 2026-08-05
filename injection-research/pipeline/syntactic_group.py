@@ -101,6 +101,13 @@ def representative_payload(con):
     remote = dict(con.execute(
         "SELECT cve_id, payload FROM remote_payload WHERE payload IS NOT NULL")
         if _table("remote_payload") else ())
+    evidence = defaultdict(list)
+    if _table("evidence_text"):
+        for cid, text in con.execute(
+                "SELECT cve_id, text FROM evidence_text ORDER BY cve_id, source, ref"):
+            evidence[cid].append(text)
+    descriptions = dict(con.execute(
+        "SELECT cve_id, description FROM cve WHERE description IS NOT NULL"))
     # Advisory pages are the last resort: unlike a pinned commit they can be
     # edited in place, so they are only consulted when nothing else has one.
     web = dict(con.execute(
@@ -115,7 +122,15 @@ def representative_payload(con):
                 found = None
             if found:
                 break
-        if found or (found := remote.get(cid)) or (found := web.get(cid)):
+        if not found:
+            found = remote.get(cid)
+        if not found:
+            for text in evidence.get(cid, ()):
+                if found := extract_payload(text, syn):
+                    break
+        if not found and (description := descriptions.get(cid)):
+            found = extract_payload(description, syn)
+        if found or (found := web.get(cid)):
             yield cid, syn, found
 
 

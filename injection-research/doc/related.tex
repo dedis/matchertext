@@ -5,11 +5,11 @@ Matchertext treats injection as a structural problem: keep untrusted input from
 altering the syntax around it, rather than filter what it may contain.
 \Cref{sec:resist:baselines} sets it head-to-head against the defenses deployed
 today; here we place it in the broader literature, grouped by how each line
-attacks the host--guest boundary.
+attacks the embedding boundary.
 
 \subsection{Language-based construction}
-The strongest sink-specific defenses fix guest structure before any value is
-bound.
+The strongest host-specific defenses fix the embedded language's structure
+before any value is bound.
 Parameterized queries do this for SQL~\cite{owasp_parameterization}, and a
 programming-languages tradition hardens the same idea into types: SQL~DOM~\cite{mcclure05sqldom}
 and Safe Query Objects~\cite{cook05safequery} replace string building with typed
@@ -20,28 +20,28 @@ For markup, contextual auto-escaping selects the escaper from each hole's
 inferred syntactic context~\cite{samuel11csas}, and typed-value schemes such as
 SafeHtml and Trusted Types gate dangerous sinks so they accept only
 non-spoofable objects rather than arbitrary strings~\cite{kern14securing,trustedtypes}.
-Each buys a strong guarantee by knowing its guest: a fixed language, a dedicated
-sink API, or an owning compiler.
+Each buys a strong guarantee by knowing the language it protects: a fixed
+language, a dedicated sink API, or an owning compiler.
 Matchertext keeps values as plain text and fixes only the \emph{boundary}, so one
-rule serves sinks it was never specialized to (\cref{sec:resist:baselines}).
+rule serves hosts it was never specialized to (\cref{sec:resist:baselines}).
 
 \subsection{Syntax embedding and safe quotation}
 The closest work makes embedding safe by construction in the language itself.
-StringBorg~\cite{bravenboer10stringborg} embeds a guest grammar into the host,
-adds quotation and antiquotation forms, and assimilates the result into
-guest-language API calls, rendering programs impervious to injection by
-construction.
+StringBorg~\cite{bravenboer10stringborg} embeds the embedded language's grammar
+into the composing one, adds quotation and antiquotation forms, and assimilates
+the result into API calls in that embedded language, rendering programs
+impervious to injection by construction.
 It is the nearest neighbor to matchertext, and the sharpest contrast: it needs an
-explicit grammar and a combined-syntax toolchain per host/guest pair, where
+explicit grammar and a combined-syntax toolchain per language pair, where
 matchertext asks only that unrelated languages share one lexical invariant.
 The metaprogramming machinery this draws on has the same shape and the same
-assumption of a known guest: hygienic macros embed code in code without
+assumption of a known embedded language: hygienic macros embed code in code without
 capture~\cite{kohlbecker86hygienic,dybvig92syntactic}, staged and
-quotation-based programming generate well-typed guest fragments~\cite{taha00metaml,sheard02template,mainland07quoted},
-tagless-final embeddings make ill-typed guest terms unrepresentable~\cite{carette09tagless},
+quotation-based programming generate well-typed embedded fragments~\cite{taha00metaml,sheard02template,mainland07quoted},
+tagless-final embeddings make ill-typed embedded terms unrepresentable~\cite{carette09tagless},
 and language workbenches sidestep parser composition through projectional
 editing~\cite{renggli10embedding}.
-All own the guest's parser or type system; matchertext targets the case where the
+All own the embedded language's parser or type system; matchertext targets the case where the
 surrounding ecosystem shares no grammar or AST at all.
 
 \subsection{Static analysis and detection}

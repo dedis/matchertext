@@ -1,4 +1,10 @@
 {
+  "0xmarcio-cve": {
+    "commit": "d22b4ad16598d148015b9d6ff1c294b4b0ea7c1f",
+    "fetched": "2026-08-04",
+    "license": "MIT",
+    "url": "https://github.com/0xMarcio/cve.git"
+  },
   "BenchmarkJava": {
     "commit": "79b9bd6177e07991a9c11dc19e457c840e229931",
     "fetched": "2026-07-28",
@@ -23,6 +29,13 @@
     "commit": "79c2cf4630fcc44f2632735de08432a07cfaf204",
     "fetched": "2026-07-13",
     "url": "https://github.com/github/advisory-database.git"
+  },
+  "awesome-poc": {
+    "commit": "0f9e22b660cb1ea12c1c3668f9128d93e08da412",
+    "fetched": "2026-08-04",
+    "license": "NOASSERTION",
+    "url": "https://github.com/Threekiii/Awesome-POC.git",
+    "use": "research-only"
   },
   "cve-scores": {
     "commit": "eef9ab5b2a334e83b23dc90f1d12fd280866e1d8",
@@ -210,10 +223,36 @@
     "sha256": "bc7cafd82fa61f426055b9a9012f5bc2a409836126cd5248c6425ae37c0c4985",
     "url": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2026.json.gz"
   },
+  "peiqi-wiki": {
+    "commit": "f4596359a8b7b31ae4d231eeaec711706b892ed2",
+    "fetched": "2026-08-04",
+    "license": "NOASSERTION",
+    "url": "https://github.com/PeiQi0/PeiQi-WIKI-Book.git",
+    "use": "authorized research only"
+  },
+  "penetration-testing-poc": {
+    "commit": "8dd4bd11727f92bfc44a4f742b79d2d09c1f5387",
+    "fetched": "2026-08-04",
+    "license": "Apache-2.0",
+    "url": "https://github.com/Mr-xn/Penetration_Testing_POC.git"
+  },
+  "poc-lab": {
+    "commit": "b3a8fa7275a8368823f63eba88eb6e6b8e62a718",
+    "fetched": "2026-08-04",
+    "license": "MIT",
+    "url": "https://github.com/Unclecheng-li/poc-lab.git"
+  },
   "redhat": {
     "fetched": "2026-07-13",
     "sha256": "a96a85a365ea3ada08220bd748bc5921f60f4b63feb8e33c27da73c8d65c2084",
     "url": "https://access.redhat.com/hydra/rest/securitydata/cve.json"
+  },
+  "some-poc-or-exp": {
+    "commit": "29c28c6af8cd1da2d9fd8789fec0d41a0079b908",
+    "fetched": "2026-08-04",
+    "license": "NOASSERTION",
+    "url": "https://github.com/coffeehb/Some-PoC-oR-ExP.git",
+    "use": "research-only"
   },
   "trickest-cve": {
     "commit": "b3a270a001a31742516eaea5c494f365de9d3c80",
@@ -229,5 +268,25 @@
     "commit": "3d48581d1262450948913da31a996c293c65dc6d",
     "fetched": "2026-07-13",
     "url": "https://github.com/cisagov/vulnrichment.git"
+  },
+  "wy876-poc": {
+    "fetched": "2026-08-04",
+    "license": "NOASSERTION",
+    "status": "unavailable",
+    "url": "https://github.com/wy876/POC.git",
+    "use": "repository terms apply"
+  },
+  "xray": {
+    "commit": "aee9f9cecc3d49a1842a33c38b96af35a7d90168",
+    "fetched": "2026-08-04",
+    "license": "LicenseRef-xray",
+    "url": "https://github.com/chaitin/xray.git",
+    "use": "attribution and disclaimer acceptance required"
+  },
+  "zulloper-cve-poc": {
+    "commit": "4fefd3b9dc3cb95c217d9eadfdcd01a82cd87799",
+    "fetched": "2026-08-04",
+    "license": "NOASSERTION",
+    "url": "https://github.com/zulloper/cve-poc.git"
   }
 }
