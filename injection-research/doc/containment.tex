@@ -150,34 +150,43 @@ skeleton, never a payload through a parser.
 \Cref{sec:threat} names the two obligations a simulation cannot reach, parse
 inertness (L2) and interpreter inertness (L3), as per-host and left to
 implementation.
-We show them for one host, a matchertext-aware SQLite, executed over the
-same corpus.
+We test them for one host, a matchertext-aware SQLite, over the CVE-derived SQL
+subset and the standalone SQL payload corpora.
 
 \paragraph{The deployed host.}
 The build realizes the discipline of \cref{sec:resist} directly: a value is
 placed in the SQL text inside an \verb|M'(...)'| literal, an identifier inside
 \verb|[|$\dots$\verb|]| read to matcher balance (A1), and the statement is
 prepared through the ordinary interface.
-The matcher-delimited hole is offered beside the legacy quote rather than
+The matcher-delimited hole is offered beside legacy composition rather than
 replacing it, so existing SQL keeps working and adoption is incremental: this is
 the point-of-use character of A2, that a value the caller still concatenates
 into host syntax is unprotected, exactly as with an escape or a bound parameter.
-An opt-in strict mode additionally refuses the quoted-string entry points,
+An opt-in strict mode additionally refuses the legacy prepare entry points,
 turning A2 from a convention into an enforced invariant for callers who want it;
 the measurement below reports the additive default and this strict build side by
 side.
 
 \paragraph{Method.}
 Each of the \dataSqliPayloads distinct SQL payloads (\dataSqliFamilies families)
-is placed in each hole through every arm and compared against the same hole
-holding a benign value.
+is placed through every compatible hole-arm pair and compared against the same
+hole holding a benign value.
+The 16 fixtures cover single- and double-quoted text, raw and parenthesized
+numbers, \texttt{IN} lists, \texttt{ORDER BY} and \texttt{LIMIT} expressions,
+one- to four-column selects, one- and two-column inserts, and identifier
+positions.
+The set retains every recorded payload. SQLite variants are limited to one
+transport percent-decoding pass, SQL Server \verb|N'...'| text, PostgreSQL
+dollar-quoted text, and a terminal MySQL \verb|#| comment; no function,
+operator, query, or attack objective is changed.
 The oracle is the compiled statement, not the string: the \textsc{Explain}
 bytecode with the value operand redacted, the read-only flag, whether any SQL is
 left after the first statement, and the rows returned, each read against the
 benign baseline.
 A payload counts against a defense only where the control, naive concatenation
-into a quote or a bare name, actually breaks out; most recorded payloads are
-fragments that never parse against SQLite and are not attacks here.
+into a quoted or raw value context or a bare name, actually breaks out; most
+recorded payloads are fragments that never parse against SQLite and are not
+attacks here.
 That effective set is \dataSqliEffective payloads.
 
 \begin{table*}[t]
@@ -187,8 +196,8 @@ That effective set is \dataSqliEffective payloads.
 \caption{Executed outcome by delivery path over the \dataSqliPayloads SQL
 payloads (\dataSqliCases cases), the additive default beside the opt-in strict
 build. Additive: the matcher-delimited holes (lower block) contain every
-payload, the escaping and bound-parameter defences hold too, and the same
-payloads break out when concatenated into a quote or a bare name (upper block);
+payload, the escaping and bound-parameter defenses hold too, and the controls
+identify the payloads that break out in host SQL or a bare name (upper block);
 \emph{Not SQL} counts fragments that do not parse against SQLite. Strict has no
 in-band holes: the value hole's strict form is the typed \texttt{?V} parameter
 and the name hole's is \texttt{?I}, both passed to
@@ -204,13 +213,13 @@ Over the effective set no matchertext hole admitted a breakout (\cref{tab:sqli})
 \dataSqliMtBreakout through the \verb|M'(...)'| value hole, \dataSqliMtStrictBreakout
 through the verified \verb|M'(%M)'| route, and \dataSqliIdentMtBreakout through the
 \verb|[|$\dots$\verb|]| name hole.
-The legacy value defences hold as well, \texttt{\%Q} and \texttt{\%q} escaping
+The legacy value defenses hold as well, \texttt{\%Q} and \texttt{\%q} escaping
 and a bound parameter, which is the honest baseline.
 Concatenation is the contrast: \dataSqliConcatBreakout breakouts of the value
 control and \dataSqliIdentConcatBreakout of the identifier control, on the very
 same payloads.
-That breakout is available only because the additive build leaves the legacy
-quote open.
+That breakout is available only because the additive build leaves legacy
+composition open.
 Recompiled in the opt-in strict mode, every text-splicing prepare, the
 concatenation and the in-band \verb|M'(...)'| alike, is refused before it reaches
 the parser (\cref{tab:sqli}, right), so the \dataSqliEffective effective-set

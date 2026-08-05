@@ -3,17 +3,16 @@
 The driver is an additive matchertext build: each untrusted value is placed
 into the SQL text inside a matcher-delimited hole, an M'(...)' literal for a
 value or [...] for an identifier, and the statement is prepared through the
-ordinary sqlite3_prepare_v2(). Naive concatenation into a quote stays available
-and is the breakout control.
+ordinary sqlite3_prepare_v2(). Naive concatenation into quoted and raw value
+contexts stays available as the breakout control.
 
 This exercises the deployed parser that doc/threat.tex leaves to implementation
 work, and it does so on the paper's own in-band holes rather than by
 simulation. Arms:
 
-  concat / ident_concat   the value spliced into a quote / an identifier, raw.
+  concat / ident_concat   the value spliced into host SQL / an identifier, raw.
                           The control: a real attack breaks out here.
   quote / escape / bind   the legacy value defences (%Q, %q, a bound ?).
-  ident_dq                the legacy quoted identifier ("%w").
   mt                      the value hole, %m -> M'(...)'.
   mt_strict               the verify-or-refuse route, M'(%M)'.
   ident_mt                the name hole, [...] over the encoded identifier.
@@ -23,12 +22,14 @@ A payload counts against a defence only where the control actually breaks out
 """
 import argparse
 import os
+import re
 import sqlite3
 import subprocess
 import sys
 import threading
 from collections import Counter, defaultdict
 from pathlib import Path
+from urllib.parse import unquote_to_bytes
 
 from export import write
 
@@ -54,6 +55,10 @@ TYPED_ARMS = ("mt_v", "ident_i")           # the strict-mode ?V / ?I paths
 SCORE_ARMS = MT_ARMS + ("ident_i",)
 LEGACY_ARMS = ("concat", "quote", "escape", "bind", "ident_concat")
 CONTROL_ARMS = ("concat", "ident_concat")
+RAW_HOSTS = {"numeric_eq", "numeric_paren", "value_in", "expr_order", "expr_limit"}
+SQLITE_ATOM = re.compile(
+    r"(?:[+-]?(?:(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?|0x[0-9a-f]+)"
+    r"|null|true|false|'(?:''|[^'])*'|x'[0-9a-f]*')\Z", re.I | re.S)
 
 PAIR = {")": "(", "]": "[", "}": "{"}
 OPEN = {v: k for k, v in PAIR.items()}
@@ -236,7 +241,7 @@ def unhex(s):
     return bytes.fromhex(s).decode("utf-8", "surrogateescape") if s != "-" else ""
 
 
-def verdict(arm, res, base, payload, is_ident):
+def verdict(arm, res, base, payload, is_ident, raw=False):
     """INERT / BREAKOUT / REJECTED / MALFORMED.
 
     A breakout is a prepared statement whose parse differs from the benign
@@ -265,6 +270,9 @@ def verdict(arm, res, base, payload, is_ident):
            and res[IDX["ro"]] == base[IDX["ro"]]:
             return "INERT"
         return "BREAKOUT"
+    if raw and arm == "concat" and SQLITE_ATOM.fullmatch(payload.strip()) \
+            and res[IDX["tail"]] == "0":
+        return "INERT"
     if any(res[IDX[k]] != base[IDX[k]] for k in STRUCTURAL):
         return "BREAKOUT"
     if int(res[IDX["tail"]]) > 0 or int(res[IDX["nrow"]]) > int(base[IDX["nrow"]]):
@@ -297,7 +305,8 @@ def strict_sweep(con, payloads):
                 assert accepted == expected, (
                     f"VERIFY mismatch for payload {idx} ({arm}/{drv.hosts[h][0]}): "
                     f"python={expected} c={accepted} value={o[:160]!r}")
-                v = verdict(arm, r, base[(h, a)], o, h in ident_hosts)
+                v = verdict(arm, r, base[(h, a)], o, h in ident_hosts,
+                            drv.hosts[h][0] in RAW_HOSTS)
                 tally[arm][{"INERT": 0, "BREAKOUT": 1, "REJECTED": 2,
                             "MALFORMED": 4}[v]] += 1
             else:
@@ -341,6 +350,81 @@ def strict_sweep(con, payloads):
     return fail
 
 
+def _sqlite_literals(payload):
+    """Map exact PostgreSQL/SQL Server text literals to SQLite text literals."""
+    out = []
+    quote = None
+    i = 0
+    while i < len(payload):
+        c = payload[i]
+        if quote:
+            out.append(c)
+            if c == "\\" and quote != "`" and i + 1 < len(payload):
+                i += 1
+                out.append(payload[i])
+            elif c == quote:
+                if i + 1 < len(payload) and payload[i + 1] == quote:
+                    i += 1
+                    out.append(payload[i])
+                else:
+                    quote = None
+        elif c in "'\"`":
+            quote = c
+            out.append(c)
+        elif c in "Nn" and i + 1 < len(payload) and payload[i + 1] == "'" \
+                and (i == 0 or not (payload[i - 1].isalnum() or payload[i - 1] in "_$")):
+            quote = "'"
+            out.append("'")
+            i += 1
+        elif c == "$":
+            j = payload.find("$", i + 1)
+            tag = payload[i + 1:j] if j >= 0 else "-"
+            valid = not tag or (tag[0].isalpha() or tag[0] == "_") \
+                and all(x.isalnum() or x == "_" for x in tag[1:])
+            end = payload.find("$" + tag + "$", j + 1) if valid else -1
+            if end >= 0:
+                out.append("'" + payload[j + 1:end].replace("'", "''") + "'")
+                i = end + len(tag) + 1
+            else:
+                out.append(c)
+        else:
+            out.append(c)
+        i += 1
+    return "".join(out)
+
+
+def sqlite_equivalent(payload):
+    """Apply only transport, literal, and comment rewrites with equal meaning."""
+    try:
+        decoded = unquote_to_bytes(payload).decode("utf-8")
+        if "\0" not in decoded:
+            payload = decoded
+    except UnicodeError:
+        pass
+
+    payload = _sqlite_literals(payload)
+
+    quote = None
+    i = 0
+    while i < len(payload):
+        c = payload[i]
+        if quote:
+            if c == "\\" and quote != "`":
+                i += 2
+                continue
+            if c == quote:
+                if i + 1 < len(payload) and payload[i + 1] == quote:
+                    i += 2
+                    continue
+                quote = None
+        elif c in "'\"`":
+            quote = c
+        elif c == "#" and (i + 1 == len(payload) or payload[i + 1].isspace()):
+            return payload[:i] + "-- " + payload[i + 1:]
+        i += 1
+    return payload
+
+
 def load_payloads(con, limit=None):
     rows = [("corpus", p) for (p,) in con.execute(
         "SELECT DISTINCT payload FROM payload WHERE syntax_type='sql'")]
@@ -349,6 +433,12 @@ def load_payloads(con, limit=None):
             "SELECT DISTINCT example FROM syntactic_group WHERE syntax_type='sql'"):
         if p not in seen:
             rows.append(("cve", p))
+            seen.add(p)
+    for source, payload in list(rows):
+        adapted = sqlite_equivalent(payload)
+        if adapted != payload and adapted not in seen:
+            rows.append((source + "_sqlite", adapted))
+            seen.add(adapted)
     rows.sort()
     return rows[:limit] if limit else rows
 
@@ -412,7 +502,8 @@ def run(args):
         for (h, a), r in rows.items():
             if drv.arms[a][0] in TYPED_ARMS:
                 continue          # the strict paths are measured by strict_sweep
-            v = verdict(drv.arms[a][0], r, base[(h, a)], o, h in ident_hosts)
+            v = verdict(drv.arms[a][0], r, base[(h, a)], o, h in ident_hosts,
+                        drv.hosts[h][0] in RAW_HOSTS)
             if a in control and v == "BREAKOUT":
                 eff_pairs.add((h, o))
             guard[(drv.arms[a][0], v)] += 1
@@ -493,7 +584,9 @@ def verdicts_for(payloads, binary=None, selfcheck=True):
         for (h, a), r in rows.items():
             arm = drv.arms[a][0]
             if arm in SCORE_ARMS:
-                out[(idx, h, arm)] = verdict(arm, r, base[(h, a)], o, h in ident_hosts)
+                out[(idx, h, arm)] = verdict(arm, r, base[(h, a)], o,
+                                             h in ident_hosts,
+                                             drv.hosts[h][0] in RAW_HOSTS)
 
     for i, h, a, r in drv.sweep(p for _, p in payloads):
         if i != cur:

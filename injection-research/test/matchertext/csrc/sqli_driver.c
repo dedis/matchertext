@@ -3,10 +3,11 @@
 ** in-band model the paper describes: each untrusted value is placed into the
 ** SQL text inside a matcher-delimited hole, an M'(...)' literal for a value or
 ** [...] for an identifier, and the statement is prepared through the ordinary
-** sqlite3_prepare_v2().  The naive path, concatenation into a quote, stays
-** available and is the breakout control.  Two further arms, mt_v and ident_i,
-** carry the strict-mode typed API instead: the value or identifier is passed
-** separately to sqlite3_matchertext_prepare_v3() as a ?V or ?I argument.  Built
+** sqlite3_prepare_v2().  The naive path, concatenation into a quoted or raw
+** value context, stays available as the breakout control. Two further arms,
+** mt_v and ident_i, carry the strict-mode typed API instead: the value or
+** identifier is passed separately to sqlite3_matchertext_prepare_v3() as a ?V
+** or ?I argument.  Built
 ** with -DSQLITE_MATCHERTEXT_STRICT, prepare_v2() is refused and those two are
 ** the only admitted paths.
 **
@@ -51,7 +52,7 @@ enum { C_CONCAT, C_QUOTE, C_ESCAPE, C_BIND, C_MT, C_MTSTRICT,
 
 typedef struct Host {
   const char *zName, *zPre, *zPost, *zBenign;
-  int mHole, bEcho;
+  int mHole, bEcho, eConcat;
 } Host;
 
 typedef struct Arm {
@@ -60,12 +61,22 @@ typedef struct Arm {
 } Arm;
 
 static const Host aHost[] = {
-  {"value_eq",    "SELECT id FROM t1 WHERE name = ", "",                        "alice", HOLE_VALUE, 0},
-  {"value_like",  "SELECT id FROM t1 WHERE name LIKE ", "",                     "alice", HOLE_VALUE, 0},
-  {"value_insert","INSERT INTO t1(name) VALUES(",     ")",                      "alice", HOLE_VALUE, 0},
-  {"value_echo",  "SELECT ",                          "",                       "alice", HOLE_VALUE, 1},
-  {"ident_order", "SELECT id FROM t1 ORDER BY ",      "",                       "name",  HOLE_IDENT, 0},
-  {"ident_col",   "SELECT ",                          " FROM t1 ORDER BY 1",    "name",  HOLE_IDENT, 0},
+  {"value_eq",     "SELECT id FROM t1 WHERE name = ",   "",                     "alice", HOLE_VALUE, 0, 0},
+  {"value_like",   "SELECT id FROM t1 WHERE name LIKE ", "",                    "alice", HOLE_VALUE, 0, 0},
+  {"value_insert", "INSERT INTO t1(name) VALUES(",      ")",                    "alice", HOLE_VALUE, 0, 0},
+  {"value_echo",   "SELECT ",                           "",                     "alice", HOLE_VALUE, 1, 0},
+  {"value_dq",     "SELECT id FROM t1 WHERE name = ",   "",                     "alice", HOLE_VALUE, 0, 2},
+  {"numeric_eq",   "SELECT id FROM t1 WHERE id = ",     "",                     "1",     HOLE_VALUE, 0, 1},
+  {"numeric_paren","SELECT id FROM t1 WHERE id = (",    ")",                    "1",     HOLE_VALUE, 0, 1},
+  {"value_in",     "SELECT id FROM t1 WHERE id IN (",   ")",                    "1",     HOLE_VALUE, 0, 1},
+  {"expr_order",   "SELECT id FROM t1 ORDER BY ",       "",                     "1",     HOLE_VALUE, 0, 1},
+  {"expr_limit",   "SELECT id FROM t1 LIMIT ",          "",                     "999999", HOLE_VALUE, 0, 1},
+  {"select_two",   "SELECT id,name FROM t1 WHERE name = ", "",                  "alice", HOLE_VALUE, 0, 0},
+  {"select_three", "SELECT id,name,id FROM t1 WHERE name = ", "",               "alice", HOLE_VALUE, 0, 0},
+  {"select_four",  "SELECT id,name,id,name FROM t1 WHERE name = ", "",           "alice", HOLE_VALUE, 0, 0},
+  {"insert_pair",  "INSERT INTO t1(name,id) VALUES(",   ",3)",                  "alice", HOLE_VALUE, 0, 0},
+  {"ident_order",  "SELECT id FROM t1 ORDER BY ",       "",                     "name",  HOLE_IDENT, 0, 0},
+  {"ident_col",    "SELECT ",                           " FROM t1 ORDER BY 1",  "name",  HOLE_IDENT, 0, 0},
 };
 
 static const Arm aArm[] = {
@@ -124,9 +135,12 @@ static u64 fnvRedact(u64 h, const char *z, const char *zA, const char *zB){
 /* Build the hole text for one arm.  Returns a sqlite3_malloc string, or 0 when
 ** the arm refuses the value (%M on an unbalanced piece).  bBind arms render a
 ** single '?'. */
-static char *renderHole(int eConv, const char *z){
+static char *renderHole(int eConv, int eConcat, const char *z){
   switch( eConv ){
-    case C_CONCAT:       return sqlite3_mprintf("'%s'", z);
+    case C_CONCAT:
+      if( eConcat==1 ) return sqlite3_mprintf("%s", z);
+      if( eConcat==2 ) return sqlite3_mprintf("\"%s\"", z);
+      return sqlite3_mprintf("'%s'", z);
     case C_QUOTE:        return sqlite3_mprintf("%Q", z);
     case C_ESCAPE:       return sqlite3_mprintf("'%q'", z);
     case C_BIND:         return sqlite3_mprintf("?");
@@ -296,7 +310,7 @@ static void runCase(int iHost, int iArm, const char *zValue, i64 nValue,
   gName[0] = 0;
   gnVal = nValue;               /* renderHole/explainHash use the true length */
 
-  zHole = renderHole(pA->eConv, zValue);
+  zHole = renderHole(pA->eConv, pH->eConcat, zValue);
   if( zHole==0 ){
     pOut->zOutcome = "rejected";   /* %M refused the piece */
     return;

@@ -242,7 +242,7 @@ def tbl_anchors(rows):
 # caller would write today, what the discipline offers, and what each premise
 # costs when it is not met.
 SQLI_ARMS = [
-    ("concat",       "Concatenated into a quote", "control"),
+    ("concat",       "Concatenated into host SQL", "control"),
     ("ident_concat", "Concatenated as a name",    "control"),
     ("quote",        "\\texttt{\\%Q} escaping",    "legacy"),
     ("escape",       "\\texttt{\\%q} escaping",    "legacy"),
