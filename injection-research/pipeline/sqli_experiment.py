@@ -59,6 +59,7 @@ RAW_HOSTS = {"numeric_eq", "numeric_paren", "value_in", "expr_order", "expr_limi
 SQLITE_ATOM = re.compile(
     r"(?:[+-]?(?:(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?|0x[0-9a-f]+)"
     r"|null|true|false|'(?:''|[^'])*'|x'[0-9a-f]*')\Z", re.I | re.S)
+SQLITE_VOLATILE = re.compile(r"\b(?:random|randomblob)\s*\(", re.I)
 
 PAIR = {")": "(", "]": "[", "}": "{"}
 OPEN = {v: k for k, v in PAIR.items()}
@@ -507,9 +508,12 @@ def run(args):
             if a in control and v == "BREAKOUT":
                 eff_pairs.add((h, o))
             guard[(drv.arms[a][0], v)] += 1
+            nrow = int(r[IDX["nrow"]]) if r[IDX["nrow"]] != "-" else None
+            if SQLITE_VOLATILE.search(o):
+                nrow = None
             raw.append((idx, h, a, v, r[IDX["outcome"]],
                         int(r[IDX["tail"]]) if r[IDX["tail"]] != "-" else None,
-                        int(r[IDX["nrow"]]) if r[IDX["nrow"]] != "-" else None))
+                        nrow))
 
     for i, h, a, r in drv.sweep(p for _, p in payloads):
         if i != cur:

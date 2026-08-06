@@ -45,6 +45,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from report import extract_payload
+import remote_sidecar
 
 ROOT = Path(__file__).resolve().parents[1]
 DB = ROOT / "data" / "cve.db"
@@ -58,13 +59,13 @@ UA = ("Mozilla/5.0 (compatible; matchertext-research/1.0; "
       "academic study of injection payload structure)")
 TIMEOUT = 25
 
-DDL = """
-CREATE TABLE IF NOT EXISTS web_payload(
-    cve_id TEXT PRIMARY KEY, source TEXT, url TEXT, sha256 TEXT,
-    payload TEXT, status TEXT);
-CREATE TABLE IF NOT EXISTS ghsl_page(
-    url TEXT PRIMARY KEY, sha256 TEXT, status TEXT);
-"""
+DDL = remote_sidecar.WEB_CREATE_DDL
+
+
+def finish(con):
+    digest = remote_sidecar.export(con)
+    print(f"remote payload sidecar: {digest}")
+    con.close()
 
 _TAG = re.compile(r"<(script|style)\b[^>]*>.*?</\1>", re.I | re.S)
 _ANY_TAG = re.compile(r"<[^>]+>")
@@ -251,7 +252,7 @@ def run(args):
         con.commit()
     if args.ghsl or args.refresh_ghsl:
         run_ghsl(con, args)
-        con.close()
+        finish(con)
         return
     done = {c for (c,) in con.execute("SELECT cve_id FROM web_payload")}
     todo = candidates(con, done)
@@ -263,6 +264,7 @@ def run(args):
     print(f"{len(done)} already fetched; {len(todo)} to go {by_host}",
           file=sys.stderr, flush=True)
     if not todo:
+        finish(con)
         return
 
     throttle = Throttle(args.delay)
@@ -313,7 +315,7 @@ def run(args):
 
     for s, n in con.execute("SELECT status, COUNT(*) FROM web_payload GROUP BY 1 ORDER BY 2 DESC"):
         print(f"  {s:12} {n}")
-    con.close()
+    finish(con)
 
 
 if __name__ == "__main__":
