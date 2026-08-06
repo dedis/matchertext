@@ -25,7 +25,7 @@
 **   C <h> <a>  run one pair
 **
 ** Result fields: outcome rc skel ro tail nrow name err
-**   outcome  ok | rejected (%M or ?V/?I refused the value) | parse (prepare failed)
+**   outcome  ok | rejected (VERIFY or ?V/?I refused the value) | parse (prepare failed)
 **   skel     16 hex digits, FNV-1a of the EXPLAIN listing sans p4, or "-"
 **   ro       sqlite3_stmt_readonly, or "-"
 **   tail     non-whitespace bytes left after the first statement (stacked query)
@@ -85,7 +85,7 @@ static const Arm aArm[] = {
   {"escape",       HOLE_VALUE, C_ESCAPE,       0, 0},  /* '%q'   escaping baseline */
   {"bind",         HOLE_VALUE, C_BIND,         1, 0},  /* ?      prepared statement */
   {"mt",           HOLE_VALUE, C_MT,           0, 0},  /* %m  -> M'(...)' value hole */
-  {"mt_strict",    HOLE_VALUE, C_MTSTRICT,     0, 0},  /* M'(%M)' verify-or-reject */
+  {"mt_strict",    HOLE_VALUE, C_MTSTRICT,      0, 0},  /* VERIFY then M'(...)' */
   {"ident_concat", HOLE_IDENT, C_IDENT_CONCAT, 0, 0},  /* <v>    naive, control */
   {"ident_mt",     HOLE_IDENT, C_IDENT_MT,     0, 0},  /* [<enc>] matchertext name hole */
   /* The strict-mode typed API: the only value and identifier paths a strict
@@ -133,7 +133,7 @@ static u64 fnvRedact(u64 h, const char *z, const char *zA, const char *zB){
 }
 
 /* Build the hole text for one arm.  Returns a sqlite3_malloc string, or 0 when
-** the arm refuses the value (%M on an unbalanced piece).  bBind arms render a
+** the arm refuses an unbalanced value.  bBind arms render a
 ** single '?'. */
 static char *renderHole(int eConv, int eConcat, const char *z){
   switch( eConv ){
@@ -145,7 +145,9 @@ static char *renderHole(int eConv, int eConcat, const char *z){
     case C_ESCAPE:       return sqlite3_mprintf("'%q'", z);
     case C_BIND:         return sqlite3_mprintf("?");
     case C_MT:           return sqlite3_mprintf("%m", z);
-    case C_MTSTRICT:     return sqlite3_mprintf("M'(%M)'", z);
+    case C_MTSTRICT:
+      if( !sqlite3_matchertext_verify(z, gnVal) ) return 0;
+      return sqlite3_mprintf("M'(%s)'", z);
     case C_IDENT_CONCAT: return sqlite3_mprintf("%s", z);
     case C_IDENT_MT: {
       char *zEnc = sqlite3_matchertext_encode(z, gnVal, 0);
@@ -172,11 +174,17 @@ static int prepPlain(const char *zSql, sqlite3_stmt **pp){
 #endif
 }
 static void execPlain(const char *zSql){
-#ifdef SQLITE_MATCHERTEXT_STRICT
-  sqlite3_matchertext_exec(gDb, zSql, -1, 0, 0, 0, 0, 0);
-#else
-  sqlite3_exec(gDb, zSql, 0, 0, 0);
-#endif
+  sqlite3_stmt *p = 0;
+  int rc = prepPlain(zSql, &p);
+  if( rc==SQLITE_OK && p ){
+    while( (rc = sqlite3_step(p))==SQLITE_ROW ){}
+    if( rc==SQLITE_DONE ) rc = SQLITE_OK;
+  }
+  if( p ){
+    int rc2 = sqlite3_finalize(p);
+    if( rc==SQLITE_OK ) rc = rc2;
+  }
+  if( rc!=SQLITE_OK ) die("cannot execute internal SQL");
 }
 
 typedef struct Result {
@@ -312,7 +320,7 @@ static void runCase(int iHost, int iArm, const char *zValue, i64 nValue,
 
   zHole = renderHole(pA->eConv, pH->eConcat, zValue);
   if( zHole==0 ){
-    pOut->zOutcome = "rejected";   /* %M refused the piece */
+    pOut->zOutcome = "rejected";   /* VERIFY refused the piece */
     return;
   }
   zSql = sqlite3_mprintf("%s%s%s", pH->zPre, zHole, pH->zPost);
@@ -402,27 +410,9 @@ static i64 decodeHex(const char *z, char *aOut){
 }
 
 static void openDb(void){
-  char *zErr = 0;
   if( sqlite3_open(":memory:", &gDb)!=SQLITE_OK ) die("open");
-#ifdef SQLITE_MATCHERTEXT_STRICT
-  /* Legacy exec is refused in strict mode, so build the fixture through the
-  ** checked API. The template carries no untrusted value, so it needs no
-  ** placeholder; one statement per call. */
-  if( sqlite3_matchertext_exec(gDb, "CREATE TABLE t1(name TEXT, id INTEGER)",
-                               -1, 0, 0, 0, 0, &zErr)!=SQLITE_OK
-   || sqlite3_matchertext_exec(gDb, "INSERT INTO t1 VALUES('alice',1),('bob',2)",
-                               -1, 0, 0, 0, 0, &zErr)!=SQLITE_OK ){
-    fprintf(stderr, "sqli_driver: setup: %s\n", zErr);
-    exit(1);
-  }
-#else
-  if( sqlite3_exec(gDb,
-        "CREATE TABLE t1(name TEXT, id INTEGER);"
-        "INSERT INTO t1 VALUES('alice',1),('bob',2);", 0, 0, &zErr)!=SQLITE_OK ){
-    fprintf(stderr, "sqli_driver: setup: %s\n", zErr);
-    exit(1);
-  }
-#endif
+  execPlain("CREATE TABLE t1(name TEXT, id INTEGER)");
+  execPlain("INSERT INTO t1 VALUES('alice',1),('bob',2)");
 }
 
 static void dumpTables(void){

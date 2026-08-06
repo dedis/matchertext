@@ -14,7 +14,7 @@ simulation. Arms:
                           The control: a real attack breaks out here.
   quote / escape / bind   the legacy value defences (%Q, %q, a bound ?).
   mt                      the value hole, %m -> M'(...)'.
-  mt_strict               the verify-or-refuse route, M'(%M)'.
+  mt_strict               the verify-or-refuse route, VERIFY then M'(...)'.
   ident_mt                the name hole, [...] over the encoded identifier.
 
 A payload counts against a defence only where the control actually breaks out
@@ -246,9 +246,9 @@ def verdict(arm, res, base, payload, is_ident, raw=False):
 
     A breakout is a prepared statement whose parse differs from the benign
     baseline in structure, leaves SQL after the first statement (a stacked
-    query), or returns more rows than the baseline. REJECTED is %M refusing an
-    unbalanced piece. For a name hole an identifier that resolves nowhere is
-    inert when the whole payload became that name.
+    query), or returns more rows than the baseline. REJECTED is VERIFY
+    refusing an unbalanced piece. For a name hole an identifier that resolves
+    nowhere is inert when the whole payload became that name.
     """
     outcome = res[IDX["outcome"]]
     if outcome == "rejected":

@@ -6,15 +6,15 @@
 \cmidrule(lr){2-5} \cmidrule(lr){6-9}
 Delivery & Inert & Broke out & Refused & Not SQL & Inert & Broke out & Refused & Not SQL \\
 \midrule
-Concatenated into host SQL         & 35{,}740 & 2{,}625 & 0 & 53{,}713 & 0 & 0 & 92{,}078 & 0 \\
-Concatenated as a name             & 1{,}221 & 21 & 0 & 11{,}912 & 0 & 0 & 13{,}154 & 0 \\
+Concatenated into host SQL         & 41{,}679 & 2{,}820 & 0 & 47{,}579 & 0 & 0 & 92{,}078 & 0 \\
+Concatenated as a name             & 1{,}263 & 21 & 0 & 11{,}870 & 0 & 0 & 13{,}154 & 0 \\
 \midrule
 \texttt{\%Q} escaping              & 92{,}078 & 0 & 0 & 0 & 0 & 0 & 92{,}078 & 0 \\
 \texttt{\%q} escaping              & 92{,}078 & 0 & 0 & 0 & 0 & 0 & 92{,}078 & 0 \\
 Bound parameter                    & 92{,}078 & 0 & 0 & 0 & 0 & 0 & 92{,}078 & 0 \\
 \midrule
 \texttt{M'(\ldots)'} value hole    & 92{,}078 & 0 & 0 & 0 & 76{,}734 & 0 & 15{,}344 & 0 \\
-\texttt{M'(\%M)'} verified         & 76{,}734 & 0 & 15{,}344 & 0 & 76{,}734 & 0 & 15{,}344 & 0 \\
+\textsc{Verify} then \texttt{M'(\ldots)'} & 76{,}734 & 0 & 15{,}344 & 0 & 76{,}734 & 0 & 15{,}344 & 0 \\
 \texttt{[\ldots]} name hole        & 13{,}150 & 0 & 0 & 4 & 10{,}958 & 0 & 2{,}192 & 4 \\
 \bottomrule
 \end{tabular}

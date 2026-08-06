@@ -248,7 +248,7 @@ SQLI_ARMS = [
     ("escape",       "\\texttt{\\%q} escaping",    "legacy"),
     ("bind",         "Bound parameter",           "legacy"),
     ("mt",           "\\texttt{M'(\\ldots)'} value hole", "mt"),
-    ("mt_strict",    "\\texttt{M'(\\%M)'} verified",      "mt"),
+    ("mt_strict",    "\\textsc{Verify} then \\texttt{M'(\\ldots)'}", "mt"),
     ("ident_mt",     "\\texttt{[\\ldots]} name hole",     "mt"),
 ]
 
