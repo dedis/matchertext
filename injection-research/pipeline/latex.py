@@ -474,7 +474,7 @@ def run(args):
         *[(f"Group{k}", num(skeleton_count(con, sk))) for k, sk in (
             ("AlertDocId", "< TAG > ALERT ( DOCUMENT . <id> ) </ TAG >"),
             ("AlertCookie", "< TAG > ALERT ( DOCUMENT . COOKIE ) </ TAG >"),
-            ("PhpOpen", "< ? <id>"))],
+            ("Sleep", "SLEEP ( <n> )"))],
         # orthogonal subclass facets, keyed by (dimension, label)
         *[(f"Sub{d.title().replace('_', '')}{l.title().replace('_', '')}", num(n))
           for d, l, n in con.execute("""SELECT dimension, label, COUNT(*) FROM subclass
