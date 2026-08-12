@@ -57,7 +57,7 @@ index 0000000..6a6fb23
 +Vulnerability records and payloads concern flaws that are long public and
 +vendor-acknowledged, so this analysis creates no new disclosure obligation.
 diff --git a/../doc/main.tex b/main.tex
-index 44117ab..62f1f01 100644
+index 44117ab..2a5bc3e 100644
 --- a/main.tex
 +++ b/main.tex
 @@ -1,11 +1,10 @@
@@ -84,7 +84,7 @@ index 44117ab..62f1f01 100644
  \usepackage{listings}
  \lstdefinelanguage{Lean}{
    morekeywords={inductive,theorem,def,where,variable,import,Prop,Set,List,Type,noncomputable,open},
-@@ -82,13 +80,12 @@
+@@ -82,20 +80,17 @@
  %%%%%%%%%%%%%%%%%%%%%%
  
  \begin{document}
@@ -102,17 +102,26 @@ index 44117ab..62f1f01 100644
  
  \maketitle
  
-@@ -112,13 +109,15 @@
+ \input{abs}
+ 
+-\tableofcontents
+-
+ \input{intro}
+ \input{motivation}
+ 
+@@ -111,14 +106,14 @@
+ 
  \input{concl}
  
++\newpage
  \appendix
+-\onecolumn
 +\input{ethics}
 +\input{openscience}
- \onecolumn
  \input{embeded_boundary}
- \newpage
+-\newpage
  \input{to_matchertext}
- \twocolumn
+-\twocolumn
  
 -\bibliographystyle{plain}
 +\bibliographystyle{unsrt}
