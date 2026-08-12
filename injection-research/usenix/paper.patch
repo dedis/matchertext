@@ -1,5 +1,43 @@
+diff --git a/../doc/containment.tex b/containment.tex
+index 9c16456..dd606d3 100644
+--- a/containment.tex
++++ b/containment.tex
+@@ -150,9 +150,14 @@ skeleton, never a payload through a parser.
+ \Cref{sec:threat} names the two obligations a simulation cannot reach, parse
+ inertness (L2) and interpreter inertness (L3), as per-host and left to
+ implementation.
++%% =========================================================================
++%% WARNING: ANONYMIZED ARTIFACT LINK MISSING. Before submission, create the
++%% anonymous.4open.science link (set its expiration AFTER 2027-08-15, past
++%% the end of the conference) and replace ANONYMOUS-LINK-TODO below.
++%% =========================================================================
+ We test them for one host, a matchertext-aware
+-SQLite,\footnote{The fork and the driver of this experiment are at
+-\url{https://github.com/dedis/matchertext-sqlite}.} over the CVE-derived SQL
++SQLite,\footnote{The fork and the driver of this experiment are available in
++an anonymized repository: \url{ANONYMOUS-LINK-TODO}.} over the CVE-derived SQL
+ subset and the standalone SQL payload corpora.
+ 
+ \paragraph{The deployed host.}
+diff --git a/../doc/embeded_boundary.tex b/embeded_boundary.tex
+index a1230b2..632f0e1 100644
+--- a/embeded_boundary.tex
++++ b/embeded_boundary.tex
+@@ -3,9 +3,9 @@
+ 
+ The declaration heads below summarize the Lean~4 development in
+ \texttt{lean/embed\_boundary.lean} that establishes premise~L1 of \cref{sec:threat} (there
+-named \texttt{embed\_boundary}), extending the machine-checked closure
+-development of~\cite{matchertext} with the boundary characterization that closure
+-alone does not supply.
++named \texttt{embed\_boundary}), extending the publicly available machine-checked
++closure development accompanying~\cite{matchertext} with the boundary
++characterization that closure alone does not supply.
+ Tactic proof bodies are elided here and given in full in the source file.
+ 
+ \begin{lstlisting}
 diff --git a/../doc/main.tex b/main.tex
-index 44117ab..bfa24ac 100644
+index 44117ab..8f07b01 100644
 --- a/main.tex
 +++ b/main.tex
 @@ -1,11 +1,9 @@
@@ -25,3 +63,73 @@ index 44117ab..bfa24ac 100644
  \usepackage{listings}
  \lstdefinelanguage{Lean}{
    morekeywords={inductive,theorem,def,where,variable,import,Prop,Set,List,Type,noncomputable,open},
+@@ -82,13 +79,12 @@
+ %%%%%%%%%%%%%%%%%%%%%%
+ 
+ \begin{document}
++% Pins the anonymized foundation paper as reference [1] under unsrt.
++\nocite{matchertext}
+ 
+-\title{Matchertext: Structural Injection Resistance by Construction \\
+-	\Large{%
+-	~\\
+-	\url{https://github.com/dedis/matchertext}}}
++\title{Matchertext: Structural Injection Resistance by Construction}
+ 
+-\author{Bryan Ford, Antoine Bastide \\ EPFL}
++\author{\rm Anonymous submission}
+ 
+ \maketitle
+ 
+@@ -118,7 +114,7 @@
+ \input{to_matchertext}
+ \twocolumn
+ 
+-\bibliographystyle{plain}
++\bibliographystyle{unsrt}
+ \bibliography{refs}
+ 
+ \end{document}
+diff --git a/../doc/refs.bib b/refs.bib
+index 498a048..58525a9 100644
+--- a/refs.bib
++++ b/refs.bib
+@@ -1,9 +1,6 @@
+ @misc{matchertext,
+-  author = {Bryan Ford},
+   title  = {Matchertext: Towards Verbatim Interlanguage Embedding},
+   year   = {2026},
+-  note   = {EPFL, Decentralized and Distributed Systems (DEDIS) Laboratory},
+-  howpublished = {\url{https://github.com/dedis/matchertext}},
+ }
+ 
+ @misc{cvelist,
+diff --git a/../doc/threat.tex b/threat.tex
+index a553825..98d314d 100644
+--- a/threat.tex
++++ b/threat.tex
+@@ -151,8 +151,8 @@ extent; L2 makes the structural skeleton of $\mathrm{parse}(P[v])$ independent o
+ $v$; and L3 carries that independence through to execution.
+ Hence $\mathrm{closure}\wedge\mathrm{L1}\wedge\mathrm{L2}\wedge\mathrm{L3}\Rightarrow$
+ inertness.
+-Closure and the correctness of \textsc{Verify} are machine-checked in the
+-underlying formalism~\cite{matchertext}, and we discharge L1 here, once for all
++Closure and the correctness of \textsc{Verify} are machine-checked
++in the formalism of~\cite{matchertext}; this paper discharges L1, once for all
+ hosts (\cref{sec:appendix:lean}).
+ L2 and L3 are the residual obligations, both per host, which we discharge for
+ one host, a matchertext-aware SQLite, in \cref{sec:prevent:exec}.
+diff --git a/../doc/to_matchertext.tex b/to_matchertext.tex
+index 8ae0544..8e6aa87 100644
+--- a/to_matchertext.tex
++++ b/to_matchertext.tex
+@@ -7,7 +7,8 @@ The declaration heads below summarize the Lean~4 development in
+ matchertext. It reuses the base definitions of \cref{sec:appendix:lean}
+ (\texttt{Opener}, \texttt{Closer}, \texttt{Nonmatcher}, \texttt{MT}, and the
+ \texttt{depth}/\texttt{embed\_boundary} results) and the closure lemmas
+-\texttt{mt\_append}/\texttt{mt\_wrap} of~\cite{matchertext}.
++\texttt{mt\_append}/\texttt{mt\_wrap} imported from the public artifact
++of~\cite{matchertext}.
+ Definition bodies are shown in full; tactic proof bodies are elided and given in
+ the source file.
+ 

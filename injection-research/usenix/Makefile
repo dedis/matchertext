@@ -1,4 +1,4 @@
-.PHONY: usenix apply patch clean
+.PHONY: usenix apply patch check clean
 
 SRC = ../doc
 BUILD = build
@@ -7,6 +7,7 @@ FILE = usenix
 
 usenix: apply
 	@latexmk -pdf -outdir=$(BUILD) main.tex
+	@$(MAKE) check
 	@cp $(BUILD)/main.pdf $(FILE).pdf
 	@rm -f main.pdf
 
@@ -29,6 +30,13 @@ patch:
 		sed -e 's|^--- a/\.\./doc/|--- a/|' -e 's|^+++ b/\.\./doc/|+++ b/|' >> $(PATCH); \
 	done; \
 	[ -s $(PATCH) ] || rm -f $(PATCH)
+
+# Deanonymizing strings fail the build; the artifact-link placeholder only warns.
+check:
+	@! grep -n -e dedis -e EPFL -e Bastide -e Ford -e 'github\.com/dedis' *.tex refs.bib || \
+		{ echo "ERROR: deanonymizing strings in staged sources"; exit 1; }
+	@! grep -l ANONYMOUS-LINK-TODO *.tex >/dev/null || \
+		echo "*** WARNING: ANONYMOUS-LINK-TODO placeholder still in the paper ***"
 
 clean:
 	@rm -rf build/*
