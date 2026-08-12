@@ -52,8 +52,8 @@ Grouping by identical skeleton yields \textbf{\dataDistinctSkeletons} distinct g
 different breakout structure always does.
 The largest groups are recognizable attack families: the XSS skeletons
 \verb|<TAG>ALERT(DOCUMENT.<id>)</TAG>| (\dataGroupAlertDocId CVEs) and its
-\verb|DOCUMENT.COOKIE| variant (\dataGroupAlertCookie), and the code-eval fragment
-\verb|<? <id>| (\dataGroupPhpOpen).
+\verb|DOCUMENT.COOKIE| variant (\dataGroupAlertCookie), and the SQL blind-time
+family \verb|SLEEP(<n>)| (\dataGroupSleep).
 The tail is long: the singletons are \dataSingletonGroupShare of groups but only \dataSingletonCVEShare of CVEs, and
 they collapse to \dataSingletonVerdicts distinct verdicts, since the skeleton preserves tags and
 operators that the containment test does not depend on.

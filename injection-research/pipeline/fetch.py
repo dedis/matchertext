@@ -5,11 +5,12 @@ manifest.json, which records every pin needed to reproduce the corpus.
 """
 import argparse
 import datetime
-import hashlib
 import json
 import subprocess
 import urllib.request
 from pathlib import Path
+
+import snapshots
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data" / "raw"
@@ -74,15 +75,11 @@ SARD_SUITES = {
     "juliet-c": "https://samate.nist.gov/SARD/downloads/test-suites/"
                 "2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
 }
-FREEZE = False
+REFRESH = False
 
 
 def sha256(path):
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
+    return snapshots.sha256(path)
 
 
 def download(url, dest):
@@ -95,55 +92,89 @@ def download(url, dest):
     tmp.rename(dest)
 
 
-def pin(manifest, key, url, dest, today, **extra):
-    prev = manifest.get(key, {}).get("sha256")
-    # --freeze keeps an already-pinned rolling feed at its recorded revision, so a
-    # corpus change can be attributed to newly added sources rather than to
-    # upstream drift in the old ones.
-    if FREEZE and dest.exists() and prev:
+def pin(manifest, key, url, dest, today, fetcher=download, **extra):
+    entry, expected = manifest.get(key, {}), manifest.get(key, {}).get("sha256")
+    if expected and not REFRESH:
+        if not dest.exists() or sha256(dest) != expected:
+            if not snapshots.materialize(expected, dest):
+                print(f"fetching pinned {key} ...", flush=True)
+                fetcher(url, dest)
+                actual = sha256(dest)
+                if actual != expected:
+                    dest.unlink()
+                    raise RuntimeError(
+                        f"{key}: upstream no longer serves pinned object {expected}; "
+                        "configure MATCHERTEXT_SNAPSHOT_ARCHIVE")
+        snapshots.store(dest, expected)
         return
-    # These HTTP endpoints serve mutable "latest"/rolling feeds (NVD re-scores
-    # CVEs, CWE/Debian/Red Hat track head), so a drifted local copy means the
-    # upstream moved: re-fetch and re-pin rather than aborting.
-    if dest.exists() and prev and sha256(dest) != prev:
-        print(f"{key}: local copy differs from manifest pin, re-fetching", flush=True)
-        dest.unlink()
+    print(f"refreshing {key} ..." if expected else f"fetching {key} ...", flush=True)
+    fetcher(url, dest)
+    digest = snapshots.store(dest)
+    manifest[key] = {**entry, "url": url, "sha256": digest,
+                     "fetched": str(today), **extra}
+
+
+def git_head(dest):
+    return subprocess.run(["git", "-C", str(dest), "rev-parse", "HEAD"],
+                          capture_output=True, text=True, check=True).stdout.strip()
+
+
+def git_fetch(dest, url, commit=None):
     if not dest.exists():
-        print(f"fetching {key} ...", flush=True)
-        download(url, dest)
-    manifest[key] = {"url": url, "sha256": sha256(dest),
-                     "fetched": manifest.get(key, {}).get("fetched", str(today)), **extra}
+        dest.mkdir(parents=True)
+        subprocess.run(["git", "-C", str(dest), "init"], check=True,
+                       stdout=subprocess.DEVNULL)
+        subprocess.run(["git", "-C", str(dest), "remote", "add", "origin", url],
+                       check=True)
+    target = commit or "HEAD"
+    subprocess.run(["git", "-C", str(dest), "fetch", "--depth", "1", "origin", target],
+                   check=True)
+    subprocess.run(["git", "-C", str(dest), "checkout", "--detach", "--force",
+                    "FETCH_HEAD"], check=True, stdout=subprocess.DEVNULL)
+    head = git_head(dest)
+    if commit and head != commit:
+        raise RuntimeError(f"{dest.name}: expected {commit}, got {head}")
+    return head
 
 
 def run(args):
-    global FREEZE
-    FREEZE = getattr(args, "freeze", False)
+    global REFRESH
+    REFRESH = getattr(args, "refresh", False)
     manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {}
     today = datetime.datetime.now(datetime.UTC).date()
 
     for name, url in GIT_REPOS.items():
         dest = RAW / name
-        if not dest.exists():
-            print(f"cloning {name} ...", flush=True)
-            clone = subprocess.run(["git", "clone", "--depth", "1", url, str(dest)])
-            if clone.returncode:
-                if name not in SOURCE_METADATA:
-                    clone.check_returncode()
-                manifest[name] = {"url": url, "fetched": str(today),
-                                  "status": "unavailable", **SOURCE_METADATA.get(name, {})}
-                print(f"{name}: unavailable, skipping", flush=True)
-                continue
-        head = subprocess.run(["git", "-C", str(dest), "rev-parse", "HEAD"],
-                              capture_output=True, text=True, check=True).stdout.strip()
-        entry = {**manifest.get(name, {}), "url": url, "commit": head,
-                 "fetched": manifest.get(name, {}).get("fetched", str(today)),
-                 **SOURCE_METADATA.get(name, {})}
-        entry.pop("status", None)
-        manifest[name] = entry
+        entry = manifest.get(name, {})
+        pinned = entry.get("commit")
+        if entry.get("status") == "unavailable" and not REFRESH:
+            print(f"{name}: pinned as unavailable, skipping", flush=True)
+            continue
+        try:
+            head = git_head(dest) if dest.exists() else None
+            if REFRESH or not pinned:
+                print(f"refreshing {name} ...", flush=True)
+                head = git_fetch(dest, url)
+                entry = {**entry, "url": url, "commit": head, "fetched": str(today),
+                         **SOURCE_METADATA.get(name, {})}
+                entry.pop("status", None)
+                manifest[name] = entry
+            elif head != pinned:
+                print(f"fetching pinned {name} ...", flush=True)
+                head = git_fetch(dest, url, pinned)
+        except subprocess.CalledProcessError:
+            if name not in SOURCE_METADATA or pinned:
+                raise
+            manifest[name] = {"url": url, "fetched": str(today),
+                              "status": "unavailable", **SOURCE_METADATA.get(name, {})}
+            print(f"{name}: unavailable, skipping", flush=True)
+            continue
         print(f"{name}: {head}")
 
     years = getattr(args, "years", None)
-    for year in range(2002, today.year + 1):
+    pinned_years = sorted(int(key[4:]) for key in manifest if key.startswith("nvd-"))
+    available_years = range(2002, today.year + 1) if REFRESH or not pinned_years else pinned_years
+    for year in available_years:
         if years and year not in years:
             continue
         pin(manifest, f"nvd-{year}", NVD_FEED.format(year=year),
@@ -161,40 +192,36 @@ def run(args):
     for name, url in SARD_SUITES.items():
         pin(manifest, name, url, RAW / "sard" / f"{name}.zip", today)
 
-    fetch_redhat(manifest, today)
+    pin(manifest, "redhat", REDHAT_URL, RAW / "redhat" / "redhat_cve.json", today,
+        fetcher=fetch_redhat)
     pin(manifest, "debian", DEBIAN_URL, RAW / "debian" / "debian_security.json", today)
 
     MANIFEST.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     print(f"manifest written: {MANIFEST}")
 
 
-def fetch_redhat(manifest, today):
+def fetch_redhat(url, dest):
     """Paginate the Red Hat security-data list endpoint into one JSON array."""
-    dest = RAW / "redhat" / "redhat_cve.json"
-    if not dest.exists():
-        print("fetching redhat ...", flush=True)
-        rows, page = [], 1
-        while True:
-            url = f"{REDHAT_URL}?per_page=1000&page={page}"
-            req = urllib.request.Request(url, headers={"User-Agent": "matchertext-injection-research"})
-            with urllib.request.urlopen(req) as r:
-                batch = json.load(r)
-            if not batch:
-                break
-            rows.extend(batch)
-            page += 1
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(json.dumps(rows))
-        print(f"redhat: {len(rows)} records", flush=True)
-    digest = sha256(dest)
-    manifest["redhat"] = {"url": REDHAT_URL, "sha256": digest,
-                          "fetched": manifest.get("redhat", {}).get("fetched", str(today))}
+    rows, page = [], 1
+    while True:
+        req = urllib.request.Request(f"{url}?per_page=1000&page={page}",
+                                     headers={"User-Agent": "matchertext-injection-research"})
+        with urllib.request.urlopen(req) as response:
+            batch = json.load(response)
+        if not batch:
+            break
+        rows.extend(batch)
+        page += 1
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(json.dumps(rows))
+    print(f"redhat: {len(rows)} records", flush=True)
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--years", type=int, nargs="*", help="restrict NVD feeds to these years")
     ap.add_argument("--epss-date", help="EPSS snapshot date YYYY-MM-DD (default: yesterday)")
-    ap.add_argument("--freeze", action="store_true",
-                    help="keep already-pinned rolling feeds at their recorded revision")
+    ap.add_argument("--refresh", action="store_true",
+                    help="replace manifest pins with current upstream revisions")
+    ap.add_argument("--freeze", action="store_true", help=argparse.SUPPRESS)
     run(ap.parse_args())

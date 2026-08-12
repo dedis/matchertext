@@ -14,6 +14,8 @@ import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
+import remote_sidecar
+
 csv.field_size_limit(1 << 24)
 CVE_RE = re.compile(r"CVE-\d{4}-\d+")
 CVE_ANY_RE = re.compile(r"CVE-\d{4}-\d+", re.I)
@@ -618,7 +620,7 @@ def load_payloads(con):
                 s = line.strip()
                 if PAYLOAD_MIN <= len(s) <= PAYLOAD_MAX and not s.startswith("#"):
                     rows.add((corpus, path, syn, s))
-    con.executemany("INSERT OR IGNORE INTO payload VALUES(?,?,?,?)", rows)
+    con.executemany("INSERT OR IGNORE INTO payload VALUES(?,?,?,?)", sorted(rows))
     con.commit()
 
 
@@ -664,6 +666,8 @@ def run(args):
     con = sqlite3.connect(DB)
     con.execute("PRAGMA journal_mode=WAL")
     con.executescript(DDL)
+    recovered = remote_sidecar.import_into(con)
+    print(f"remote payload sidecar: {recovered} rows", flush=True)
     print("cvelistV5", flush=True)
     load_cvelist(con, years)
     print("vulnrichment", flush=True)

@@ -33,15 +33,58 @@ noncomputable def encAux (esc : α → List α) :
 noncomputable def toMatchertext (esc : α → List α) (v : List α) : List α :=
   encAux Pi esc [] [] v
 
--- Lemma: an escape contains no matchers, hence is matchertext.
+-- Neither conjunct of the hypothesis below implies the other. Depth 0 does not
+-- give MT: ")(" balances to zero yet dips below it at the first character.
+theorem depth_zero_not_mt
+    (hdisj : ∀ x y z, (x, y) ∈ Pi → (z, x) ∈ Pi → False)
+    {o c : α} (hp : (o, c) ∈ Pi) :
+    depth Pi [c, o] = 0 ∧ ¬ MT Pi [c, o] := by
+  have ho : Opener Pi o := ⟨c, hp⟩
+  have hc : Closer Pi c := ⟨o, hp⟩
+  have hco : ¬ Opener Pi c := fun h => disjoint Pi hdisj c ⟨h, hc⟩
+  refine ⟨by simp [depth, delta, ho, hco, hc], fun hm => ?_⟩
+  have h := depth_prefix_nonneg Pi hdisj hm [c] ⟨[o], rfl⟩
+  rw [depth_singleton, if_neg hco, if_pos hc] at h
+  norm_num at h
+
+-- Lemma: matcher-free escapes are matchertext of depth 0; one way to discharge
+-- the hypothesis below, no longer the only one.
 theorem esc_mt (esc : α → List α)
     (hesc : ∀ c x, x ∈ esc c → Nonmatcher Pi x) (c : α) :
-    MT Pi (esc c) :=
-  MT.flat _ (fun x hx => hesc c x hx)
+    MT Pi (esc c) ∧ depth Pi (esc c) = 0 := by
+  refine ⟨MT.flat _ (fun x hx => hesc c x hx), ?_⟩
+  apply List.sum_eq_zero
+  intro y hy
+  obtain ⟨x, hx, rfl⟩ := List.mem_map.mp hy
+  have hn := hesc c x hx
+  simp only [Nonmatcher, Matcher, not_or] at hn
+  simp [delta, hn.1, hn.2]
+
+-- Lemma: the C alphabet's four-character escapes (backslash, tag, then a matched
+-- pair, e.g. `\o()`) are matchertext by nesting rather than flatness, and of depth 0.
+theorem esc_mt_paired
+    (hdisj : ∀ x y z, (x, y) ∈ Pi → (z, x) ∈ Pi → False)
+    {bs t o c : α}
+    (hbs : Nonmatcher Pi bs) (ht : Nonmatcher Pi t) (hp : (o, c) ∈ Pi) :
+    MT Pi [bs, t, o, c] ∧ depth Pi [bs, t, o, c] = 0 := by
+  have ho : Opener Pi o := ⟨c, hp⟩
+  have hc : Closer Pi c := ⟨o, hp⟩
+  have hco : ¬ Opener Pi c := fun hoc => disjoint Pi hdisj c ⟨hoc, hc⟩
+  constructor
+  · have h : ([bs, t, o, c] : List α) = [bs, t] ++ [o] ++ [] ++ [c] ++ [] := by simp
+    rw [h]
+    apply MT.nest [bs, t] [] [] o c hp ?_ (mt_nil Pi) (mt_nil Pi)
+    apply MT.flat
+    intro x hx
+    rcases List.mem_pair.mp hx with rfl | rfl
+    · exact hbs
+    · exact ht
+  · simp only [Nonmatcher, Matcher, not_or] at hbs ht
+    simp [depth, delta, hbs.1, hbs.2, ht.1, ht.2, ho, hco, hc]
 
 -- Lemma: unwinding the pending stack preserves matchertext.
 theorem unwind_mt (esc : α → List α)
-    (hesc : ∀ c x, x ∈ esc c → Nonmatcher Pi x)
+    (hesc : ∀ c, MT Pi (esc c) ∧ depth Pi (esc c) = 0)
     (st : List (Ctx α)) (hst : ∀ p ∈ st, MT Pi p.2)
     (out : List α) (hout : MT Pi out) :
     MT Pi (unwind esc st out) := by
@@ -54,11 +97,11 @@ theorem unwind_mt (esc : α → List α)
     simp only [unwind]
     apply ih
     · exact htail
-    · exact mt_append Pi (mt_append Pi hb (esc_mt Pi esc hesc o)) hout
+    · exact mt_append Pi (mt_append Pi hb (hesc o).1) hout
 
 -- Invariant (the crux): every accumulated segment stays matchertext.
 theorem encAux_mt (esc : α → List α)
-    (hesc : ∀ c x, x ∈ esc c → Nonmatcher Pi x)
+    (hesc : ∀ c, MT Pi (esc c) ∧ depth Pi (esc c) = 0)
     (st : List (Ctx α)) (hst : ∀ p ∈ st, MT Pi p.2)
     (out : List α) (hout : MT Pi out)
     (v : List α) :
@@ -86,7 +129,7 @@ theorem encAux_mt (esc : α → List α)
           show MT Pi (encAux Pi esc [] (out ++ esc x) xs)
           apply ih
           · simp
-          · exact mt_append Pi hout (esc_mt Pi esc hesc x)
+          · exact mt_append Pi hout (hesc x).1
         · show MT Pi (if (o, x) ∈ Pi then encAux Pi esc st' (b ++ [o] ++ out ++ [x]) xs
                       else encAux Pi esc ((o, b) :: st') (out ++ esc x) xs)
           by_cases hp' : (o, x) ∈ Pi
@@ -101,7 +144,7 @@ theorem encAux_mt (esc : α → List α)
             rw [if_neg hp']
             apply ih
             · exact hst
-            · exact mt_append Pi hout (esc_mt Pi esc hesc x)
+            · exact mt_append Pi hout (hesc x).1
       · -- nonmatcher: passes through verbatim
         rw [if_neg hcx]
         have hnx : Nonmatcher Pi x := by
@@ -113,7 +156,7 @@ theorem encAux_mt (esc : α → List α)
 
 -- Theorem (output ∈ L): any string at all, once encoded, is matchertext.
 theorem toMatchertext_mt (esc : α → List α)
-    (hesc : ∀ c x, x ∈ esc c → Nonmatcher Pi x) (v : List α) :
+    (hesc : ∀ c, MT Pi (esc c) ∧ depth Pi (esc c) = 0) (v : List α) :
     MT Pi (toMatchertext Pi esc v) :=
   encAux_mt Pi esc hesc [] (by simp) [] (mt_nil Pi) v
 
@@ -122,7 +165,7 @@ theorem toMatchertext_mt (esc : α → List α)
 theorem embed_boundary_encoded
     (hdisj : ∀ x y z, (x, y) ∈ Pi → (z, x) ∈ Pi → False)
     (esc : α → List α)
-    (hesc : ∀ c x, x ∈ esc c → Nonmatcher Pi x)
+    (hesc : ∀ c, MT Pi (esc c) ∧ depth Pi (esc c) = 0)
     (v : List α) {c : α} (hc : Closer Pi c) :
     (∀ p, p <+: toMatchertext Pi esc v → 0 ≤ depth Pi p)
       ∧ depth Pi (toMatchertext Pi esc v) = 0
