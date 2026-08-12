@@ -1,7 +1,7 @@
 \section{Conclusion}
 \label{sec:concl}
 
-Injection is defended today one sink at a time, and each defense knows the syntax
+Injection is defended today one host at a time, and each defense knows the syntax
 it protects.
 This paper argues that a single host-independent check can stand in for that
 collection, and measures how far it would reach.
@@ -12,21 +12,21 @@ Naming those assumptions reduces inertness to three premises, of which the
 load-bearing one, that reading to matcher balance ends an embedded value where it
 should, is discharged here by a machine-checked proof
 (\cref{sec:appendix:lean}); the two that remain are properties of a host parser
-and its interpreter, and are per-sink rather than per-context.
+and its interpreter, and are per-host rather than per-context.
 Adoption is correspondingly bounded: where a format already delimits with
 matchers, as LDAP filters and PDF strings do, the discipline costs nothing at all.
 
-Measured against a reproducible corpus of 91{,}760 injection vulnerabilities,
+Measured against a reproducible corpus of \dataInjectionCVEs injection vulnerabilities,
 that reach is a large and concentrated majority of the landscape: the recorded
-payloads of 82\% of attacks for which we could recover one are contained by a
-matcher-delimited slot under a matchertext-aware host, and at most 80\% of all
+payloads of \dataContainedShare of attacks for which we could recover one are contained by a
+matcher-delimited slot under a matchertext-aware host, and at most \dataHostableShare of all
 injection CVEs target a syntax such a host can delimit.
 The corpus also shows the shape of the containment, not only its size: it
 divides into inert embedding and outright rejection along the host language's
 native delimiter, the division \cref{sec:resist} derives, though the ratio
 between the two is a property of these recorded payloads rather than of an
 adaptive attacker.
-The residue falls along the two conditions of \cref{sec:threat}: execution sinks,
+The residue falls along the two premises of \cref{sec:threat}: execution sinks,
 where the host runs the value by design, and contexts whose delimiters are not
 matchers, neither of which any delimiting discipline can reach.
 The pipeline, corpus manifest, and per-skeleton rewrites are the concrete basis

@@ -28,25 +28,31 @@ its origin rather than merged, which both preserves provenance and lets us
 measure cross-source disagreement.
 
 \paragraph{Proof-of-concept payloads.}
-Four PoC databases supply real attack strings:
+Six PoC databases supply real attack strings:
 \href{https://gitlab.com/exploit-database/exploitdb}{Exploit-DB}, the
 \href{https://github.com/projectdiscovery/nuclei-templates}{Nuclei detection
 templates}, the
 \href{https://github.com/rapid7/metasploit-framework}{Metasploit Framework}
-modules, and the
-\href{https://github.com/nomi-sec/PoC-in-GitHub}{nomi-sec PoC-in-GitHub} index.
-The first three are cloned locally so that a payload can be extracted from the
-exploit file; the last contributes links only.
+modules, the
+\href{https://github.com/nomi-sec/PoC-in-GitHub}{nomi-sec PoC-in-GitHub} index,
+the \href{https://github.com/trickest/cve}{trickest/cve} exploit index, and
+\href{https://github.com/vulhub/vulhub}{Vulhub}'s reproduction environments.
+The first three, and Vulhub's worked exploit requests, are cloned locally so
+that a payload can be extracted; PoC-in-GitHub and trickest contribute links
+only.
+A trickest entry separates candidate exploit repositories from advisory
+write-ups, and only the former are counted as PoC evidence.
 PoC references are unified in a single table, with a local path where a payload
 is extractable.
 Because exploit code is dual-use, the corpus stores only links, identifiers, and
 locally-extracted payload fragments; no exploit files are redistributed.
 
 \paragraph{Scale.}
-The pinned snapshot comprises \textbf{365{,}310} CVE records
-(\textbf{347{,}651} in the \texttt{PUBLISHED} state).
-Across all categories the PoC databases link to 25{,}041 CVEs (Exploit-DB),
-8{,}975 (PoC-in-GitHub), 4{,}256 (Nuclei), and 3{,}106 (Metasploit); their
+The pinned snapshot comprises \textbf{\dataCVERecords} CVE records
+(\textbf{\dataPublishedCVEs} in the \texttt{PUBLISHED} state).
+Across all categories the PoC databases link to \dataPocTrickestCVEs CVEs (trickest),
+\dataPocExploitdbCVEs (Exploit-DB), \dataPocGithubCVEs (PoC-in-GitHub), \dataPocNucleiCVEs (Nuclei),
+\dataPocMetasploitCVEs (Metasploit), and \dataPocVulhubCVEs (Vulhub); their
 coverage of the injection subset is reported with the results in
 \cref{sec:results}.
 A key methodological caveat is that these sources have different, sometimes

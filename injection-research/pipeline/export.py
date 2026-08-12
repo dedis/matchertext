@@ -14,6 +14,10 @@ ROOT = Path(__file__).resolve().parents[1]
 DB = ROOT / "data" / "cve.db"
 EXPORTS = ROOT / "data" / "exports"
 
+# Quoted in classify.tex, so latex.py reads it from here rather than
+# repeating the value.
+AUDIT_PER_METHOD = 75
+
 YEAR = "COALESCE(NULLIF(substr(v.published_at,1,4),''), substr(v.cve_id,5,4))"
 
 
@@ -92,7 +96,7 @@ def cwe_disagreement(con):
           ["cve_id", "cna_family", "adp_family", "nvd_family"], sorted(rows))
 
 
-def audit_sample(con, per_method=75):
+def audit_sample(con, per_method=AUDIT_PER_METHOD):
     rows = []
     for (method,) in con.execute("SELECT DISTINCT method FROM classification ORDER BY method"):
         sample = sorted(
@@ -120,6 +124,12 @@ def coverage(con):
                                     WHERE cve_id IN (SELECT cve_id FROM classification)""")],
         ["sanity_xss_n", q("SELECT COUNT(*) FROM classification WHERE syntax_type='html_dom'")],
         ["sanity_sqli_n", q("SELECT COUNT(*) FROM classification WHERE syntax_type='sql'")],
+        ["corpus_payloads", q("SELECT COUNT(*) FROM payload")],
+        ["corpus_payloads_hostable", q(
+            "SELECT COUNT(*) FROM payload_assessment WHERE preventable=1")],
+        ["ground_truth_cases", q("SELECT COUNT(*) FROM ground_truth")],
+        ["published_with_vedas", q("""SELECT COUNT(*) FROM cve v JOIN exploit_score USING(cve_id)
+                                      WHERE v.state='PUBLISHED'""")],
     ]
     write("coverage.csv", ["metric", "value"], rows)
 

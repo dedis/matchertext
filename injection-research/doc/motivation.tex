@@ -5,7 +5,7 @@ Injection remains among the most damaging and persistent classes of software
 vulnerability. This section surveys the breadth of the problem beyond its most
 familiar members, its measured prevalence and cost, and why the very machinery
 built to contain it has itself become a recurring source of vulnerabilities:
-the motivation for the structural approach this thesis evaluates.
+the motivation for the structural approach this paper evaluates.
 
 \subsection{A wider family of embedding hazards}
 \label{sec:bg:hazards}
@@ -64,7 +64,7 @@ because a bracket or quote within it escapes its intended region.
 That is exactly the failure a matcher-balance discipline is built to resist,
 and because it recurs across the injection and markup attacks above
 rather than in any single language pair,
-one structural discipline can address the breakout-based members at once---as
+one structural discipline can address the breakout-based members at once, as
 distinct from the execution and algorithmic members (template evaluation, ReDoS,
 entity expansion) it cannot.
 
@@ -228,27 +228,27 @@ already owns, not a new artifact shadowing one it does not.
 \end{scope}
 \end{tikzpicture}
 \caption{The narrow waist. Each escaper today is written for one composing
-language and one sink, and must model that sink's syntax and track it as it
+language and one host, and must model that host's syntax and track it as it
 changes. A rule both sides implement once decouples them, since the rule mentions
-neither: any language emitting valid matchertext is compatible with any sink
+neither: any language emitting valid matchertext is compatible with any host
 reading to matcher balance. Not everything passes through the waist, however:
 contexts delimited by non-matchers, such as shell separators and CR/LF header
-breaks, and sinks that execute their contents by design lie outside it, and
+breaks, and execution sinks, which run their contents by design, lie outside it, and
 \cref{sec:prevent} measures how much of the recorded landscape that leaves.}
 \label{fig:bg:waist}
 \end{figure*}
 
 The defenses of \cref{sec:bg:sanitizer} share a shape.
-Each is written for one composing language and one sink, and works by knowing the
-sink well enough to transform values for it: a Java-to-SQL escaper knows SQL, and
+Each is written for one composing language and one host, and works by knowing the
+host well enough to transform values for it: a Java-to-SQL escaper knows SQL, and
 an HTML sanitizer knows the browser's parser closely enough to predict it.
 Neither transfers to the other's problem, so the number of defenses to write,
 audit, and re-synchronize grows with the product of the two populations.
 
 \Cref{fig:bg:waist} shows the alternative.
 A rule that both sides implement once decouples them, because the rule mentions
-neither: a language that emits valid matchertext is compatible with every sink
-that reads to matcher balance, and such a sink accepts values from every such
+neither: a language that emits valid matchertext is compatible with every host
+that reads to matcher balance, and such a host accepts values from every such
 language, without either knowing what the other is.
 The count falls from $N \times M$ relationships to $N + M$ implementations, which
 is the shape the Internet protocol stack takes for the same reason, a waist thin
