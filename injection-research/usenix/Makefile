@@ -1,12 +1,14 @@
-.PHONY: usenix apply patch
+.PHONY: usenix apply patch clean
 
 SRC = ../doc
 BUILD = build
 PATCH = paper.patch
+FILE = usenix
 
 usenix: apply
 	@latexmk -pdf -outdir=$(BUILD) main.tex
-	@cp $(BUILD)/main.pdf usenix.pdf
+	@cp $(BUILD)/main.pdf $(FILE).pdf
+	@rm -f main.pdf
 
 apply: patch
 	@cp $(SRC)/*.tex $(SRC)/refs.bib .
@@ -27,3 +29,9 @@ patch:
 		sed -e 's|^--- a/\.\./doc/|--- a/|' -e 's|^+++ b/\.\./doc/|+++ b/|' >> $(PATCH); \
 	done; \
 	[ -s $(PATCH) ] || rm -f $(PATCH)
+
+clean:
+	@rm -rf build/*
+
+open:
+	open $(FILE).pdf

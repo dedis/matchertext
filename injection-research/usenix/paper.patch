@@ -1,0 +1,27 @@
+diff --git a/../doc/main.tex b/main.tex
+index 44117ab..bfa24ac 100644
+--- a/main.tex
++++ b/main.tex
+@@ -1,11 +1,9 @@
+-\documentclass[fullpage,twocolumn]{article}
++\documentclass[letterpaper,twocolumn,10pt]{article}
++\usepackage{usenix}
+ \pdfoutput=1
+ 
+-\usepackage{times}
+ \usepackage{xspace}
+-\usepackage{cite} % sort citation numbers
+-\usepackage[hyperindex,breaklinks,colorlinks,
+-	    linkcolor=blue,citecolor=blue,urlcolor=black]{hyperref}
++\hypersetup{hyperindex,breaklinks,linkcolor=blue,citecolor=blue,urlcolor=black}
+ \usepackage{cleveref}
+ \usepackage{graphicx}
+ \usepackage{tikz}
+@@ -25,7 +23,6 @@
+ \DeclareUnicodeCharacter{00B7}{\pmbdglyph{\cdot}}
+ \usepackage{booktabs}
+ \usepackage{xurl} % allow long URLs in the bibliography to break anywhere
+-\usepackage[T1]{fontenc}
+ \usepackage{listings}
+ \lstdefinelanguage{Lean}{
+   morekeywords={inductive,theorem,def,where,variable,import,Prop,Set,List,Type,noncomputable,open},
