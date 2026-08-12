@@ -13,6 +13,7 @@ usenix: apply
 
 apply: patch
 	@cp $(SRC)/*.tex $(SRC)/refs.bib .
+	@for f in *.tex; do [ -f $(SRC)/$$f ] || rm -f $$f; done
 	@rm -rf generated && cp -R $(SRC)/generated .
 	@for p in *.patch; do [ -s "$$p" ] || continue; patch -p1 < "$$p" || exit 1; done
 

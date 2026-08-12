@@ -36,8 +36,28 @@ index a1230b2..632f0e1 100644
  Tactic proof bodies are elided here and given in full in the source file.
  
  \begin{lstlisting}
+diff --git a/ethics.tex b/ethics.tex
+new file mode 100644
+index 0000000..6a6fb23
+--- /dev/null
++++ b/ethics.tex
+@@ -0,0 +1,14 @@
++\section{Ethics considerations}
++\label{sec:appendix:ethics}
++
++This work attacked no live or third-party system.
++The corpus study (\cref{sec:corpus}) is a static analysis of public CVE records
++and already-public proof-of-concept strings drawn from the sources named in
++\cref{sec:data}; no payload was sent to any deployed service, and the
++proof-of-concept material is referenced by source, not redistributed.
++The only executed attacks (\cref{sec:prevent:exec}) ran against a SQLite fork
++and driver built in-house for this paper, in an isolated local environment, to
++test the paper's own claims.
++No personal data was collected and no human subjects were involved.
++Vulnerability records and payloads concern flaws that are long public and
++vendor-acknowledged, so this analysis creates no new disclosure obligation.
 diff --git a/../doc/main.tex b/main.tex
-index 44117ab..8f07b01 100644
+index 44117ab..abdee43 100644
 --- a/main.tex
 +++ b/main.tex
 @@ -1,11 +1,9 @@
@@ -81,7 +101,15 @@ index 44117ab..8f07b01 100644
  
  \maketitle
  
-@@ -118,7 +114,7 @@
+@@ -112,13 +108,15 @@
+ \input{concl}
+ 
+ \appendix
++\input{ethics}
++\input{openscience}
+ \onecolumn
+ \input{embeded_boundary}
+ \newpage
  \input{to_matchertext}
  \twocolumn
  
@@ -90,6 +118,28 @@ index 44117ab..8f07b01 100644
  \bibliography{refs}
  
  \end{document}
+diff --git a/openscience.tex b/openscience.tex
+new file mode 100644
+index 0000000..376ecf1
+--- /dev/null
++++ b/openscience.tex
+@@ -0,0 +1,16 @@
++\section{Open science}
++\label{sec:appendix:openscience}
++
++All artifacts behind this paper's claims are shared at submission through an
++anonymized repository (\url{ANONYMOUS-LINK-TODO}) and will be archived publicly
++upon publication:
++the classification pipeline and every generated table and number in this paper
++(\cref{sec:corpus});
++the corpus manifest pinning each upstream source by content hash;
++the per-skeleton rewrites of the containment measurement
++(\cref{sec:prevent:exec});
++the Lean~4 proof developments
++(\cref{sec:appendix:lean,sec:appendix:tomatchertext});
++and the matchertext-aware SQLite fork with its driver and test harness.
++The pipeline is deterministic, so every quoted figure is reproducible from the
++manifest alone.
 diff --git a/../doc/refs.bib b/refs.bib
 index 498a048..58525a9 100644
 --- a/refs.bib
@@ -120,7 +170,7 @@ index a553825..98d314d 100644
  L2 and L3 are the residual obligations, both per host, which we discharge for
  one host, a matchertext-aware SQLite, in \cref{sec:prevent:exec}.
 diff --git a/../doc/to_matchertext.tex b/to_matchertext.tex
-index 8ae0544..8e6aa87 100644
+index 707ea0d..0e62c18 100644
 --- a/to_matchertext.tex
 +++ b/to_matchertext.tex
 @@ -7,7 +7,8 @@ The declaration heads below summarize the Lean~4 development in
