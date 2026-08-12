@@ -57,10 +57,10 @@ index 0000000..6a6fb23
 +Vulnerability records and payloads concern flaws that are long public and
 +vendor-acknowledged, so this analysis creates no new disclosure obligation.
 diff --git a/../doc/main.tex b/main.tex
-index 44117ab..abdee43 100644
+index 44117ab..62f1f01 100644
 --- a/main.tex
 +++ b/main.tex
-@@ -1,11 +1,9 @@
+@@ -1,11 +1,10 @@
 -\documentclass[fullpage,twocolumn]{article}
 +\documentclass[letterpaper,twocolumn,10pt]{article}
 +\usepackage{usenix}
@@ -71,11 +71,12 @@ index 44117ab..abdee43 100644
 -\usepackage{cite} % sort citation numbers
 -\usepackage[hyperindex,breaklinks,colorlinks,
 -	    linkcolor=blue,citecolor=blue,urlcolor=black]{hyperref}
-+\hypersetup{hyperindex,breaklinks,linkcolor=blue,citecolor=blue,urlcolor=black}
++% Link colors darkened so grayscale print keeps near-body-text contrast.
++\hypersetup{hyperindex,breaklinks,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=black}
  \usepackage{cleveref}
  \usepackage{graphicx}
  \usepackage{tikz}
-@@ -25,7 +23,6 @@
+@@ -25,7 +24,6 @@
  \DeclareUnicodeCharacter{00B7}{\pmbdglyph{\cdot}}
  \usepackage{booktabs}
  \usepackage{xurl} % allow long URLs in the bibliography to break anywhere
@@ -83,7 +84,7 @@ index 44117ab..abdee43 100644
  \usepackage{listings}
  \lstdefinelanguage{Lean}{
    morekeywords={inductive,theorem,def,where,variable,import,Prop,Set,List,Type,noncomputable,open},
-@@ -82,13 +79,12 @@
+@@ -82,13 +80,12 @@
  %%%%%%%%%%%%%%%%%%%%%%
  
  \begin{document}
@@ -101,7 +102,7 @@ index 44117ab..abdee43 100644
  
  \maketitle
  
-@@ -112,13 +108,15 @@
+@@ -112,13 +109,15 @@
  \input{concl}
  
  \appendix
