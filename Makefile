@@ -1,5 +1,9 @@
 GOROOT := $(shell go env GOROOT)
 
+.PHONY: all build gen-parser build-lsp build-wasm vscode-live-preview
+
+all: build
+
 build:
 	go build -o minml ./go/markup/minml/cmd/
 
@@ -7,6 +11,7 @@ gen-parser:
 	cd dev/tree-sitter && tree-sitter generate
 
 build-lsp:
+	rm -rf go/markup/minml/lsp/queries
 	cp -R dev/tree-sitter/queries go/markup/minml/lsp/queries
 	go build -o minml-lsp ./go/markup/minml/cmd/lsp/
 

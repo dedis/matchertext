@@ -48,6 +48,13 @@ tree-sitter generate
 
 This reads `grammar.js` and writes `src/parser.c` plus the supporting `src/tree_sitter/` headers.
 
+The repository root offers the same thing as a make target, which is what the
+other build steps expect:
+
+```sh
+make gen-parser
+```
+
 ## Running the test suite
 
 The corpus test file at `test/corpus/minml.txt` contains 39 test cases covering all node types, disambiguation edge cases, and error recovery.
