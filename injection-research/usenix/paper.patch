@@ -1,8 +1,8 @@
 diff --git a/../doc/abs.tex b/abs.tex
-index 2ace122..dc08ee7 100644
+index 2ace122..bf5f052 100644
 --- a/abs.tex
 +++ b/abs.tex
-@@ -7,11 +7,15 @@ pairs \verb|()|, \verb|[]|, and \verb|{}| must always match.
+@@ -7,11 +7,12 @@ pairs \verb|()|, \verb|[]|, and \verb|{}| must always match.
  A host can then delimit an untrusted value with a matcher pair and read it to
  matcher balance, so escaping the slot would require an unmatched matcher, which
  is not valid matchertext.
@@ -12,12 +12,9 @@ index 2ace122..dc08ee7 100644
 -premises: correct boundary location, a parser that does not re-enter the hole,
 -and an interpreter that treats the hole as data.
 +Verbatim embedding is not the same as injection resistance.
-+We state the security guarantee as \emph{inertness}: the host's parse of a
-+program does not depend on what its holes contain.
-+Inertness is strictly stronger than the closure property it is easily conflated
-+with, and reduces to three premises: that the boundary is located correctly,
-+that the parser does not re-enter the hole, and that the interpreter treats its
-+contents as data.
++We state the security guarantee as \emph{inertness}: the host's parse of a program does not depend on what its holes contain.
++Inertness is strictly stronger than the closure property and reduces to three premises: that the boundary is located correctly,
++that the parser does not re-enter the hole, and that the interpreter treats its contents as data.
 +We discharge the first with a machine-checked proof; the other two are per-host
 +obligations.
  We then ask how much of the real landscape this could reach.
@@ -812,16 +809,17 @@ index 0000000..376ecf1
 +The pipeline is deterministic, so every quoted figure is reproducible from the
 +manifest alone.
 diff --git a/../doc/refs.bib b/refs.bib
-index 498a048..58525a9 100644
+index 8a94b93..fdcadf1 100644
 --- a/refs.bib
 +++ b/refs.bib
-@@ -1,9 +1,6 @@
+@@ -1,10 +1,6 @@
  @misc{matchertext,
 -  author = {Bryan Ford},
    title  = {Matchertext: Towards Verbatim Interlanguage Embedding},
    year   = {2026},
 -  note   = {EPFL, Decentralized and Distributed Systems (DEDIS) Laboratory},
 -  howpublished = {\url{https://github.com/dedis/matchertext}},
+-  url    = {https://github.com/dedis/matchertext},
  }
  
  @misc{cvelist,
