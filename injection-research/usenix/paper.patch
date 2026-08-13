@@ -1,3 +1,28 @@
+diff --git a/../doc/abs.tex b/abs.tex
+index 2ace122..dc08ee7 100644
+--- a/abs.tex
++++ b/abs.tex
+@@ -7,11 +7,15 @@ pairs \verb|()|, \verb|[]|, and \verb|{}| must always match.
+ A host can then delimit an untrusted value with a matcher pair and read it to
+ matcher balance, so escaping the slot would require an unmatched matcher, which
+ is not valid matchertext.
+-Whether that helps against injection depends on what it actually guarantees.
+-We state the guarantee as an \emph{inertness} property, that the host's parse of
+-a program is independent of the content placed in its holes, and reduce it to three
+-premises: correct boundary location, a parser that does not re-enter the hole,
+-and an interpreter that treats the hole as data.
++Verbatim embedding is not the same as injection resistance.
++We state the security guarantee as \emph{inertness}: the host's parse of a
++program does not depend on what its holes contain.
++Inertness is strictly stronger than the closure property it is easily conflated
++with, and reduces to three premises: that the boundary is located correctly,
++that the parser does not re-enter the hole, and that the interpreter treats its
++contents as data.
++We discharge the first with a machine-checked proof; the other two are per-host
++obligations.
+ We then ask how much of the real landscape this could reach.
+ From a reproducible corpus of \textbf{\dataInjectionCVEs} injection CVEs, classified by the
+ embedded syntax each attack targets, and measuring the structure of recorded
 diff --git a/../doc/classify.tex b/classify.tex
 index d076825..ebca89a 100644
 --- a/classify.tex
