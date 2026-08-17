@@ -177,6 +177,16 @@ The 16 fixtures cover single- and double-quoted text, raw and parenthesized
 numbers, \texttt{IN} lists, \texttt{ORDER BY} and \texttt{LIMIT} expressions,
 one- to four-column selects, one- and two-column inserts, and identifier
 positions.
+Hosts and arms are each typed by hole kind, so \dataSqliValueHosts value
+fixtures run against \dataSqliValueArms value arms and \dataSqliIdentHosts
+identifier fixtures against \dataSqliIdentArms identifier arms:
+\dataSqliCasesPerPayload cases per payload, \dataSqliCases in all.
+The two typed strict entry points are swept separately and reported in the
+right-hand block.
+The \dataSqliIdentMtMalformed name-hole cases that do not compile are the
+\dataSqliNulPayloads payloads carrying a trailing zero byte, which ends a
+SQLite statement wherever it appears, so the composed statement is never
+reached rather than the hole failing to contain it.
 The set retains every recorded payload. SQLite variants are limited to one
 transport percent-decoding pass, SQL Server \verb|N'...'| text, PostgreSQL
 dollar-quoted text, and a terminal MySQL \verb|#| comment; no function,

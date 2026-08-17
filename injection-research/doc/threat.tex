@@ -101,7 +101,7 @@ Inertness holds under four premises, each necessary:
 	matcher code points.
 	A check on any earlier, still-encoded representation is unsound: a value
 	valid at that point can acquire an unmatched matcher after a later decode
-	(\eg \verb|%5D|$\rightarrow$\verb|]|) and break out.\footnote{%
+	(\eg \verb|%5D|$\rightarrow$\verb|]|) and break out.
 	Making \textsc{Verify} itself robust to \emph{transport} encodings
 	(percent, entity, backslash, \dots) is not viable: those forms compose to
 	unbounded depth and vary by pipeline, reintroducing the parser-shadowing
@@ -114,7 +114,7 @@ Inertness holds under four premises, each necessary:
 	cannot create an imbalance.
 	Because that set is fixed, canonicalization eliminates it outright, which is
 	why A3 places normalization before the check rather than asking
-	\textsc{Verify} to model it.}
+	\textsc{Verify} to model it.
 \item[\textbf{A4}] \emph{Not a semantic sink.} The host does not execute the
 	contained value by design (server-side templates, expression languages,
 	code evaluation, \verb|javascript:| URLs); delimiting confines structure,

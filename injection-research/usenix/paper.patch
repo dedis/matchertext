@@ -112,7 +112,7 @@ index d2ea6de..f7c8ef7 100644
 +The pipeline, corpus manifest, and per-skeleton rewrites are the concrete
 +basis for extending this measurement.
 diff --git a/../doc/containment.tex b/containment.tex
-index 9c16456..b20f553 100644
+index 6c7a6e9..63dc412 100644
 --- a/containment.tex
 +++ b/containment.tex
 @@ -33,11 +33,10 @@ on the same payloads for the one syntax a matchertext host now implements.
@@ -242,7 +242,7 @@ index 9c16456..b20f553 100644
  subset and the standalone SQL payload corpora.
  
  \paragraph{The deployed host.}
-@@ -197,16 +187,10 @@ That effective set is \dataSqliEffective payloads.
+@@ -207,16 +197,10 @@ That effective set is \dataSqliEffective payloads.
  \input{generated/tbl-sqli-arms}
  \caption{Executed outcome by delivery path over the \dataSqliPayloads SQL
  payloads (\dataSqliCases cases), the additive default beside the opt-in strict
@@ -455,7 +455,7 @@ index 44117ab..b58dae7 100644
  
  \end{document}
 diff --git a/../doc/motivation.tex b/motivation.tex
-index 81f269b..d6864ae 100644
+index 796d456..a571c97 100644
 --- a/motivation.tex
 +++ b/motivation.tex
 @@ -15,171 +15,95 @@ of a much larger family that share the boundary-crossing cause of \cref{sec:intr
@@ -1203,7 +1203,7 @@ index b7bc6f9..0947d54 100644
  \end{table*}
  
 diff --git a/../doc/threat.tex b/threat.tex
-index a553825..29e6f31 100644
+index a5aec7e..e5f254f 100644
 --- a/threat.tex
 +++ b/threat.tex
 @@ -13,47 +13,38 @@ premise binds.
@@ -1280,7 +1280,7 @@ index a553825..29e6f31 100644
  The attacker supplies $v$ and may choose \emph{arbitrary} bytes, character
 @@ -103,18 +94,13 @@ Inertness holds under four premises, each necessary:
  	valid at that point can acquire an unmatched matcher after a later decode
- 	(\eg \verb|%5D|$\rightarrow$\verb|]|) and break out.\footnote{%
+ 	(\eg \verb|%5D|$\rightarrow$\verb|]|) and break out.
  	Making \textsc{Verify} itself robust to \emph{transport} encodings
 -	(percent, entity, backslash, \dots) is not viable: those forms compose to
 +	(percent, entity, backslash, \dots) is not viable: those compose to
@@ -1294,11 +1294,11 @@ index a553825..29e6f31 100644
 -	cannot create an imbalance.
 -	Because that set is fixed, canonicalization eliminates it outright, which is
 -	why A3 places normalization before the check rather than asking
--	\textsc{Verify} to model it.}
+-	\textsc{Verify} to model it.
 +	Unicode normalization has a finite preimage: exactly 20 code points
 +	normalize to a \emph{lone} matcher (\eg \texttt{U+FF3B}$\rightarrow$\texttt{[})
 +	and the rest to balanced pairs, so canonicalization eliminates the set
-+	outright rather than asking \textsc{Verify} to model it.}
++	outright rather than asking \textsc{Verify} to model it.
  \item[\textbf{A4}] \emph{Not a semantic sink.} The host does not execute the
  	contained value by design (server-side templates, expression languages,
  	code evaluation, \verb|javascript:| URLs); delimiting confines structure,

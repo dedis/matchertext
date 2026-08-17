@@ -31,7 +31,7 @@ patch:
   		exit 0; \
 	 else \
 		rm -f $(PATCH); \
-		{ (cd $(SRC) && ls *.tex refs.bib generated/*.tex); ls *.tex refs.bib generated/*.tex; } 2>/dev/null | sort -u | \
+		{ (cd $(SRC) && ls *.tex refs.bib); ls *.tex refs.bib; } 2>/dev/null | sort -u | \
         	while read f; do \
         		a=$(SRC)/$$f; b=$$f; \
         		[ -f "$$a" ] || a=/dev/null; \
