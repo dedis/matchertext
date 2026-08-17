@@ -40,11 +40,11 @@ layers.
 
 \paragraph{Label accuracy.}
 Only the naive-Bayes layer is statistical, and it is both the smallest (\dataMethodNbShare of
-labels) and the only one we can score directly: on a held-out set of \dataNbTestDocs
+labels) and the only one we can score directly. On a held-out set of \dataNbTestDocs
 CVEs it reaches a weighted precision of \textbf{\dataNbPrecision} and recall of
-\textbf{\dataNbRecall} at \dataNbCoverage coverage, and it is strongest exactly where the
+\textbf{\dataNbRecall} at \dataNbCoverage coverage. It is strongest exactly where the
 containment analysis is most sensitive (HTML/DOM \dataNbPrecisionHtmlDom/\dataNbRecallHtmlDom, SQL \dataNbPrecisionSql/\dataNbRecallSql),
-weakest on the small execution-sink classes it labels least often
+and weakest on the small execution-sink classes it labels least often
 (code/eval \dataNbPrecisionCodeEval/\dataNbRecallCodeEval).
 The deterministic layers carry the remaining \dataMethodDeterministicShare of labels and rest on the
 CWE-to-syntax map, whose accuracy we do not independently validate.

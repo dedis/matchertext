@@ -1,16 +1,16 @@
 diff --git a/../doc/abs.tex b/abs.tex
-index 2ace122..bf5f052 100644
+index 4b5643c..8ea6e5f 100644
 --- a/abs.tex
 +++ b/abs.tex
-@@ -7,11 +7,12 @@ pairs \verb|()|, \verb|[]|, and \verb|{}| must always match.
+@@ -7,19 +7,20 @@ pairs \verb|()|, \verb|[]|, and \verb|{}| must always match.
  A host can then delimit an untrusted value with a matcher pair and read it to
  matcher balance, so escaping the slot would require an unmatched matcher, which
  is not valid matchertext.
 -Whether that helps against injection depends on what it actually guarantees.
--We state the guarantee as an \emph{inertness} property, that the host's parse of
--a program is independent of the content placed in its holes, and reduce it to three
--premises: correct boundary location, a parser that does not re-enter the hole,
--and an interpreter that treats the hole as data.
+-We state the guarantee as an \emph{inertness} property: the host's parse of
+-a program is independent of the content placed in its holes.
+-We reduce it to three premises: correct boundary location, a parser that does
+-not re-enter the hole, and an interpreter that treats the hole as data.
 +Verbatim embedding is not the same as injection resistance.
 +We state the security guarantee as \emph{inertness}: the host's parse of a program does not depend on what its holes contain.
 +Inertness is strictly stronger than the closure property and reduces to three premises: that the boundary is located correctly,
@@ -18,42 +18,83 @@ index 2ace122..bf5f052 100644
 +We discharge the first with a machine-checked proof; the other two are per-host
 +obligations.
  We then ask how much of the real landscape this could reach.
- From a reproducible corpus of \textbf{\dataInjectionCVEs} injection CVEs, classified by the
- embedded syntax each attack targets, and measuring the structure of recorded
+-We build a reproducible corpus of \textbf{\dataInjectionCVEs} injection CVEs, classified by the
+-embedded syntax each attack targets.
++We start from a reproducible corpus of \textbf{\dataInjectionCVEs} injection CVEs,
++classified by the embedded syntax each attack targets.
+ We measure the structure of recorded attack strings under a matchertext-aware
+ host rather than a deployed one.
+-We find that \textbf{\dataContainedShare} of those with a recoverable payload are structurally contained,
+-and that at most \textbf{\dataHostableShare} of all injection CVEs target a matcher-delimitable
+-syntax.
++We find that \textbf{\dataContainedShare} of those with a recoverable payload are structurally
++contained.
++At most \textbf{\dataHostableShare} of all injection CVEs target a matcher-delimitable syntax.
+ The residue is execution sinks and non-matcher-delimited contexts, which no
+ delimiting discipline can reach, so the boundary the measurement draws is a
+ property of injection itself rather than of this design.
 diff --git a/../doc/classify.tex b/classify.tex
-index d076825..ebca89a 100644
+index b74212c..a2fd259 100644
 --- a/classify.tex
 +++ b/classify.tex
-@@ -20,20 +20,13 @@ records, spanning \dataInjectionCWEs distinct CWEs.
+@@ -18,33 +18,30 @@ records, spanning \dataInjectionCWEs distinct CWEs.
+ 
+ \paragraph{Layered labeling.}
  Each CVE's syntax type is resolved by a fallback chain, ordered from most to
- least reliable, mirroring the content-classifier methodology of the matchertext
- empirical study~\cite{matchertext}:
+-least reliable, mirroring the content-classifier methodology of the matchertext
+-empirical study~\cite{matchertext}:
 -
- (1) a deterministic map from specific CWEs (\eg \mbox{CWE-89}$\rightarrow$SQL,
+-(1) a deterministic map from specific CWEs (\eg \mbox{CWE-89}$\rightarrow$SQL,
 -\mbox{CWE-79}$\rightarrow$HTML, \mbox{CWE-78}$\rightarrow$shell);
 -
 -(2) phrase rules over the CNA description (``SQL injection'', ``cross-site
 -scripting'', ``command injection'', \dots);
 -
-+\mbox{CWE-79}$\rightarrow$HTML);
-+(2) phrase rules over the CNA description (``SQL injection'', \dots);
- (3) a character-trigram naive-Bayes classifier trained on the CWE- and
- rule-labeled set, applied to the still-unlabeled remainder above a confidence
+-(3) a character-trigram naive-Bayes classifier trained on the CWE- and
+-rule-labeled set, applied to the still-unlabeled remainder above a confidence
 -margin; and
 -
 -(4) an explicit \texttt{unknown} bucket.
 -
 -\noindent Of the injection CVEs, \dataMethodCwe (\dataMethodCweShare) are labeled deterministically from CWEs,
-+margin; and (4) an explicit \texttt{unknown} bucket.
++least reliable.
++This mirrors the content-classifier methodology of the matchertext empirical
++study~\cite{matchertext}.
++First, a deterministic map from specific CWEs (\eg \mbox{CWE-89}$\rightarrow$SQL,
++\mbox{CWE-79}$\rightarrow$HTML).
++Second, phrase rules over the CNA description (``SQL injection'', \dots).
++Third, a character-trigram naive-Bayes classifier, trained on the CWE- and
++rule-labeled set and applied to the still-unlabeled remainder above a confidence
++margin.
++Fourth, an explicit \texttt{unknown} bucket.
 +Of the injection CVEs, \dataMethodCwe (\dataMethodCweShare) are labeled deterministically from CWEs,
  \dataMethodRule from phrase rules, \dataMethodNb from naive Bayes, and only \dataMethodUnknown remain
  unknown, so the classification rests overwhelmingly on the deterministic
  layers.
+ 
+ \paragraph{Label accuracy.}
+-Only the naive-Bayes layer is statistical, and it is both the smallest (\dataMethodNbShare of
+-labels) and the only one we can score directly. On a held-out set of \dataNbTestDocs
+-CVEs it reaches a weighted precision of \textbf{\dataNbPrecision} and recall of
+-\textbf{\dataNbRecall} at \dataNbCoverage coverage. It is strongest exactly where the
+-containment analysis is most sensitive (HTML/DOM \dataNbPrecisionHtmlDom/\dataNbRecallHtmlDom, SQL \dataNbPrecisionSql/\dataNbRecallSql),
+-and weakest on the small execution-sink classes it labels least often
++Only the naive-Bayes layer is statistical.
++It is both the smallest (\dataMethodNbShare of labels) and the only one we can
++score directly.
++On a held-out set of \dataNbTestDocs CVEs it reaches a weighted precision of
++\textbf{\dataNbPrecision} and recall of \textbf{\dataNbRecall} at \dataNbCoverage coverage.
++It is strongest exactly where the containment analysis is most sensitive
++(HTML/DOM \dataNbPrecisionHtmlDom/\dataNbRecallHtmlDom, SQL \dataNbPrecisionSql/\dataNbRecallSql).
++It is weakest on the small execution-sink classes it labels least often
+ (code/eval \dataNbPrecisionCodeEval/\dataNbRecallCodeEval).
+ The deterministic layers carry the remaining \dataMethodDeterministicShare of labels and rest on the
+ CWE-to-syntax map, whose accuracy we do not independently validate.
 diff --git a/../doc/concl.tex b/concl.tex
-index d2ea6de..f7c8ef7 100644
+index 01c1451..ff20a1e 100644
 --- a/concl.tex
 +++ b/concl.tex
-@@ -1,35 +1,26 @@
+@@ -1,36 +1,28 @@
  \section{Conclusion}
  \label{sec:concl}
  
@@ -64,34 +105,36 @@ index d2ea6de..f7c8ef7 100644
 -The guarantee is \emph{inertness}, that a host's parse does not depend on what its
 -holes contain, which is strictly stronger than the closure property the discipline
 -inherits and does not follow from it without assumptions about the host.
--Naming those assumptions reduces inertness to three premises, of which the
--load-bearing one, that reading to matcher balance ends an embedded value where it
--should, is discharged here by a machine-checked proof
--(\cref{sec:appendix:lean}); the two that remain are properties of a host parser
--and its interpreter, and are per-host rather than per-context.
--Adoption is correspondingly bounded: where a format already delimits with
--matchers, as LDAP filters and PDF strings do, the discipline costs nothing at all.
+-Naming those assumptions reduces inertness to three premises.
+-The load-bearing one, that reading to matcher balance ends an embedded value
+-where it should, is discharged here by a machine-checked proof
 +Injection is defended today one host at a time; this paper argues that a single
 +host-independent check can stand in for that collection, and measures how far
 +it would reach.
-+The guarantee is \emph{inertness}, that a host's parse does not depend on what
-+its holes contain: strictly stronger than the closure property the discipline
-+inherits, and reduced to three premises, of which the load-bearing boundary
-+premise is discharged by a machine-checked proof (\cref{sec:appendix:lean}) and
-+the other two are per-host properties of the parser and its interpreter.
++The guarantee is \emph{inertness}: a host's parse does not depend on what
++its holes contain.
++This is strictly stronger than the closure property the discipline inherits, and
++reduces to three premises.
++The load-bearing boundary premise is discharged by a machine-checked proof
+ (\cref{sec:appendix:lean}).
+-The two that remain are properties of a host parser and its interpreter, and
+-are per-host rather than per-context.
+-Adoption is correspondingly bounded: where a format already delimits with
+-matchers, as LDAP filters and PDF strings do, the discipline costs nothing at all.
++The other two are per-host properties of the parser and its interpreter.
 +Where a format already delimits with matchers, as LDAP filters and PDF strings
 +do, the discipline costs nothing at all.
  
 -Measured against a reproducible corpus of \dataInjectionCVEs injection vulnerabilities,
--that reach is a large and concentrated majority of the landscape: the recorded
--payloads of \dataContainedShare of attacks for which we could recover one are contained by a
--matcher-delimited slot under a matchertext-aware host, and at most \dataHostableShare of all
--injection CVEs target a syntax such a host can delimit.
--The corpus also shows the shape of the containment, not only its size: it
--divides into inert embedding and outright rejection along the host language's
--native delimiter, the division \cref{sec:resist} derives, though the ratio
--between the two is a property of these recorded payloads rather than of an
--adaptive attacker.
+-that reach is a large and concentrated majority of the landscape.
+-The recorded payloads of \dataContainedShare of attacks for which we could recover one are
+-contained by a matcher-delimited slot under a matchertext-aware host, and at
+-most \dataHostableShare of all injection CVEs target a syntax such a host can delimit.
+-The corpus also shows the shape of the containment, not only its size.
+-It divides into inert embedding and outright rejection along the host language's
+-native delimiter, the division \cref{sec:resist} derives.
+-The ratio between the two is a property of these recorded payloads rather than
+-of an adaptive attacker.
 -The residue falls along the two premises of \cref{sec:threat}: execution sinks,
 -where the host runs the value by design, and contexts whose delimiters are not
 -matchers, neither of which any delimiting discipline can reach.
@@ -100,10 +143,10 @@ index d2ea6de..f7c8ef7 100644
 -the structural argument with the usability questions that adoption ultimately
 -turns on.
 +Measured against a reproducible corpus of \dataInjectionCVEs injection
-+vulnerabilities, that reach is a large and concentrated majority: the recorded
-+payloads of \dataContainedShare of attacks for which we could recover one are
-+contained by a matcher-delimited slot under an aware host, and at most
-+\dataHostableShare of all injection CVEs target a syntax such a host can
++vulnerabilities, that reach is a large and concentrated majority.
++The recorded payloads of \dataContainedShare of attacks for which we could
++recover one are contained by a matcher-delimited slot under an aware host.
++At most \dataHostableShare of all injection CVEs target a syntax such a host can
 +delimit.
 +The containment divides into inert embedding and rejection along the host's
 +native delimiter, the division \cref{sec:resist} derives; the residue falls
@@ -112,7 +155,7 @@ index d2ea6de..f7c8ef7 100644
 +The pipeline, corpus manifest, and per-skeleton rewrites are the concrete
 +basis for extending this measurement.
 diff --git a/../doc/containment.tex b/containment.tex
-index 6c7a6e9..63dc412 100644
+index 90408aa..8c97833 100644
 --- a/containment.tex
 +++ b/containment.tex
 @@ -33,11 +33,10 @@ on the same payloads for the one syntax a matchertext host now implements.
@@ -131,6 +174,23 @@ index 6c7a6e9..63dc412 100644
  \label{tab:mech}
  \end{table}
  
+@@ -63,13 +62,13 @@ itself is a property of the recorded corpus rather than of an adaptive attacker.
+ The remaining \dataOutsideCVEs payload-backed CVEs are outside both conditions, and divide
+ by the premise of \cref{sec:threat} they fail.
+ \dataOutsideSemantic target execution/semantic sinks (server-side templates, expression
+-languages, code evaluation, spreadsheet formulas, and \verb|javascript:| URLs).
+-The host runs the contained value by design, so delimiting cannot stop
++languages, code evaluation, spreadsheet formulas, and \verb|javascript:| URLs)
++where the host runs the contained value by design. Delimiting cannot stop
+ it: the template payload \verb|{{7*7}}| is already valid matchertext yet is
+ still executed.
+ The other \dataOutsideNonmatcher target contexts delimited by non-matchers with no matcher hosting:
+ shell command separators (\verb|;|~\verb-|-~\verb|&|), CR/LF header breaks, and
+-the angle brackets of XML/XXE. None of these are matcher characters.
++the angle brackets of XML/XXE, none of which are matcher characters.
+ 
+ \paragraph{Projection.}
+ A payload is required to classify the mechanism, but the \emph{context}
 @@ -83,30 +82,27 @@ This is an upper bound, since a fraction of HTML/DOM cases are the
  \textbf{\dataJsSinkRate}.
  
@@ -139,9 +199,9 @@ index 6c7a6e9..63dc412 100644
 -A SQL injection payload is a literal string a write-up can quote, whereas
 -code-eval and argument payloads are usually built at run time and never appear
 -verbatim, so payload availability correlates with syntax and specifically with
-+payload-backed CVEs are not a random sample: a SQL payload is a literal string a
++payload-backed CVEs are not a random sample. A SQL payload is a literal string a
 +write-up can quote, whereas code-eval and argument payloads are built at run
-+time and never appear verbatim, so payload availability correlates with
++time and never appear verbatim. So payload availability correlates with
  matcher-hostable syntax.
 -Applying the pooled \dataContainedShare to the whole corpus inherits that skew
 -and yields \dataNaiveEstimate (\dataNaiveShare), too high by \dataSkewCost CVEs.
@@ -189,16 +249,16 @@ index 6c7a6e9..63dc412 100644
 -covers.
 -The gap between \dataPayloadBackedCVEs and \dataInjectionCVEs is payload
 -availability, not a containment failure.
-+as contained and treats every CVE without a recoverable payload as uncontained,
-+a hard lower bound; the \dataContainedShare above is a different quantity, the
++as contained. It treats every CVE without a recoverable payload as uncontained,
++a hard lower bound. The \dataContainedShare above is a different quantity, the
 +contained share \emph{within} the payload-backed subset.
  
  \paragraph{What payload availability bounds.}
 -That gap is a property of the disclosure ecosystem rather than of our
 -extraction.
--Most CVEs never receive a public proof of concept at all: Mandiant finds that
+-Most CVEs never receive a public proof of concept at all. Mandiant finds that
 -\textbf{51\%} of vulnerabilities disclosed in 2021 and 2022 eventually acquired
--public exploit or proof-of-concept code~\cite{mandiant23tte}, and VulnCheck
+-public exploit or proof-of-concept code~\cite{mandiant23tte}. VulnCheck
 -reports \textbf{26\%} of CVEs carrying 2025 identifiers had such code by the end
 -of that year, a share that grows as a vulnerability
 -ages~\cite{vulncheck26exploit}.
@@ -212,11 +272,11 @@ index 6c7a6e9..63dc412 100644
 -of it, and the fragment-level bound should be read against that population, not
 -against \dataInjectionCVEs.
 +The gap between \dataPayloadBackedCVEs and \dataInjectionCVEs is payload
-+availability, a property of the disclosure ecosystem, not a containment failure:
++availability, a property of the disclosure ecosystem, not a containment failure.
 +Mandiant finds \textbf{51\%} of vulnerabilities disclosed in 2021--2022
 +eventually acquired public exploit or proof-of-concept
-+code~\cite{mandiant23tte}, VulnCheck reports \textbf{26\%} for CVEs carrying
-+2025 identifiers~\cite{vulncheck26exploit}, and \dataInjectionWithPoc of our
++code~\cite{mandiant23tte}. VulnCheck reports \textbf{26\%} for CVEs carrying
++2025 identifiers~\cite{vulncheck26exploit}. Our own corpus is stricter: \dataInjectionWithPoc of our
 +injection CVEs (\dataInjectionWithPocShare) carry any proof-of-concept reference
 +at all, a literal attack string being a stricter requirement still.
 +The measurable population is therefore roughly half the corpus, and the
@@ -242,7 +302,22 @@ index 6c7a6e9..63dc412 100644
  subset and the standalone SQL payload corpora.
  
  \paragraph{The deployed host.}
-@@ -207,16 +197,10 @@ That effective set is \dataSqliEffective payloads.
+@@ -163,10 +153,11 @@ prepared through the ordinary interface.
+ The matcher-delimited hole is offered beside legacy composition rather than
+ replacing it, so existing SQL keeps working and adoption is incremental. This is
+ the point-of-use character of A2: a value the caller still concatenates
+-into host syntax is unprotected. An escape or a bound parameter leaves it unprotected in the same way.
++into host syntax is unprotected. This holds exactly as with an escape or a bound
++parameter.
+ An opt-in strict mode additionally refuses the legacy prepare entry points,
+-turning A2 from a convention into an enforced invariant for callers who want it.
+-The measurement below reports the additive default and this strict build side by
++turning A2 from a convention into an enforced invariant for callers who want it;
++the measurement below reports the additive default and this strict build side by
+ side.
+ 
+ \paragraph{Method.}
+@@ -207,16 +198,10 @@ That effective set is \dataSqliEffective payloads.
  \input{generated/tbl-sqli-arms}
  \caption{Executed outcome by delivery path over the \dataSqliPayloads SQL
  payloads (\dataSqliCases cases), the additive default beside the opt-in strict
@@ -263,28 +338,90 @@ index 6c7a6e9..63dc412 100644
  \label{tab:sqli}
  \end{table*}
  
+@@ -234,25 +219,25 @@ That breakout is available only because the additive build leaves legacy
+ composition open.
+ Recompiled in the opt-in strict mode, every text-splicing prepare, the
+ concatenation and the in-band \verb|M'(...)'| alike, is refused before it reaches
+-the parser (\cref{tab:sqli}, right). The \dataSqliEffective effective-set
+-attacks then have no path at all, and A2 holds by construction rather than by
++the parser (\cref{tab:sqli}, right). So the \dataSqliEffective effective-set
++attacks have no path at all, and A2 holds by construction rather than by
+ discipline.
+ The only admitted paths are then the typed \texttt{?V} value and \texttt{?I}
+ identifier parameters of \texttt{sqlite3\_matchertext\_prepare\_v3()}. Run
+-over the SQL corpus, they contain it exactly as the additive holes do:
++over the SQL corpus they contain it exactly as the additive holes do:
+ \dataSqliStrictValueBreakout value breakouts and \dataSqliStrictIdentBreakout
+ identifier breakouts. The \texttt{?V} route binds each valid value and refuses
+-the \dataSqliStrictValueRejected that are not matchertext. The \texttt{?I} route
++the \dataSqliStrictValueRejected that are not matchertext, and the \texttt{?I} route
+ holds each as a single name.
+ Short of strict mode, an application closes the same gap itself by carrying the
+-two \textsc{Verify} checks of the discipline. The first check is that the input is valid
+-matchertext, which admits it or routes it through the encoder. The second is that the
++two \textsc{Verify} checks of the discipline. The first: that the input is valid
++matchertext, which admits it or routes it through the encoder. The second: that the
+ input placed in its matcher-delimited hole leaves the assembled statement valid
+ matchertext, the closure the host reads to matcher balance.
+ The value-hole and name-hole rows are exactly those two checks applied by the
+ driver; the concatenation control is their absence.
+ The value hole embeds each payload inertly, its quotes and operators read as
+-data. The verified route instead refuses the \dataSqliMtStrictRejected payloads
++data; the verified route instead refuses the \dataSqliMtStrictRejected payloads
+ that are not valid matchertext, so the two mechanisms of \cref{sec:resist},
+ inert embedding and rejection, appear directly.
+ The identifier hole holds each payload as a single name, which resolves or does
+@@ -264,9 +249,8 @@ A zero is evidence only if the oracle could have reported a one.
+ We rebuild the scanner deliberately broken, once so the boundary locator stops
+ at the first closer and once so \textsc{Verify} always accepts, and rerun.
+ Each broken build changes the verdict of the holes that rest on it, in up to
+-\dataSqliSabotageDetect of cases. Those holes are the value
+-and name holes that end by matcher balance, and the verified route that calls
+-\textsc{Verify}. The honest zero is therefore
+-read against demonstrated detection power rather than a blind harness.
++\dataSqliSabotageDetect of cases. Those are the value and name holes that end by
++matcher balance and the verified route that calls \textsc{Verify}. So the honest
++zero is read against demonstrated detection power rather than a blind harness.
+ The C scanner and an independent implementation agree on \textsc{Verify} for
+ every payload, and the run is deterministic.
 diff --git a/../doc/data.tex b/data.tex
-index c4945fe..4691ba7 100644
+index 7a852cf..440489b 100644
 --- a/data.tex
 +++ b/data.tex
-@@ -22,10 +22,9 @@ weakness hierarchy used for classification.
+@@ -12,21 +12,19 @@ The \href{https://github.com/CVEProject/cvelistV5}{MITRE CVE List}
+ (\texttt{cvelistV5}) is the canonical record of identity, CNA provenance, and
+ description.
+ \href{https://nvd.nist.gov/vuln/data-feeds}{NVD} supplies normalized CWE, CPE,
+-and CVSS.
+-\href{https://github.com/cisagov/vulnrichment}{CISA Vulnrichment}
+-backfills recent CWE/CVSS via its ADP container.
+-\href{https://github.com/cisagov/kev-data}{CISA KEV} marks known-exploited CVEs.
++and CVSS; \href{https://github.com/cisagov/vulnrichment}{CISA Vulnrichment}
++backfills recent CWE/CVSS via its ADP container;
++\href{https://github.com/cisagov/kev-data}{CISA KEV} marks known-exploited CVEs;
+ \href{https://www.first.org/epss/}{FIRST EPSS} supplies exploit-likelihood
+-scores, and the \href{https://cwe.mitre.org/}{MITRE CWE list} provides the
++scores; and the \href{https://cwe.mitre.org/}{MITRE CWE list} provides the
+ weakness hierarchy used for classification.
+ \href{https://github.com/github/advisory-database}{GitHub Security Advisories},
  \href{https://access.redhat.com/security/data}{Red~Hat}, and
  \href{https://security-tracker.debian.org/tracker/}{Debian} add further CWE,
  CVSS, severity, and fix-state signals through their CVE aliases.
 -Because the same CVE can carry different weakness labels from different sources,
--enrichment is kept \emph{source-separated}: each CWE or CVSS row is tagged with
--its origin rather than merged, which both preserves provenance and lets us
--measure cross-source disagreement.
+-enrichment is kept \emph{source-separated}.
+-Each CWE or CVSS row is tagged with its origin rather than merged, which both
+-preserves provenance and lets us measure cross-source disagreement.
 +Enrichment is kept \emph{source-separated}, each CWE or CVSS row tagged with its
 +origin rather than merged, preserving provenance and exposing cross-source
 +disagreement.
  
  \paragraph{Proof-of-concept payloads.}
  Six PoC databases supply real attack strings:
-@@ -39,13 +38,11 @@ the \href{https://github.com/trickest/cve}{trickest/cve} exploit index, and
+@@ -39,14 +37,13 @@ modules, the
+ the \href{https://github.com/trickest/cve}{trickest/cve} exploit index, and
  \href{https://github.com/vulhub/vulhub}{Vulhub}'s reproduction environments.
  The first three, and Vulhub's worked exploit requests, are cloned locally so
- that a payload can be extracted; PoC-in-GitHub and trickest contribute links
+-that a payload can be extracted; PoC-in-GitHub and trickest contribute links
 -only.
 -A trickest entry separates candidate exploit repositories from advisory
 -write-ups, and only the former are counted as PoC evidence.
@@ -292,7 +429,9 @@ index c4945fe..4691ba7 100644
 -is extractable.
 -Because exploit code is dual-use, the corpus stores only links, identifiers, and
 -locally-extracted payload fragments; no exploit files are redistributed.
-+only, and of a trickest entry only the candidate exploit repositories, not the
++that a payload can be extracted.
++PoC-in-GitHub and trickest contribute links only.
++Of a trickest entry, only the candidate exploit repositories, not the
 +advisory write-ups, count as PoC evidence.
 +References are unified in one table with a local path where a payload is
 +extractable; because exploit code is dual-use, the corpus stores only links,
@@ -319,18 +458,19 @@ index a1230b2..632f0e1 100644
  \begin{lstlisting}
 diff --git a/ethics.tex b/ethics.tex
 new file mode 100644
-index 0000000..6a6fb23
+index 0000000..8cb2979
 --- /dev/null
 +++ b/ethics.tex
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,15 @@
 +\section{Ethics considerations}
 +\label{sec:appendix:ethics}
 +
 +This work attacked no live or third-party system.
 +The corpus study (\cref{sec:corpus}) is a static analysis of public CVE records
 +and already-public proof-of-concept strings drawn from the sources named in
-+\cref{sec:data}; no payload was sent to any deployed service, and the
-+proof-of-concept material is referenced by source, not redistributed.
++\cref{sec:data}.
++No payload was sent to any deployed service, and the proof-of-concept material
++is referenced by source, not redistributed.
 +The only executed attacks (\cref{sec:prevent:exec}) ran against a SQLite fork
 +and driver built in-house for this paper, in an isolated local environment, to
 +test the paper's own claims.
@@ -338,10 +478,32 @@ index 0000000..6a6fb23
 +Vulnerability records and payloads concern flaws that are long public and
 +vendor-acknowledged, so this analysis creates no new disclosure obligation.
 diff --git a/../doc/intro.tex b/intro.tex
-index b8ce9bf..2e58bf7 100644
+index 98029f0..6ff4595 100644
 --- a/intro.tex
 +++ b/intro.tex
-@@ -27,23 +27,21 @@ assumptions, and how much of the real injection landscape it could reach.
+@@ -3,8 +3,8 @@
+ 
+ Injection vulnerabilities arise when untrusted data crosses a language boundary
+ and is misinterpreted as structure rather than as inert content.
+-Examples are a quote that closes a SQL string literal, an angle bracket that
+-opens an HTML tag, and a semicolon that starts a new shell command.
++A quote can close a SQL string literal, an angle bracket can open an HTML tag,
++and a semicolon can start a new shell command.
+ Despite decades of mitigations (parameterized queries, context-sensitive
+ output encoding, allowlisting), injection continues to dominate vulnerability
+ disclosures.
+@@ -16,8 +16,8 @@ language-independent structural rule: the ASCII matcher pairs \verb|()|,
+ \verb|[]|, and \verb|{}| must always match.
+ Under this rule, a host language can delimit an untrusted value with a matcher
+ pair and read it to matcher balance.
+-To escape its slot the value would have to emit an unmatched matcher, which is
+-not valid matchertext and is escaped on the way in.
++To escape its slot, the value would have to emit an unmatched matcher.
++Such a matcher is not valid matchertext, and is escaped on the way in.
+ The canonical injection \verb|' OR '1'='1| illustrates the mechanism: hosted as
+ \verb|WHERE name = [| \emph{value} \verb|]|, the quote that would have closed
+ the string literal is now ordinary text inside the matched region, and the
+@@ -28,23 +28,21 @@ assumptions, and how much of the real injection landscape it could reach.
  We make four contributions:
  \begin{itemize}
  \item	A security reading of the matchertext discipline
@@ -455,14 +617,28 @@ index 44117ab..b58dae7 100644
  
  \end{document}
 diff --git a/../doc/motivation.tex b/motivation.tex
-index 796d456..a571c97 100644
+index 351fdaa..db2de26 100644
 --- a/motivation.tex
 +++ b/motivation.tex
-@@ -15,171 +15,95 @@ of a much larger family that share the boundary-crossing cause of \cref{sec:intr
- The same failure recurs across many more language pairs than those two,
+@@ -3,10 +3,10 @@
+ 
+ Injection remains among the most damaging and persistent classes of software
+ vulnerability. This section surveys the breadth of the problem beyond its most
+-familiar members, together with its measured prevalence and cost. It also shows
+-why the very machinery built to contain it has itself become a recurring source
+-of vulnerabilities. This is the motivation for the structural approach this
+-paper evaluates.
++familiar members. It reviews the measured prevalence and cost. It then shows
++why the very machinery built to contain injection has itself become a recurring
++source of vulnerabilities. This is the motivation for the structural approach
++this paper evaluates.
+ 
+ \subsection{A wider family of embedding hazards}
+ \label{sec:bg:hazards}
+@@ -17,170 +17,95 @@ The same failure recurs across many more language pairs than those two,
  and produces symptoms well beyond information disclosure.
  
--Several are, like SQL injection, outright remote compromises.
+ Several are, like SQL injection, outright remote compromises.
 -In the 2021 Log4Shell vulnerability,
 -a \verb|${jndi:...}| sequence appearing anywhere in a logged string
 -was expanded by Log4j's message interpolation into a remote lookup
@@ -470,16 +646,16 @@ index 796d456..a571c97 100644
 -Command injection arises when user input reaches a shell without proper quoting,
 -so that metacharacters such as \verb|;| or \verb|&|
 -break out of the intended single argument~\cite{owasp_cmdinjection}.
--Spreadsheet formula injection turns exported data into code:
--a field beginning with \verb|=| is re-interpreted as a formula
--when a CSV export is opened in a spreadsheet,
--as in an Azure activity-log entry
--that executed on an administrator's machine on download~\cite{gietzen18csv}.
+-Spreadsheet formula injection turns exported data into code.
+-A field beginning with \verb|=| is re-interpreted as a formula
+-when a CSV export is opened in a spreadsheet.
+-One Azure activity-log entry
+-executed on an administrator's machine on download~\cite{gietzen18csv}.
 -Server-side template injection embeds user input into a template
--instead of passing it as data,
--letting an expression such as \verb|{{7*7}}| reach the template engine
--and frequently the whole server~\cite{portswigger_ssti},
--while the analogous client-side attack
+-instead of passing it as data.
+-An expression such as \verb|{{7*7}}| then reaches the template engine
+-and frequently the whole server~\cite{portswigger_ssti}.
+-The analogous client-side attack
 -breaks out of the AngularJS expression sandbox
 -to run arbitrary JavaScript~\cite{peguero16angular}.
 -Even purpose-built defenses are not immune:
@@ -493,31 +669,30 @@ index 796d456..a571c97 100644
 -the widely cited ``Norway problem''~\cite{oconnor23yaml}.
 -A regular expression with nested quantifiers
 -fed adversarial input backtracks catastrophically and hangs the program,
--a regular-expression denial of service~\cite{owasp_redos};
--and the XML ``billion laughs'' attack
+-a regular-expression denial of service~\cite{owasp_redos}.
+-The XML ``billion laughs'' attack
 -expands a kilobyte of nested entity definitions into gigabytes,
 -exhausting memory during parsing~\cite{sullivan09xml}.
 -
 -The maintainability face of the same problem
--is the leaning toothpick syndrome,
--and history shows that ad-hoc syntactic fixes tend to backfire:
+-is the leaning toothpick syndrome.
+-History shows that ad-hoc syntactic fixes tend to backfire.
 -PHP's \verb|magic_quotes| feature auto-escaped quotes in request data
--to forestall injection,
--but did so inconsistently, invited double-escaping bugs,
+-to forestall injection.
+-It did so inconsistently, invited double-escaping bugs,
 -and was eventually deprecated~\cite{php_magicquotes}.
 -What unites the largest of these cases is structural:
 -content meant to be inert data is read as syntax
 -because a bracket or quote within it escapes its intended region.
-+Several are, like SQL injection, outright remote compromises:
-+the 2021 Log4Shell vulnerability expanded a \verb|${jndi:...}| sequence
++The 2021 Log4Shell vulnerability expanded a \verb|${jndi:...}| sequence
 +appearing anywhere in a logged string into a remote lookup that executed
-+attacker-supplied code~\cite{cve2021log4shell};
-+command injection lets metacharacters such as \verb|;| or \verb|&| in
-+unquoted input break out of a single shell argument~\cite{owasp_cmdinjection};
-+spreadsheet formula injection turns a CSV field beginning with \verb|=| into
-+code, as in an Azure activity-log entry that executed on an administrator's
-+machine on download~\cite{gietzen18csv};
-+and template injection lets an expression such as \verb|{{7*7}}| reach the
++attacker-supplied code~\cite{cve2021log4shell}.
++Command injection lets metacharacters such as \verb|;| or \verb|&| in
++unquoted input break out of a single shell argument~\cite{owasp_cmdinjection}.
++Spreadsheet formula injection turns a CSV field beginning with \verb|=| into
++code. One Azure activity-log entry executed on an administrator's
++machine on download~\cite{gietzen18csv}.
++Template injection lets an expression such as \verb|{{7*7}}| reach the
 +template engine server-side~\cite{portswigger_ssti} or escape the AngularJS
 +expression sandbox client-side~\cite{peguero16angular}.
 +Even purpose-built defenses are not immune: the DOMPurify sanitizer has been
@@ -534,15 +709,16 @@ index 796d456..a571c97 100644
 +What unites the largest of these cases is structural: content meant to be inert
 +data is read as syntax because a bracket or quote within it escapes its
 +intended region.
- That is exactly the failure a matcher-balance discipline is built to resist,
--and because it recurs across the injection and markup attacks above
--rather than in any single language pair,
--one structural discipline can address the breakout-based members at once, as
--distinct from the execution and algorithmic members (template evaluation, ReDoS,
--entity expansion) it cannot.
-+and because it recurs across language pairs, one discipline can address the
-+breakout-based members at once, as distinct from the execution and algorithmic
-+members (template evaluation, ReDoS, entity expansion) it cannot.
+ That is exactly the failure a matcher-balance discipline is built to resist.
+-It recurs across the injection and markup attacks above
+-rather than in any single language pair.
+-One structural discipline can therefore address the breakout-based members at once.
+-This is distinct from the execution and algorithmic members (template evaluation,
+-ReDoS, entity expansion) it cannot address.
++Because it recurs across language pairs, one discipline can address the
++breakout-based members at once. This is distinct from the execution and
++algorithmic members (template evaluation, ReDoS, entity expansion) it cannot
++address.
  
  
 -\subsection{The prevalence and cost of injection failures}
@@ -561,10 +737,10 @@ index 796d456..a571c97 100644
 -OWASP's 2025 Injection category maps to 62,445 recorded CVEs,
 -of which it attributes more than 30,000 to XSS
 -and more than 14,000 to SQL injection~\cite{owasp_top10_2025}.
--Independent scanning corroborates this:
+-Independent scanning corroborates this.
 -Edgescan's 2025 report attributes 28.28\% of critical and high-severity
--web and API findings to SQL injection and a further 17\% to XSS~\cite{edgescan25},
--and Veracode has reported XSS in 47\% and SQL injection in 28\%
+-web and API findings to SQL injection and a further 17\% to XSS~\cite{edgescan25}.
+-Veracode has reported XSS in 47\% and SQL injection in 28\%
 -of the applications it tested~\cite{veracode_soss}.
 -The cost of a single failure can be severe:
 -the 2015 TalkTalk breach, an SQL injection,
@@ -578,19 +754,19 @@ index 796d456..a571c97 100644
 -In one controlled study,
 -all ten programmers asked to fix an XSS flaw
 -with a standard output-encoding library
--failed to remove it completely~\cite{wijayarathna18esapi};
--an analysis of real PHP applications
--found them carrying far more distinct sanitizers than syntactic contexts,
--one application defining 95 sanitization functions
--against thousands of output sites,
--an arrangement in which selecting the wrong encoder for a context
+-failed to remove it completely~\cite{wijayarathna18esapi}.
+-An analysis of real PHP applications
+-found them carrying far more distinct sanitizers than syntactic contexts.
+-One application defined 95 sanitization functions
+-against thousands of output sites.
+-In that arrangement, selecting the wrong encoder for a context
 -is both easy and common~\cite{weinberger11xss}.
--The risky patterns remain widespread:
--a 2024 study of nearly a million GitHub projects
+-The risky patterns remain widespread.
+-A 2024 study of nearly a million GitHub projects
 -found SQL assembled by string concatenation
--in 42\% of the Java, 56\% of the C\#, and 91\% of the PHP files examined,
--the construction from which injection arises
--once untrusted input reaches the query structure~\cite{dennis24sql}.
+-in 42\% of the Java, 56\% of the C\#, and 91\% of the PHP files examined~\cite{dennis24sql}.
+-This is the construction from which injection arises
+-once untrusted input reaches the query structure.
 -
 -The record is consistent and stark:
 -injection and XSS are common, severe, and long-lived,
@@ -608,27 +784,27 @@ index 796d456..a571c97 100644
 -is itself substantial code, and itself a recurring source of vulnerabilities.
 -A production HTML sanitizer must track
 -the host parser's full and quirk-laden behavior,
--so the components are not small:
--DOMPurify's core file runs to roughly 2,400 lines,
--and project-wide the larger sanitizers reach tens of thousands,
--HTML Purifier and OWASP's ESAPI each near 40,000
+-so the components are not small.
+-DOMPurify's core file runs to roughly 2,400 lines.
+-Project-wide, the larger sanitizers reach tens of thousands:
+-HTML Purifier and OWASP's ESAPI each near 40,000,
 -and Python's Bleach around 15,000.
 -Because such a sanitizer is correct only while its model
 -matches every browser exactly,
--each divergence becomes a bypass,
--and the bypasses recur as named classes:
--mutation XSS, in which sanitized markup turns executable
--once the browser reparses it~\cite{heiderich13mxss};
--parsing differentials, in which the sanitizer and the browser
--disagree about the same input~\cite{klein24parsing};
--and DOM clobbering, in which attacker-named elements
+-each divergence becomes a bypass.
+-The bypasses recur as named classes.
+-Mutation XSS turns sanitized markup executable
+-once the browser reparses it~\cite{heiderich13mxss}.
+-Parsing differentials make the sanitizer and the browser
+-disagree about the same input~\cite{klein24parsing}.
+-DOM clobbering lets attacker-named elements
 -subvert the security logic itself~\cite{khodayari23clobbering}.
 -
 -The result is a steady stream of flaws in the sanitizers themselves.
 -DOMPurify has carried at least nine CVEs,
 -publishing sixteen security advisories in under three months
--of 2026 alone~\cite{dompurify_advisories},
--and the Rails HTML sanitizer disclosed five CVEs on a single day~\cite{rails_sanitizer_cves};
+-of 2026 alone~\cite{dompurify_advisories}.
+-The Rails HTML sanitizer disclosed five CVEs on a single day~\cite{rails_sanitizer_cves}.
 -Bleach, sanitize-html, and HTML Purifier
 -each have their own multi-entry histories.
 -These counts include only flaws \emph{in} the sanitizers,
@@ -642,9 +818,9 @@ index 796d456..a571c97 100644
 -to a structural \emph{transformation}.
 -Verifying that a value's matchers balance
 -is host-independent and small,
--whereas a sanitizer must shadow the host language's parser and its quirks;
--the security literature has repeatedly reached the analogous conclusion,
--favoring safety by construction, typed template contexts,
+-whereas a sanitizer must shadow the host language's parser and its quirks.
+-The security literature has repeatedly reached the analogous conclusion.
+-It favors safety by construction, typed template contexts,
 -and parameterized queries over ad-hoc escaping~\cite{samuel11csas,momot16langsec,owasp_parameterization}.
 -The check itself is a few lines of uniform, host-independent balance-counting,
 -against tens of thousands of lines of parser-shadowing transformation
@@ -653,17 +829,17 @@ index 796d456..a571c97 100644
 -A matchertext host must also end an embedded value by matcher balance
 -and suppress its own decoding inside the hole,
 -and the write path adds an encoder and its inverse (\cref{sec:threat}).
--Matchertext thus relocates trust rather than eliminating it:
--what must hold uniformly across languages shrinks to a small host-independent
--check, and what remains per host is a bounded change to a parser the host
+-Matchertext thus relocates trust rather than eliminating it.
+-What must hold uniformly across languages shrinks to a small host-independent
+-check. What remains per host is a bounded change to a parser the host
 -already owns, not a new artifact shadowing one it does not.
 +Injection has appeared in every edition of the OWASP Top~10 since 2010, subsuming
 +cross-site scripting since 2021~\cite{owasp_top10_2021}, and the underlying
 +weaknesses top MITRE's 2025 CWE Top~25, XSS (CWE-79) first and SQL injection
 +(CWE-89) second~\cite{cwe_top25_2025}.
-+The volumes are large: OWASP's 2025 Injection category maps to 62,445 recorded
++The volumes are large. OWASP's 2025 Injection category maps to 62,445 recorded
 +CVEs, more than 30,000 of them XSS and more than 14,000 SQL
-+injection~\cite{owasp_top10_2025}, and Edgescan's 2025 report attributes 28.28\%
++injection~\cite{owasp_top10_2025}. Edgescan's 2025 report attributes 28.28\%
 +of critical and high-severity web and API findings to SQL injection and a
 +further 17\% to XSS~\cite{edgescan25}.
 +A single failure can be severe: the 2015 TalkTalk SQL injection exposed the data
@@ -673,12 +849,12 @@ index 796d456..a571c97 100644
 +sanitization are empirically error-prone.
 +In one controlled study, all ten programmers asked to fix an XSS flaw with a
 +standard output-encoding library failed to remove it
-+completely~\cite{wijayarathna18esapi}; real PHP applications carry far more
++completely~\cite{wijayarathna18esapi}. Real PHP applications carry far more
 +distinct sanitizers than syntactic contexts, one defining 95 sanitization
-+functions against thousands of output sites~\cite{weinberger11xss}; and a 2024
-+study of nearly a million GitHub projects found SQL assembled by string
-+concatenation in 42\% of the Java, 56\% of the C\#, and 91\% of the PHP files
-+examined~\cite{dennis24sql}.
++functions against thousands of output sites~\cite{weinberger11xss}. A 2024
++study examined nearly a million GitHub projects. It found SQL assembled by
++string concatenation in 42\% of Java files, 56\% of C\#, and 91\% of
++PHP~\cite{dennis24sql}.
 +
 +\label{sec:bg:sanitizer}%
 +The sanitizer machinery is itself a recurring source of vulnerabilities.
@@ -699,8 +875,8 @@ index 796d456..a571c97 100644
 +
 +This is the concrete case for preferring a structural \emph{check} to a
 +structural \emph{transformation}.
-+Verifying that a value's matchers balance is host-independent and a few lines,
-+whereas a sanitizer must shadow the host parser and its quirks; the security
++Verifying that a value's matchers balance is host-independent and a few lines.
++A sanitizer instead must shadow the host parser and its quirks. The security
 +literature has repeatedly favored safety by construction, typed template
 +contexts, and parameterized queries over ad-hoc
 +escaping~\cite{samuel11csas,momot16langsec,owasp_parameterization}.
@@ -713,7 +889,7 @@ index 796d456..a571c97 100644
  
  
  \subsection{The narrow waist}
-@@ -195,46 +119,42 @@ already owns, not a new artifact shadowing one it does not.
+@@ -196,53 +121,50 @@ already owns, not a new artifact shadowing one it does not.
  	note/.style={font=\small},
  ]
  \begin{scope}[xshift=-4.3cm]
@@ -786,26 +962,47 @@ index 796d456..a571c97 100644
  \label{fig:bg:waist}
  \end{figure*}
  
+ The defenses of \cref{sec:bg:sanitizer} share a shape.
+-Each is written for one composing language and one host. Each works by knowing the
+-host well enough to transform values for it. A Java-to-SQL escaper knows SQL, and
+-an HTML sanitizer knows the browser's parser closely enough to predict it.
++Each is written for one composing language and one host. Each works by knowing
++the host well enough to transform values for it. A Java-to-SQL escaper knows
++SQL, and an HTML sanitizer knows the browser's parser closely enough to predict
++it.
+ Neither transfers to the other's problem, so the number of defenses to write,
+ audit, and re-synchronize grows with the product of the two populations.
+ 
+@@ -251,8 +173,8 @@ A rule that both sides implement once decouples them, because the rule mentions
+ neither. A language that emits valid matchertext is compatible with every host
+ that reads to matcher balance. Such a host accepts values from every such
+ language, without either knowing what the other is.
+-The count falls from $N \times M$ relationships to $N + M$ implementations, which
+-is the shape the Internet protocol stack takes for the same reason, a waist thin
++The count falls from $N \times M$ relationships to $N + M$ implementations. This
++is the shape the Internet protocol stack takes for the same reason: a waist thin
+ enough that what sits above and below it can vary independently.
+ 
+ Whether that shape is worth adopting is a security question rather than an
 diff --git a/openscience.tex b/openscience.tex
 new file mode 100644
-index 0000000..376ecf1
+index 0000000..519fb4b
 --- /dev/null
 +++ b/openscience.tex
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,15 @@
 +\section{Open science}
 +\label{sec:appendix:openscience}
 +
 +All artifacts behind this paper's claims are shared at submission through an
-+anonymized repository (\url{ANONYMOUS-LINK-TODO}) and will be archived publicly
-+upon publication:
-+the classification pipeline and every generated table and number in this paper
-+(\cref{sec:corpus});
-+the corpus manifest pinning each upstream source by content hash;
-+the per-skeleton rewrites of the containment measurement
-+(\cref{sec:prevent:exec});
-+the Lean~4 proof developments
-+(\cref{sec:appendix:lean,sec:appendix:tomatchertext});
-+and the matchertext-aware SQLite fork with its driver and test harness.
++anonymized repository (\url{ANONYMOUS-LINK-TODO}), and will be archived publicly
++upon publication.
++These are the classification pipeline and every generated table and number in
++this paper (\cref{sec:corpus}); the corpus manifest pinning each upstream source
++by content hash; and the per-skeleton rewrites of the containment measurement
++(\cref{sec:prevent:exec}).
++They also include the Lean~4 proof developments
++(\cref{sec:appendix:lean,sec:appendix:tomatchertext}), and the matchertext-aware
++SQLite fork with its driver and test harness.
 +The pipeline is deterministic, so every quoted figure is reproducible from the
 +manifest alone.
 diff --git a/../doc/refs.bib b/refs.bib
@@ -824,56 +1021,77 @@ index 8a94b93..fdcadf1 100644
  
  @misc{cvelist,
 diff --git a/../doc/related.tex b/related.tex
-index 21a2489..91a6b55 100644
+index 98f308d..20c1a59 100644
 --- a/related.tex
 +++ b/related.tex
-@@ -9,21 +9,18 @@ attacks the embedding boundary.
+@@ -4,50 +4,42 @@
+ Matchertext treats injection as a structural problem: keep untrusted input from
+ altering the syntax around it, rather than filter what it may contain.
+ \Cref{sec:resist:baselines} sets it head-to-head against the defenses deployed
+-today. Here we place it in the broader literature, grouped by how each line
++today; here we place it in the broader literature, grouped by how each line
+ attacks the embedding boundary.
  
  \subsection{Language-based construction}
  The strongest host-specific defenses fix the embedded language's structure
 -before any value is bound.
--Parameterized queries do this for SQL~\cite{owasp_parameterization}, and a
--programming-languages tradition hardens the same idea into types: SQL~DOM~\cite{mcclure05sqldom}
+-Parameterized queries do this for SQL~\cite{owasp_parameterization}.
+-A programming-languages tradition hardens the same idea into types: SQL~DOM~\cite{mcclure05sqldom}
 -and Safe Query Objects~\cite{cook05safequery} replace string building with typed
--query values; language-integrated query gives the host-to-SQL translation a
--formal, meaning-preserving account~\cite{cheney13liq}; and Ur/Web~\cite{chlipala15urweb}
--collapses web multi-language composition into one statically typed language.
+-query values.
+-Language-integrated query gives the host-to-SQL translation a formal,
+-meaning-preserving account~\cite{cheney13liq}.
+-Ur/Web~\cite{chlipala15urweb} collapses web multi-language composition into one
+-statically typed language.
 -For markup, contextual auto-escaping selects the escaper from each hole's
--inferred syntactic context~\cite{samuel11csas}, and typed-value schemes such as
--SafeHtml and Trusted Types gate dangerous sinks so they accept only
--non-spoofable objects rather than arbitrary strings~\cite{kern14securing,trustedtypes}.
+-inferred syntactic context~\cite{samuel11csas}.
+-Typed-value schemes such as SafeHtml and Trusted Types gate dangerous sinks, so
+-they accept only non-spoofable objects rather than arbitrary strings~\cite{kern14securing,trustedtypes}.
 -Each buys a strong guarantee by knowing the language it protects: a fixed
 -language, a dedicated sink API, or an owning compiler.
 -Matchertext keeps values as plain text and fixes only the \emph{boundary}, so one
 -rule serves hosts it was never specialized to (\cref{sec:resist:baselines}).
-+before any value is bound: parameterized queries~\cite{owasp_parameterization}
-+and their typed hardenings SQL~DOM~\cite{mcclure05sqldom} and Safe Query
-+Objects~\cite{cook05safequery}, language-integrated query with a formal,
-+meaning-preserving translation~\cite{cheney13liq}, and
-+Ur/Web~\cite{chlipala15urweb}, which collapses web composition into one
-+statically typed language; for markup, contextual
-+auto-escaping~\cite{samuel11csas} and typed-value sink gates such as SafeHtml
-+and Trusted Types~\cite{kern14securing,trustedtypes}, which
-+\cref{sec:resist:baselines} already sets against the discipline head-to-head.
++before any value is bound. For queries, these include
++parameterized queries~\cite{owasp_parameterization} and their typed hardenings
++SQL~DOM~\cite{mcclure05sqldom} and Safe Query Objects~\cite{cook05safequery}.
++Others are language-integrated query with a formal, meaning-preserving
++translation~\cite{cheney13liq}, and Ur/Web~\cite{chlipala15urweb}, which
++collapses web composition into one statically typed language. For markup,
++examples include contextual auto-escaping~\cite{samuel11csas} and typed-value
++sink gates such as SafeHtml and Trusted Types~\cite{kern14securing,trustedtypes}.
++\Cref{sec:resist:baselines} already sets these against the discipline
++head-to-head.
 +Each buys a strong guarantee by knowing the language it protects; matchertext
 +keeps values as plain text and fixes only the \emph{boundary}, so one rule
 +serves hosts it was never specialized to.
  
  \subsection{Syntax embedding and safe quotation}
  The closest work makes embedding safe by construction in the language itself.
-@@ -34,15 +31,14 @@ impervious to injection by construction.
- It is the nearest neighbor to matchertext, and the sharpest contrast: it needs an
- explicit grammar and a combined-syntax toolchain per language pair, where
- matchertext asks only that unrelated languages share one lexical invariant.
+ StringBorg~\cite{bravenboer10stringborg} embeds the embedded language's grammar
+-into the composing one, and adds quotation and antiquotation forms.
+-It assimilates the result into API calls in that embedded language, rendering
+-programs impervious to injection by construction.
+-It is the nearest neighbor to matchertext, and the sharpest contrast.
+-It needs an explicit grammar and a combined-syntax toolchain per language pair,
+-where matchertext asks only that unrelated languages share one lexical invariant.
 -The metaprogramming machinery this draws on has the same shape and the same
--assumption of a known embedded language: hygienic macros embed code in code without
--capture~\cite{kohlbecker86hygienic,dybvig92syntactic}, staged and
--quotation-based programming generate well-typed embedded fragments~\cite{taha00metaml,sheard02template,mainland07quoted},
--tagless-final embeddings make ill-typed embedded terms unrepresentable~\cite{carette09tagless},
--and language workbenches sidestep parser composition through projectional
+-assumption of a known embedded language.
+-Hygienic macros embed code in code without
+-capture~\cite{kohlbecker86hygienic,dybvig92syntactic}.
+-Staged and quotation-based programming generate well-typed embedded
+-fragments~\cite{taha00metaml,sheard02template,mainland07quoted}.
+-Tagless-final embeddings make ill-typed embedded terms
+-unrepresentable~\cite{carette09tagless}.
+-Language workbenches sidestep parser composition through projectional
 -editing~\cite{renggli10embedding}.
 -All own the embedded language's parser or type system; matchertext targets the case where the
 -surrounding ecosystem shares no grammar or AST at all.
++into the composing one, adds quotation and antiquotation forms, and assimilates
++the result into API calls in that embedded language, rendering programs
++impervious to injection by construction.
++It is the nearest neighbor to matchertext, and the sharpest contrast: it needs an
++explicit grammar and a combined-syntax toolchain per language pair, where
++matchertext asks only that unrelated languages share one lexical invariant.
 +The metaprogramming machinery this draws on shares the assumption of a known
 +embedded language: hygienic macros~\cite{kohlbecker86hygienic,dybvig92syntactic},
 +staged and quotation-based
@@ -885,60 +1103,109 @@ index 21a2489..91a6b55 100644
  
  \subsection{Static analysis and detection}
  A large body of work finds injection flaws in existing code rather than
-@@ -81,20 +77,16 @@ per-context schemes; matchertext offers not one encoder for all contexts but one
+@@ -55,58 +47,47 @@ preventing them.
+ Information-flow and taint analyses trace untrusted data to sensitive sinks:
+ WebSSARI~\cite{huang04webssari}, Livshits and Lam~\cite{livshits05finding},
+ Pixy~\cite{jovanovic06pixy}, Xie and Aiken~\cite{xie06static}, and the
+-industrial-scale successors TAJ~\cite{tripp09taj} and Andromeda~\cite{tripp13andromeda}.
+-FlowDroid~\cite{arzt14flowdroid} is the mobile analogue.
++industrial-scale successors TAJ~\cite{tripp09taj} and Andromeda~\cite{tripp13andromeda},
++with FlowDroid~\cite{arzt14flowdroid} the mobile analogue.
+ String analysis reasons about the generated query itself~\cite{wassermann07sound}, and
+ modern SAST productizes both for continuous integration~\cite{dahse14simulation}.
+ These detect variants of a bad construction after the fact and trade soundness
+ against precision and analyst noise.
+-Matchertext instead makes the boundary-breaking construction unrepresentable.
+-It is complementary to analysis for the errors (wrong sink, logic faults, misuse
++Matchertext instead makes the boundary-breaking construction unrepresentable, and
++is complementary to analysis for the errors (wrong sink, logic faults, misuse
+ outside the discipline) that a boundary rule does not touch.
+ 
+ \subsection{Cross-cutting structural defenses}
+ Closer in ambition are defenses that enforce a global invariant separating
+ trusted structure from untrusted data.
+ CSSE tags input and evaluates it in context across SQL, XSS, and shell
+-injection~\cite{pietraszek05csse}.
+-Document Structure Integrity~\cite{nadji09dsi},
++injection~\cite{pietraszek05csse}. Document Structure Integrity~\cite{nadji09dsi},
+ BLUEPRINT~\cite{terlouw09blueprint}, and Noncespaces~\cite{vangundy12noncespaces}
+ protect HTML structure through browser cooperation and randomized or
+-nonce-marked namespaces.
+-Content Security Policy mitigates content injection at
+-execution time~\cite{w3c_csp}.
+-SQLrand~\cite{boyd04sqlrand} and
++nonce-marked namespaces. Content Security Policy mitigates content injection at
++execution time~\cite{w3c_csp}. SQLrand~\cite{boyd04sqlrand} and
+ instruction-set randomization~\cite{barrantes03isr} randomize the accepted
+ language so injected code cannot speak it.
+ All mark trusted structure \emph{out of band}, with propagated metadata,
+-browser state, or a secret.
+-Matchertext makes the boundary self-delimiting \emph{in band} and public, with no
+-tag to carry and no secret to keep.
++browser state, or a secret, whereas matchertext makes the boundary
++self-delimiting \emph{in band} and public, with no tag to carry and no secret to
++keep.
+ The web's lack of a universal escaper, precisely because parse context is
+ per-language and non-composable~\cite{owasp_xss}, is what forces these
+-per-context schemes.
+-Matchertext offers not one encoder for all contexts but one
++per-context schemes. Matchertext offers not one encoder for all contexts but one
  rule for locating the hole before any context-specific encoder runs.
  
  \subsection{Definitions and measurement}
--Formal framings of injection ground the inertness property of \cref{sec:threat}.
+ Formal framings of injection ground the inertness property of \cref{sec:threat}.
 -The language-theoretic security program frames the root cause as processing rich
--input without first recognizing it~\cite{momot16langsec}; Su and Wassermann
--define command injection as untrusted input altering the intended syntactic
--structure of the generated command, with a grammar-based prevention
--algorithm~\cite{su06essence}; and Ray and Ligatti define code injection by
--whether input is used as a normal-form value rather than as code~\cite{ray12defining},
--the vocabulary matchertext's guarantee targets.
--Taxonomies and measurements bound the problem: the SQL-injection countermeasure
+-input without first recognizing it~\cite{momot16langsec}.
+-Su and Wassermann define command injection as untrusted input altering the
+-intended syntactic structure of the generated command, with a grammar-based
+-prevention algorithm~\cite{su06essence}.
+-Ray and Ligatti define code injection by whether input is used as a normal-form
+-value rather than as code~\cite{ray12defining}, the vocabulary matchertext's
+-guarantee targets.
+-Taxonomies and measurements bound the problem.
+-The SQL-injection countermeasure
 -taxonomy of Halfond et al.~\cite{halfond06classification}, systematic XSS
 -surveys~\cite{hannousse22xss}, and large-scale studies of DOM-based
 -XSS~\cite{lekies13dom} show defenses clustering around sink-specific filtering
--and detection, with no cross-language boundary convention among the standard
+-and detection.
+-No cross-language boundary convention appears among the standard
 -categories.
 -The weakness labels reviewers and CVE pipelines use group these failures by
 -effect~\cite{cwe,owasp_top10_2021}; matchertext addresses the subset that shares
 -a single lexical boundary mechanism.
-+Formal framings of injection ground the inertness property of \cref{sec:threat}:
-+language-theoretic security frames the root cause as processing rich input
-+without first recognizing it~\cite{momot16langsec}; Su and Wassermann define
++Language-theoretic security frames the root cause as processing rich input
++without first recognizing it~\cite{momot16langsec}. Su and Wassermann define
 +command injection as untrusted input altering the intended syntactic structure
-+of the generated command~\cite{su06essence}; and Ray and Ligatti define code
++of the generated command~\cite{su06essence}. Ray and Ligatti define code
 +injection by whether input is used as a normal-form value rather than as
 +code~\cite{ray12defining}, the vocabulary matchertext's guarantee targets.
 +Taxonomies and
 +measurements~\cite{halfond06classification,hannousse22xss,lekies13dom} show
 +defenses clustering around sink-specific filtering and detection with no
-+cross-language boundary convention, and the weakness labels CVE pipelines use
-+group these failures by effect~\cite{cwe,owasp_top10_2021}; matchertext
++cross-language boundary convention. The weakness labels CVE pipelines use
++group these failures by effect~\cite{cwe,owasp_top10_2021}. Matchertext
 +addresses the subset that shares a single lexical boundary mechanism.
 diff --git a/../doc/relevance.tex b/relevance.tex
-index 12ebefd..e1dcf66 100644
+index 114adeb..49468d1 100644
 --- a/relevance.tex
 +++ b/relevance.tex
-@@ -1,15 +1,14 @@
+@@ -1,127 +1,83 @@
  \section{Matchertext and its security relevance}
  \label{sec:relevance}
  
 -The narrow waist of \cref{sec:bg:waist} is a claim about \emph{embedding},
 -not about security.
 -Matchertext was designed so that a string in one language can be placed in another
--verbatim, without escaping; its stated benefit is that the writer of embedded text
--need reason about only one language's rules at a time~\cite{matchertext}.
+-verbatim, without escaping.
+-Its stated benefit is that the writer of embedded text need reason about only one
+-language's rules at a time~\cite{matchertext}.
 -That is a usability argument.
--This section states the discipline precisely enough to reason about, explains why
--a property invented for embedding bears on injection at all, and sets out the
--questions the rest of the paper answers.
+-This section states the discipline precisely enough to reason about.
+-It explains why a property invented for embedding bears on injection at all, and
+-sets out the questions the rest of the paper answers.
 +The narrow waist of \cref{sec:bg:waist} is a claim about \emph{embedding}, not
-+about security: matchertext was designed so that a string in one language can be
-+placed in another verbatim, and its stated benefit, that the writer of embedded
++about security. Matchertext was designed so that a string in one language can be
++placed in another verbatim. Its stated benefit, that the writer of embedded
 +text need reason about only one language's rules at a time, is a usability
 +argument~\cite{matchertext}.
 +This section states the discipline precisely enough to reason about, explains
@@ -947,14 +1214,21 @@ index 12ebefd..e1dcf66 100644
  
  \subsection{The discipline}
  \label{sec:relevance:discipline}
-@@ -20,95 +19,64 @@ Writing $O$ and $C$ for the openers and closers of $\Pi$, and \emph{nonmatchers}
- for every other character, the language $L$ of matchertext strings is defined
- inductively: any string of nonmatchers is in $L$, and if $m_1,m_2,m_3\in L$ and
+ 
+ Matchertext is a purely syntactic rule over an alphabet $\Sigma$ and a set $\Pi$
+ of open/close character pairs: the \emph{matchers} must match.
+-Write $O$ and $C$ for the openers and closers of $\Pi$, and \emph{nonmatchers}
+-for every other character.
+-The language $L$ of matchertext strings is defined
+-inductively: any string of nonmatchers is in $L$, and if $m_1,m_2,m_3\in L$ and
++Writing $O$ and $C$ for the openers and closers of $\Pi$, and \emph{nonmatchers}
++for every other character, the language $L$ of matchertext strings is defined
++inductively. Any string of nonmatchers is in $L$, and if $m_1,m_2,m_3\in L$ and
  $(o,c)\in\Pi$ then $m_1\,o\,m_2\,c\,m_3\in L$.
 -The concrete configuration takes $\Sigma$ to be Unicode and $\Pi$ to be the three
--ASCII pairs \verb|()|, \verb|[]|, and \verb|{}|; the angle brackets are excluded
--because they are used unmatched as inequality operators far too often to
--constrain~\cite{matchertext}.
+-ASCII pairs \verb|()|, \verb|[]|, and \verb|{}|.
+-The angle brackets are excluded because they are used unmatched as inequality
+-operators far too often to constrain~\cite{matchertext}.
 +The concrete configuration takes $\Sigma$ to be Unicode and $\Pi$ to be the
 +three ASCII pairs \verb|()|, \verb|[]|, and \verb|{}|; the angle brackets are
 +excluded as too often legitimately unmatched~\cite{matchertext}.
@@ -971,15 +1245,19 @@ index 12ebefd..e1dcf66 100644
 -A valid matchertext string placed inside matched delimiters therefore yields a
 -valid matchertext string, at any nesting depth and with no escaping or expansion.
 -Second, membership in $L$ is decided by a single linear scan, the \textsc{Verify}
--recognizer, which maintains a stack of unclosed openers and accepts exactly when
--every closer matches its opener and the stack ends empty.
+-recognizer.
+-It maintains a stack of unclosed openers and accepts exactly when every closer
+-matches its opener and the stack ends empty.
 +$(s_o,s_c)$ is a matched delimiter pair, then $s_o\,m\,s_c\in L$, at any nesting
 +depth and with no escaping or expansion.
 +Second, membership in $L$ is decided by a single linear scan, the
 +\textsc{Verify} recognizer.
  Third, a total encoder \textsc{ToMatchertext} maps \emph{any} string into $L$ by
- escaping only its unmatched matchers, so free-form input that legitimately
- contains an unmatched bracket need not be rejected.
+-escaping only its unmatched matchers.
+-Free-form input that legitimately contains an unmatched bracket therefore need
+-not be rejected.
++escaping only its unmatched matchers, so free-form input that legitimately
++contains an unmatched bracket need not be rejected.
  Closure and the correctness of \textsc{Verify} are machine-checked; so is
  \textsc{ToMatchertext}'s landing in $L$ on every input
 -(\cref{sec:appendix:tomatchertext}), leaving only its decoder round-trip informal.
@@ -994,43 +1272,49 @@ index 12ebefd..e1dcf66 100644
 -Verbatim embedding and injection resistance are not the same property, and the
 -paper's claim turns on the difference between them.
 -
--Injection, as \cref{sec:motivation} describes it, is a boundary failure: a value
--meant to occupy one syntactic region escapes it, because a delimiter inside the
--value collides with the delimiter that was supposed to contain it.
--Conventional defenses attack the \emph{collision}, transforming the value so that
-+Conventional defenses attack the \emph{collision}: they transform the value so
- its dangerous characters can no longer be confused with the host's, which is why
--they must know the host's syntax and why there is a different one for every
--host and context.
+-Injection, as \cref{sec:motivation} describes it, is a boundary failure.
+-A value meant to occupy one syntactic region escapes it, because a delimiter
+-inside the value collides with the delimiter that should contain it.
+ Conventional defenses attack the \emph{collision}: they transform the value so
+-that its dangerous characters can no longer be confused with the host's.
+-That is why they must know the host's syntax, and why there is a different one
+-for every host and context.
 -Matchertext attacks the \emph{boundary} instead.
--If a host delimits an untrusted value with a matcher pair and finds the end of
--that value by counting matchers rather than by scanning for a terminator, then
--escaping the region requires emitting an unmatched matcher, and by closure no
--valid matchertext string contains one.
-+each must know the host's syntax and why there is a different one per host and
+-Suppose a host delimits an untrusted value with a matcher pair.
+-It finds the end of that value by counting matchers, not by scanning for a
+-terminator.
+-Then escaping the region requires emitting an unmatched matcher, and by closure
+-no valid matchertext string contains one.
++its dangerous characters can no longer be confused with the host's. This is why
++each must know the host's syntax, and why there is a different one per host and
 +context.
-+Matchertext attacks the \emph{boundary} instead: if a host delimits an untrusted
-+value with a matcher pair and finds its end by counting matchers rather than by
-+scanning for a terminator, escaping the region requires emitting an unmatched
-+matcher, and by closure no valid matchertext string contains one.
++Matchertext attacks the \emph{boundary} instead. Suppose a host delimits an
++untrusted value with a matcher pair and finds its end by counting matchers
++rather than by scanning for a terminator. Escaping the region then requires
++emitting an unmatched matcher, and by closure no valid matchertext string
++contains one.
  The characters that drive the classic breakouts, the quote in SQL and the angle
--bracket in HTML, are nonmatchers: the discipline leaves them entirely
--unconstrained, and they become ordinary data inside a matched region, which
--closure keeps balanced whatever nonmatchers the value carries.
+-bracket in HTML, are nonmatchers.
+-The discipline leaves them entirely unconstrained, and they become ordinary data
 +bracket in HTML, are nonmatchers: entirely unconstrained, and ordinary data
-+inside a matched region.
+ inside a matched region.
+-Closure keeps that region balanced whatever nonmatchers the value carries.
  
 -Two consequences follow, and they are the reason this is a security question
 -rather than a syntactic one.
 +Two consequences make this a security question rather than a syntactic one.
  The check is \emph{host-independent}: \textsc{Verify} inspects only the six
- matcher characters and knows nothing about SQL, HTML, or LDAP, so the same
- recognizer serves every host, which is exactly what a sanitizer cannot do.
+-matcher characters and knows nothing about SQL, HTML, or LDAP.
+-The same recognizer therefore serves every host, which is exactly what a
+-sanitizer cannot do.
 -And the check is a \emph{verification} rather than a transformation, so its failure
--mode is benign: a rejected value is data that does not embed, whereas a missed case
--in an escaping routine \emph{is} the injection.
+-mode is benign.
+-A rejected value is data that does not embed, whereas a missed case in an escaping
+-routine \emph{is} the injection.
 -Together these are the narrow waist applied to security: one uniform obligation on
 -the value, in place of one bespoke transformation per host-context pair.
++matcher characters and knows nothing about SQL, HTML, or LDAP, so the same
++recognizer serves every host, which is exactly what a sanitizer cannot do.
 +And the check is a \emph{verification} rather than a transformation, so its
 +failure mode is benign: a rejected value is data that does not embed, whereas a
 +missed case in an escaping routine \emph{is} the injection.
@@ -1050,54 +1334,148 @@ index 12ebefd..e1dcf66 100644
 -Delimiting a value is not by itself a security property, and ``cannot break out''
 -is not a specification.
 -\Cref{sec:threat} states the guarantee as an \emph{inertness} invariant on the
--host's parse, separates it from the weaker closure property it is easily
--conflated with, and reduces it to a small set of named premises about the host
+-host's parse.
+-It separates that guarantee from the weaker closure property it is easily
+-conflated with.
+-And it reduces the guarantee to a small set of named premises about the host
 -parser, the interpreter, and the pipeline that reaches them.
 -
 -\paragraph{Q2: can a real language adopt this, and at what cost?}
 -The guarantee assumes a matchertext-aware host, and no mainstream language is one
 -today.
 -\Cref{sec:resist} develops the argument for the syntaxes where injection actually
--occurs, then asks what adopting it costs: which hosting options deliver the
--property, what each adds to the trusted computing base, and how the result
--compares with the defenses already deployed for these hosts.
+-occurs.
+-It then asks what adopting it costs: which hosting options deliver the property,
+-and what each adds to the trusted computing base.
+-A final question is how the result compares with the defenses already deployed
+-for these hosts.
 -
 -\paragraph{Q3: how much of the real injection landscape could this reach?}
 -Even granting the property and its adoption, the discipline addresses only
--injections that are structural breakouts from matcher-delimitable contexts, and
--that is a proper subset of what the term covers.
+-injections that are structural breakouts from matcher-delimitable contexts.
+-That is a proper subset of what the term covers.
 -\Cref{sec:corpus,sec:results,sec:prevent} measure the subset against a corpus of
--recorded vulnerabilities, and \cref{sec:prevent} reports both what fraction of
--attacks with a recoverable payload would be contained and what fraction of the
--landscape is out of reach in principle.
+-recorded vulnerabilities.
+-\Cref{sec:prevent} reports what fraction of
+-attacks with a recoverable payload would be contained.
+-It also reports what fraction of the landscape is out of reach in principle.
 +\emph{parsers}, and the second does not follow from the first without
 +assumptions about the host.
-+Three questions organize the rest of the paper: what is guaranteed and under
-+what assumptions (\cref{sec:threat}); whether a real language can adopt this
-+and at what cost (\cref{sec:resist}); and how much of the real injection
-+landscape it could reach, a proper subset of injection that
-+\cref{sec:corpus,sec:results,sec:prevent} measure against a corpus of recorded
-+vulnerabilities, reporting both the contained fraction and the fraction out of
-+reach in principle.
++Three questions organize the rest of the paper. First, what is guaranteed and
++under what assumptions (\cref{sec:threat})? Second, can a real language adopt
++this, and at what cost (\cref{sec:resist})? Third, how much of the real
++injection landscape can it reach? This is a proper subset of injection.
++\Cref{sec:corpus,sec:results,sec:prevent} measure it against a corpus of
++recorded vulnerabilities, reporting both the contained fraction and the fraction
++out of reach in principle.
 diff --git a/../doc/resist.tex b/resist.tex
-index b7bc6f9..0947d54 100644
+index 23bd634..6a2de88 100644
 --- a/resist.tex
 +++ b/resist.tex
-@@ -136,55 +136,31 @@ injection bugs arise.
+@@ -10,7 +10,7 @@ We develop this first for SQL injection, then for cross-site scripting, whose
+ several distinct HTML escaping contexts collapse to one discipline.
+ The same argument then covers two settings where the host already delimits with
+ matchers, so the discipline asks for no new syntax.
+-The two settings are LDAP directory filters, whose parenthesised assertions are
++These are LDAP directory filters, whose parenthesised assertions are
+ matcher-delimited already, and the PDF document format, whose literal strings
+ already require matcher balance.
+ 
+@@ -28,8 +28,8 @@ leaves unconstrained.
+ We instead delimit each untrusted value with the matcher pair
+ \verb|[|$\dots$\verb|]| and have the query processor treat the content as
+ embedded matchertext.
+-It ends by matcher balance rather than by scanning for a closing quote, so the
+-clause becomes \verb|WHERE name = [|\textit{userName}\verb|]|.
++It ends the value by matcher balance rather than by scanning for a closing quote,
++so the clause becomes \verb|WHERE name = [|\textit{userName}\verb|]|.
+ 
+ Concretely, the canonical injection \verb|x' OR '1'='1| now fails two ways.
+ Supplied verbatim it contains no matchers, so it embeds as the literal name
+@@ -66,8 +66,8 @@ so that its outputs are recognizable in the surrounding text, as any
+ backslash-style escape is.
+ Then \textsc{FromMatchertext} scans the balance-delimited region once.
+ It maps each \textsc{esc}$(c)$ back to its matcher $c$ and copies every other
+-character, so that
+-$\textsc{FromMatchertext}(\textsc{ToMatchertext}(v)) = v$ for every $v$:
++character, so that $\textsc{FromMatchertext}(\textsc{ToMatchertext}(v)) = v$ for
++every $v$:
+ \begin{verbatim}
+ FromMatchertext(m):
+   out = []; i = 0
+@@ -85,9 +85,8 @@ A decoder bug corrupts a value; it cannot manufacture a breakout, since the regi
+ is already inertly delimited before decoding begins.
+ 
+ Under a matchertext-aware host that ends each value by matcher balance,
+-matchertext offers a \emph{structural} property.
+-No valid-matchertext value, in any position, can escape its delimiters or alter
+-the surrounding query structure.
++matchertext offers a \emph{structural} property: no valid-matchertext value, in
++any position, can escape its delimiters or alter the surrounding query structure.
+ This closes off the sub-class of injection that depends on breaking out of a
+ delimiter.
+ This is a syntactic-closure property; it does not by itself establish that later
+@@ -104,27 +103,23 @@ injection sites, each with its own escaping regime.
+ A value placed as element content, between \verb|<div>| and \verb|</div>|, breaks
+ out on \verb|<| or \verb|&|.
+ The same value in a quoted attribute, \verb|<input value="|\emph{v}\verb|">|,
+-breaks out on the active quote rather than \verb|<|.
+-In an unquoted attribute the breakout set widens to whitespace and \verb|=|.
++breaks out on the active quote rather than \verb|<|, and in an unquoted attribute
++the breakout set widens to whitespace and \verb|=|.
+ A value in a script body, \verb|<script>var n="|\emph{v}\verb|"</script>|, has two
+-independent exits.
+-One is the JavaScript string quote.
+-The other is the raw \verb|</script>| sequence that ends the element regardless of
+-JavaScript syntax.
++independent exits: the JavaScript string quote and the raw \verb|</script>|
++sequence that ends the element regardless of JavaScript syntax.
+ The recurring bug is applying one escaper, usually HTML-entity encoding, in all
+ three contexts, where it is correct only for element content.
+ 
+ Matcher-delimiting collapses the three to a single discipline, exactly as for
+ SQL.
+ Each hole is read verbatim up to a matched close bracket and the host performs no
+-transformation.
+-It uses matchertext markup forms~\cite{matchertext}
++transformation, using matchertext markup forms~\cite{matchertext}
+ (\eg \verb|<div [|\emph{v}\verb|]>|, \verb|value=[|\emph{v}\verb|]|, and
+ \verb|<![MDATA[|\emph{v}\verb|]]>|).
+ Because the matchers are \verb|()[]{}| and not \verb|<>|, the characters that
+-drove every breakout above become ordinary data inside a matched hole.
+-These are \verb|<|, \verb|&|, the quote, and even the literal \verb|</script>|
+-sequence.
++drove every breakout above, \verb|<|, \verb|&|, the quote, and even the literal
++\verb|</script>| sequence, become ordinary data inside a matched hole.
+ The parser counts brackets rather than scanning for tags, so an injected
+ \verb|<img src=x onerror=steal()>| is inert text.
+ The three context-specific sanitizers thus reduce to the single \textsc{Verify}
+@@ -140,8 +135,8 @@ the same.
+ Such semantic sinks are out of scope.
+ A second limit is expressiveness: matchertext content is verbatim text and cannot
+ carry child markup.
+-This is exactly right for embedding an untrusted string as inert data.
+-It is not a substitute for rendering a user's rich HTML, a harder problem left to
++This is exactly right for embedding an untrusted string as inert data but is not
++a substitute for rendering a user's rich HTML, a harder problem left to
+ allow-list sanitizers.
+ The clean guarantee covers the data-not-markup case, where the large majority of
+ injection bugs arise.
+@@ -149,59 +144,35 @@ injection bugs arise.
  \subsection{Preventing LDAP injection}
  \label{sec:resist:ldap}
  
 -LDAP directory queries are the sharpest illustration of the discipline, because
 -the language already delimits its structure with a matcher.
 -A search filter nests parenthesised assertions, \eg the bind check
--\verb|(&(uid=|\textit{userName}\verb|)(userPassword=|\textit{pass}\verb|))|, and
--the classic vulnerability~\cite{alonso08ldap} is a \verb|userName| that closes its
--assertion early and injects further clauses, as in \verb|*)(uid=*|, so that the
--password assertion no longer constrains the match and the bind succeeds against an
--arbitrary account.
+-\verb|(&(uid=|\textit{userName}\verb|)(userPassword=|\textit{pass}\verb|))|.
+-The classic vulnerability~\cite{alonso08ldap} is a \verb|userName| that closes its
+-assertion early and injects further clauses, as in \verb|*)(uid=*|.
+-The password assertion then no longer constrains the match, and the bind succeeds
+-against an arbitrary account.
 -Where SQL forced us to \emph{introduce} a matcher pair, LDAP needs none: the
--assertion's own parentheses \verb|(uid=|$\dots$\verb|)| already delimit the value,
--so we simply have the directory processor end that value by matcher balance rather
+-assertion's own parentheses \verb|(uid=|$\dots$\verb|)| already delimit the value.
+-We simply have the directory processor end that value by matcher balance rather
 -than at the first \verb|)|.
 -
 -The canonical injection then fails exactly as before: adapted to the delimiter,
@@ -1108,30 +1486,35 @@ index b7bc6f9..0947d54 100644
 -parentheses~\cite{rfc4515}, so a conformant emitter is already close to compliant
 -and needs no new hosting form.
 +LDAP needs no new hosting form, because a search filter already delimits each
-+assertion with a matcher: in the bind check
++assertion with a matcher.
++In the bind check
 +\verb|(&(uid=|\textit{userName}\verb|)(userPassword=|\textit{pass}\verb|))|, the
 +classic attack~\cite{alonso08ldap} is a \verb|userName| such as \verb|*)(uid=*|
-+that closes its assertion early so the password clause no longer constrains the
++that closes its assertion early, so the password clause no longer constrains the
 +bind.
 +Ending the value by matcher balance rather than at the first \verb|)| defeats it
 +exactly as for SQL: the payload carries an unmatched \verb|)|, is not matchertext,
-+and cannot embed at all; RFC~4515 value-encoding already escapes unbalanced
-+parentheses~\cite{rfc4515}, so conformant emitters are nearly compliant today.
++and cannot embed at all.
++RFC~4515 value-encoding already escapes unbalanced parentheses~\cite{rfc4515}, so
++conformant emitters are nearly compliant today.
  
  \subsection{Preventing PDF object injection}
  \label{sec:resist:pdf}
  
--The same structural argument extends to the PDF document format, whose literal
--strings are delimited by parentheses and, like the PostScript strings they descend
--from, admit balanced parentheses unescaped, requiring an escape only for an
--unmatched parenthesis or backslash~\cite{iso32000}: the format already mandates
--matcher balance for its strings.
--A server-side generator that concatenates untrusted input into a
+-The same structural argument extends to the PDF document format.
+-Its literal strings are delimited by parentheses and, like the PostScript strings
+-they descend from, admit balanced parentheses unescaped.
+-They require an escape only for an unmatched parenthesis or
+-backslash~\cite{iso32000}, so the format already mandates matcher balance for its
+-strings.
+-A server-side generator may concatenate untrusted input into a
 -\verb|(|$\dots$\verb|)| string, a \verb|/URI (|$\dots$\verb|)|, or a
--\verb|/JS (|$\dots$\verb|)| action lets an attacker close the string and append
--new objects or dictionary keys, adding annotations, actions, or JavaScript that
--Acrobat and browser viewers will parse and run, the ``XSS for PDFs'' class that
--yields script execution, request forgery, and document exfiltration~\cite{heyes20pdf}.
+-\verb|/JS (|$\dots$\verb|)| action.
+-This lets an attacker close the string and append new objects or dictionary keys.
+-The attacker adds annotations, actions, or JavaScript that Acrobat and browser
+-viewers will parse and run.
+-It is the ``XSS for PDFs'' class that yields script execution, request forgery,
+-and document exfiltration~\cite{heyes20pdf}.
 -
 -Emitting each untrusted value through \textsc{ToMatchertext} closes this by
 -construction.
@@ -1141,26 +1524,28 @@ index b7bc6f9..0947d54 100644
 -\end{center}
 -begins with an unmatched \verb|)|, is not matchertext, and is escaped to inert
 -data rather than embedded, while a balanced value such as \verb|f(x)| embeds
--unchanged.
--As with SQL and XSS the guarantee is structural and stops at sinks that execute by
--design: data an application deliberately routes into a \verb|/JS| action still
--runs, though it can no longer escape its string to \emph{introduce} one, which is
--where the reported attacks overwhelmingly live.
 +PDF's literal strings are parenthesis-delimited and admit \emph{balanced}
 +parentheses unescaped~\cite{iso32000}, so the format already mandates matcher
-+balance; yet a generator that concatenates untrusted input into a
++balance.
++Yet a generator that concatenates untrusted input into a
 +\verb|(|$\dots$\verb|)| string or a \verb|/URI| or \verb|/JS| action lets the
-+attacker close the string and append objects the viewer parses and runs, the
-+``XSS for PDFs'' class~\cite{heyes20pdf}.
-+Emitting the value through \textsc{ToMatchertext} closes this by construction:
-+the canonical breakout \verb|)>>/AA<<|$\dots$\verb|(| begins with an unmatched
-+\verb|)| and is escaped to inert data, a balanced \verb|f(x)| embeds unchanged,
-+and, as before, data an application deliberately routes into a \verb|/JS| action
-+still runs but can no longer escape its string to \emph{introduce} one.
++attacker close the string and append objects the viewer parses and runs.
++This is the ``XSS for PDFs'' class~\cite{heyes20pdf}.
++Emitting the value through \textsc{ToMatchertext} closes this by construction.
++The canonical breakout \verb|)>>/AA<<|$\dots$\verb|(| begins with an unmatched
++\verb|)| and is escaped to inert data, and a balanced \verb|f(x)| embeds
+ unchanged.
+-As with SQL and XSS, the guarantee is structural and stops at sinks that execute
+-by design.
+-Data an application deliberately routes into a \verb|/JS| action still runs.
+-It can no longer escape its string to \emph{introduce} one, which is where the
+-reported attacks overwhelmingly live.
++As before, data an application deliberately routes into a \verb|/JS| action still
++runs but can no longer escape its string to \emph{introduce} one.
  
  \subsection{Fitting matchertext into existing languages}
  \label{sec:resist:fitting}
-@@ -194,33 +170,29 @@ where the reported attacks overwhelmingly live.
+@@ -211,33 +182,29 @@ reported attacks overwhelmingly live.
  \small
  \begin{tabular}{llllll}
  \hline
@@ -1202,11 +1587,64 @@ index b7bc6f9..0947d54 100644
  \label{tab:resist:a2}
  \end{table*}
  
+@@ -253,19 +220,19 @@ and are worth separating.
+ 
+ \paragraph{Making the host aware (A1).}
+ \Cref{tab:resist:a1} compares the routes.
+-Reusing a construct the format \emph{already} delimits with matchers is free.
++Reusing a construct the format \emph{already} delimits with matchers is free:
+ LDAP search filters and PDF literal strings
+-(\cref{sec:resist:ldap,sec:resist:pdf}) are parenthesis-delimited by definition,
+-so the discipline coincides with the format.
+-A1 then costs no new syntax and no new trusted code.
++(\cref{sec:resist:ldap,sec:resist:pdf}) are parenthesis-delimited by definition.
++The discipline coincides with the format, and A1 costs no new syntax and no
++new trusted code.
+ It also reaches only the formats built that way.
+ Extending a host's grammar with a hole form reaches the syntaxes where injection
+ actually concentrates, at the price of a change inside the host's parser.
+-The change is not always conservative.
+-T-SQL already gives \verb|[|$\dots$\verb|]| a meaning as a delimited identifier.
+-A hole form for SQL must then pick different delimiters, or accept that it is not
+-backward-compatible the way \cite{matchertext}'s \verb|M"|$\dots$\verb|"| literal
+-is for C.
++The change is not always conservative: T-SQL already gives
++\verb|[|$\dots$\verb|]| a meaning as a delimited identifier.
++A hole form for SQL must either pick different delimiters or accept that it is not
++backward-compatible in the way \cite{matchertext}'s \verb|M"|$\dots$\verb|"|
++literal is for C.
+ Replacing the host language obtains A1 by construction and reaches everything it
+ covers, but only for new deployments, since nothing previously written parses.
+ 
+@@ -277,9 +244,8 @@ around a hole rather than into it.
+ This is where the source-level syntaxes of~\cite{matchertext} earn their place in
+ a security argument, and \cref{tab:resist:a2} sets them against the status quo.
+ A matchertext literal with structural interpolation makes the template's holes
+-explicit and its structure fixed.
+-An interpolated value then cannot alter the surrounding query, no matter what it
+-contains.
++explicit and its structure fixed, so an interpolated value cannot alter the
++surrounding query no matter what it contains.
+ This is an application of the discipline that~\cite{matchertext} identifies as its
+ security-relevant use of interpolation.
+ The literal form is a conservative extension for mainstream C-like languages,
+@@ -308,9 +274,8 @@ be a placeholder, so identifier positions fall back to ad-hoc allow-listing,
+ which is the construction \cref{sec:resist:sql} covers directly with
+ \verb|FROM [|\textit{table}\verb|]|.
+ \emph{Contextual auto-escaping} and typed template contexts do the same work for
+-markup.
+-They select the escaper from the syntactic context rather than leaving the choice
+-to the programmer.
++markup, selecting the escaper from the syntactic context rather than leaving the
++choice to the programmer.
+ Browser-side mechanisms such as Trusted Types enforce a related discipline at the
+ host.
+ \emph{Taint tracking} is orthogonal to all of these: it decides \emph{which}
 diff --git a/../doc/threat.tex b/threat.tex
-index a5aec7e..e5f254f 100644
+index 3cf2ead..1107a5b 100644
 --- a/threat.tex
 +++ b/threat.tex
-@@ -13,47 +13,38 @@ premise binds.
+@@ -13,77 +13,62 @@ premise binds.
  \begin{verbatim}
    UNTRUSTED  │                           TRUSTED COMPUTING BASE
  ─────────────┼──────────────────────────────────────────────────────────────────────────────────
@@ -1237,39 +1675,44 @@ index a5aec7e..e5f254f 100644
 -as \texttt{\%5D}, passes \textsc{Verify} and only becomes an unmatched matcher
 -once the parser reads it.}
 +everything right of the boundary must be correct for inertness to hold. A3 binds
-+at the first stage while its violation surfaces at the last: a still-encoded
++at the first stage while its violation surfaces at the last. A still-encoded
 +value such as \texttt{\%5D} passes \textsc{Verify} and becomes an unmatched
 +matcher only when the parser reads it.}
  \label{fig:threat:pipeline}
  \end{figure*}
  
 -\paragraph{Protected asset.}
--For a host program with a hole $P[\cdot]$
--into which an untrusted value $v$ is placed, the asset is the invariant that the
--\emph{structure} of the host's parse of $P[v]$ is independent of the content of
--$v$: the value occupies a single data position and contributes no host syntax.
+-A host program has a hole $P[\cdot]$ that receives an untrusted value $v$.
+-The protected asset is one invariant: the \emph{structure} of the host's parse of
+-$P[v]$ does not depend on the content of $v$.
+-The value occupies a single data position and adds no host syntax.
 -
 -\paragraph{Trusted computing base.}
--The guarantee rests on (i) a \emph{matchertext-aware host} that delimits the hole
--with a matcher pair and ends the embedded value by matcher balance rather than by
--scanning for its native closer; (ii) the \textsc{Verify} recognizer that decides
--membership in the matchertext language $L$; and (iii) the total encoder
--\textsc{ToMatchertext} and its inverse, used on free-form fields; its
--output-in-$L$ obligation is discharged in \cref{sec:appendix:tomatchertext},
--narrowing~(iii) to the decoder round-trip.
--The boundary-locating step of (i) is the operationally load-bearing part; we
--discharge it below as premise L1 (machine checked), so what the host must still be trusted for is the
--\emph{implementation} of that step rather than its principle.
+-The guarantee rests on three trusted parts.
+-(i)~A \emph{matchertext-aware host} delimits the hole with a matcher pair.
+-It ends the embedded value by matcher balance, not by scanning for its native
+-closer.
+-(ii)~The \textsc{Verify} recognizer decides membership in the matchertext
+-language $L$.
+-(iii)~The total encoder \textsc{ToMatchertext} and its inverse handle free-form
+-fields.
+-Its output-in-$L$ obligation is discharged in \cref{sec:appendix:tomatchertext},
+-which narrows~(iii) to the decoder round-trip.
+-The boundary-locating step of~(i) is the operationally load-bearing part.
+-We discharge it below as premise L1, which is machine checked.
+-The host must then be trusted only for the \emph{implementation} of that step,
+-not its principle.
 +\paragraph{Asset and trusted base.}
-+For a host program with a hole $P[\cdot]$ into which an untrusted value $v$ is
-+placed, the asset is the invariant that the \emph{structure} of the host's parse
-+of $P[v]$ is independent of the content of $v$: the value occupies a single data
-+position and contributes no host syntax.
-+The guarantee rests on (i) a \emph{matchertext-aware host} that delimits the
-+hole with a matcher pair and ends the embedded value by matcher balance rather
-+than by scanning for its native closer; (ii) the \textsc{Verify} recognizer that
-+decides membership in the matchertext language $L$; and (iii) the total encoder
-+\textsc{ToMatchertext} and its inverse, whose output-in-$L$ obligation is
++Consider a host program with a hole $P[\cdot]$ into which an untrusted value $v$
++is placed. The asset is the invariant that the \emph{structure} of the host's
++parse of $P[v]$ is independent of the content of $v$. The value occupies a
++single data position and contributes no host syntax.
++The guarantee rests on three components. Component (i) is a
++\emph{matchertext-aware host} that delimits the hole with a matcher pair. It
++ends the embedded value by matcher balance rather than by scanning for its
++native closer. Component (ii) is the \textsc{Verify} recognizer that decides
++membership in the matchertext language $L$. Component (iii) is the total encoder
++\textsc{ToMatchertext} and its inverse; their output-in-$L$ obligation is
 +discharged in \cref{sec:appendix:tomatchertext}, narrowing~(iii) to the decoder
 +round-trip.
 +The boundary-locating step of (i) is the load-bearing part; premise L1 below
@@ -1278,7 +1721,43 @@ index a5aec7e..e5f254f 100644
  
  \paragraph{Attacker.}
  The attacker supplies $v$ and may choose \emph{arbitrary} bytes, character
-@@ -103,18 +94,13 @@ Inertness holds under four premises, each necessary:
+ encodings, Unicode, length, and matcher-nesting depth, and may submit strings
+ that are \emph{not} valid matchertext.
+ Following Kerckhoffs, the attacker knows the discipline, which delimiter kind
+-guards the hole, and where the hole boundaries lie.
+-The attacker crafts $v$ \emph{against} the matcher-delimited slot.
+-The recorded corpus payloads (\cref{sec:results}) instead target the legacy quote
+-or tag-delimited host.
++guards the hole, and where the hole boundaries lie. The attacker crafts $v$
++\emph{against} the matcher-delimited slot, not the legacy quote or tag-delimited
++host that the recorded corpus payloads (\cref{sec:results}) target.
+ The attacker does not control the host source, the configuration $(\Sigma,\Pi)$,
+ or the trusted components above.
+ 
+ \paragraph{Security property (inertness).}
+ Let $\textsc{Verify}(v)\Leftrightarrow v\in L$.
+-Take every host program $P[\cdot]$ and every $v$ with $\textsc{Verify}(v)$.
+-The host parse of $P[v]$ places the content of $v$ at a single terminal.
+-The bytes of that terminal do not contribute to the parse structure of $P$.
+-Equivalently, the structural skeleton of the parse of $P[v]$ is independent of
+-$v$.
++For every host program $P[\cdot]$ and every $v$ with $\textsc{Verify}(v)$, the
++host parse of $P[v]$ places the content of $v$ at a single terminal. That
++terminal's bytes do not contribute to the parse structure of $P$. Equivalently,
++the structural skeleton of the parse of $P[v]$ is independent of $v$.
+ This is strictly stronger than the closure property $s_o\|v\|s_c\in L$ that
+ \cref{sec:resist} inherits from the always-embeddability
+-theorem~\cite{matchertext}.
+-Closure states that the \emph{delimited string remains valid matchertext}.
+-Inertness states that the \emph{host parser treats the delimited content as
+-data}.
++theorem~\cite{matchertext}. Closure states that the \emph{delimited string
++remains valid matchertext}, whereas inertness states that the \emph{host parser
++treats the delimited content as data}.
+ Closure is a lemma toward inertness, not inertness itself: it constrains the
+ \emph{string}, not the host \emph{parser}.
+ 
+@@ -110,18 +95,13 @@ Inertness holds under four premises, each necessary:
  	valid at that point can acquire an unmatched matcher after a later decode
  	(\eg \verb|%5D|$\rightarrow$\verb|]|) and break out.
  	Making \textsc{Verify} itself robust to \emph{transport} encodings
@@ -1302,7 +1781,18 @@ index a5aec7e..e5f254f 100644
  \item[\textbf{A4}] \emph{Not a semantic sink.} The host does not execute the
  	contained value by design (server-side templates, expression languages,
  	code evaluation, \verb|javascript:| URLs); delimiting confines structure,
-@@ -129,14 +115,11 @@ whose lexeme is the value in its canonical, fully-decoded form (A3).
+@@ -130,22 +110,17 @@ Inertness holds under four premises, each necessary:
+ 
+ \paragraph{From closure to inertness.}
+ We model the aware host of A1 as a grammar $G$ with one distinguished production
+-$\mathit{hole}\rightarrow s_o\,\mathit{content}\,s_c$.
+-The matcher-balance locator recovers $\mathit{content}$ and enters it into $G$ as
+-a single terminal.
+-The lexeme of that terminal is the value in its canonical, fully-decoded form
+-(A3).
++$\mathit{hole}\rightarrow s_o\,\mathit{content}\,s_c$. Here $\mathit{content}$ is
++recovered by the matcher-balance locator and enters $G$ as a single terminal.
++Its lexeme is the value in its canonical, fully-decoded form (A3).
  Inertness then rests on three premises, each separately dischargeable:
  \begin{itemize}
  \item[\textbf{L1}] \emph{Boundary.} Reading to matcher balance ends the
@@ -1322,19 +1812,21 @@ index a5aec7e..e5f254f 100644
  \item[\textbf{L2}] \emph{Parse inertness.} In $G$ the hole derives exactly one
  	terminal with that lexeme, and no other production derives structure from
  	within it: the parser does not re-enter $G$ on hole content. Reparse-based
-@@ -145,26 +128,24 @@ Inertness then rests on three premises, each separately dischargeable:
+@@ -154,31 +129,24 @@ Inertness then rests on three premises, each separately dischargeable:
  	terminal as a data value and never re-lexes, reparses, or executes its
  	bytes.
  \end{itemize}
--The chain is then immediate: closure~\cite{matchertext} keeps $P[v]$ a balanced
--matchertext document, so the locator operates on valid input; L1 fixes the hole's
--extent; L2 makes the structural skeleton of $\mathrm{parse}(P[v])$ independent of
--$v$; and L3 carries that independence through to execution.
+-The chain is then immediate.
+-Closure~\cite{matchertext} keeps $P[v]$ a balanced matchertext document, so the
+-locator operates on valid input.
+-L1 fixes the hole's extent.
+-L2 makes the structural skeleton of $\mathrm{parse}(P[v])$ independent of $v$.
+-L3 carries that independence through to execution.
 -Hence $\mathrm{closure}\wedge\mathrm{L1}\wedge\mathrm{L2}\wedge\mathrm{L3}\Rightarrow$
-+The chain is then immediate: closure~\cite{matchertext} keeps $P[v]$ balanced,
-+so the locator operates on valid input; L1 fixes the hole's extent; L2 makes the
++The chain is then immediate. Closure~\cite{matchertext} keeps $P[v]$ balanced,
++so the locator operates on valid input. L1 fixes the hole's extent; L2 makes the
 +parse skeleton independent of $v$; and L3 carries that independence through to
-+execution, so
++execution. Thus
 +$\mathrm{closure}\wedge\mathrm{L1}\wedge\mathrm{L2}\wedge\mathrm{L3}\Rightarrow$
  inertness.
  Closure and the correctness of \textsc{Verify} are machine-checked in the
@@ -1347,16 +1839,19 @@ index a5aec7e..e5f254f 100644
 +SQLite in \cref{sec:prevent:exec}.
  
  \paragraph{Scope.}
--\emph{structural} injection are in scope: an attacker-controlled value that alters
+-In scope is \emph{structural} injection: an attacker-controlled value that alters
 -the host parse by escaping its region.
--Out of scope, and excluded from the containment claims throughout, are:
--execution and semantic sinks (A4); contexts delimited by non-matchers with no
--matcher hosting (shell separators, CR/LF header breaks, XML/XXE angle brackets);
--\emph{semantic} abuse in which a well-formed value is merely unauthorized, an
--access-control question; algorithmic denial of service (regular-expression
--backtracking, entity expansion), which is not a breakout; and second-order
--injection in which stored input is reinterpreted later in a different context,
--unless it is re-checked under A3 at that later host.
+-Several classes are out of scope, and are excluded from the containment claims
+-throughout.
+-Execution and semantic sinks fall outside it (A4).
+-So do contexts delimited by non-matchers with no matcher hosting: shell
+-separators, CR/LF header breaks, and XML/XXE angle brackets.
+-\emph{Semantic} abuse is also out of scope, where a well-formed value is merely
+-unauthorized; this is an access-control question.
+-Algorithmic denial of service, such as regular-expression backtracking or entity
+-expansion, is not a breakout, and is out of scope.
+-Second-order injection is out of scope too: stored input reinterpreted later in a
+-different context, unless A3 re-checks it at that later host.
 \ No newline at end of file
 +In scope is \emph{structural} injection: an attacker-controlled value that
 +alters the host parse by escaping its region.

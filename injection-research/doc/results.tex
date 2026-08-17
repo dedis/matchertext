@@ -37,16 +37,18 @@ The CVSS vector yields reachability for free: \textbf{\dataSubPrivilegePreAuth} 
 are exploitable pre-authentication, \dataSubPrivilegeLowPriv require low privilege, and \dataSubPrivilegeHighPriv
 high privilege.
 Finer \emph{technique} labels come from PoC payloads and descriptions where
-present: SQL injections resolve into blind-boolean (\dataSubTechniqueBlindBoolean), union-based (\dataSubTechniqueUnionBased),
-blind-time (\dataSubTechniqueBlindTime), and authentication-bypass (\dataSubTechniqueAuthBypass) attacks, while XSS resolves
-into stored (\dataSubTechniqueStored), reflected (\dataSubTechniqueReflected), and DOM-based (\dataSubTechniqueDomBased).
+present.
+SQL injections resolve into blind-boolean (\dataSubTechniqueBlindBoolean), union-based (\dataSubTechniqueUnionBased),
+blind-time (\dataSubTechniqueBlindTime), and authentication-bypass (\dataSubTechniqueAuthBypass) attacks.
+XSS resolves into stored (\dataSubTechniqueStored), reflected (\dataSubTechniqueReflected), and DOM-based (\dataSubTechniqueDomBased).
 
 \paragraph{Syntactic groups.}
 For the \textbf{\dataPayloadBackedCVEs} injection CVEs with an extractable PoC payload, we
-reduce each payload to a \emph{syntactic skeleton}: string literals, numbers,
-and identifiers are abstracted to placeholders (\verb|<q>|, \verb|<n>|,
-\verb|<id>|) while the structural grammar (matchers, operators, tags, and a
-curated set of injection keywords) is preserved.
+reduce each payload to a \emph{syntactic skeleton}.
+String literals, numbers, and identifiers are abstracted to placeholders
+(\verb|<q>|, \verb|<n>|, \verb|<id>|).
+The structural grammar (matchers, operators, tags, and a curated set of
+injection keywords) is preserved.
 Grouping by identical skeleton yields \textbf{\dataDistinctSkeletons} distinct groups
 (\dataSingletonGroups of them singletons), so specific values never split a group but a
 different breakout structure always does.
@@ -58,5 +60,5 @@ The tail is long: the singletons are \dataSingletonGroupShare of groups but only
 they collapse to \dataSingletonVerdicts distinct verdicts, since the skeleton preserves tags and
 operators that the containment test does not depend on.
 Because the skeleton preserves exactly the matcher structure while discarding
-values, it is the natural unit on which to test matchertext containment next: the
-verdict depends only on that structure, so it is shared by every CVE in a group.
+values, it is the natural unit on which to test matchertext containment next.
+The verdict depends only on that structure, so it is shared by every CVE in a group.

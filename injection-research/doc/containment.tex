@@ -1,8 +1,8 @@
 \section{Measuring matchertext containment}
 \label{sec:prevent}
 
-Matchertext contains an injection under mainly two conditions: the untrusted value lands in a slot
-a matchertext-aware host delimits with a matcher pair, and the value is itself
+Matchertext contains an injection under mainly two conditions. First, the untrusted value lands in a slot
+a matchertext-aware host delimits with a matcher pair. Second, the value is itself
 valid matchertext, checked by the passive \textsc{Verify} scan rather than by
 escaping.
 An attack then fails one of two ways, by \emph{inert embedding} or by
@@ -63,13 +63,13 @@ itself is a property of the recorded corpus rather than of an adaptive attacker.
 The remaining \dataOutsideCVEs payload-backed CVEs are outside both conditions, and divide
 by the premise of \cref{sec:threat} they fail.
 \dataOutsideSemantic target execution/semantic sinks (server-side templates, expression
-languages, code evaluation, spreadsheet formulas, and \verb|javascript:| URLs)
-where the host runs the contained value by design, so delimiting cannot stop
+languages, code evaluation, spreadsheet formulas, and \verb|javascript:| URLs).
+The host runs the contained value by design, so delimiting cannot stop
 it: the template payload \verb|{{7*7}}| is already valid matchertext yet is
 still executed.
 The other \dataOutsideNonmatcher target contexts delimited by non-matchers with no matcher hosting:
 shell command separators (\verb|;|~\verb-|-~\verb|&|), CR/LF header breaks, and
-the angle brackets of XML/XXE, none of which are matcher characters.
+the angle brackets of XML/XXE. None of these are matcher characters.
 
 \paragraph{Projection.}
 A payload is required to classify the mechanism, but the \emph{context}
@@ -126,9 +126,9 @@ availability, not a containment failure.
 \paragraph{What payload availability bounds.}
 That gap is a property of the disclosure ecosystem rather than of our
 extraction.
-Most CVEs never receive a public proof of concept at all: Mandiant finds that
+Most CVEs never receive a public proof of concept at all. Mandiant finds that
 \textbf{51\%} of vulnerabilities disclosed in 2021 and 2022 eventually acquired
-public exploit or proof-of-concept code~\cite{mandiant23tte}, and VulnCheck
+public exploit or proof-of-concept code~\cite{mandiant23tte}. VulnCheck
 reports \textbf{26\%} of CVEs carrying 2025 identifiers had such code by the end
 of that year, a share that grows as a vulnerability
 ages~\cite{vulncheck26exploit}.
@@ -161,12 +161,12 @@ placed in the SQL text inside an \verb|M'(...)'| literal, an identifier inside
 \verb|[|$\dots$\verb|]| read to matcher balance (A1), and the statement is
 prepared through the ordinary interface.
 The matcher-delimited hole is offered beside legacy composition rather than
-replacing it, so existing SQL keeps working and adoption is incremental: this is
-the point-of-use character of A2, that a value the caller still concatenates
-into host syntax is unprotected, exactly as with an escape or a bound parameter.
+replacing it, so existing SQL keeps working and adoption is incremental. This is
+the point-of-use character of A2: a value the caller still concatenates
+into host syntax is unprotected. An escape or a bound parameter leaves it unprotected in the same way.
 An opt-in strict mode additionally refuses the legacy prepare entry points,
-turning A2 from a convention into an enforced invariant for callers who want it;
-the measurement below reports the additive default and this strict build side by
+turning A2 from a convention into an enforced invariant for callers who want it.
+The measurement below reports the additive default and this strict build side by
 side.
 
 \paragraph{Method.}
@@ -195,10 +195,10 @@ The oracle is the compiled statement, not the string: the \textsc{Explain}
 bytecode with the value operand redacted, the read-only flag, whether any SQL is
 left after the first statement, and the rows returned, each read against the
 benign baseline.
-A payload counts against a defense only where the control, naive concatenation
-into a quoted or raw value context or a bare name, actually breaks out; most
-recorded payloads are fragments that never parse against SQLite and are not
-attacks here.
+A payload counts against a defense only where the control actually breaks out.
+The control is naive concatenation into a quoted or raw value context, or a bare
+name. Most recorded payloads are fragments that never parse against SQLite and
+are not attacks here.
 That effective set is \dataSqliEffective payloads.
 
 \begin{table*}[t]
@@ -234,25 +234,25 @@ That breakout is available only because the additive build leaves legacy
 composition open.
 Recompiled in the opt-in strict mode, every text-splicing prepare, the
 concatenation and the in-band \verb|M'(...)'| alike, is refused before it reaches
-the parser (\cref{tab:sqli}, right), so the \dataSqliEffective effective-set
-attacks have no path at all and A2 holds by construction rather than by
+the parser (\cref{tab:sqli}, right). The \dataSqliEffective effective-set
+attacks then have no path at all, and A2 holds by construction rather than by
 discipline.
 The only admitted paths are then the typed \texttt{?V} value and \texttt{?I}
-identifier parameters of \texttt{sqlite3\_matchertext\_prepare\_v3()}, and run
-over the SQL corpus they contain it exactly as the additive holes do:
+identifier parameters of \texttt{sqlite3\_matchertext\_prepare\_v3()}. Run
+over the SQL corpus, they contain it exactly as the additive holes do:
 \dataSqliStrictValueBreakout value breakouts and \dataSqliStrictIdentBreakout
-identifier breakouts, the \texttt{?V} route binding each valid value and refusing
-the \dataSqliStrictValueRejected that are not matchertext, the \texttt{?I} route
-holding each as a single name.
+identifier breakouts. The \texttt{?V} route binds each valid value and refuses
+the \dataSqliStrictValueRejected that are not matchertext. The \texttt{?I} route
+holds each as a single name.
 Short of strict mode, an application closes the same gap itself by carrying the
-two \textsc{Verify} checks of the discipline: that the input is valid
-matchertext, which admits it or routes it through the encoder, and that the
+two \textsc{Verify} checks of the discipline. The first check is that the input is valid
+matchertext, which admits it or routes it through the encoder. The second is that the
 input placed in its matcher-delimited hole leaves the assembled statement valid
 matchertext, the closure the host reads to matcher balance.
 The value-hole and name-hole rows are exactly those two checks applied by the
 driver; the concatenation control is their absence.
 The value hole embeds each payload inertly, its quotes and operators read as
-data; the verified route instead refuses the \dataSqliMtStrictRejected payloads
+data. The verified route instead refuses the \dataSqliMtStrictRejected payloads
 that are not valid matchertext, so the two mechanisms of \cref{sec:resist},
 inert embedding and rejection, appear directly.
 The identifier hole holds each payload as a single name, which resolves or does
@@ -263,9 +263,10 @@ cannot fill.
 A zero is evidence only if the oracle could have reported a one.
 We rebuild the scanner deliberately broken, once so the boundary locator stops
 at the first closer and once so \textsc{Verify} always accepts, and rerun.
-Each broken build changes the verdict of the holes that rest on it, the value
-and name holes that end by matcher balance and the verified route that calls
-\textsc{Verify}, in up to \dataSqliSabotageDetect of cases, so the honest zero is
+Each broken build changes the verdict of the holes that rest on it, in up to
+\dataSqliSabotageDetect of cases. Those holes are the value
+and name holes that end by matcher balance, and the verified route that calls
+\textsc{Verify}. The honest zero is therefore
 read against demonstrated detection power rather than a blind harness.
 The C scanner and an independent implementation agree on \textsc{Verify} for
 every payload, and the run is deterministic.

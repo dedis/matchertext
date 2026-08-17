@@ -3,9 +3,10 @@
 
 Injection remains among the most damaging and persistent classes of software
 vulnerability. This section surveys the breadth of the problem beyond its most
-familiar members, its measured prevalence and cost, and why the very machinery
-built to contain it has itself become a recurring source of vulnerabilities:
-the motivation for the structural approach this paper evaluates.
+familiar members, together with its measured prevalence and cost. It also shows
+why the very machinery built to contain it has itself become a recurring source
+of vulnerabilities. This is the motivation for the structural approach this
+paper evaluates.
 
 \subsection{A wider family of embedding hazards}
 \label{sec:bg:hazards}
@@ -23,16 +24,16 @@ that loaded and executed attacker-supplied code~\cite{cve2021log4shell}.
 Command injection arises when user input reaches a shell without proper quoting,
 so that metacharacters such as \verb|;| or \verb|&|
 break out of the intended single argument~\cite{owasp_cmdinjection}.
-Spreadsheet formula injection turns exported data into code:
-a field beginning with \verb|=| is re-interpreted as a formula
-when a CSV export is opened in a spreadsheet,
-as in an Azure activity-log entry
-that executed on an administrator's machine on download~\cite{gietzen18csv}.
+Spreadsheet formula injection turns exported data into code.
+A field beginning with \verb|=| is re-interpreted as a formula
+when a CSV export is opened in a spreadsheet.
+One Azure activity-log entry
+executed on an administrator's machine on download~\cite{gietzen18csv}.
 Server-side template injection embeds user input into a template
-instead of passing it as data,
-letting an expression such as \verb|{{7*7}}| reach the template engine
-and frequently the whole server~\cite{portswigger_ssti},
-while the analogous client-side attack
+instead of passing it as data.
+An expression such as \verb|{{7*7}}| then reaches the template engine
+and frequently the whole server~\cite{portswigger_ssti}.
+The analogous client-side attack
 breaks out of the AngularJS expression sandbox
 to run arbitrary JavaScript~\cite{peguero16angular}.
 Even purpose-built defenses are not immune:
@@ -46,27 +47,27 @@ so a list entry \verb|NO|, a country code, parses as the boolean false,
 the widely cited ``Norway problem''~\cite{oconnor23yaml}.
 A regular expression with nested quantifiers
 fed adversarial input backtracks catastrophically and hangs the program,
-a regular-expression denial of service~\cite{owasp_redos};
-and the XML ``billion laughs'' attack
+a regular-expression denial of service~\cite{owasp_redos}.
+The XML ``billion laughs'' attack
 expands a kilobyte of nested entity definitions into gigabytes,
 exhausting memory during parsing~\cite{sullivan09xml}.
 
 The maintainability face of the same problem
-is the leaning toothpick syndrome,
-and history shows that ad-hoc syntactic fixes tend to backfire:
+is the leaning toothpick syndrome.
+History shows that ad-hoc syntactic fixes tend to backfire.
 PHP's \verb|magic_quotes| feature auto-escaped quotes in request data
-to forestall injection,
-but did so inconsistently, invited double-escaping bugs,
+to forestall injection.
+It did so inconsistently, invited double-escaping bugs,
 and was eventually deprecated~\cite{php_magicquotes}.
 What unites the largest of these cases is structural:
 content meant to be inert data is read as syntax
 because a bracket or quote within it escapes its intended region.
-That is exactly the failure a matcher-balance discipline is built to resist,
-and because it recurs across the injection and markup attacks above
-rather than in any single language pair,
-one structural discipline can address the breakout-based members at once, as
-distinct from the execution and algorithmic members (template evaluation, ReDoS,
-entity expansion) it cannot.
+That is exactly the failure a matcher-balance discipline is built to resist.
+It recurs across the injection and markup attacks above
+rather than in any single language pair.
+One structural discipline can therefore address the breakout-based members at once.
+This is distinct from the execution and algorithmic members (template evaluation,
+ReDoS, entity expansion) it cannot address.
 
 
 \subsection{The prevalence and cost of injection failures}
@@ -84,10 +85,10 @@ The absolute volumes are large.
 OWASP's 2025 Injection category maps to 62,445 recorded CVEs,
 of which it attributes more than 30,000 to XSS
 and more than 14,000 to SQL injection~\cite{owasp_top10_2025}.
-Independent scanning corroborates this:
+Independent scanning corroborates this.
 Edgescan's 2025 report attributes 28.28\% of critical and high-severity
-web and API findings to SQL injection and a further 17\% to XSS~\cite{edgescan25},
-and Veracode has reported XSS in 47\% and SQL injection in 28\%
+web and API findings to SQL injection and a further 17\% to XSS~\cite{edgescan25}.
+Veracode has reported XSS in 47\% and SQL injection in 28\%
 of the applications it tested~\cite{veracode_soss}.
 The cost of a single failure can be severe:
 the 2015 TalkTalk breach, an SQL injection,
@@ -101,19 +102,19 @@ are empirically error-prone.
 In one controlled study,
 all ten programmers asked to fix an XSS flaw
 with a standard output-encoding library
-failed to remove it completely~\cite{wijayarathna18esapi};
-an analysis of real PHP applications
-found them carrying far more distinct sanitizers than syntactic contexts,
-one application defining 95 sanitization functions
-against thousands of output sites,
-an arrangement in which selecting the wrong encoder for a context
+failed to remove it completely~\cite{wijayarathna18esapi}.
+An analysis of real PHP applications
+found them carrying far more distinct sanitizers than syntactic contexts.
+One application defined 95 sanitization functions
+against thousands of output sites.
+In that arrangement, selecting the wrong encoder for a context
 is both easy and common~\cite{weinberger11xss}.
-The risky patterns remain widespread:
-a 2024 study of nearly a million GitHub projects
+The risky patterns remain widespread.
+A 2024 study of nearly a million GitHub projects
 found SQL assembled by string concatenation
-in 42\% of the Java, 56\% of the C\#, and 91\% of the PHP files examined,
-the construction from which injection arises
-once untrusted input reaches the query structure~\cite{dennis24sql}.
+in 42\% of the Java, 56\% of the C\#, and 91\% of the PHP files examined~\cite{dennis24sql}.
+This is the construction from which injection arises
+once untrusted input reaches the query structure.
 
 The record is consistent and stark:
 injection and XSS are common, severe, and long-lived,
@@ -131,27 +132,27 @@ The machinery built to perform this escaping
 is itself substantial code, and itself a recurring source of vulnerabilities.
 A production HTML sanitizer must track
 the host parser's full and quirk-laden behavior,
-so the components are not small:
-DOMPurify's core file runs to roughly 2,400 lines,
-and project-wide the larger sanitizers reach tens of thousands,
-HTML Purifier and OWASP's ESAPI each near 40,000
+so the components are not small.
+DOMPurify's core file runs to roughly 2,400 lines.
+Project-wide, the larger sanitizers reach tens of thousands:
+HTML Purifier and OWASP's ESAPI each near 40,000,
 and Python's Bleach around 15,000.
 Because such a sanitizer is correct only while its model
 matches every browser exactly,
-each divergence becomes a bypass,
-and the bypasses recur as named classes:
-mutation XSS, in which sanitized markup turns executable
-once the browser reparses it~\cite{heiderich13mxss};
-parsing differentials, in which the sanitizer and the browser
-disagree about the same input~\cite{klein24parsing};
-and DOM clobbering, in which attacker-named elements
+each divergence becomes a bypass.
+The bypasses recur as named classes.
+Mutation XSS turns sanitized markup executable
+once the browser reparses it~\cite{heiderich13mxss}.
+Parsing differentials make the sanitizer and the browser
+disagree about the same input~\cite{klein24parsing}.
+DOM clobbering lets attacker-named elements
 subvert the security logic itself~\cite{khodayari23clobbering}.
 
 The result is a steady stream of flaws in the sanitizers themselves.
 DOMPurify has carried at least nine CVEs,
 publishing sixteen security advisories in under three months
-of 2026 alone~\cite{dompurify_advisories},
-and the Rails HTML sanitizer disclosed five CVEs on a single day~\cite{rails_sanitizer_cves};
+of 2026 alone~\cite{dompurify_advisories}.
+The Rails HTML sanitizer disclosed five CVEs on a single day~\cite{rails_sanitizer_cves}.
 Bleach, sanitize-html, and HTML Purifier
 each have their own multi-entry histories.
 These counts include only flaws \emph{in} the sanitizers,
@@ -165,9 +166,9 @@ This is the concrete case for preferring a structural \emph{check}
 to a structural \emph{transformation}.
 Verifying that a value's matchers balance
 is host-independent and small,
-whereas a sanitizer must shadow the host language's parser and its quirks;
-the security literature has repeatedly reached the analogous conclusion,
-favoring safety by construction, typed template contexts,
+whereas a sanitizer must shadow the host language's parser and its quirks.
+The security literature has repeatedly reached the analogous conclusion.
+It favors safety by construction, typed template contexts,
 and parameterized queries over ad-hoc escaping~\cite{samuel11csas,momot16langsec,owasp_parameterization}.
 The check itself is a few lines of uniform, host-independent balance-counting,
 against tens of thousands of lines of parser-shadowing transformation
@@ -176,9 +177,9 @@ The check is not the whole trusted base.
 A matchertext host must also end an embedded value by matcher balance
 and suppress its own decoding inside the hole,
 and the write path adds an encoder and its inverse (\cref{sec:threat}).
-Matchertext thus relocates trust rather than eliminating it:
-what must hold uniformly across languages shrinks to a small host-independent
-check, and what remains per host is a bounded change to a parser the host
+Matchertext thus relocates trust rather than eliminating it.
+What must hold uniformly across languages shrinks to a small host-independent
+check. What remains per host is a bounded change to a parser the host
 already owns, not a new artifact shadowing one it does not.
 
 
@@ -239,16 +240,16 @@ breaks, and execution sinks, which run their contents by design, lie outside it,
 \end{figure*}
 
 The defenses of \cref{sec:bg:sanitizer} share a shape.
-Each is written for one composing language and one host, and works by knowing the
-host well enough to transform values for it: a Java-to-SQL escaper knows SQL, and
+Each is written for one composing language and one host. Each works by knowing the
+host well enough to transform values for it. A Java-to-SQL escaper knows SQL, and
 an HTML sanitizer knows the browser's parser closely enough to predict it.
 Neither transfers to the other's problem, so the number of defenses to write,
 audit, and re-synchronize grows with the product of the two populations.
 
 \Cref{fig:bg:waist} shows the alternative.
 A rule that both sides implement once decouples them, because the rule mentions
-neither: a language that emits valid matchertext is compatible with every host
-that reads to matcher balance, and such a host accepts values from every such
+neither. A language that emits valid matchertext is compatible with every host
+that reads to matcher balance. Such a host accepts values from every such
 language, without either knowing what the other is.
 The count falls from $N \times M$ relationships to $N + M$ implementations, which
 is the shape the Internet protocol stack takes for the same reason, a waist thin

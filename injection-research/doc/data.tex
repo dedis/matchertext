@@ -12,20 +12,21 @@ The \href{https://github.com/CVEProject/cvelistV5}{MITRE CVE List}
 (\texttt{cvelistV5}) is the canonical record of identity, CNA provenance, and
 description.
 \href{https://nvd.nist.gov/vuln/data-feeds}{NVD} supplies normalized CWE, CPE,
-and CVSS; \href{https://github.com/cisagov/vulnrichment}{CISA Vulnrichment}
-backfills recent CWE/CVSS via its ADP container;
-\href{https://github.com/cisagov/kev-data}{CISA KEV} marks known-exploited CVEs;
+and CVSS.
+\href{https://github.com/cisagov/vulnrichment}{CISA Vulnrichment}
+backfills recent CWE/CVSS via its ADP container.
+\href{https://github.com/cisagov/kev-data}{CISA KEV} marks known-exploited CVEs.
 \href{https://www.first.org/epss/}{FIRST EPSS} supplies exploit-likelihood
-scores; and the \href{https://cwe.mitre.org/}{MITRE CWE list} provides the
+scores, and the \href{https://cwe.mitre.org/}{MITRE CWE list} provides the
 weakness hierarchy used for classification.
 \href{https://github.com/github/advisory-database}{GitHub Security Advisories},
 \href{https://access.redhat.com/security/data}{Red~Hat}, and
 \href{https://security-tracker.debian.org/tracker/}{Debian} add further CWE,
 CVSS, severity, and fix-state signals through their CVE aliases.
 Because the same CVE can carry different weakness labels from different sources,
-enrichment is kept \emph{source-separated}: each CWE or CVSS row is tagged with
-its origin rather than merged, which both preserves provenance and lets us
-measure cross-source disagreement.
+enrichment is kept \emph{source-separated}.
+Each CWE or CVSS row is tagged with its origin rather than merged, which both
+preserves provenance and lets us measure cross-source disagreement.
 
 \paragraph{Proof-of-concept payloads.}
 Six PoC databases supply real attack strings:
@@ -56,6 +57,6 @@ Across all categories the PoC databases link to \dataPocTrickestCVEs CVEs (trick
 coverage of the injection subset is reported with the results in
 \cref{sec:results}.
 A key methodological caveat is that these sources have different, sometimes
-mutable, update cadences (NVD in particular re-scores CVEs continuously), so
-the analysis fixes a dated snapshot and treats ``field missing in source'' as
-distinct from ``property absent in the vulnerability.''
+mutable, update cadences (NVD in particular re-scores CVEs continuously).
+The analysis therefore fixes a dated snapshot and treats ``field missing in
+source'' as distinct from ``property absent in the vulnerability.''

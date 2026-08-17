@@ -38,45 +38,52 @@ once the parser reads it.}
 \end{figure*}
 
 \paragraph{Protected asset.}
-For a host program with a hole $P[\cdot]$
-into which an untrusted value $v$ is placed, the asset is the invariant that the
-\emph{structure} of the host's parse of $P[v]$ is independent of the content of
-$v$: the value occupies a single data position and contributes no host syntax.
+A host program has a hole $P[\cdot]$ that receives an untrusted value $v$.
+The protected asset is one invariant: the \emph{structure} of the host's parse of
+$P[v]$ does not depend on the content of $v$.
+The value occupies a single data position and adds no host syntax.
 
 \paragraph{Trusted computing base.}
-The guarantee rests on (i) a \emph{matchertext-aware host} that delimits the hole
-with a matcher pair and ends the embedded value by matcher balance rather than by
-scanning for its native closer; (ii) the \textsc{Verify} recognizer that decides
-membership in the matchertext language $L$; and (iii) the total encoder
-\textsc{ToMatchertext} and its inverse, used on free-form fields; its
-output-in-$L$ obligation is discharged in \cref{sec:appendix:tomatchertext},
-narrowing~(iii) to the decoder round-trip.
-The boundary-locating step of (i) is the operationally load-bearing part; we
-discharge it below as premise L1 (machine checked), so what the host must still be trusted for is the
-\emph{implementation} of that step rather than its principle.
+The guarantee rests on three trusted parts.
+(i)~A \emph{matchertext-aware host} delimits the hole with a matcher pair.
+It ends the embedded value by matcher balance, not by scanning for its native
+closer.
+(ii)~The \textsc{Verify} recognizer decides membership in the matchertext
+language $L$.
+(iii)~The total encoder \textsc{ToMatchertext} and its inverse handle free-form
+fields.
+Its output-in-$L$ obligation is discharged in \cref{sec:appendix:tomatchertext},
+which narrows~(iii) to the decoder round-trip.
+The boundary-locating step of~(i) is the operationally load-bearing part.
+We discharge it below as premise L1, which is machine checked.
+The host must then be trusted only for the \emph{implementation} of that step,
+not its principle.
 
 \paragraph{Attacker.}
 The attacker supplies $v$ and may choose \emph{arbitrary} bytes, character
 encodings, Unicode, length, and matcher-nesting depth, and may submit strings
 that are \emph{not} valid matchertext.
 Following Kerckhoffs, the attacker knows the discipline, which delimiter kind
-guards the hole, and where the hole boundaries lie, and crafts $v$ \emph{against}
-the matcher-delimited slot, not the legacy quote or tag-delimited host that the
-recorded corpus payloads (\cref{sec:results}) target.
+guards the hole, and where the hole boundaries lie.
+The attacker crafts $v$ \emph{against} the matcher-delimited slot.
+The recorded corpus payloads (\cref{sec:results}) instead target the legacy quote
+or tag-delimited host.
 The attacker does not control the host source, the configuration $(\Sigma,\Pi)$,
 or the trusted components above.
 
 \paragraph{Security property (inertness).}
 Let $\textsc{Verify}(v)\Leftrightarrow v\in L$.
-For every host program $P[\cdot]$ and every $v$ with $\textsc{Verify}(v)$, the
-host parse of $P[v]$ places the content of $v$ at a single terminal whose bytes
-do not contribute to the parse structure of $P$; equivalently, the structural
-skeleton of the parse of $P[v]$ is independent of $v$.
+Take every host program $P[\cdot]$ and every $v$ with $\textsc{Verify}(v)$.
+The host parse of $P[v]$ places the content of $v$ at a single terminal.
+The bytes of that terminal do not contribute to the parse structure of $P$.
+Equivalently, the structural skeleton of the parse of $P[v]$ is independent of
+$v$.
 This is strictly stronger than the closure property $s_o\|v\|s_c\in L$ that
 \cref{sec:resist} inherits from the always-embeddability
-theorem~\cite{matchertext}: closure states that the \emph{delimited string
-remains valid matchertext}, whereas inertness states that the \emph{host parser
-treats the delimited content as data}.
+theorem~\cite{matchertext}.
+Closure states that the \emph{delimited string remains valid matchertext}.
+Inertness states that the \emph{host parser treats the delimited content as
+data}.
 Closure is a lemma toward inertness, not inertness itself: it constrains the
 \emph{string}, not the host \emph{parser}.
 
@@ -123,9 +130,11 @@ Inertness holds under four premises, each necessary:
 
 \paragraph{From closure to inertness.}
 We model the aware host of A1 as a grammar $G$ with one distinguished production
-$\mathit{hole}\rightarrow s_o\,\mathit{content}\,s_c$, where $\mathit{content}$ is
-recovered by the matcher-balance locator and enters $G$ as a single terminal
-whose lexeme is the value in its canonical, fully-decoded form (A3).
+$\mathit{hole}\rightarrow s_o\,\mathit{content}\,s_c$.
+The matcher-balance locator recovers $\mathit{content}$ and enters it into $G$ as
+a single terminal.
+The lexeme of that terminal is the value in its canonical, fully-decoded form
+(A3).
 Inertness then rests on three premises, each separately dischargeable:
 \begin{itemize}
 \item[\textbf{L1}] \emph{Boundary.} Reading to matcher balance ends the
@@ -145,10 +154,12 @@ Inertness then rests on three premises, each separately dischargeable:
 	terminal as a data value and never re-lexes, reparses, or executes its
 	bytes.
 \end{itemize}
-The chain is then immediate: closure~\cite{matchertext} keeps $P[v]$ a balanced
-matchertext document, so the locator operates on valid input; L1 fixes the hole's
-extent; L2 makes the structural skeleton of $\mathrm{parse}(P[v])$ independent of
-$v$; and L3 carries that independence through to execution.
+The chain is then immediate.
+Closure~\cite{matchertext} keeps $P[v]$ a balanced matchertext document, so the
+locator operates on valid input.
+L1 fixes the hole's extent.
+L2 makes the structural skeleton of $\mathrm{parse}(P[v])$ independent of $v$.
+L3 carries that independence through to execution.
 Hence $\mathrm{closure}\wedge\mathrm{L1}\wedge\mathrm{L2}\wedge\mathrm{L3}\Rightarrow$
 inertness.
 Closure and the correctness of \textsc{Verify} are machine-checked in the
@@ -158,13 +169,16 @@ L2 and L3 are the residual obligations, both per host, which we discharge for
 one host, a matchertext-aware SQLite, in \cref{sec:prevent:exec}.
 
 \paragraph{Scope.}
-\emph{structural} injection are in scope: an attacker-controlled value that alters
+In scope is \emph{structural} injection: an attacker-controlled value that alters
 the host parse by escaping its region.
-Out of scope, and excluded from the containment claims throughout, are:
-execution and semantic sinks (A4); contexts delimited by non-matchers with no
-matcher hosting (shell separators, CR/LF header breaks, XML/XXE angle brackets);
-\emph{semantic} abuse in which a well-formed value is merely unauthorized, an
-access-control question; algorithmic denial of service (regular-expression
-backtracking, entity expansion), which is not a breakout; and second-order
-injection in which stored input is reinterpreted later in a different context,
-unless it is re-checked under A3 at that later host.
+Several classes are out of scope, and are excluded from the containment claims
+throughout.
+Execution and semantic sinks fall outside it (A4).
+So do contexts delimited by non-matchers with no matcher hosting: shell
+separators, CR/LF header breaks, and XML/XXE angle brackets.
+\emph{Semantic} abuse is also out of scope, where a well-formed value is merely
+unauthorized; this is an access-control question.
+Algorithmic denial of service, such as regular-expression backtracking or entity
+expansion, is not a breakout, and is out of scope.
+Second-order injection is out of scope too: stored input reinterpreted later in a
+different context, unless A3 re-checks it at that later host.
