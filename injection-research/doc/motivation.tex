@@ -5,7 +5,7 @@ Injection remains among the most damaging and persistent classes of software
 vulnerability. This section surveys the breadth of the problem beyond its most
 familiar members, its measured prevalence and cost, and why the very machinery
 built to contain it has itself become a recurring source of vulnerabilities:
-the motivation for the structural approach this thesis evaluates.
+the motivation for the structural approach this paper evaluates.
 
 \subsection{A wider family of embedding hazards}
 \label{sec:bg:hazards}
@@ -64,7 +64,7 @@ because a bracket or quote within it escapes its intended region.
 That is exactly the failure a matcher-balance discipline is built to resist,
 and because it recurs across the injection and markup attacks above
 rather than in any single language pair,
-one structural discipline can address the breakout-based members at once---as
+one structural discipline can address the breakout-based members at once, as
 distinct from the execution and algorithmic members (template evaluation, ReDoS,
 entity expansion) it cannot.
 
@@ -181,3 +181,80 @@ what must hold uniformly across languages shrinks to a small host-independent
 check, and what remains per host is a bounded change to a parser the host
 already owns, not a new artifact shadowing one it does not.
 
+
+\subsection{The narrow waist}
+\label{sec:bg:waist}
+
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[
+	lang/.style={font=\small},
+	link/.style={draw=black!45, line width=0.4pt},
+	waist/.style={draw, fill=black!8, minimum width=5.4cm,
+		minimum height=0.9cm, font=\small},
+	note/.style={font=\small},
+]
+\begin{scope}[xshift=-4.3cm]
+	\node[note] at (0,2.6) {\textbf{Today}};
+	\node[lang] (t1) at (-1.8,1.7) {Java};
+	\node[lang] (t2) at (-0.6,1.7) {PHP};
+	\node[lang] (t3) at ( 0.6,1.7) {$\cdots$};
+	\node[lang] (t4) at ( 1.8,1.7) {Go};
+	\node[lang] (s1) at (-1.8,-1.7) {SQL};
+	\node[lang] (s2) at (-0.6,-1.7) {HTML};
+	\node[lang] (s3) at ( 0.6,-1.7) {$\cdots$};
+	\node[lang] (s4) at ( 1.8,-1.7) {shell};
+	\foreach \a in {t1,t2,t3,t4}
+		\foreach \b in {s1,s2,s3,s4}
+			\draw[link] (\a) -- (\b);
+	\node[note] at (0,-2.6) {$N \times M$ escapers, one per pair};
+\end{scope}
+\begin{scope}[xshift=4.3cm]
+	\node[note] at (0,2.6) {\textbf{With matchertext}};
+	\node[lang] (u1) at (-2.4,1.7) {C};
+	\node[lang] (u2) at (-1.2,1.7) {Java};
+	\node[lang] (u3) at ( 0.0,1.7) {PHP};
+	\node[lang] (u4) at ( 1.2,1.7) {$\cdots$};
+	\node[lang] (u5) at ( 2.4,1.7) {Go};
+	\node[waist] (w) at (0,0) {matchers must match};
+	\node[lang] (v1) at (-2.4,-1.7) {SQL};
+	\node[lang] (v2) at (-1.2,-1.7) {HTML};
+	\node[lang] (v3) at ( 0.0,-1.7) {LDAP};
+	\node[lang] (v4) at ( 1.2,-1.7) {$\cdots$};
+	\node[lang] (v5) at ( 2.4,-1.7) {URI};
+	\foreach \a in {u1,u2,u3,u4,u5} \draw[link] (\a) -- (w.north);
+	\foreach \b in {v1,v2,v3,v4,v5} \draw[link] (w.south) -- (\b);
+	\node[note] at (0,-2.6) {$N + M$ implementations, one rule each};
+\end{scope}
+\end{tikzpicture}
+\caption{The narrow waist. Each escaper today is written for one composing
+language and one host, and must model that host's syntax and track it as it
+changes. A rule both sides implement once decouples them, since the rule mentions
+neither: any language emitting valid matchertext is compatible with any host
+reading to matcher balance. Not everything passes through the waist, however:
+contexts delimited by non-matchers, such as shell separators and CR/LF header
+breaks, and execution sinks, which run their contents by design, lie outside it, and
+\cref{sec:prevent} measures how much of the recorded landscape that leaves.}
+\label{fig:bg:waist}
+\end{figure*}
+
+The defenses of \cref{sec:bg:sanitizer} share a shape.
+Each is written for one composing language and one host, and works by knowing the
+host well enough to transform values for it: a Java-to-SQL escaper knows SQL, and
+an HTML sanitizer knows the browser's parser closely enough to predict it.
+Neither transfers to the other's problem, so the number of defenses to write,
+audit, and re-synchronize grows with the product of the two populations.
+
+\Cref{fig:bg:waist} shows the alternative.
+A rule that both sides implement once decouples them, because the rule mentions
+neither: a language that emits valid matchertext is compatible with every host
+that reads to matcher balance, and such a host accepts values from every such
+language, without either knowing what the other is.
+The count falls from $N \times M$ relationships to $N + M$ implementations, which
+is the shape the Internet protocol stack takes for the same reason, a waist thin
+enough that what sits above and below it can vary independently.
+
+Whether that shape is worth adopting is a security question rather than an
+aesthetic one, and it turns on what the shared rule actually guarantees when the
+value in the hole is chosen by an attacker.
+\Cref{sec:relevance} takes it up.

@@ -1,36 +1,20 @@
-\section{Machine-checked Lean development}
+\section{Machine-checked: \textsc{FindEmbedEnd}}
 \label{sec:appendix:lean}
 
 The declaration heads below summarize the Lean~4 development in
-\texttt{injection-research/doc/proof.lean} that establishes premise~L1 of \cref{sec:threat} (there
+\texttt{lean/embed\_boundary.lean} that establishes premise~L1 of \cref{sec:threat} (there
 named \texttt{embed\_boundary}), extending the machine-checked closure
 development of~\cite{matchertext} with the boundary characterization that closure
 alone does not supply.
 Tactic proof bodies are elided here and given in full in the source file.
 
 \begin{lstlisting}
-import Mathlib
+import core
+
 open Classical
 
 variable {α : Type*}         -- the alphabet Σ, kept abstract
 variable (Pi : Set (α × α))  -- the set of pairs Π
-
-def Opener     (x : α) : Prop := ∃ y, (x, y) ∈ Pi
-def Closer     (x : α) : Prop := ∃ y, (y, x) ∈ Pi
-def Matcher    (x : α) : Prop := Opener Pi x ∨ Closer Pi x
-def Nonmatcher (x : α) : Prop := ¬ Matcher Pi x
-
--- Lemma: no opener can be a closer, and vice versa.
-theorem disjoint
-    (h : ∀ x y z, (x, y) ∈ Pi → (z, x) ∈ Pi → False)
-    (x : α) : ¬ (Opener Pi x ∧ Closer Pi x) := by ...
-
--- The inductive definition of matchertext.
-inductive MT (Pi : Set (α × α)) : List α → Prop where
-  | flat (n : List α) (h : ∀ x ∈ n, Nonmatcher Pi x) : MT Pi n
-  | nest (m₁ m₂ m₃ : List α) (o c : α) (hp : (o, c) ∈ Pi)
-         (h₁ : MT Pi m₁) (h₂ : MT Pi m₂) (h₃ : MT Pi m₃) :
-      MT Pi (m₁ ++ [o] ++ m₂ ++ [c] ++ m₃)
 
 -- Net matcher depth: +1 per opener, -1 per closer, 0 per nonmatcher. Noncomputable since only
 -- a host implementation would need a computable version.

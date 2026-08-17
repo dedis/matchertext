@@ -1,0 +1,83 @@
+\section{Machine-checked: \textsc{ToMatchertext}}
+\label{sec:appendix:tomatchertext}
+
+The declaration heads below summarize the Lean~4 development in
+\texttt{lean/to\_matchertext.lean} that discharges the write-path obligation of
+\cref{sec:threat} (TCB item~iii): the total encoder's output is \emph{always}
+matchertext. It reuses the base definitions of \cref{sec:appendix:lean}
+(\texttt{Opener}, \texttt{Closer}, \texttt{Nonmatcher}, \texttt{MT}, and the
+\texttt{depth}/\texttt{embed\_boundary} results) and the closure lemmas
+\texttt{mt\_append}/\texttt{mt\_wrap} of~\cite{matchertext}.
+Definition bodies are shown in full; tactic proof bodies are elided and given in
+the source file.
+
+\begin{lstlisting}
+import Core
+import embed_boundary
+import always_embeddable
+open Classical
+
+variable {α : Type*}         -- the alphabet Σ, kept abstract
+variable (Pi : Set (α × α))  -- the set of pairs Π
+
+-- A pending scan context: an opener awaiting its closer, with the output at its level.
+abbrev Ctx (α : Type*) := α × List α
+
+-- End of input: every opener still pending is unmatched, so it is escaped.
+noncomputable def unwind (esc : α → List α) : List (Ctx α) → List α → List α
+  | [], out => out
+  | (o, b) :: st, out => unwind esc st (b ++ esc o ++ out)
+
+-- One left-to-right pass. `st` holds the pending openers, `out` the output at the current
+-- level. A closer is matched only if it pairs with the top; else it is unmatched and escaped.
+noncomputable def encAux (esc : α → List α) :
+    List (Ctx α) → List α → List α → List α
+  | st, out, [] => unwind esc st out
+  | st, out, x :: xs =>
+      if Opener Pi x then encAux esc ((x, out) :: st) [] xs
+      else if Closer Pi x then
+        match st with
+        | (o, b) :: st' =>
+            if (o, x) ∈ Pi then encAux esc st' (b ++ [o] ++ out ++ [x]) xs
+            else encAux esc st (out ++ esc x) xs
+        | [] => encAux esc st (out ++ esc x) xs
+      else encAux esc st (out ++ [x]) xs
+
+noncomputable def toMatchertext (esc : α → List α) (v : List α) : List α :=
+  encAux Pi esc [] [] v
+
+-- Lemma: an escape contains no matchers, hence is matchertext.
+theorem esc_mt (esc : α → List α)
+    (hesc : ∀ c x, x ∈ esc c → Nonmatcher Pi x) (c : α) :
+    MT Pi (esc c) := ...
+
+-- Lemma: unwinding the pending stack preserves matchertext.
+theorem unwind_mt (esc : α → List α)
+    (hesc : ∀ c x, x ∈ esc c → Nonmatcher Pi x)
+    (st : List (Ctx α)) (hst : ∀ p ∈ st, MT Pi p.2)
+    (out : List α) (hout : MT Pi out) :
+    MT Pi (unwind esc st out) := by ...
+
+-- Invariant (the crux): every accumulated segment stays matchertext.
+theorem encAux_mt (esc : α → List α)
+    (hesc : ∀ c x, x ∈ esc c → Nonmatcher Pi x)
+    (st : List (Ctx α)) (hst : ∀ p ∈ st, MT Pi p.2)
+    (out : List α) (hout : MT Pi out) (v : List α) :
+    MT Pi (encAux Pi esc st out v) := by ...
+
+-- Theorem (output ∈ L): any string at all, once encoded, is matchertext.
+theorem toMatchertext_mt (esc : α → List α)
+    (hesc : ∀ c x, x ∈ esc c → Nonmatcher Pi x) (v : List α) :
+    MT Pi (toMatchertext Pi esc v) := ...
+
+-- Corollary (write-path payoff): reading to matcher balance recovers exactly the encoded
+-- value, for a freely chosen v. embed_boundary assumes MT Pi m, which toMatchertext_mt supplies.
+theorem embed_boundary_encoded
+    (hdisj : ∀ x y z, (x, y) ∈ Pi → (z, x) ∈ Pi → False)
+    (esc : α → List α)
+    (hesc : ∀ c x, x ∈ esc c → Nonmatcher Pi x)
+    (v : List α) {c : α} (hc : Closer Pi c) :
+    (∀ p, p <+: toMatchertext Pi esc v → 0 ≤ depth Pi p)
+      ∧ depth Pi (toMatchertext Pi esc v) = 0
+      ∧ depth Pi (toMatchertext Pi esc v ++ [c]) = -1 := ...
+\end{lstlisting}

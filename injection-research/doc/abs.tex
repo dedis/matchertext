@@ -1,24 +1,25 @@
 \begin{abstract}
-Injection attacks remains one of the most persistent classes of software
-vulnerability, and the \emph{matchertext} discipline is being proposed as a
-structural defense: requiring the ASCII matcher pairs \verb|()|, \verb|[]|, and
-\verb|{}| to always match, so untrusted input in a matcher-delimited slot cannot
-break out without producing an unmatched matcher.
-This paper measures how much of the real injection landscape that proposal could
-structurally reach.
-We assemble a reproducible corpus unifying the MITRE CVE record with normalized
-enrichment and four proof-of-concept (PoC) databases, identify \textbf{91{,}760}
-injection CVEs among roughly 348k published records, and classify each by
-weakness family and by the embedded \emph{syntax} it targets.
-For the subset with an extractable PoC payload, we reduce each attack to a
-\emph{syntactic skeleton} and test whether a matchertext-aware host would contain
-it: whether the value sits in a matcher-delimited slot and is itself valid
-matchertext.
-We find that \textbf{82\%} of payload-backed injection CVEs are structurally
-contained, and, projected across all injection CVEs, at most \textbf{80\%} target
-a matcher-delimitable syntax; the residue is execution sinks and
-non-matcher-delimited contexts the discipline provably cannot address.
-These figures characterize the structure of recorded attack strings under a
-matchertext-aware host, not the behavior of a deployed defense: no such host is
-implemented or evaluated here.
+Injection remains one of the most persistent classes of software vulnerability.
+The escaping and sanitization meant to prevent it are per-language,
+per-context, and hand-applied at every use site.
+The \emph{matchertext} discipline proposes one rule instead: the ASCII matcher
+pairs \verb|()|, \verb|[]|, and \verb|{}| must always match.
+A host can then delimit an untrusted value with a matcher pair and read it to
+matcher balance, so escaping the slot would require an unmatched matcher, which
+is not valid matchertext.
+Whether that helps against injection depends on what it actually guarantees.
+We state the guarantee as an \emph{inertness} property, that the host's parse of
+a program is independent of the content placed in its holes, and reduce it to three
+premises: correct boundary location, a parser that does not re-enter the hole,
+and an interpreter that treats the hole as data.
+We then ask how much of the real landscape this could reach.
+From a reproducible corpus of \textbf{91{,}760} injection CVEs, classified by the
+embedded syntax each attack targets, and measuring the structure of recorded
+attack strings under a matchertext-aware host rather than a deployed one, we find
+that \textbf{82\%} of those with a recoverable payload are structurally contained,
+and that at most \textbf{80\%} of all injection CVEs target a matcher-delimitable
+syntax.
+The residue is execution sinks and non-matcher-delimited contexts, which no
+delimiting discipline can reach, so the boundary the measurement draws is a
+property of injection itself rather than of this design.
 \end{abstract}

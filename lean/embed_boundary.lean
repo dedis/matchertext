@@ -1,52 +1,22 @@
-import Mathlib
+import core
 
-/- Premises given in the paper -/
-
-variable {α : Type*}              -- the alphabet Σ, kept abstract on purpose
-variable (Pi : Set (α × α))       -- the set of pairs Π
-
---
-def Opener     (x : α)   : Prop := ∃ y, (x, y) ∈ Pi
-def Closer     (x : α)   : Prop := ∃ y, (y, x) ∈ Pi
-def Matcher    (x : α)   : Prop := Opener Pi x ∨ Closer Pi x
-def Nonmatcher (x : α)   : Prop := ¬ Matcher Pi x
-
--- Prove: no opener can be a closer, and vice versa
-theorem disjoint
-    (h : ∀ x y z, (x, y) ∈ Pi → (z, x) ∈ Pi → False)
-    (x : α) : ¬ (Opener Pi x ∧ Closer Pi x) := by
-  intro hx
-  rcases hx with ⟨ho, hc⟩
-  rcases ho with ⟨y, hy⟩
-  rcases hc with ⟨z, hz⟩
-  exact h x y z hy hz
-
--- The inductive definition of Matchertext
-inductive MT (Pi : Set (α × α)) : List α → Prop where
-  | flat (n : List α) (h : ∀ x ∈ n, Nonmatcher Pi x) : MT Pi n
-  | nest (m₁ m₂ m₃ : List α) (o c : α) (hp : (o, c) ∈ Pi) (h₁ : MT Pi m₁) (h₂ : MT Pi m₂) (h₃ : MT Pi m₃) :
-      MT Pi (m₁ ++ [o] ++ m₂ ++ [c] ++ m₃)
-
--- ============================================================================
--- L1: reading a matched-delimited region "to matcher balance" recovers a
--- well-defined region that is itself matchertext. Stated declaratively over the
--- language `MT`.
--- ============================================================================
+variable {α : Type*}
+variable (Pi : Set (α × α))
 
 open Classical
 
-/-- Net matcher depth: +1 per opener, -1 per closer, 0 per nonmatcher.
-    `noncomputable` since only a host implementation would need a computable version. -/
+-- Net matcher depth: +1 per opener, -1 per closer, 0 per nonmatcher. Noncomputable since only
+-- a host implementation would need a computable version.
 noncomputable def delta (x : α) : Int := if Opener Pi x then 1 else if Closer Pi x then -1 else 0
 noncomputable def depth (l : List α) : Int := (l.map (delta Pi)).sum
 
 -- Lemma: depth is additive over concatenation.
 theorem depth_append (a b : List α) : depth Pi (a ++ b) = depth Pi a + depth Pi b := by simp [depth]
 
--- Lemma: a single character's contribution to the depth.
+-- Lemma: one character's contribution.
 theorem depth_singleton (x : α) : depth Pi [x] = (if Opener Pi x then 1 else if Closer Pi x then -1 else 0) := by simp [depth, delta]
 
--- Lemma: a matchertext string has net depth zero.
+-- Lemma (balanced): a matchertext string has net depth 0, since it is well balanced.
 theorem depth_zero
     (hdisj : ∀ x y z, (x, y) ∈ Pi → (z, x) ∈ Pi → False)
     {m : List α} (hm : MT Pi m) : depth Pi m = 0 := by
@@ -79,8 +49,8 @@ theorem depth_zero
     simp only [depth_append, ih₁, ih₂, ih₃, hdo, hdc]
     omega
 
--- Lemma (floor): no prefix of a matchertext string dips below depth zero, so a reader tracking matcher balance
--- never underflows inside the embedded value.
+-- Lemma (floor, the crux): no prefix of a matchertext string dips below depth 0, so
+-- a reader tracking matcher balance never underflows inside the embedding.
 theorem depth_prefix_nonneg
     (hdisj : ∀ x y z, (x, y) ∈ Pi → (z, x) ∈ Pi → False)
     {m : List α} (hm : MT Pi m) : ∀ p, p <+: m → 0 ≤ depth Pi p := by
@@ -149,12 +119,11 @@ theorem depth_prefix_nonneg
     have := ih₃ p₄ hpre
     linarith
 
-/-- **L1** Placing a matchertext value `m` in a
-    matched pair `(o, c)` and reading to balance recovers exactly `m`: every prefix
-    of `m` stays at depth ≥ 0, `m` returns to 0, and the context-closer `c` is the
-    first character to drive the depth negative — so the balance boundary is
-    precisely `|m|`. It follows from the three lemmas above, showing the boundary
-    result is a corollary, not new machinery. -/
+-- Theorem (L1): placing a matchertext value m in a hole closed by c and reading to
+-- balance recovers exactly m: every prefix of m stays at depth ≥ 0, m itself returns
+-- to 0, and c is the first character to drive the depth negative, so the balance
+-- boundary is precisely |m|. It follows from the three lemmas above: the boundary
+-- result is a corollary, not new machinery.
 theorem embed_boundary
     (hdisj : ∀ x y z, (x, y) ∈ Pi → (z, x) ∈ Pi → False)
     {m : List α} (hm : MT Pi m) {c : α} (hc : Closer Pi c) :

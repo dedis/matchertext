@@ -1,0 +1,14 @@
+name = "matchertext"
+defaultTargets = ["Matchertext"]
+
+# Mathlib is pinned in lake-manifest.json; `lean-toolchain` must match the Lean
+# version that revision uses. To build from a fresh clone (needs elan and network):
+#   lake exe cache get && lake build
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+version = "git#master"
+
+[[lean_lib]]
+name = "Matchertext"
+globs = ["Core", "always_embeddable", "embed_boundary", "to_matchertext"]

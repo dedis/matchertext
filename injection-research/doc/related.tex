@@ -1,0 +1,100 @@
+\section{Related work}
+\label{sec:related}
+
+Matchertext treats injection as a structural problem: keep untrusted input from
+altering the syntax around it, rather than filter what it may contain.
+\Cref{sec:resist:baselines} sets it head-to-head against the defenses deployed
+today; here we place it in the broader literature, grouped by how each line
+attacks the embedding boundary.
+
+\subsection{Language-based construction}
+The strongest host-specific defenses fix the embedded language's structure
+before any value is bound.
+Parameterized queries do this for SQL~\cite{owasp_parameterization}, and a
+programming-languages tradition hardens the same idea into types: SQL~DOM~\cite{mcclure05sqldom}
+and Safe Query Objects~\cite{cook05safequery} replace string building with typed
+query values; language-integrated query gives the host-to-SQL translation a
+formal, meaning-preserving account~\cite{cheney13liq}; and Ur/Web~\cite{chlipala15urweb}
+collapses web multi-language composition into one statically typed language.
+For markup, contextual auto-escaping selects the escaper from each hole's
+inferred syntactic context~\cite{samuel11csas}, and typed-value schemes such as
+SafeHtml and Trusted Types gate dangerous sinks so they accept only
+non-spoofable objects rather than arbitrary strings~\cite{kern14securing,trustedtypes}.
+Each buys a strong guarantee by knowing the language it protects: a fixed
+language, a dedicated sink API, or an owning compiler.
+Matchertext keeps values as plain text and fixes only the \emph{boundary}, so one
+rule serves hosts it was never specialized to (\cref{sec:resist:baselines}).
+
+\subsection{Syntax embedding and safe quotation}
+The closest work makes embedding safe by construction in the language itself.
+StringBorg~\cite{bravenboer10stringborg} embeds the embedded language's grammar
+into the composing one, adds quotation and antiquotation forms, and assimilates
+the result into API calls in that embedded language, rendering programs
+impervious to injection by construction.
+It is the nearest neighbor to matchertext, and the sharpest contrast: it needs an
+explicit grammar and a combined-syntax toolchain per language pair, where
+matchertext asks only that unrelated languages share one lexical invariant.
+The metaprogramming machinery this draws on has the same shape and the same
+assumption of a known embedded language: hygienic macros embed code in code without
+capture~\cite{kohlbecker86hygienic,dybvig92syntactic}, staged and
+quotation-based programming generate well-typed embedded fragments~\cite{taha00metaml,sheard02template,mainland07quoted},
+tagless-final embeddings make ill-typed embedded terms unrepresentable~\cite{carette09tagless},
+and language workbenches sidestep parser composition through projectional
+editing~\cite{renggli10embedding}.
+All own the embedded language's parser or type system; matchertext targets the case where the
+surrounding ecosystem shares no grammar or AST at all.
+
+\subsection{Static analysis and detection}
+A large body of work finds injection flaws in existing code rather than
+preventing them.
+Information-flow and taint analyses trace untrusted data to sensitive sinks:
+WebSSARI~\cite{huang04webssari}, Livshits and Lam~\cite{livshits05finding},
+Pixy~\cite{jovanovic06pixy}, Xie and Aiken~\cite{xie06static}, and the
+industrial-scale successors TAJ~\cite{tripp09taj} and Andromeda~\cite{tripp13andromeda},
+with FlowDroid~\cite{arzt14flowdroid} the mobile analogue.
+String analysis reasons about the generated query itself~\cite{wassermann07sound}, and
+modern SAST productizes both for continuous integration~\cite{dahse14simulation}.
+These detect variants of a bad construction after the fact and trade soundness
+against precision and analyst noise.
+Matchertext instead makes the boundary-breaking construction unrepresentable, and
+is complementary to analysis for the errors (wrong sink, logic faults, misuse
+outside the discipline) that a boundary rule does not touch.
+
+\subsection{Cross-cutting structural defenses}
+Closer in ambition are defenses that enforce a global invariant separating
+trusted structure from untrusted data.
+CSSE tags input and evaluates it in context across SQL, XSS, and shell
+injection~\cite{pietraszek05csse}; Document Structure Integrity~\cite{nadji09dsi},
+BLUEPRINT~\cite{terlouw09blueprint}, and Noncespaces~\cite{vangundy12noncespaces}
+protect HTML structure through browser cooperation and randomized or
+nonce-marked namespaces; Content Security Policy mitigates content injection at
+execution time~\cite{w3c_csp}; and SQLrand~\cite{boyd04sqlrand} and
+instruction-set randomization~\cite{barrantes03isr} randomize the accepted
+language so injected code cannot speak it.
+All mark trusted structure \emph{out of band}, with propagated metadata,
+browser state, or a secret, whereas matchertext makes the boundary
+self-delimiting \emph{in band} and public, with no tag to carry and no secret to
+keep.
+The web's lack of a universal escaper, precisely because parse context is
+per-language and non-composable~\cite{owasp_xss}, is what forces these
+per-context schemes; matchertext offers not one encoder for all contexts but one
+rule for locating the hole before any context-specific encoder runs.
+
+\subsection{Definitions and measurement}
+Formal framings of injection ground the inertness property of \cref{sec:threat}.
+The language-theoretic security program frames the root cause as processing rich
+input without first recognizing it~\cite{momot16langsec}; Su and Wassermann
+define command injection as untrusted input altering the intended syntactic
+structure of the generated command, with a grammar-based prevention
+algorithm~\cite{su06essence}; and Ray and Ligatti define code injection by
+whether input is used as a normal-form value rather than as code~\cite{ray12defining},
+the vocabulary matchertext's guarantee targets.
+Taxonomies and measurements bound the problem: the SQL-injection countermeasure
+taxonomy of Halfond et al.~\cite{halfond06classification}, systematic XSS
+surveys~\cite{hannousse22xss}, and large-scale studies of DOM-based
+XSS~\cite{lekies13dom} show defenses clustering around sink-specific filtering
+and detection, with no cross-language boundary convention among the standard
+categories.
+The weakness labels reviewers and CVE pipelines use group these failures by
+effect~\cite{cwe,owasp_top10_2021}; matchertext addresses the subset that shares
+a single lexical boundary mechanism.

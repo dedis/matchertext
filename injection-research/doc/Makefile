@@ -1,4 +1,4 @@
-.PHONY: FORCE lenny all clean distclean
+.PHONY: FORCE all fast link clean open
 
 FILE=main
 BUILD=build
@@ -24,8 +24,5 @@ clean:
 	$(RM) -r $(BUILD)
 	$(RM) *.aux *.bak *~
 
-distclean: clean
-	$(RM) $(FILE).pdf
-	$(RM) $(FILE).ps
-	$(RM) $(FILE).dvi
-	$(RM) *.d
+open:
+	open $(FILE).pdf

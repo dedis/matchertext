@@ -8,6 +8,21 @@
 	    linkcolor=blue,citecolor=blue,urlcolor=black]{hyperref}
 \usepackage{cleveref}
 \usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{pmboxdraw} % box-drawing glyphs for the ASCII figures under pdflatex
+\usepackage{amssymb}
+% Glyphs the ASCII figures use that pmboxdraw does not cover. Each is set in a
+% box exactly one character cell wide, as pmboxdraw itself does, so that they sit
+% on the monospace grid and do not shift the rest of their line.
+\newlength{\pmbdcell}
+\newcommand{\pmbdglyph}[1]{%
+	\settowidth{\pmbdcell}{0}%
+	\makebox[\pmbdcell][c]{\ensuremath{#1}}%
+}
+\DeclareUnicodeCharacter{25BC}{\pmbdglyph{\blacktriangledown}}
+\DeclareUnicodeCharacter{25BA}{\pmbdglyph{\blacktriangleright}}
+\DeclareUnicodeCharacter{2208}{\pmbdglyph{\in}}
+\DeclareUnicodeCharacter{00B7}{\pmbdglyph{\cdot}}
 \usepackage{booktabs}
 \usepackage{xurl} % allow long URLs in the bibliography to break anywhere
 \usepackage[T1]{fontenc}
@@ -64,7 +79,7 @@
 
 \begin{document}
 
-\title{Matchertext: An Empirical Analysis of Injection Vulnerabilities \\
+\title{Matchertext: Structural Injection Resistance by Construction \\
 	\Large{%
 	~\\
 	\url{https://github.com/dedis/matchertext}}}
@@ -79,17 +94,24 @@
 
 \input{intro}
 \input{motivation}
-\input{data}
-\input{classify}
-\input{results}
+
+\input{relevance}
 \input{threat}
 \input{resist}
+
+\input{corpus}
+\input{results}
 \input{prevent}
+
+\input{related}
+
 \input{concl}
 
 \appendix
 \onecolumn
-\input{appendix}
+\input{embeded_boundary}
+\newpage
+\input{to_matchertext}
 \twocolumn
 
 \bibliographystyle{plain}
