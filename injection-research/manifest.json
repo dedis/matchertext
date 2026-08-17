@@ -247,6 +247,14 @@
     "sha256": "a96a85a365ea3ada08220bd748bc5921f60f4b63feb8e33c27da73c8d65c2084",
     "url": "https://access.redhat.com/hydra/rest/securitydata/cve.json"
   },
+  "remote-payloads": {
+    "format": "matchertext-derived-payloads-v2",
+    "ghsl_page": 802,
+    "remote_attempt": 19230,
+    "remote_payload": 15200,
+    "sha256": "d401841c956f530b309319eb4e82a5523778cfb04b1b16c74cd50738b4822c43",
+    "web_payload": 426
+  },
   "some-poc-or-exp": {
     "commit": "29c28c6af8cd1da2d9fd8789fec0d41a0079b908",
     "fetched": "2026-08-04",

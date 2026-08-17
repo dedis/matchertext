@@ -46,6 +46,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from report import extract_payload
+import remote_sidecar
 
 ROOT = Path(__file__).resolve().parents[1]
 DB = ROOT / "data" / "cve.db"
@@ -76,14 +77,13 @@ MAX_FILES = 2000
 MAX_TREE_FILES = 64
 TIMEOUT = 25
 
-DDL = """
-CREATE TABLE IF NOT EXISTS remote_payload(
-    cve_id TEXT PRIMARY KEY, source TEXT, repo TEXT, sha TEXT,
-    file TEXT, payload TEXT, status TEXT);
-CREATE TABLE IF NOT EXISTS remote_attempt(
-    cve_id TEXT, repo TEXT, sha TEXT, file TEXT, payload TEXT, status TEXT,
-    PRIMARY KEY(cve_id, repo));
-"""
+DDL = remote_sidecar.REMOTE_CREATE_DDL
+
+
+def finish(con):
+    digest = remote_sidecar.export(con)
+    print(f"remote payload sidecar: {digest}")
+    con.close()
 
 
 def repo_of(url):
@@ -644,15 +644,15 @@ def run(args):
     con.commit()
     if args.alternates:
         run_alternates(con, args)
-        con.close()
+        finish(con)
         return
     if args.constructed:
         run_constructed(con, args)
-        con.close()
+        finish(con)
         return
     if args.fanout_trees:
         run_fanout(con, args)
-        con.close()
+        finish(con)
         return
     tree_shas = {}
     if args.trees:
@@ -718,7 +718,7 @@ def run(args):
         for st, n in con.execute("""SELECT status, COUNT(*) FROM remote_payload
                                     GROUP BY 1 ORDER BY 2 DESC"""):
             print(f"  {st:20} {n}")
-        con.close()
+        finish(con)
         return
 
     if args.archives:
@@ -755,7 +755,7 @@ def run(args):
         for st, n in con.execute("""SELECT status, COUNT(*) FROM remote_payload
                                     GROUP BY 1 ORDER BY 2 DESC"""):
             print(f"  {st:12} {n}")
-        con.close()
+        finish(con)
         return
 
     def do_chunk(chunk):
@@ -846,7 +846,7 @@ def run(args):
     for st, n in con.execute("""SELECT status, COUNT(*) FROM remote_payload
                                 GROUP BY 1 ORDER BY 2 DESC"""):
         print(f"  {st:12} {n}")
-    con.close()
+    finish(con)
 
 
 if __name__ == "__main__":

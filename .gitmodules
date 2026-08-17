@@ -73,3 +73,6 @@
 [submodule "LLVM/extern/tree-sitter/tree-sitter-python"]
 	path = LLVM/extern/tree-sitter/tree-sitter-python
 	url = https://github.com/tree-sitter/tree-sitter-python.git
+[submodule "injection-research/sqlite"]
+	path = injection-research/sqlite
+	url = https://github.com/AntoineBastide47/sqlite.git
