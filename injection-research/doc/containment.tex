@@ -1,0 +1,143 @@
+\section{Measuring matchertext containment}
+\label{sec:prevent}
+
+Matchertext contains an injection under mainly two conditions: the untrusted value lands in a slot
+a matchertext-aware host delimits with a matcher pair, and the value is itself
+valid matchertext, checked by the passive \textsc{Verify} scan rather than by
+escaping.
+An attack then fails one of two ways, by \emph{inert embedding} or by
+\emph{rejection}, and which route a real attack takes is a property of the
+payload, and so measurable against the corpus.
+
+\begin{figure*}[t]
+\footnotesize
+\input{generated/fig-tree}
+\caption{Containment outcome as two decisions. The context condition is tested
+first, so the \dataOutsideCVEs outside are never candidates rather than escapes; the value
+condition then separates inert embedding from rejection. The leaves reconcile
+with \cref{tab:mech}.}
+\label{fig:prevent:tree}
+\end{figure*}
+
+\paragraph{Method.}
+For each of the \dataPayloadBackedCVEs payload-backed CVEs we reuse its syntactic skeleton and decide two things:
+whether the target syntax is one a matchertext host can delimit with a matcher
+pair, and, if so, whether the skeleton passes \textsc{Verify}.
+A passing skeleton is contained by \emph{inert embedding}; a failing one is
+stopped by \emph{rejection}.
+This test characterizes the structure of each recorded payload under a
+matchertext-aware host; it does not exercise a deployed host parser, which we
+leave to future implementation work.
+
+\begin{table}[t]
+\centering
+\small
+\input{generated/tbl-mech}
+\caption{Containment outcome by syntax over all \dataPayloadBackedCVEs payload-backed CVEs.
+Contexts a matchertext host can delimit (upper block) are contained by inert
+embedding or by rejection; the \emph{Outside} column counts CVEs failing a
+premise of \cref{sec:threat}, either an execution sink (the HTML/DOM entries
+are \texttt{javascript:} URLs) or a context whose delimiters are not matchers.}
+\label{tab:mech}
+\end{table}
+
+\paragraph{Results.}
+Of the \dataPayloadBackedCVEs payload-backed injection CVEs, the recorded payloads of
+\textbf{\dataContained} (\textbf{\dataContainedShare}) are contained by a matcher-delimited slot that a
+matchertext-aware host reads to matcher balance, assuming no intervening
+decoding; the split turns on the host's native delimiter.
+The per-syntax mechanisms of \cref{sec:resist} appear directly in the corpus.
+LDAP is the pure rejection case: every real LDAP payload fails \textsc{Verify}
+(\dataLdapInert inert, \dataLdapRejected rejected), its parenthesis breakout carrying an unmatched \verb|)|.
+SQL and XSS, breaking out on nonmatchers, are overwhelmingly valid matchertext
+and embed inertly; the \dataSqlRejected SQL rejections additionally carry an unbalanced
+function or subquery parenthesis.
+The ratio between the two mechanisms is descriptive, not predictive.
+These payloads were written against quote and tag-delimited hosts; an attacker
+aware of a matcher-delimited slot would balance the matchers, shifting cases
+from rejection to inert embedding.
+Containment is unaffected, since both routes hold the value, but the split
+itself is a property of the recorded corpus rather than of an adaptive attacker.
+
+\paragraph{Where matchertext cannot help.}
+The remaining \dataOutsideCVEs payload-backed CVEs are outside both conditions, and divide
+by the premise of \cref{sec:threat} they fail.
+\dataOutsideSemantic target execution/semantic sinks (server-side templates, expression
+languages, code evaluation, spreadsheet formulas, and \verb|javascript:| URLs)
+where the host runs the contained value by design, so delimiting cannot stop
+it: the template payload \verb|{{7*7}}| is already valid matchertext yet is
+still executed.
+The other \dataOutsideNonmatcher target contexts delimited by non-matchers with no matcher hosting:
+shell command separators (\verb|;|~\verb-|-~\verb|&|), CR/LF header breaks, and
+the angle brackets of XML/XXE, none of which are matcher characters.
+
+\paragraph{Projection.}
+A payload is required to classify the mechanism, but the \emph{context}
+condition can be read from the syntax label alone.
+Projecting it onto the full corpus, at most \textbf{\dataHostableCVEs} of the
+\textbf{\dataInjectionCVEs} injection CVEs (\textbf{\dataHostableShare}) target a matcher-delimitable
+syntax.
+This is an upper bound, since a fraction of HTML/DOM cases are the
+\verb|javascript:| semantic sinks above: \dataHtmlDomJsSinks of the
+\dataHtmlDomBacked HTML/DOM CVEs carrying a payload are such sinks, a rate of
+\textbf{\dataJsSinkRate}.
+
+Turning the measured rate into a corpus estimate needs care, because
+payload-backed CVEs are not a random sample.
+A SQL injection payload is a literal string a write-up can quote, whereas
+code-eval and argument payloads are usually built at run time and never appear
+verbatim, so payload availability correlates with syntax and specifically with
+matcher-hostable syntax.
+Applying the pooled \dataContainedShare to the whole corpus inherits that skew
+and yields \dataNaiveEstimate (\dataNaiveShare), too high by \dataSkewCost CVEs.
+We therefore estimate a containment rate per syntax and weight by the corpus
+counts (\cref{tab:strata}), the standard post-stratification correction, giving
+a central estimate of \textbf{\dataCentralEstimate}
+(\textbf{\dataCentralShare}) against the \dataHostableShare ceiling.
+Within a syntax the estimate still assumes payload-backed CVEs carry semantic sinks at
+the same rate as the rest, which their skew toward exploitable web bugs may not
+warrant.
+
+\begin{table}[t]
+\centering
+\small
+\input{generated/tbl-strata}
+\caption{Post-stratification strata. The containment rate is measured on the
+payload-backed CVEs of each syntax and applied to that syntax's share of the
+corpus, so the estimate does not inherit the sampling skew of the subset.
+A dagger would mark a syntax with no payload-backed CVE, whose rate falls back
+to the structural rule of \cref{sec:threat}.}
+\label{tab:strata}
+\end{table}
+Read against a single denominator, the full \dataInjectionCVEs injection CVEs,
+the reach of the discipline runs from a floor of \textbf{\dataFloorShare} to a
+ceiling of \textbf{\dataHostableShare}, with \dataCentralShare as the central
+estimate.
+The floor counts only the \dataContained CVEs whose recorded payload we verified
+as contained, and treats every CVE without a recoverable payload as uncontained;
+it is therefore a hard lower bound rather than an estimate.
+The \dataContainedShare reported above is a different quantity, the contained
+share \emph{within} the payload-backed subset, and does not sit on this scale:
+it answers what happens once a payload is known, not how much of the corpus that
+covers.
+The gap between \dataPayloadBackedCVEs and \dataInjectionCVEs is payload
+availability, not a containment failure.
+
+\paragraph{What payload availability bounds.}
+That gap is a property of the disclosure ecosystem rather than of our
+extraction.
+Most CVEs never receive a public proof of concept at all: Mandiant finds that
+\textbf{51\%} of vulnerabilities disclosed in 2021 and 2022 eventually acquired
+public exploit or proof-of-concept code~\cite{mandiant23tte}, and VulnCheck
+reports \textbf{26\%} of CVEs carrying 2025 identifiers had such code by the end
+of that year, a share that grows as a vulnerability
+ages~\cite{vulncheck26exploit}.
+Our corpus agrees from the other direction: \dataInjectionWithPoc injection CVEs
+(\dataInjectionWithPocShare) carry any proof-of-concept reference whatsoever, so
+for the remainder there is no artifact to recover, from this pipeline or any
+other.
+A literal attack string is a stricter requirement still, since a proof of
+concept that constructs its payload at run time exposes none.
+The measurable population is therefore roughly half the corpus rather than all
+of it, and the fragment-level bound should be read against that population, not
+against \dataInjectionCVEs.

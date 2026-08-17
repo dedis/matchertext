@@ -16,10 +16,10 @@ and its interpreter, and are per-host rather than per-context.
 Adoption is correspondingly bounded: where a format already delimits with
 matchers, as LDAP filters and PDF strings do, the discipline costs nothing at all.
 
-Measured against a reproducible corpus of 91{,}760 injection vulnerabilities,
+Measured against a reproducible corpus of \dataInjectionCVEs injection vulnerabilities,
 that reach is a large and concentrated majority of the landscape: the recorded
-payloads of 82\% of attacks for which we could recover one are contained by a
-matcher-delimited slot under a matchertext-aware host, and at most 80\% of all
+payloads of \dataContainedShare of attacks for which we could recover one are contained by a
+matcher-delimited slot under a matchertext-aware host, and at most \dataHostableShare of all
 injection CVEs target a syntax such a host can delimit.
 The corpus also shows the shape of the containment, not only its size: it
 divides into inert embedding and outright rejection along the host language's

@@ -8,10 +8,13 @@ files; payload sampling is seeded, so the report is reproducible.
 Usage: python3 pipeline/report.py [--samples 5] [--seed 42]
 """
 import argparse
+import ast
+import base64
 import html
 import random
 import re
 import sqlite3
+import warnings
 from pathlib import Path
 
 import matchertext
@@ -24,17 +27,42 @@ OUT = ROOT / "data" / "exports" / "report.html"
 # Per-syntax payload signatures, ordered most-specific first. Applied to the
 # text of a linked exploit file to pull out the actual injection string.
 _SIGNS = {
-    "sql": [r"UNION(?:\s+ALL)?\s+SELECT\b[^\n]*", r"'\s*(?:OR|AND)\s*'?\d+'?\s*=\s*'?\d+[^\n]*",
-            r"'\s*(?:OR|AND)\b[^\n]*--", r"\bAND\s+\d+=\d+[^\n]*", r"';?\s*WAITFOR\s+DELAY[^\n]*",
-            r"\bextractvalue\s*\([^\n]*", r"\bSLEEP\s*\(\d+\)[^\n]*", r"\[sql\]"],
-    "html_dom": [r"<script\b[^>]*>.*?</script>", r"<img[^>]*onerror\s*=[^\n]*?>",
-                 r"<svg[^>]*on\w+\s*=[^\n]*?>", r'"><script[^\n]*', r"javascript:\S+",
+    "sql": [r"UNION(?:\s+ALL)?\s+SELECT\b[^\n]*",
+            # \)? catches the paren-breakout form `admin') OR '1'='1`, which is
+            # precisely the unmatched-closer case the containment split turns on.
+            r"'\)?\s*(?:OR|AND)\s*'?\d+'?\s*=\s*'?\d+[^\n]*",
+            r"'\)?\s*(?:OR|AND)\b[^\n]*--", r"\bAND\s+\d+=\d+[^\n]*", r"';?\s*WAITFOR\s+DELAY[^\n]*",
+            r"\bextractvalue\s*\([^\n]*",
+            # Stops at the closing paren: running to end of line dragged in the
+            # enclosing query's closers, as in `SLEEP(5)))vltp)`, whose stray
+            # `)`s turn a balanced payload into an apparent rejection.
+            r"\bSLEEP\s*\(\d+\)", r"\[sql\]"],
+    # A bare <script> tag is not a payload. In curated exploit files that was
+    # harmless, but a linked repo is often the vulnerable application itself,
+    # whose own source is full of benign script tags and jQuery includes. Require
+    # the body to actually do something an attack does.
+    "html_dom": [r"<script\b[^>]*>[^<]{0,150}?(?:alert|prompt|confirm|eval"
+                 r"|document\s*\.\s*(?:cookie|domain|location|write))\s*[({][^<]{0,120}?</script>",
+                 r"<img[^>]*onerror\s*=[^\n]*?>",
+                 r"<svg[^>]*on\w+\s*=[^\n]*?>",
+                 # Both of these fired on ordinary page source: `"><script` on an
+                 # attribute boundary, `javascript:` on a benign inline handler.
+                 r'"><script[^\n]{0,120}?(?:alert|prompt|confirm|eval|document\s*\.)',
+                 r"javascript:\s*(?:alert|prompt|confirm|eval|document\s*\.)\S{0,80}",
                  r"%3[Cc]script[^\n]*"],
-    "shell_command": [r"[;&|]\s*(?:cat|id|whoami|ping|curl|wget|sleep|uname|nc|bash|sh)\b[^\n]*",
-                      r"\$\([^)\n]+\)", r"`[^`\n]+`"],
-    "code_eval": [r"<\?php\b[^\n]*", r"\beval\s*\([^\n)]+\)[^\n]*", r"\bsystem\s*\([^\n)]+\)[^\n]*",
-                  r"\bpassthru\s*\([^\n)]+\)[^\n]*", r"\bassert\s*\([^\n)]+\)[^\n]*"],
-    "crlf_header": [r"(?:%0[dD]%0[aA]|\\r\\n)\S+"],
+    "shell_command": [r"`(?:[ \t]*|[^`\n]{0,80}[;&|][ \t]*)(?:/[\w.-]+/)*"
+                      r"(?:cat|id|whoami|pwd|ping|curl|wget|sleep|touch|rm|mkdir|uname|nc|bash|sh|echo|reboot|telnetd?|calc(?:\.exe)?|powershell|cmd(?:\.exe)?|certutil)"
+                      r"(?![\w(./-])[^`\n]*`",
+                      r"\$\([ \t]*(?:/[\w.-]+/)*(?:cat|id|whoami|pwd|ping|curl|wget|sleep|touch|rm|mkdir|uname|nc|bash|sh|echo|reboot|telnetd?|calc(?:\.exe)?|powershell|cmd(?:\.exe)?|certutil)(?![\w(./-])[^)\n]*\)",
+                      r"[;&|][ \t]*(?:/[\w.-]+/)*(?:cat|id|whoami|pwd|ping|curl|wget|sleep|touch|rm|mkdir|uname|nc|bash|sh|echo|reboot|telnetd?|calc(?:\.exe)?|powershell|cmd(?:\.exe)?|certutil)(?![\w(./-])[^`\n]*"],
+    # These once matched any call named system()/eval(); in prose and diagrams
+    # that is a false positive, so require the argument to look like an injected
+    # command or a variable rather than an identifier.
+    "code_eval": [r"<\?php\b[^\n]{0,140}?(?:system|exec|eval|passthru|shell_exec|assert|\$_)[^\n]{0,60}",
+                  r"\b(?:eval|system|passthru|shell_exec|popen)\s*\(\s*"
+                  r"(?:[\"'`]?\s*(?:cat|ls|id|whoami|uname|curl|wget|nc|sh|bash|echo|ping|dir|type|net)\b"
+                  r"|\$|`|base64_decode)[^\n)]{0,80}\)"],
+    "crlf_header": [r"(?:%0[dD]%0[aA]|\\r\\n)[A-Za-z][\w-]{1,40}:[^\n]*"],
     "ldap": [r"\*\)\([^\n]*", r"\)\(\w+=[^\n]*"],
     "xpath_xquery": [r"'?\s*or\s*'?1'?\s*=\s*'?1[^\n]*", r"count\(/[^\n]*", r"//\*[^\n]*"],
     "template": [r"\{\{[^\n]*?\}\}", r"<%[^\n]*?%>", r"#\{[^\n]*?\}"],
@@ -42,9 +70,12 @@ _SIGNS = {
     "formula_csv": [r"[=+@\-](?:cmd|CMD|SUM|HYPERLINK|WEBSERVICE)[^\n]*", r"=\d+[+\-*][^\n]*"],
     "nosql": [r"\{\s*[\"']?\$(?:gt|ne|where|regex)[^\n]*", r"\[\$ne\][^\n]*"],
     "xml": [r"<!DOCTYPE[^\n]*\[[^\n]*", r"<!ENTITY\b[^\n]*", r"SYSTEM\s+[\"']file:[^\n]*"],
-    "argument": [r"-[A-Za-z][\w-]*=`[^\n]*", r"-o\w+=\S[^\n]*", r"-[A-Za-z][\w-]*=\S+"],
+    # A bare `-flag=value` is just a command line. Argument injection needs the
+    # value to carry a command substitution or separator.
+    "argument": [r"-[A-Za-z][\w-]*=`[^\n]*", r"-[A-Za-z][\w-]*=\$\([^\n]*",
+                 r"-[A-Za-z][\w-]*=[^\s\n]*[;|&][^\n]*"],
 }
-SIGNS = {s: [re.compile(p, re.I | re.S) for p in ps] for s, ps in _SIGNS.items()}
+SIGNS = {s: [re.compile(p, re.I) for p in ps] for s, ps in _SIGNS.items()}
 
 
 # Metavariable placeholders mark *where* to inject; they are not attack payloads.
@@ -59,24 +90,386 @@ _PLACEHOLDER = re.compile(
 
 
 def is_placeholder(frag):
-    return bool(_PLACEHOLDER.match(frag)) or "#{" in frag
+    return bool(_PLACEHOLDER.match(frag)) or frag in ("${}", "#{}", "{{}}") or "#{" in frag
 
 
-def extract_payload(text, syn):
+# Payloads recorded as URLs are the single largest extraction gap: the literal
+# signatures above require real whitespace, so `union+select`, `UNION/**/SELECT`
+# and `%20UNION%20SELECT` all miss. These match the URL forms, and their matches
+# are decoded before use, because a percent-escape is only a percent-escape in
+# transit -- the web server decodes it, so the SQL or HTML parser really does see
+# `(` where the recorded PoC wrote `%28`. Skeletonizing the undecoded form would
+# hide matchers that are genuinely present and bias the containment split toward
+# inert embedding.
+_SEP = r"(?:%20|\+|/\*\*?/|\s)"
+_TAIL = r"[^\s\"'<>\n]*"
+# \b is wrong here: after a percent-escape the preceding character is a digit
+# (the `0` of %20), so \bunion never fires on %20UNION. Guard on letters only.
+_W = r"(?<![A-Za-z_])"
+_URL_SIGNS = {
+    "sql": [rf"{_W}union{_SEP}+(?:all{_SEP}+)?select{_TAIL}",
+            rf"{_W}(?:and|or){_SEP}+\d+{_SEP}*={_SEP}*\d+{_TAIL}",
+            rf"{_W}(?:and|or){_SEP}*\((?:ascii|substring|substr|length|count){_TAIL}",
+            rf"%27{_TAIL}(?:union|select|or|and){_TAIL}",
+            rf"{_W}(?:sleep|benchmark|pg_sleep)(?:%28|\()\d+(?:%29|\))",
+            rf"{_W}concat_ws(?:%28|\(){_TAIL}"],
+    "html_dom": [r"[\"'][^\"'\n]{0,24}\son\w+\s*=\s*(?:alert|prompt|confirm)\([^)\n]*\)[^\n]{0,40}",
+                 r"[\"']\s*;\s*(?:alert|prompt|confirm)\([^)\n]*\)\s*;?\s*(?://|<)",
+                 r"%22[^\n]{0,60}?on\w+\s*(?:%3[Dd]|=)\s*(?:alert|prompt|confirm)[^\n]{0,40}",
+                 rf"%3[Cc](?:script|img|svg){_TAIL}",
+                 r"(?:&lt;|&#(?:0*60|x0*3c);)(?:script\b[^`\n]{0,80}"
+                 r"(?:alert|prompt|confirm|document)[^`\n]{0,160}|(?:img|svg)\b[^`\n]{0,80}"
+                 r"on(?:error|load)[^`\n]{0,160})"],
+    # Balancing the non-hostable syntaxes matters for the containment measure:
+    # improving extraction only for SQL and XSS would skew the payload-backed
+    # set toward matcher-hostable contexts and inflate the contained share.
+    "shell_command": [
+        rf"(?:%3[Bb]|%7[Cc]|%26){_SEP}*(?:echo|cat|id|whoami|ping|curl|wget|uname|nc|ls|dir|sleep){_TAIL}",
+        r"%24(?:%28|\()[^\n]{0,60}",
+        r"%60[^\n]{0,60}%60"],
+    "code_eval": [
+        r"T\(java\.lang\.Runtime\)[^\n]{0,80}",
+        r"\bgetRuntime\(\)\s*\.\s*exec\([^\n)]{0,60}\)",
+        rf"%3[Cc]%3[Ff]php{_TAIL}",
+        rf"[?&]\w+=https?(?::|%3[Aa])(?://|%2[Ff]%2[Ff]){_TAIL}\.(?:txt|php)\?"],
+}
+URL_SIGNS = {s: [re.compile(p, re.I) for p in ps] for s, ps in _URL_SIGNS.items()}
+_PCT = re.compile(r"%([0-9A-Fa-f]{2})")
+
+
+def urlform_decode(frag, rounds=2):
+    """Undo the transport encoding a recorded URL payload carries.
+
+    Two rounds because double-encoding (%2527 -> %27 -> ') is common in the
+    corpus; `+` is a query-string space, and an emptied SQL comment (/**/) is a
+    whitespace substitute used to evade naive filters.
+    """
+    for _ in range(rounds):
+        decoded = _PCT.sub(lambda m: chr(int(m.group(1), 16)), frag)
+        if decoded == frag:
+            break
+        frag = decoded
+    return re.sub(r"/\*\*?/", " ", frag).replace("+", " ")
+
+
+_PAIR = {")": "(", "]": "[", "}": "{"}
+
+
+def is_truncated(frag):
+    """Did the signature cut the payload mid-expression?
+
+    A breakout emits an unmatched *closer*: closing the slot early is the whole
+    manoeuvre, so `'r0t')</script>` is a real payload. An unmatched *opener* left
+    at the tail is the regex stopping inside a function call instead, as in
+    `ASCII(SUBSTRING(passwd,`. Keeping those would count a regex artifact as a
+    VERIFY rejection -- they accounted for 37% of all rejections before this
+    check -- so treat them as failed extractions rather than payloads.
+    """
+    stack = []
+    for ch in frag:
+        if ch in "([{":
+            stack.append(ch)
+        elif ch in _PAIR and stack and stack[-1] == _PAIR[ch]:
+            stack.pop()
+    return bool(stack)
+
+
+_JS_STUB = re.compile(r"^javascript:(?:alert|prompt|confirm|eval)?$", re.I)
+_SHELL_STUB = re.compile(r"^(?:\$\([A-Za-z_][\w.]*\)|`[^`]*\$\{[^}]+\}[^`]*`)$")
+_EVAL_STUB = re.compile(r"^(?:getRuntime\(\)\s*\.\s*)?exec\(\s*\)$", re.I)
+_LISTENER = re.compile(r"^`?nc\s+-[^\n`]*l", re.I)
+_SHELL_BARE = re.compile(r"^`?(?:(?:/bin/)?(?:sh|bash)|curl|wget|rm|cat|nc)`?$", re.I)
+_SHELL_WHOLE = re.compile(
+    r"^[`\"']*(?:[;&|]|(?:/[\w.-]+/)*(?:cat|id|whoami|pwd|ping|curl|wget|sleep|touch|rm|mkdir|"
+    r"uname|nc|bash|sh|echo|reboot|telnetd?|calc(?:\.exe)?|powershell|cmd(?:\.exe)?|certutil)(?![\w(./-]))", re.I)
+_SOURCEISH = re.compile(r"\b(?:snprintf|sprintf|system)\s*\(|%[a-z](?:\W|$)", re.I)
+# `&id=62` is a URL parameter named id, not the id command.
+_URL_PARAM = re.compile(r"^[&;|]\w+=")
+
+
+def _accept(frag, truncation_check=True):
+    return (3 <= len(frag) <= 200
+            and not is_placeholder(frag)
+            and not (truncation_check and is_truncated(frag))
+            and not _JS_STUB.match(frag)
+            and not _SHELL_STUB.match(frag)
+            and not _EVAL_STUB.match(frag)
+            and not _LISTENER.match(frag)
+            and not _SHELL_BARE.match(frag)
+            and not _URL_PARAM.match(frag))
+
+
+def extend_balance(text, end, frag, limit=8):
+    """Reclaim closers a regex could not count.
+
+    A pattern cannot match nested parentheses, so `eval(base64_decode($x))` is
+    captured one `)` short and the truncation guard would throw it away. If the
+    characters immediately following the match are closing matchers, they belong
+    to the payload: append them until it balances.
+    """
+    while is_truncated(frag) and limit and end < len(text) and text[end] in ")]}":
+        frag += text[end]
+        end += 1
+        limit -= 1
+    return frag
+
+
+# Exploit-DB write-ups and sqlmap transcripts often label the payload outright.
+# The label is a locator the per-syntax signatures cannot supply: it marks a
+# string as the attack even when that string uses a command or sink the
+# signatures do not enumerate, as in `...&currentTSREmailTo=|date>/tmp/x`.
+_LABELLED = [
+    re.compile(r"^[ \t]*#?[ \t]*Payload[ \t]*:[ \t]*(\S.{4,180})$", re.I | re.M),
+    re.compile(r"^[ \t]*#?[ \t]*(?:PoC|Proof of Concept)[ \t]*:[ \t]*(\S.{4,180})$", re.I | re.M),
+    re.compile(r"^[ \t]*(?:GET|POST)[ \t]+(\S{8,180})[ \t]+HTTP", re.M),
+    re.compile(r"\bpayload(?:\s+such\s+as|\s+like)?[ \t]+([;&|]\s*\S.{2,100}?)"
+               r"(?=\s+(?:into|through|in|to)\b|[.,\n])", re.I),
+]
+# Trusting a label still needs the value to look like an attack rather than a
+# bare path or a separator line: it must carry a delimiter, metacharacter or
+# escape, and it must not be only structure.
+_ATTACKISH = re.compile(r"""['"<>;|`]|\$\(|%[0-9A-Fa-f]{2}|&&|\|\||[(){}\[\]]""")
+_ONLY_PUNCT = re.compile(r"^[\W_]+$")
+
+# Static construction forms used by exploit scripts. Only constant parts are
+# folded; no PoC code is executed. A reconstructed string must still match the
+# syntax-specific signatures below, which keeps ordinary program strings out.
+_STR = re.compile(r'''"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`''', re.S)
+_CONCAT = re.compile(r"[\s+.&()\\]*")
+_B64 = re.compile(r"[A-Za-z0-9_+/=-]{12,684}")
+_B64_HINT = re.compile(r"base64|b64decode|atob|frombase64", re.I)
+_ESC = re.compile(r"\\(?:x([0-9A-Fa-f]{2})|u([0-9A-Fa-f]{4})|([nrt\\'\"]))")
+_FIELD = re.compile(r"(?:[\"'][\w.-]+[\"']|[\w.-]+)[ \t]*[:=][ \t]*$")
+_BUILD_HINT = re.compile(
+    r"base64|b64decode|atob|frombase64|\b(?:f|rf|fr)[\"']|\.format\s*\(|"
+    r"[\"'][^\n]{0,200}[\"'][ \t]*(?:\+|\.|&)[ \t]*(?:[frbu]{0,2}[\"']|[A-Za-z_])",
+    re.I)
+
+
+def _unescape(value):
+    def sub(m):
+        if m.group(1):
+            return chr(int(m.group(1), 16))
+        if m.group(2):
+            return chr(int(m.group(2), 16))
+        return {"n": "\n", "r": "\r", "t": "\t"}.get(m.group(3), m.group(3))
+    return _ESC.sub(sub, value[1:-1])
+
+
+def _static_python(node, env=None):
+    """Fold static Python string expressions without evaluating code."""
+    env = env or {}
+    if isinstance(node, ast.Constant) and isinstance(node.value, (str, bytes)):
+        return node.value.decode("utf-8", "replace") if isinstance(node.value, bytes) else node.value
+    if isinstance(node, ast.Name):
+        return env.get(node.id)
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left, right = _static_python(node.left, env), _static_python(node.right, env)
+        return left + right if left is not None and right is not None else None
+    if (isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult)
+            and isinstance(node.right, ast.Constant) and isinstance(node.right.value, int)):
+        value = _static_python(node.left, env)
+        return value * min(node.right.value, 256) if value is not None else None
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod):
+        value = _static_python(node.left, env)
+        return re.sub(r"%(?:\([^)]+\))?[#0 +\-]*\d*(?:\.\d+)?[a-zA-Z]", "0", value) \
+            if value is not None else None
+    if isinstance(node, ast.JoinedStr):
+        parts = []
+        for value in node.values:
+            if isinstance(value, ast.FormattedValue):
+                parts.append(_static_python(value.value, env) or "0")
+            else:
+                parts.append(_static_python(value, env) or "0")
+        return "".join(parts)
+    if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "format"):
+        value = _static_python(node.func.value, env)
+        return re.sub(r"\{[^{}]*\}", "0", value) if value is not None else None
+    if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+            and node.func.attr in ("encode", "decode")):
+        return _static_python(node.func.value, env)
+    return None
+
+
+def constructed_strings(text):
+    """Yield decoded or statically joined strings from exploit source."""
+    seen = set()
+
+    def emit(value):
+        value = value.strip()
+        if 3 <= len(value) <= 500 and value not in seen:
+            seen.add(value)
+            return value
+        return None
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", SyntaxWarning)
+        trees = []
+        fenced = [body for lang, body in re.findall(r"```([^\r\n]*)\r?\n(.*?)```", text,
+                                                     re.S)
+                  if lang.strip().lower() in ("", "py", "python", "python2", "python3")]
+        for source in (text, *fenced):
+            try:
+                trees.append(ast.parse(source))
+            except (SyntaxError, ValueError, MemoryError):
+                pass
+    for tree in trees:
+        env = {}
+        for node in ast.walk(tree):
+            if (isinstance(node, (ast.Assign, ast.AnnAssign))
+                    and isinstance(node.value, ast.AST)):
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                value = _static_python(node.value, env)
+                if value is not None:
+                    for target in targets:
+                        if isinstance(target, ast.Name):
+                            env[target.id] = value
+            if isinstance(node, (ast.BinOp, ast.JoinedStr, ast.Call)):
+                value = _static_python(node, env)
+                if value and (out := emit(value)):
+                    yield out
+
+    # Backtick code fences are Markdown containers, not JavaScript strings.
+    string_text = re.sub(r"```[^\n]*\n|```", "", text)
+    tokens = [m for m in _STR.finditer(string_text)
+              if not (m.group(0).startswith("`") and "\n" in m.group(0))]
+    group = []
+    for token in tokens:
+        if group and not _CONCAT.fullmatch(string_text[group[-1].end():token.start()]):
+            if len(group) > 1 and (out := emit("".join(_unescape(x.group(0)) for x in group))):
+                yield out
+            group = []
+        group.append(token)
+    if len(group) > 1 and (out := emit("".join(_unescape(x.group(0)) for x in group))):
+        yield out
+
+    for token in tokens:
+        line_start = max(string_text.rfind("\n", 0, token.start()) + 1,
+                         token.start() - 160)
+        line = string_text[line_start:token.start()]
+        if not line.lstrip().startswith(("#", "//")) and _FIELD.search(line):
+            if out := emit(_unescape(token.group(0))):
+                yield out
+        start, end = max(0, token.start() - 80), min(len(string_text), token.end() + 40)
+        if not _B64_HINT.search(string_text[start:end]):
+            continue
+        encoded = token.group(0)[1:-1]
+        if not _B64.fullmatch(encoded):
+            continue
+        try:
+            decoded = base64.b64decode(encoded.replace("-", "+").replace("_", "/")
+                                       + "=" * (-len(encoded) % 4), validate=True)
+            value = decoded.decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            continue
+        if out := emit(value):
+            yield out
+
+    for line in text.splitlines():
+        if "=" not in line or "&" not in line:
+            continue
+        for field in re.split(r"&(?=[A-Za-z_][\w.-]*=)", line):
+            if "=" not in field:
+                continue
+            value = urlform_decode(field.split("=", 1)[1].strip())
+            cuts = [i for i in (value.find(";"), value.find("|")) if i >= 0]
+            if cuts and (out := emit(value[min(cuts):])):
+                yield out
+
+
+def extract_labelled(text, syn):
+    for rx in _LABELLED:
+        for m in rx.finditer(text):
+            raw = " ".join(m.group(1).split())
+            if syn == "shell_command":
+                raw = re.split(r"&(?:quot|gt|lt);", raw, 1, re.I)[0].rstrip()
+            # The whole labelled value is preferred over a signature match inside
+            # it: a signature would capture some suffix such as `SLEEP(5)))vltp)`,
+            # whose stray closers make a balanced payload look like a rejection.
+            # is_truncated is skipped here for the same reason it exists -- it
+            # detects a regex stopping mid-expression, and a labelled line is a
+            # delimited whole, so a trailing `{` in `'};alert(1);{'` is the real
+            # payload rather than a cut.
+            if (_accept(raw, truncation_check=False) and _ATTACKISH.search(raw)
+                    and not _ONLY_PUNCT.match(raw) and "=" in raw):
+                return raw
+            inner = extract_payload(raw, syn, labelled=False)
+            if inner:
+                return inner
+    return None
+
+
+def extract_payload(text, syn, labelled=True, constructed=True, prefer_constructed=False):
+    def built_payload():
+        hits = []
+        for candidate in constructed_strings(text):
+            payload = extract_payload(candidate, syn, labelled=False, constructed=False)
+            if payload:
+                if (syn == "shell_command" and len(candidate) <= 200
+                        and _SHELL_WHOLE.match(candidate.strip())):
+                    hits.append((0, -len(candidate), candidate.strip()))
+                else:
+                    hits.append((1, -len(payload), payload))
+        return min(hits)[2] if hits else None
+
+    if constructed and prefer_constructed and (payload := built_payload()):
+        return payload
+    if labelled and (payload := extract_labelled(text, syn)):
+        return payload
     for rx in SIGNS.get(syn, ()):
-        m = rx.search(text)
-        if m:
-            frag = " ".join(m.group(0).split())
-            if 3 <= len(frag) <= 200 and not is_placeholder(frag):
+        for m in rx.finditer(text):
+            if (syn == "shell_command"
+                    and re.search(r"<(?:COMMAND|CMD)>", text[max(0, m.start() - 100):m.end()], re.I)):
+                continue
+            frag = " ".join(extend_balance(text, m.end(), m.group(0)).split())
+            if syn == "shell_command" and _SOURCEISH.search(frag):
+                continue
+            if syn == "html_dom":
+                if re.match(r"(?:&lt;|&#(?:0*60|x0*3c);)(?:img|svg)\b", frag, re.I):
+                    close = re.search(r"&gt;", frag, re.I)
+                    if close:
+                        frag = frag[:close.end()]
+                else:
+                    close = re.search(r"&lt;/script&gt;", frag, re.I)
+                    if close:
+                        frag = frag[:close.end()]
+            if syn == "shell_command":
+                frag = re.split(r"&(?:quot|gt|lt);", frag, 1, re.I)[0].rstrip()
+                frag = re.split(r"\s+HTTP/\d|,\s+then\b", frag, 1, re.I)[0].rstrip()
+                if _PCT.search(frag):
+                    frag = urlform_decode(frag)
+            if _accept(frag):
                 return frag
+    # Literal forms first, so an unencoded payload is never routed through the
+    # decoder; only fall back to the URL forms when nothing else matched.
+    for rx in URL_SIGNS.get(syn, ()):
+        for m in rx.finditer(text):
+            frag = " ".join(urlform_decode(m.group(0)).split())
+            if syn == "html_dom":
+                close = re.search(r"&gt;", frag, re.I)
+                if close and re.match(r"(?:&lt;|&#(?:0*60|x0*3c);)(?:img|svg)\b",
+                                      frag, re.I):
+                    frag = frag[:close.end()]
+                else:
+                    close = re.search(r"&lt;/script&gt;", frag, re.I)
+                    if close:
+                        frag = frag[:close.end()]
+            if _accept(frag):
+                return frag
+    if constructed and not prefer_constructed and _BUILD_HINT.search(text):
+        return built_payload()
     return None
 
 
 def sample_payloads(con, syn, n, rng):
+    # Seeding rng only makes the sample reproducible if the list it shuffles has
+    # a fixed order to begin with, hence the ORDER BY.
     links = con.execute(
         """SELECT DISTINCT c.cve_id, p.source, p.local_path FROM poc p
            JOIN classification c USING(cve_id)
-           WHERE c.syntax_type=? AND p.local_path IS NOT NULL""", (syn,)).fetchall()
+           WHERE c.syntax_type=? AND p.local_path IS NOT NULL
+           ORDER BY c.cve_id, p.source, p.local_path""", (syn,)).fetchall()
     rng.shuffle(links)
     out, seen = [], set()
     for cve_id, source, rel in links:

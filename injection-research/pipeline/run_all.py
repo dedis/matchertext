@@ -4,6 +4,7 @@ Usage:
   python3 pipeline/run_all.py                      # full corpus
   python3 pipeline/run_all.py --years 2024         # single-year slice
   python3 pipeline/run_all.py --skip-fetch         # rebuild from pinned snapshots
+  python3 pipeline/run_all.py --freeze             # keep existing rolling feeds pinned
 """
 import argparse
 
@@ -11,8 +12,10 @@ import build_db
 import classify
 import export
 import fetch
+import latex
 import subclass
 import syntactic_group
+import validate
 
 
 def main():
@@ -20,6 +23,8 @@ def main():
     ap.add_argument("--years", type=int, nargs="*", help="restrict to these CVE years")
     ap.add_argument("--epss-date", help="EPSS snapshot date YYYY-MM-DD (default: yesterday)")
     ap.add_argument("--skip-fetch", action="store_true")
+    ap.add_argument("--freeze", action="store_true",
+                    help="keep existing rolling-source snapshots pinned")
     ap.add_argument("--nb-margin", type=float, default=3.0,
                     help="minimum NB log-odds margin to accept a label")
     args = ap.parse_args()
@@ -29,7 +34,9 @@ def main():
     classify.run(args)
     subclass.run(args)
     syntactic_group.run(args)
+    validate.run(args)
     export.run(args)
+    latex.run(args)
 
 
 if __name__ == "__main__":

@@ -27,9 +27,54 @@ GIT_REPOS = {
     "metasploit-framework": "https://github.com/rapid7/metasploit-framework.git",
     "advisory-database": "https://github.com/github/advisory-database.git",
     "PoC-in-GitHub": "https://github.com/nomi-sec/PoC-in-GitHub.git",
+    # PoC linkage and exploit-availability scoring
+    "trickest-cve": "https://github.com/trickest/cve.git",
+    "cve-scores": "https://github.com/ARPSyndicate/cve-scores.git",
+    "vulhub": "https://github.com/vulhub/vulhub.git",
+    # Payload corpora: the attack strings themselves, per sink type. These drive
+    # the matchertext-prevention measurement, which needs payloads rather than
+    # CVE metadata.
+    "PayloadsAllTheThings": "https://github.com/swisskyrepo/PayloadsAllTheThings.git",
+    "fuzzdb": "https://github.com/fuzzdb-project/fuzzdb.git",
+    "SecLists": "https://github.com/danielmiessler/SecLists.git",
+    # Labeled ground truth: injection cases with known CWE and known verdict.
+    "BenchmarkJava": "https://github.com/OWASP-Benchmark/BenchmarkJava.git",
+    # Additional public CVE PoC collections and link indexes. Repositories with
+    # no open-source license remain research inputs; their terms are recorded in
+    # the manifest and their files stay below data/raw, which is not exported.
+    "awesome-poc": "https://github.com/Threekiii/Awesome-POC.git",
+    "wy876-poc": "https://github.com/wy876/POC.git",
+    "penetration-testing-poc": "https://github.com/Mr-xn/Penetration_Testing_POC.git",
+    "some-poc-or-exp": "https://github.com/coffeehb/Some-PoC-oR-ExP.git",
+    "peiqi-wiki": "https://github.com/PeiQi0/PeiQi-WIKI-Book.git",
+    "poc-lab": "https://github.com/Unclecheng-li/poc-lab.git",
+    "xray": "https://github.com/chaitin/xray.git",
+    "0xmarcio-cve": "https://github.com/0xMarcio/cve.git",
+    "zulloper-cve-poc": "https://github.com/zulloper/cve-poc.git",
+}
+SOURCE_METADATA = {
+    "awesome-poc": {"license": "NOASSERTION", "use": "research-only"},
+    "wy876-poc": {"license": "NOASSERTION", "use": "repository terms apply"},
+    "penetration-testing-poc": {"license": "Apache-2.0"},
+    "some-poc-or-exp": {"license": "NOASSERTION", "use": "research-only"},
+    "peiqi-wiki": {"license": "NOASSERTION", "use": "authorized research only"},
+    "poc-lab": {"license": "MIT"},
+    "xray": {"license": "LicenseRef-xray",
+             "use": "attribution and disclaimer acceptance required"},
+    "0xmarcio-cve": {"license": "MIT"},
+    "zulloper-cve-poc": {"license": "NOASSERTION"},
 }
 REDHAT_URL = "https://access.redhat.com/hydra/rest/securitydata/cve.json"
 DEBIAN_URL = "https://security-tracker.debian.org/tracker/data/json"
+# NIST SARD Juliet suites: synthetic cases whose paths encode the CWE, giving a
+# CWE-labeled corpus independent of the CVE record.
+SARD_SUITES = {
+    "juliet-java": "https://samate.nist.gov/SARD/downloads/test-suites/"
+                   "2017-10-01-juliet-test-suite-for-java-v1-3.zip",
+    "juliet-c": "https://samate.nist.gov/SARD/downloads/test-suites/"
+                "2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+}
+FREEZE = False
 
 
 def sha256(path):
@@ -52,6 +97,11 @@ def download(url, dest):
 
 def pin(manifest, key, url, dest, today, **extra):
     prev = manifest.get(key, {}).get("sha256")
+    # --freeze keeps an already-pinned rolling feed at its recorded revision, so a
+    # corpus change can be attributed to newly added sources rather than to
+    # upstream drift in the old ones.
+    if FREEZE and dest.exists() and prev:
+        return
     # These HTTP endpoints serve mutable "latest"/rolling feeds (NVD re-scores
     # CVEs, CWE/Debian/Red Hat track head), so a drifted local copy means the
     # upstream moved: re-fetch and re-pin rather than aborting.
@@ -66,6 +116,8 @@ def pin(manifest, key, url, dest, today, **extra):
 
 
 def run(args):
+    global FREEZE
+    FREEZE = getattr(args, "freeze", False)
     manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {}
     today = datetime.datetime.now(datetime.UTC).date()
 
@@ -73,11 +125,21 @@ def run(args):
         dest = RAW / name
         if not dest.exists():
             print(f"cloning {name} ...", flush=True)
-            subprocess.run(["git", "clone", "--depth", "1", url, str(dest)], check=True)
+            clone = subprocess.run(["git", "clone", "--depth", "1", url, str(dest)])
+            if clone.returncode:
+                if name not in SOURCE_METADATA:
+                    clone.check_returncode()
+                manifest[name] = {"url": url, "fetched": str(today),
+                                  "status": "unavailable", **SOURCE_METADATA.get(name, {})}
+                print(f"{name}: unavailable, skipping", flush=True)
+                continue
         head = subprocess.run(["git", "-C", str(dest), "rev-parse", "HEAD"],
                               capture_output=True, text=True, check=True).stdout.strip()
-        manifest[name] = {"url": url, "commit": head,
-                          "fetched": manifest.get(name, {}).get("fetched", str(today))}
+        entry = {**manifest.get(name, {}), "url": url, "commit": head,
+                 "fetched": manifest.get(name, {}).get("fetched", str(today)),
+                 **SOURCE_METADATA.get(name, {})}
+        entry.pop("status", None)
+        manifest[name] = entry
         print(f"{name}: {head}")
 
     years = getattr(args, "years", None)
@@ -95,6 +157,9 @@ def run(args):
         RAW / "epss" / f"epss_scores-{date}.csv.gz", today, date=date)
 
     pin(manifest, "cwe", CWE_URL, RAW / "cwe" / "cwec_latest.xml.zip", today)
+
+    for name, url in SARD_SUITES.items():
+        pin(manifest, name, url, RAW / "sard" / f"{name}.zip", today)
 
     fetch_redhat(manifest, today)
     pin(manifest, "debian", DEBIAN_URL, RAW / "debian" / "debian_security.json", today)
@@ -130,4 +195,6 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--years", type=int, nargs="*", help="restrict NVD feeds to these years")
     ap.add_argument("--epss-date", help="EPSS snapshot date YYYY-MM-DD (default: yesterday)")
+    ap.add_argument("--freeze", action="store_true",
+                    help="keep already-pinned rolling feeds at their recorded revision")
     run(ap.parse_args())

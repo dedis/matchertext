@@ -86,18 +86,52 @@ def skeleton(payload):
 def representative_payload(con):
     syn_of = dict(con.execute("SELECT cve_id, syntax_type FROM classification"))
     paths = defaultdict(list)
-    for cid, lp in con.execute("SELECT cve_id, local_path FROM poc WHERE local_path IS NOT NULL"):
+    # See subclass.py: ordered so payload selection is stable across ingestions.
+    for cid, lp in con.execute("""SELECT cve_id, local_path FROM poc
+                                  WHERE local_path IS NOT NULL
+                                  ORDER BY cve_id, source, ref"""):
         if cid in syn_of:
             paths[cid].append(lp)
+    # Payloads recovered from linked GitHub repos, which have no local file.
+    # Local files win: they are pinned in the corpus snapshot, whereas a remote
+    # payload depends on a repo that may since have vanished.
+    def _table(name):
+        return con.execute("""SELECT COUNT(*) FROM sqlite_master
+                              WHERE type='table' AND name=?""", (name,)).fetchone()[0]
+    remote = dict(con.execute(
+        "SELECT cve_id, payload FROM remote_payload WHERE payload IS NOT NULL")
+        if _table("remote_payload") else ())
+    evidence = defaultdict(list)
+    if _table("evidence_text"):
+        for cid, text in con.execute(
+                "SELECT cve_id, text FROM evidence_text ORDER BY cve_id, source, ref"):
+            evidence[cid].append(text)
+    descriptions = dict(con.execute(
+        "SELECT cve_id, description FROM cve WHERE description IS NOT NULL"))
+    # Advisory pages are the last resort: unlike a pinned commit they can be
+    # edited in place, so they are only consulted when nothing else has one.
+    web = dict(con.execute(
+        "SELECT cve_id, payload FROM web_payload WHERE payload IS NOT NULL")
+        if _table("web_payload") else ())
     for cid, syn in syn_of.items():
+        found = None
         for lp in paths.get(cid, ()):
             try:
-                p = extract_payload((RAW / lp).read_text(encoding="utf-8", errors="replace"), syn)
+                found = extract_payload((RAW / lp).read_text(encoding="utf-8", errors="replace"), syn)
             except OSError:
-                p = None
-            if p:
-                yield cid, syn, p
+                found = None
+            if found:
                 break
+        if not found:
+            found = remote.get(cid)
+        if not found:
+            for text in evidence.get(cid, ()):
+                if found := extract_payload(text, syn):
+                    break
+        if not found and (description := descriptions.get(cid)):
+            found = extract_payload(description, syn)
+        if found or (found := web.get(cid)):
+            yield cid, syn, found
 
 
 def run(args):
