@@ -146,7 +146,7 @@ index 01c1451..97b09d0 100644
 +contained by a matcher-delimited slot, and at most \dataHostableShare target a
 +syntax an aware host can delimit.
 diff --git a/../doc/containment.tex b/containment.tex
-index 90408aa..0629d9c 100644
+index 90408aa..c90056f 100644
 --- a/containment.tex
 +++ b/containment.tex
 @@ -1,13 +1,14 @@
@@ -353,24 +353,18 @@ index 90408aa..0629d9c 100644
  
  \subsection{An executed host}
  \label{sec:prevent:exec}
-@@ -150,9 +140,14 @@ skeleton, never a payload through a parser.
- \Cref{sec:threat} names the two obligations a simulation cannot reach, parse
+@@ -151,8 +141,8 @@ skeleton, never a payload through a parser.
  inertness (L2) and interpreter inertness (L3), as per-host and left to
  implementation.
-+%% =========================================================================
-+%% WARNING: ANONYMIZED ARTIFACT LINK MISSING. Before submission, create the
-+%% anonymous.4open.science link (set its expiration AFTER 2027-08-15, past
-+%% the end of the conference) and replace ANONYMOUS-LINK-TODO below.
-+%% =========================================================================
  We test them for one host, a matchertext-aware
 -SQLite,\footnote{The fork and the driver of this experiment are at
 -\url{https://github.com/dedis/matchertext-sqlite}.} over the CVE-derived SQL
 +SQLite,\footnote{The fork and the driver of this experiment are available in
-+an anonymized repository: \url{ANONYMOUS-LINK-TODO}.} over the CVE-derived SQL
++an anonymized repository: \url{https://anonymous.4open.science/r/matchertext-sqlite-4301/}.} over the CVE-derived SQL
  subset and the standalone SQL payload corpora.
  
  \paragraph{The deployed host.}
-@@ -163,10 +158,11 @@ prepared through the ordinary interface.
+@@ -163,10 +153,11 @@ prepared through the ordinary interface.
  The matcher-delimited hole is offered beside legacy composition rather than
  replacing it, so existing SQL keeps working and adoption is incremental. This is
  the point-of-use character of A2: a value the caller still concatenates
@@ -385,7 +379,7 @@ index 90408aa..0629d9c 100644
  side.
  
  \paragraph{Method.}
-@@ -187,10 +183,11 @@ The \dataSqliIdentMtMalformed name-hole cases that do not compile are the
+@@ -187,10 +178,11 @@ The \dataSqliIdentMtMalformed name-hole cases that do not compile are the
  \dataSqliNulPayloads payloads carrying a trailing zero byte, which ends a
  SQLite statement wherever it appears, so the composed statement is never
  reached rather than the hole failing to contain it.
@@ -401,7 +395,7 @@ index 90408aa..0629d9c 100644
  The oracle is the compiled statement, not the string: the \textsc{Explain}
  bytecode with the value operand redacted, the read-only flag, whether any SQL is
  left after the first statement, and the rows returned, each read against the
-@@ -207,16 +204,10 @@ That effective set is \dataSqliEffective payloads.
+@@ -207,16 +199,10 @@ That effective set is \dataSqliEffective payloads.
  \input{generated/tbl-sqli-arms}
  \caption{Executed outcome by delivery path over the \dataSqliPayloads SQL
  payloads (\dataSqliCases cases), the additive default beside the opt-in strict
@@ -422,7 +416,7 @@ index 90408aa..0629d9c 100644
  \label{tab:sqli}
  \end{table*}
  
-@@ -234,27 +225,28 @@ That breakout is available only because the additive build leaves legacy
+@@ -234,27 +220,28 @@ That breakout is available only because the additive build leaves legacy
  composition open.
  Recompiled in the opt-in strict mode, every text-splicing prepare, the
  concatenation and the in-band \verb|M'(...)'| alike, is refused before it reaches
@@ -461,7 +455,7 @@ index 90408aa..0629d9c 100644
  The identifier hole holds each payload as a single name, which resolves or does
  not but never contributes syntax, and is the one position a bound parameter
  cannot fill.
-@@ -264,9 +256,8 @@ A zero is evidence only if the oracle could have reported a one.
+@@ -264,9 +251,8 @@ A zero is evidence only if the oracle could have reported a one.
  We rebuild the scanner deliberately broken, once so the boundary locator stops
  at the first closer and once so \textsc{Verify} always accepts, and rerun.
  Each broken build changes the verdict of the holes that rest on it, in up to
@@ -1103,7 +1097,7 @@ index 351fdaa..166680f 100644
  aesthetic one, and it turns on what the shared rule actually guarantees when the
 diff --git a/openscience.tex b/openscience.tex
 new file mode 100644
-index 0000000..519fb4b
+index 0000000..7c64118
 --- /dev/null
 +++ b/openscience.tex
 @@ -0,0 +1,15 @@
@@ -1111,7 +1105,7 @@ index 0000000..519fb4b
 +\label{sec:appendix:openscience}
 +
 +All artifacts behind this paper's claims are shared at submission through an
-+anonymized repository (\url{ANONYMOUS-LINK-TODO}), and will be archived publicly
++anonymized repository (\url{https://anonymous.4open.science/r/matchertext-C533/}), and will be archived publicly
 +upon publication.
 +These are the classification pipeline and every generated table and number in
 +this paper (\cref{sec:corpus}); the corpus manifest pinning each upstream source
