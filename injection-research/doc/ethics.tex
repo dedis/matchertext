@@ -1,0 +1,15 @@
+\section{Ethics considerations}
+\label{sec:appendix:ethics}
+
+This work attacked no live or third-party system.
+The corpus study (\cref{sec:corpus}) is a static analysis of public CVE records
+and already-public proof-of-concept strings drawn from the sources named in
+\cref{sec:data}.
+No payload was sent to any deployed service, and the proof-of-concept material
+is referenced by source, not redistributed.
+The only executed attacks (\cref{sec:prevent:exec}) ran against a SQLite fork
+and driver built in-house for this paper, in an isolated local environment, to
+test the paper's own claims.
+No personal data was collected and no human subjects were involved.
+Vulnerability records and payloads concern flaws that are long public and
+vendor-acknowledged, so this analysis creates no new disclosure obligation.
