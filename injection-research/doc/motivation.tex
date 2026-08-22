@@ -86,7 +86,7 @@ The point is not that sanitizers are dispensable. It is that a transformation
 re-implementing another language's parser, re-synchronized as it changes, is
 inherently a large attack surface.
 
-This is the concrete case for preferring a structural \emph{check} to a
+This contrast is the concrete case for preferring a structural \emph{check} to a
 structural \emph{transformation}.
 Verifying that a value's matchers balance is host-independent and a few lines.
 A sanitizer instead must shadow the host parser and its quirks. The security
@@ -165,7 +165,7 @@ once decouples them, because the rule mentions neither. A language that emits
 valid matchertext is compatible with every host that reads to matcher balance.
 Such a host accepts values from every such language, without either knowing
 what the other is. The count falls from $N \times M$ relationships to $N + M$
-implementations. This is the shape the Internet protocol stack takes for the
+implementations. This decoupling is the shape the Internet protocol stack takes for the
 same reason: a waist thin enough that what sits above and below it can vary
 independently.
 

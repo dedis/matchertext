@@ -87,7 +87,7 @@ Under a matchertext-aware host that ends each value by matcher balance,
 matchertext offers a \emph{structural} property: no valid-matchertext value,
 in any position, can escape its delimiters or alter the surrounding query
 structure, closing off the sub-class of injection that depends on breaking out
-of a delimiter. This is a syntactic-closure property. It does not by itself
+of a delimiter. This guarantee is a syntactic-closure property. It does not by itself
 establish that later decoding, reparsing, or execution of the contained value
 is safe. It does not adjudicate whether a well-formed value is
 \emph{authorized}, which remains a matter of access control, and it
@@ -134,7 +134,7 @@ the same.
 Such semantic sinks are out of scope.
 A second limit is expressiveness: matchertext content is verbatim text and cannot
 carry child markup.
-This is exactly right for embedding an untrusted string as inert data but is not
+This restriction is exactly right for embedding an untrusted string as inert data but is not
 a substitute for rendering a user's rich HTML, a harder problem left to
 allow-list sanitizers.
 The clean guarantee covers the data-not-markup case, where the large majority of
@@ -255,19 +255,18 @@ ship behind a flag without endangering existing code.
 Together the two premises replace an obligation on the programmer at every use
 site with an obligation on two parsers: A1 relocates a bounded part of the host's
 parser, and A2 adds a lexical form to the application language.
-Neither removes a parser from the trusted base, and neither is meant to
-(\cref{sec:bg:sanitizer}).
+Neither removes a parser from the trusted base, and neither is meant to.
 
 \subsection{Comparison with existing defenses}
 \label{sec:resist:baselines}
 
 \Cref{sec:bg:sanitizer} contrasts matchertext with hand-escaping and sanitizers.
-The strongest defenses for these hosts are not sanitizers, however, and
-matchertext should be measured against those instead.
+The strongest defenses for these hosts are not sanitizers and
+matchertext should be measured against those stronger defenses instead.
 
 \emph{Parameterized queries} are the strongest of them: a prepared statement
 fixes the query structure before any value is bound, so no value can alter it,
-and it holds today with no change to the language. It binds \emph{values},
+and the technique holds today with no change to the language. It binds \emph{values},
 however, and only values: a table or column name cannot be a placeholder, so
 identifier positions fall back to ad-hoc allow-listing, which is the
 construction \cref{sec:resist:sql} covers directly with
@@ -277,17 +276,17 @@ markup, selecting the escaper from the syntactic context rather than leaving the
 choice to the programmer.
 Browser-side mechanisms such as Trusted Types enforce a related discipline at the
 host.
-\emph{Taint tracking} is orthogonal to all of these: it decides \emph{which}
+\emph{Taint tracking} is orthogonal to all of these defenses: it decides \emph{which}
 values are untrusted, not what happens when one reaches a hole.
 
-Matchertext differs from all of them in what it is a defense \emph{of}.
+Matchertext differs from all of these baselines in what it is a defense \emph{of}.
 Each baseline is a mechanism for one host: prepared statements know SQL,
 auto-escapers know markup, and neither transfers to LDAP filters, PDF strings, or
 URIs, each of which needs a defense written and maintained separately.
 Inertness is stated over a hole rather than over a value, and \textsc{Verify}
 inspects six characters and knows nothing about the language around them, so one
 check serves every host and covers identifier positions as readily as values.
-That is the narrow waist of \cref{sec:bg:waist} claimed as a security property:
+That single check is the narrow waist of \cref{sec:bg:waist} claimed as a security property:
 $N$ hosts need $N$ defenses today, and one discipline instead of $N$ is the
 distinctive claim.
 Two consequences follow: correctness stops depending on a per-context choice,
@@ -300,6 +299,6 @@ The baselines ask for a library; matchertext asks the host to read to matcher
 balance, which \cref{tab:resist:a1} shows is free where the format already
 delimits with matchers, as in LDAP and PDF, and a parser change where it does
 not.
-The two also compose: nothing in \cref{sec:threat} prevents a parameterized query
+Matchertext and parameterized queries also compose: nothing in \cref{sec:threat} prevents a parameterized query
 from carrying a matcher-delimited identifier, which is the combination neither
 mechanism reaches alone.

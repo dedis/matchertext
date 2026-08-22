@@ -81,7 +81,7 @@ condition can be read from the syntax label alone.
 Projecting it onto the full corpus, at most \textbf{\dataHostableCVEs} of the
 \textbf{\dataInjectionCVEs} injection CVEs (\textbf{\dataHostableShare}) target a matcher-delimitable
 syntax.
-This is an upper bound, since a fraction of HTML/DOM cases are the
+This figure is an upper bound, since a fraction of HTML/DOM cases are the
 \verb|javascript:| semantic sinks above.
 Of the \dataHtmlDomBacked HTML/DOM CVEs carrying a payload, \dataHtmlDomJsSinks
 are such sinks, a rate of \textbf{\dataJsSinkRate}.
@@ -151,7 +151,7 @@ placed in the SQL text inside an \verb|M'(...)'| literal, an identifier inside
 \verb|[|$\dots$\verb|]| read to matcher balance (A1), and the statement is
 prepared through the ordinary interface.
 The matcher-delimited hole is offered beside legacy composition rather than
-replacing it, so existing SQL keeps working and adoption is incremental. This is
+replacing it, so existing SQL keeps working and adoption is incremental. This additive design is
 the point-of-use character of A2: a value the caller still concatenates
 into host syntax is unprotected. This holds exactly as with an escape or a bound
 parameter.
