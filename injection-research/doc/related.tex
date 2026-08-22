@@ -26,27 +26,19 @@ the result into API calls, rendering programs injection-proof by construction.
 It is the nearest neighbor to matchertext, and the sharpest contrast: it needs an
 explicit grammar and a combined-syntax toolchain per language pair, where
 matchertext asks only one shared lexical invariant.
-The metaprogramming it draws on assumes a known embedded
-language: hygienic macros~\cite{kohlbecker86hygienic,dybvig92syntactic},
-staged and quotation-based
-generation~\cite{taha00metaml,sheard02template,mainland07quoted}, tagless-final
-embeddings~\cite{carette09tagless}, and projectional language
-workbenches~\cite{renggli10embedding}.
+The metaprogramming it draws on likewise assumes a known embedded language:
+hygienic macros, staged generation, tagless-final embeddings, and language
+workbenches~\cite{kohlbecker86hygienic,dybvig92syntactic,taha00metaml,sheard02template,mainland07quoted,carette09tagless,renggli10embedding}.
 
 \subsection{Static analysis and detection}
-A large body of work finds injection flaws in existing code rather than
-preventing them.
-Information-flow and taint analyses trace untrusted data to sensitive sinks:
-WebSSARI~\cite{huang04webssari}, Livshits and Lam~\cite{livshits05finding},
-Pixy~\cite{jovanovic06pixy}, Xie and Aiken~\cite{xie06static}, and the
-industrial-scale successors TAJ~\cite{tripp09taj} and Andromeda~\cite{tripp13andromeda},
-with FlowDroid~\cite{arzt14flowdroid} the mobile analogue.
-String analysis reasons about the generated query itself~\cite{wassermann07sound}, and
-modern SAST productizes both for continuous integration~\cite{dahse14simulation}.
-These detect variants of a bad construction after the fact and trade soundness
-against precision and analyst noise.
-Matchertext instead makes the boundary-breaking construction unrepresentable, and
-is complementary to the analysis that catches errors a boundary rule cannot.
+A large body of work finds injection flaws in existing code rather than preventing
+them: information-flow and taint analyses tracing untrusted data to
+sinks~\cite{huang04webssari,livshits05finding,jovanovic06pixy,xie06static,tripp09taj,tripp13andromeda,arzt14flowdroid},
+string analysis reasoning about the generated query~\cite{wassermann07sound}, and
+the SAST tools that productize both~\cite{dahse14simulation}. These detect a bad
+construction after the fact and trade soundness against precision. Matchertext
+instead makes the boundary-breaking construction unrepresentable, complementary to
+the analysis that catches what a boundary rule cannot.
 
 \subsection{Cross-cutting structural defenses}
 Closer in ambition are defenses that enforce a global invariant separating
@@ -67,17 +59,12 @@ per-language and non-composable~\cite{owasp_xss}, is what forces these
 per-context schemes. Matchertext instead offers one rule for locating the hole
 before any context-specific encoder runs.
 
-\subsection{Definitions and measurement}
-Formal framings of injection ground the inertness property of \cref{sec:threat}.
+\subsection{Defining injection}
+Formal framings ground the inertness property of \cref{sec:threat}.
 Language-theoretic security frames the root cause as processing rich input
-without first recognizing it~\cite{momot16langsec}. Su and Wassermann define it
-as untrusted input altering the generated command's syntactic
-structure~\cite{su06essence}. Ray and Ligatti define it by whether input is used
-as a normal-form value rather than as code~\cite{ray12defining}, the vocabulary
-matchertext targets.
-Taxonomies and
-measurements~\cite{halfond06classification,hannousse22xss,lekies13dom} show
-defenses clustering around sink-specific filtering and detection with no
-cross-language boundary convention. The weakness labels CVE pipelines use
-group these failures by effect~\cite{cwe,owasp_top10_2021}. Matchertext
-addresses the subset that shares a single lexical boundary mechanism.
+without first recognizing it~\cite{momot16langsec}. Su and Wassermann define
+injection as untrusted input altering the generated command's syntactic
+structure~\cite{su06essence}, and Ray and Ligatti by whether input is used as a
+normal-form value rather than as code~\cite{ray12defining}, the vocabulary
+matchertext targets. Matchertext addresses the subset of these framings that
+shares a single lexical boundary mechanism.

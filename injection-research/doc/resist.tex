@@ -65,8 +65,7 @@ injective, with a reserved introducer so that its outputs are recognizable in
 the surrounding text, as any backslash-style escape is. Then
 \textsc{FromMatchertext} scans the balance-delimited region once, mapping each
 \textsc{esc}$(c)$ back to its matcher $c$ and copying every other character,
-so that $\textsc{FromMatchertext}(\textsc{ToMatchertext}(v)) = v$ for every
-$v$:
+so that $\forall v, \textsc{FromMatchertext}(\textsc{ToMatchertext}(v)) = v$:
 \begin{verbatim}
 FromMatchertext(m):
   out = []; i = 0
