@@ -158,7 +158,7 @@ python3 pipeline/latex.py
 ```
 
 They write the analysis CSV files and `report.html` under `data/exports/`.
-They also write 142 macros and six tables under `doc/generated/` for the paper.
+They also write 147 macros and six tables under `doc/generated/` for the paper.
 
 ## Update the remote payload corpus
 
@@ -211,14 +211,14 @@ follow the source terms recorded in `manifest.json`.
 
 ## Main outputs
 
-| Path | Contents |
-| --- | --- |
-| `manifest.json` | Git commits, HTTP hashes, and sidecar pin |
-| `snapshot-archive/sha256/` | Immutable HTTP and sidecar objects |
-| `data/raw/` | Pinned source repositories and downloaded files |
-| `data/cve.db` | Parsed corpus, classifications, groups, and replay cases |
-| `data/exports/` | CSV analysis files and the HTML report |
-| `doc/generated/` | LaTeX macros and tables used by the paper |
+| Path                       | Contents                                                 |
+|----------------------------|----------------------------------------------------------|
+| `manifest.json`            | Git commits, HTTP hashes, and sidecar pin                |
+| `snapshot-archive/sha256/` | Immutable HTTP and sidecar objects                       |
+| `data/raw/`                | Pinned source repositories and downloaded files          |
+| `data/cve.db`              | Parsed corpus, classifications, groups, and replay cases |
+| `data/exports/`            | CSV analysis files and the HTML report                   |
+| `doc/generated/`           | LaTeX macros and tables used by the paper                |
 
 The large snapshot objects are ignored by Git. Copy or publish the complete
 snapshot archive when the corpus must be reproduced on another machine.

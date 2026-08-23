@@ -1,91 +1,71 @@
-This repository contains a draft paper and experimental code
-related to matchertext, a syntactic discipline that allows
-strings in one compliant language to be embedded verbatim without escaping
-(e.g., via cut-and-paste) into itself or another compliant language.
+# Matchertext
 
-For an overview of the matchertext idea please see
+Matchertext is a syntactic discipline that lets a string in one language be
+embedded in another **verbatim**, with no escaping, obfuscation, or expansion.
+Cut and paste becomes correct by construction.
+
+It is one rule: **matchers must match.** The ASCII matcher pairs `()`, `[]` and
+`{}` must appear in properly nested pairs throughout a compliant string.
+Everything else is a nonmatcher and is unconstrained.
+
+```
+matchertext:      a(b)c      call(item[index])      ' OR '1'='1
+not matchertext:  a)b        ([)]                   smile :]
+```
+
+The payoff is a boundary that does not depend on the contents. A host language
+that delimits a hole with a matcher pair can find the end of an embedded value
+by counting balance, so no character inside the value needs escaping and no
+character can end the value early.
+
+For the idea in full, see
 [the matchertext paper](https://bford.info/pub/lang/matchertext/).
 
-The main contents of this repository are currently:
+## Two papers live here
 
-* [doc](doc): the LaTeX source for the in-progress matchertext paper.
-* [go](go): experimental Go code for parsing and converting matchertext.
-* [dev](dev): developer tools, including a Tree-sitter grammar and VS Code extension.
+| Paper                                           | Source                                     | Subject                                                                                                                    |
+|-------------------------------------------------|--------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
+| Towards Verbatim Interlanguage Embedding        | [`doc`](doc)                               | The discipline itself: definition, host-language extensions, MinML, and a compliance study of real-world code              |
+| Structural Injection Resistance by Construction | [`injection-research`](injection-research) | What the discipline is worth against injection: a security property, a SQLite implementation, and a CVE corpus measurement |
 
-### Build
+## Directory map
 
-In order to build the MinML tools, you can use the `Makefile`. Below is an overview of the various build commands:
+Each directory documents itself; follow the link rather than looking for
+instructions here.
 
-| Command               | Description                                                                                        |
-|-----------------------|----------------------------------------------------------------------------------------------------|
-| build                 | Build the main `minml` CLI tool.                                                                   |
-| build-lsp             | Build the `minml-lsp` Language Server (also copies Tree-sitter queries from `dev/tree-sitter/queries/`). |
-| build-wasm            | Builds the WASM binary used by browser-based tools and the VS Code extension.                      |
-| vscode-live-preview   | Builds the WASM and extension, then installs it to your local VS Code extensions directory.       |
-| gen-parser            | Generates the Tree-sitter C parser from `grammar.js`.                                              |
+| Directory                                  | Contents                                                                             |
+|--------------------------------------------|--------------------------------------------------------------------------------------|
+| [`doc`](doc)                               | LaTeX source for the matchertext paper                                               |
+| [`lean`](lean)                             | Machine-checked proofs of the properties both papers rely on                         |
+| [`go`](go)                                 | Go reference implementation: the matchertext scanner, MinML, and the language server |
+| [`dev`](dev)                               | Editor tooling: a Tree-sitter grammar and a VS Code extension                        |
+| [`LLVM`](LLVM)                             | Clang-based tool that measures matchertext compliance across source trees            |
+| [`injection-research`](injection-research) | The injection study: CVE pipeline, corpus, and a matchertext-aware SQLite            |
 
-### Developer Tools
+Smaller items with no README of their own: `perl/escapes.pl` and
+`raku/escapes.raku` sketch matcher escape sequences for those languages, and
+`test/index.m` is a sample MinML document.
 
-#### MinML Language Server (`minml-lsp`)
-An LSP server written in Go that provides real-time feedback and intelligent editing features for MinML files (`.m`, `.minml`). It uses Tree-sitter for error-tolerant parsing.
+## Building
 
-> **Note:** The LSP embeds Tree-sitter highlight queries at build time. The `make build-lsp` target copies them automatically from `dev/tree-sitter/queries/`. If you build manually with `go build`, copy them first:
-> ```bash
-> cp -R dev/tree-sitter/queries go/markup/minml/lsp/queries
-> ```
-- **Diagnostics**: Immediate feedback on syntax errors, such as unmatched brackets.
-- **Completion**: Intelligent suggestions for HTML5 tags and attributes based on context.
-- **Hover**: Documentation for HTML5 tags and all MinML constructs (character references, raw blocks, comments, etc.).
+The MinML tooling is built from the repository root, which is a single entry
+point rather than the home of the work. Three of these targets have no other
+home: they read from one directory and write into another, and
+`vscode-live-preview` needs the `minml-lsp` binary left at the root.
 
-#### Testing the LSP Server
+| Command                    | Produces                                              |
+|----------------------------|-------------------------------------------------------|
+| `make build`               | the `minml` CLI                                       |
+| `make build-lsp`           | the `minml-lsp` language server                       |
+| `make build-wasm`          | the WebAssembly parser, for the browser and VS Code   |
+| `make gen-parser`          | the Tree-sitter C parser from `grammar.js`            |
+| `make vscode-live-preview` | the VS Code extension, installed locally              |
 
-##### 1. Manual Testing (CLI)
-The LSP protocol requires an initialization step and specific headers (`Content-Length`) for every message. The easiest way to test it manually is to pipe a formatted string to the server.
+`build` and `gen-parser` are one-line wrappers over the native command for
+their directory; the linked README gives that command directly. Everything
+else in the repository builds from its own directory.
 
-**Test Initialization:**
-Run this command to see the server's capabilities:
-```bash
-printf "Content-Length: 58\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}" | ./minml-lsp
-```
+## Contributing
 
-**Test Diagnostics:**
-To test features like diagnostics, you must send an `initialize` request followed by the action. You can use a subshell to send multiple messages:
-```bash
-(
-  printf "Content-Length: 58\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}"
-  sleep 0.1
-  printf "Content-Length: 134\r\n\r\n{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didOpen\",\"params\":{\"textDocument\":{\"uri\":\"file:///test.m\",\"version\":1,\"text\":\"div[unclosed\"}}}"
-) | ./minml-lsp
-```
-*Note: The `Content-Length` must be exactly the number of bytes in the JSON body — use `echo -n '<json>' | wc -c` to verify.*
-
-##### 2. Testing in VS Code
-1. Install the extension and LSP binary together: `make vscode-live-preview`
-   The LSP binary is bundled inside the extension directory automatically.
-2. Open a `.m` file in VS Code.
-3. **Diagnostics**: Type `div[unclosed`. You should see a "Missing ]" error in the Problems tab.
-4. **Completion**: Type `[` to see tag suggestions or `{` to see attribute suggestions.
-5. **Hover**: Hover over a tag like `div` to see its HTML5 documentation, or hover over `-[a comment]` to see MinML construct documentation.
-
-If features don't appear, check the **Output** panel and select **MinML Language Server** from the dropdown to view logs.
-
-#### Debugging the LSP
-You can enable detailed debug logging to troubleshoot the server:
-
-- **CLI**: Run with the `--debug` flag: `./minml-lsp --debug`
-- **TCP mode** (useful with external inspection tools): `./minml-lsp --addr :2087`
-- **VS Code**: Go to Settings (`Cmd+,`), search for `Minml: Debug`, and check the box. Logs will appear in the **Output** panel.
-
-### Recommended Testing Tools
-
-For more advanced testing and protocol validation, the following tools are highly recommended:
-
-| Tool | Purpose | Key Feature |
-|---|---|---|
-| **[LSP Devtools](https://github.com/swyddfa/lsp-devtools)** | Inspection | A TUI that shows live JSON-RPC traffic between editor and server. |
-| **[LSP Inspector](https://microsoft.github.io/language-server-protocol/inspector/)** | Visualization | Upload server logs to see a graphical timeline of requests and responses. |
-| **[pytest-lsp](https://github.com/swyddfa/pytest-lsp)** | E2E Testing | A Python-based framework to write automated tests that run the Go binary. |
-| **[VS Code Extension Tester](https://github.com/redhat-developer/vscode-extension-tester)** | Integration | Automates a real VS Code instance to test UI and LSP features together. |
-
-#### Pro Tip: In-Memory Testing in Go
-Since the server uses `glsp`, you can write unit tests in Go using `net.Pipe()`. This allows you to connect a mock client directly to your server handler in memory, avoiding the need for actual `stdio` or TCP during testing.
+This is a research repository and a work in progress. Contributions are
+welcome; see the paper for the open questions each part is trying to answer.
