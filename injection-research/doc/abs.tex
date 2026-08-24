@@ -8,20 +8,20 @@ pairs \verb|()|, \verb|[]|, and \verb|{}| must always match.
 A host can then delimit an untrusted value with a matcher pair and read it to
 matcher balance, so escaping the slot would require an unmatched matcher, which
 is not valid matchertext.
-Whether that helps against injection depends on what it actually guarantees.
-We state matchertext's guarantee as an \emph{inertness} property:
-the host's parse of
-a program is independent of the content placed in its holes.
-We reduce it to three premises: correct boundary location, a parser that does
-not re-enter the hole, and an interpreter that treats the hole as data.
+Verbatim embedding is not the same as injection resistance.
+We state the security guarantee as \emph{inertness}: the host's parse of a program does not depend on what its holes contain.
+Inertness is strictly stronger than the closure property and reduces to three premises: that the boundary is located correctly,
+that the parser does not re-enter the hole, and that the interpreter treats its contents as data.
+We discharge the first with a machine-checked proof; the other two are per-host
+obligations.
 We then ask how much of the real landscape this could reach.
-We build a reproducible corpus of \textbf{\dataInjectionCVEs} injection CVEs, classified by the
-embedded syntax each attack targets.
+We start from a reproducible corpus of \textbf{\dataInjectionCVEs} injection CVEs,
+classified by the embedded syntax each attack targets.
 We measure the structure of recorded attack strings under a matchertext-aware
 host rather than a deployed one.
-We find that \textbf{\dataContainedShare} of those with a recoverable payload are structurally contained,
-and that at most \textbf{\dataHostableShare} of all injection CVEs target a matcher-delimitable
-syntax.
+We find that \textbf{\dataContainedShare} of those with a recoverable payload are structurally
+contained.
+At most \textbf{\dataHostableShare} of all injection CVEs target a matcher-delimitable syntax.
 The residue is execution sinks and non-matcher-delimited contexts, which no
 delimiting discipline can reach, so the boundary the measurement draws is a
 property of injection itself rather than of this design.

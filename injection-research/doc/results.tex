@@ -24,7 +24,7 @@ only a tenth of the corpus, carries a disproportionate share of them.
 \paragraph{Proof-of-concept coverage.}
 \textbf{\dataInjectionWithPoc} injection CVEs (\dataInjectionWithPocShare) carry at least one linked PoC.
 The PoC databases overlap, so unifying them raises payload coverage well
-above any single source. Of these, \textbf{\dataPayloadBackedCVEs} yield an extractable payload; the remainder
+above any single source. Of these, \textbf{\dataPayloadBackedCVEs} yield an extractable payload. The remainder
 are links only or exploits from which no literal attack string can be recovered, such as modules
 that construct their payload programmatically. This linkage is what makes the containment analysis
 of \cref{sec:prevent} possible, since it supplies the real attack strings.
@@ -56,8 +56,8 @@ The largest groups are recognizable attack families: the XSS skeletons
 \verb|<TAG>ALERT(DOCUMENT.<id>)</TAG>| (\dataGroupAlertDocId CVEs) and its
 \verb|DOCUMENT.COOKIE| variant (\dataGroupAlertCookie), and the SQL blind-time
 family \verb|SLEEP(<n>)| (\dataGroupSleep).
-The tail is long: the singletons are \dataSingletonGroupShare of groups but only \dataSingletonCVEShare of CVEs, and
-they collapse to \dataSingletonVerdicts distinct verdicts, since the skeleton preserves tags and
+The tail is long: the singletons are \dataSingletonGroupShare of groups but only \dataSingletonCVEShare of CVEs.
+They collapse to \dataSingletonVerdicts distinct verdicts, since the skeleton preserves tags and
 operators that the containment test does not depend on.
 Because the skeleton preserves exactly the matcher structure while discarding
 values, it is the natural unit on which to test matchertext containment next.

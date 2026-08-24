@@ -18,33 +18,30 @@ records, spanning \dataInjectionCWEs distinct CWEs.
 
 \paragraph{Layered labeling.}
 Each CVE's syntax type is resolved by a fallback chain, ordered from most to
-least reliable, mirroring the content-classifier methodology of the matchertext
-empirical study~\cite{matchertext}:
-
-(1) a deterministic map from specific CWEs (\eg \mbox{CWE-89}$\rightarrow$SQL,
-\mbox{CWE-79}$\rightarrow$HTML, \mbox{CWE-78}$\rightarrow$shell);
-
-(2) phrase rules over the CNA description (``SQL injection'', ``cross-site
-scripting'', ``command injection'', \dots);
-
-(3) a character-trigram naive-Bayes classifier trained on the CWE- and
-rule-labeled set, applied to the still-unlabeled remainder above a confidence
-margin; and
-
-(4) an explicit \texttt{unknown} bucket.
-
-\noindent Of the injection CVEs, \dataMethodCwe (\dataMethodCweShare) are labeled deterministically from CWEs,
+least reliable.
+This mirrors the content-classifier methodology of the matchertext empirical
+study~\cite{matchertext}.
+First, a deterministic map from specific CWEs (\eg \mbox{CWE-89}$\rightarrow$SQL,
+\mbox{CWE-79}$\rightarrow$HTML).
+Second, phrase rules over the CNA description (``SQL injection'', \dots).
+Third, a character-trigram naive-Bayes classifier, trained on the CWE- and
+rule-labeled set and applied to the still-unlabeled remainder above a confidence
+margin.
+Fourth, an explicit \texttt{unknown} bucket.
+Of the injection CVEs, \dataMethodCwe (\dataMethodCweShare) are labeled deterministically from CWEs,
 \dataMethodRule from phrase rules, \dataMethodNb from naive Bayes, and only \dataMethodUnknown remain
 unknown, so the classification rests overwhelmingly on the deterministic
 layers.
 
 \paragraph{Label accuracy.}
-Only the naive-Bayes layer is statistical, and it is both the smallest (\dataMethodNbShare of
-labels) and the only one we can score directly. On a held-out set of \dataNbTestDocs
-CVEs it reaches a weighted precision of \textbf{\dataNbPrecision} and recall of
-\textbf{\dataNbRecall} at \dataNbCoverage coverage. It is strongest exactly where the
-containment analysis is most sensitive (HTML/DOM \dataNbPrecisionHtmlDom/\dataNbRecallHtmlDom, SQL \dataNbPrecisionSql/\dataNbRecallSql),
-and weakest on the small execution-sink classes it labels least often
+Only the naive-Bayes layer is statistical.
+It is both the smallest (\dataMethodNbShare of labels) and the only one we can
+score directly.
+On a held-out set of \dataNbTestDocs CVEs it reaches a weighted precision of
+\textbf{\dataNbPrecision} and recall of \textbf{\dataNbRecall} at \dataNbCoverage coverage.
+It is strongest exactly where the containment analysis is most sensitive
+(HTML/DOM \dataNbPrecisionHtmlDom/\dataNbRecallHtmlDom, SQL \dataNbPrecisionSql/\dataNbRecallSql).
+It is weakest on the small execution-sink classes it labels least often
 (code/eval \dataNbPrecisionCodeEval/\dataNbRecallCodeEval).
 The deterministic layers carry the remaining \dataMethodDeterministicShare of labels and rest on the
 CWE-to-syntax map, whose accuracy we do not independently validate.

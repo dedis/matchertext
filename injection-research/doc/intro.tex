@@ -1,58 +1,51 @@
 \section{Introduction}
 \label{sec:intro}
 
-Injection vulnerabilities arise when untrusted data crosses a language boundary
-and is misinterpreted as structure rather than as inert content.
-Examples are a quote that closes a SQL string literal, an angle bracket that
-opens an HTML tag, and a semicolon that starts a new shell command.
-Despite decades of mitigations (parameterized queries, context-sensitive
-output encoding, allowlisting), injection continues to dominate vulnerability
-disclosures.
-Each defense is specific to one host language and one syntactic context, and
-each is applied by hand at the point of use.
+Software is built by embedding one language inside another: a query, some markup,
+a document. When the embedded string is untrusted, its boundary with the
+surrounding syntax is where injection lives, as a quote closes a SQL literal or an
+angle bracket opens an HTML tag. The accepted defense escapes, parameterizes, or
+sanitizes the value so it can no longer be read as structure.
 
-The \emph{matchertext} discipline~\cite{matchertext} proposes a single,
-language-independent structural rule: the ASCII matcher pairs \verb|()|,
-\verb|[]|, and \verb|{}| must always match, unconditionally.
-Under this rule, a host language can delimit an untrusted value with a matcher
-pair and read it to matcher balance.
-To escape its slot the value would have to emit an unmatched matcher, which is
-not valid matchertext and is escaped on the way in.
-The canonical injection \verb|' OR '1'='1| illustrates the mechanism: hosted as
-\verb|WHERE name = [| \emph{value} \verb|]|, the quote that would have closed
-the string literal is now ordinary text inside the matched region, and the
-tautology cannot break out.
+These transforms work one context at a time, which is the whole problem. Each
+is written for a single host and a single syntactic position, chosen by hand at
+each use site, so securing one context means maintaining a separate defense for
+every other. What is missing is the option to defend the boundary once, with a
+check that does not change from host to host.
 
-This paper asks what a matchertext-based defense would guarantee, under what
-assumptions, and how much of the real injection landscape it could reach
-if such a discipline were gradually adopted.
-We make four contributions:
-\begin{itemize}
-\item	A security reading of the matchertext discipline
-	(\cref{sec:relevance}), which develops what the rule is, why a
-	discipline designed for verbatim embedding bears on injection at all,
-	and what would have to hold for it to help.
-\item	A precise threat model and security property (\cref{sec:threat}) that
-	states the guarantee as an \emph{inertness} invariant, distinguishes it
-	from the weaker closure theorem it is easily conflated with, and reduces
-	it to three named premises; the load-bearing boundary premise we
-	discharge with a machine-checked Lean proof (\cref{sec:appendix:lean}).
-\item	A structural argument (\cref{sec:resist}) that matcher-delimiting
-	untrusted input resists injection across SQL, HTML, LDAP, and PDF, with
-	the options for fitting the discipline into existing languages and how
-	it compares with the defenses already deployed.
-\item	An empirical measurement of its structural reach
-	(\cref{sec:prevent}), over a reproducible, snapshot-pinned corpus
-	(\cref{sec:corpus}) that unifies the official CVE record with normalized
-	enrichment and four proof-of-concept databases, classified by weakness
-	family and by the embedded \emph{syntax} each attack targets
-	(\cref{sec:results}).
-\end{itemize}
+That option is absent since conventional defenses attack the
+\emph{collision}, rewriting the value so its characters cannot be confused with
+the host's. This forces each defence to model that syntax: a sanitizer shadows the host
+parser, and every divergence is a bypass. The web has no universal escaper because
+parse context is per-language and does not compose~\cite{owasp_xss}.
 
-Together these findings answer
-whether one uniform check could replace many of the
-per-host defenses injection is fought with today, and how much of the recorded
-landscape such a check would reach.
-Both figures below assume a matchertext-aware host and characterize attack
-structure rather than a deployed defense, and the payload-backed and projected
-figures are reported separately, each over its own subset.
+So we ask: can one host-independent check replace the per-host collection, what
+does it guarantee against an attacker who knows the check and writes against it,
+and how much of real injection can it reach?
+
+Matchertext~\cite{matchertext} answers by attacking the \emph{boundary} instead:
+its rule names no language, only that the ASCII matcher pairs \verb|()|,
+\verb|[]|, and \verb|{}| must always match. A host wraps an untrusted value in a
+matcher pair and ends it by matcher balance. Hosted as
+\verb|WHERE name = [|\emph{value}\verb|]|, the payload \verb|' OR '1'='1| cannot
+break out, since escaping would need an unmatched \verb|]| that is not valid
+matchertext. One recognizer inspects only the six matcher characters and serves
+every host. The rule was built for verbatim embedding~\cite{matchertext}. Using
+it for security is where this paper begins.
+
+Each question becomes one part of the design. Because an embedding rule is not yet
+a security property, we state the guarantee as \emph{inertness}, that a host's
+parse does not depend on what its holes contain and
+discharge its boundary premise with a machine-checked Lean proof
+(\cref{sec:threat}). Because the convention must be retrofitted, we show it
+resisting SQL, HTML, LDAP, and PDF injection, free where a format already delimits
+with matchers and a bounded parser change elsewhere (\cref{sec:resist}). Because
+no rule reaches every context, execution sinks and non-matcher syntax stay out of
+reach, so the ceiling we report is a property of injection, not this design.
+
+We measure the reach over a reproducible corpus of \dataInjectionCVEs injection
+CVEs, replaying recorded attack strings under a matchertext-aware host
+(\cref{sec:corpus,sec:results,sec:prevent}): \dataContainedShare of attacks with a
+usable payload are contained, and at most \dataHostableShare target a delimitable
+syntax. A matchertext-aware SQLite fork we build admits no breakout over the
+recorded SQL payloads.
