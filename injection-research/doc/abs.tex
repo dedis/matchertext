@@ -22,6 +22,9 @@ host language rather than a deployed one.
 We find that \textbf{\dataContainedShare} of those with a recoverable payload are structurally
 contained.
 At most \textbf{\dataHostableShare} of all injection CVEs target a matcher-delimitable syntax.
+We implement the design in SQLite and test \dataSqliPayloads recorded SQL payloads
+across \dataSqliCases cases; no matcher-delimited value or identifier escapes its
+slot.
 The residue is execution sinks and non-matcher-delimited contexts, which no
 delimiting discipline can reach, so the boundary the measurement draws is a
 property of injection itself rather than of this design.
