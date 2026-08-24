@@ -47,7 +47,7 @@ covers it directly.
 Which tables a caller may name remains an authorization question, distinct from
 injection.
 
-Free-form fields, a name, a comment, a search box, may legitimately contain
+Free-form fields -- a name, a comment, a search box -- may legitimately contain
 unmatched matchers (\eg a fragment \verb|f(x| or \verb|smile :]|).
 Rather than reject them, we pass them through a total encoder
 \textsc{ToMatchertext}$(v)$ that escapes only the \emph{unmatched} matchers in
