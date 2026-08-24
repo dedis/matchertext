@@ -346,26 +346,6 @@ def sqli_macros(con):
             "(SELECT MIN(value_id) FROM mt_sqli_case)"))),
         ("SqliFamilies", num(q("SELECT COUNT(DISTINCT family) FROM mt_sqli_value"))),
         ("SqliEffective", num(eff)),
-        # The shape of the case count: hosts and arms are each typed by hole
-        # kind, and only compatible pairs run, so the per-payload figure is
-        # hosts(value)*arms(value) + hosts(ident)*arms(ident). Count what
-        # appears in mt_sqli_case, not what mt_sqli_arm declares: the typed ?V
-        # and ?I strict arms are swept separately into mt_sqli_strict.
-        ("SqliValueHosts", num(q(
-            "SELECT COUNT(DISTINCT host_id) FROM mt_sqli_case WHERE host_id IN "
-            "(SELECT host_id FROM mt_sqli_host WHERE hole=1)"))),
-        ("SqliIdentHosts", num(q(
-            "SELECT COUNT(DISTINCT host_id) FROM mt_sqli_case WHERE host_id IN "
-            "(SELECT host_id FROM mt_sqli_host WHERE hole=2)"))),
-        ("SqliValueArms", num(q(
-            "SELECT COUNT(DISTINCT arm_id) FROM mt_sqli_case WHERE arm_id IN "
-            "(SELECT arm_id FROM mt_sqli_arm WHERE hole=1)"))),
-        ("SqliIdentArms", num(q(
-            "SELECT COUNT(DISTINCT arm_id) FROM mt_sqli_case WHERE arm_id IN "
-            "(SELECT arm_id FROM mt_sqli_arm WHERE hole=2)"))),
-        ("SqliCasesPerPayload", num(q(
-            "SELECT COUNT(*) FROM mt_sqli_case WHERE value_id="
-            "(SELECT MIN(value_id) FROM mt_sqli_case)"))),
         # The only treatment-arm cases that do not compile: payloads carrying a
         # zero byte, which ends a SQLite statement.
         ("SqliIdentMtMalformed", num(q(
@@ -377,13 +357,6 @@ def sqli_macros(con):
         ("SqliMtBreakout", num(brk.get("mt", 0))),
         ("SqliMtStrictBreakout", num(brk.get("mt_strict", 0))),
         ("SqliIdentMtBreakout", num(brk.get("ident_mt", 0))),
-        # The only cases in a treatment arm that fail to compile: payloads
-        # carrying a zero byte, which ends a SQLite statement.
-        ("SqliIdentMtMalformed", num(q(
-            """SELECT COUNT(*) FROM mt_sqli_case c JOIN mt_sqli_arm a USING(arm_id)
-               WHERE a.name='ident_mt' AND c.verdict='MALFORMED'"""))),
-        ("SqliNulPayloads", num(q(
-            "SELECT COUNT(*) FROM mt_sqli_value WHERE instr(value, char(0))>0"))),
         # the controls, over the effective set
         ("SqliConcatBreakout", num(effb.get("concat", 0))),
         ("SqliIdentConcatBreakout", num(effb.get("ident_concat", 0))),
