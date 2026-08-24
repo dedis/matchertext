@@ -46,10 +46,10 @@ compliance study, see~\cite{matchertext}.
 \label{sec:relevance:security}
 
 Conventional defenses attack the \emph{collision}: they transform the value so
-its dangerous characters can no longer be confused with the host's. This is why
-each must know the host's syntax, and why there is a different one per host and
-context.
-Matchertext attacks the \emph{boundary} instead. Suppose a host delimits an
+its dangerous characters can no longer be confused with the host language's. This is why
+each must know the host language's syntax, and why there is a different one per host
+language and context.
+Matchertext attacks the \emph{boundary} instead. Suppose a host language delimits an
 untrusted value with a matcher pair and finds its end by counting matchers
 rather than by scanning for a terminator. Escaping the region then requires
 emitting an unmatched matcher, and by closure no valid matchertext string
@@ -59,21 +59,21 @@ bracket in HTML, are nonmatchers: entirely unconstrained, and ordinary data
 inside a matched region.
 
 Two consequences make this a security question rather than a syntactic one.
-The check is \emph{host-independent}: \textsc{Verify} inspects only the six
+The check is \emph{language-independent}: \textsc{Verify} inspects only the six
 matcher characters and knows nothing about SQL, HTML, or LDAP, so the same
-recognizer serves every host, which is exactly what a sanitizer cannot do.
+recognizer serves every host language, which is exactly what a sanitizer cannot do.
 And the check is a \emph{verification} rather than a transformation, so its
 failure mode is benign: a rejected value is data that does not embed, whereas a
 missed case in an escaping routine \emph{is} the injection.
 Together these are the narrow waist applied to security: one uniform obligation
-on the value, in place of one bespoke transformation per host-context pair.
+on the value, in place of one bespoke transformation per host language and context.
 
 \subsection{What must hold, and what we ask}
 \label{sec:relevance:questions}
 
 Closure constrains \emph{strings}, whereas security is a claim about
 \emph{parsers}, and the second does not follow from the first without
-assumptions about the host.
+assumptions about the host language.
 Three questions organize the rest of the paper. First, what is guaranteed and
 under what assumptions (\cref{sec:threat})? Second, can a real language adopt
 this, and at what cost (\cref{sec:resist})? Third, how much of the real

@@ -71,8 +71,8 @@ C\#, and 91\% of PHP~\cite{dennis24sql}.
 
 \label{sec:bg:sanitizer}%
 The sanitizer machinery is itself a recurring source of vulnerabilities.
-A production HTML sanitizer must track the host parser's full and quirk-laden
-behavior: DOMPurify's core file runs to roughly 2,400 lines and the larger
+A production HTML sanitizer must track the host-language parser's full and
+quirk-laden behavior: DOMPurify's core file runs to roughly 2,400 lines and the larger
 sanitizers reach tens of thousands project-wide.
 Correct only while its model matches every browser exactly, each divergence
 becomes a bypass. The bypasses recur as named classes: mutation
@@ -88,17 +88,17 @@ inherently a large attack surface.
 
 This contrast is the concrete case for preferring a structural \emph{check} to a
 structural \emph{transformation}.
-Verifying that a value's matchers balance is host-independent and a few lines.
-A sanitizer instead must shadow the host parser and its quirks. The security
+Verifying that a value's matchers balance is language-independent and a few lines.
+A sanitizer instead must shadow the host-language parser and its quirks. The security
 literature has repeatedly favored safety by construction, typed template
 contexts, and parameterized queries over ad-hoc
 escaping~\cite{samuel11csas,momot16langsec,owasp_parameterization}.
-The check is not the whole trusted base: a matchertext host must also end an
+The check is not the whole trusted base: a matchertext host language must also end an
 embedded value by matcher balance and suppress its own decoding inside the
 hole, and the write path adds an encoder and its inverse (\cref{sec:threat}).
 Matchertext thus relocates trust rather than eliminating it: what must hold
-uniformly across languages shrinks to a small host-independent check, and what
-remains per host is a bounded change to a parser the host already owns.
+uniformly across languages shrinks to a small language-independent check, and what
+remains per host language is a bounded change to a parser the host language already owns.
 
 
 \subsection{The narrow waist}
@@ -154,16 +154,16 @@ outside the waist; \cref{sec:prevent} measures how much that leaves.}
 \end{figure*}
 
 The defenses of \cref{sec:bg:sanitizer} share a shape: each is written for one
-composing language and one host, and works by knowing the host well enough to
-transform values for it. A Java-to-SQL escaper knows SQL, and an HTML
+composing language and one host language, and works by knowing that host language
+well enough to transform values for it. A Java-to-SQL escaper knows SQL, and an HTML
 sanitizer knows the browser's parser closely enough to predict it. Neither
 transfers to the other's problem, so the number of defenses to write, audit,
 and re-synchronize grows with the product of the two populations.
 
 \Cref{fig:bg:waist} shows the alternative: a rule that both sides implement
 once decouples them, because the rule mentions neither. A language that emits
-valid matchertext is compatible with every host that reads to matcher balance.
-Such a host accepts values from every such language, without either knowing
+valid matchertext is compatible with every host language that reads to matcher balance.
+Such a host language accepts values from every one of them, without either knowing
 what the other is. The count falls from $N \times M$ relationships to $N + M$
 implementations. This decoupling is the shape the Internet protocol stack takes for the
 same reason: a waist thin enough that what sits above and below it can vary

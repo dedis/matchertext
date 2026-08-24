@@ -1,17 +1,13 @@
 \section{Conclusion}
 \label{sec:concl}
 
-Injection is defended today one host at a time.
-This paper argues that one host-independent check can stand in for that
-collection, and measures how far it reaches.
-The guarantee is \emph{inertness}: a host's parse does not depend on what its
-holes contain.
-It is strictly stronger than the closure property the discipline inherits, and
-reduces to three premises; the load-bearing boundary premise is discharged by a
-machine-checked proof (\cref{sec:appendix:lean}), and the other two are per-host.
-Where a format already delimits with matchers, as LDAP filters and PDF strings
-do, the discipline costs nothing.
-Measured against \dataInjectionCVEs injection vulnerabilities, the reach is a
-large majority: \dataContainedShare of attacks with a recoverable payload are
-contained by a matcher-delimited slot, and at most \dataHostableShare target a
-syntax an aware host can delimit.
+Injection is defended today one host language at a time. This paper argues that one
+language-independent check can stand in for that collection, and measures how far
+it reaches. The guarantee is \emph{inertness}: a host language's parse does not depend on what
+its holes contain, a property strictly stronger than closure and discharged by a
+machine-checked boundary proof (\cref{sec:appendix:lean}). Where a format already
+delimits with matchers, as LDAP filters and PDF strings do, the discipline costs
+nothing. Measured against \dataInjectionCVEs injection vulnerabilities,
+\dataContainedShare of attacks with a recoverable payload are contained by a
+matcher-delimited slot and at most \dataHostableShare target a matcher-delimitable
+syntax.

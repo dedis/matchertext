@@ -5,9 +5,9 @@
 deployed today; here we place it in the broader literature, grouped by how each
 line attacks the embedding boundary.
 
-\subsection{Language-based construction}
-The strongest host-specific defenses fix the embedded language's structure
-before any value is bound. For queries, these include
+\paragraph{Language-based construction.}
+The strongest host-language-specific defenses fix the embedded language's
+structure before any value is bound. For queries, these include
 parameterized queries~\cite{owasp_parameterization} and their typed hardenings
 SQL~DOM~\cite{mcclure05sqldom} and Safe Query Objects~\cite{cook05safequery}.
 Others are language-integrated query~\cite{cheney13liq} and
@@ -15,10 +15,10 @@ Ur/Web~\cite{chlipala15urweb}, which collapses web composition into one
 statically typed language. For markup,
 examples include contextual auto-escaping~\cite{samuel11csas} and typed-value
 sink gates such as SafeHtml and Trusted Types~\cite{kern14securing,trustedtypes}.
-Each buys a strong guarantee by knowing the language it protects; matchertext
-keeps values as plain text and fixes only the \emph{boundary}.
+Each defense buys a strong guarantee by knowing the language it protects;
+matchertext keeps values as plain text and fixes only the \emph{boundary}.
 
-\subsection{Syntax embedding and safe quotation}
+\paragraph{Syntax embedding and safe quotation.}
 The closest work makes embedding safe by construction in the language itself.
 StringBorg~\cite{bravenboer10stringborg} embeds the embedded language's grammar
 into the composing one, adds quotation and antiquotation forms, and assimilates
@@ -30,7 +30,7 @@ The metaprogramming it draws on likewise assumes a known embedded language:
 hygienic macros, staged generation, tagless-final embeddings, and language
 workbenches~\cite{kohlbecker86hygienic,dybvig92syntactic,taha00metaml,sheard02template,mainland07quoted,carette09tagless,renggli10embedding}.
 
-\subsection{Static analysis and detection}
+\paragraph{Static analysis and detection.}
 A large body of work finds injection flaws in existing code rather than preventing
 them: information-flow and taint analyses tracing untrusted data to
 sinks~\cite{huang04webssari,livshits05finding,jovanovic06pixy,xie06static,tripp09taj,tripp13andromeda,arzt14flowdroid},
@@ -40,7 +40,7 @@ construction after the fact and trade soundness against precision. Matchertext
 instead makes the boundary-breaking construction unrepresentable, complementary to
 the analysis that catches what a boundary rule cannot.
 
-\subsection{Cross-cutting structural defenses}
+\paragraph{Cross-cutting structural defenses.}
 Closer in ambition are defenses that enforce a global invariant separating
 trusted structure from untrusted data.
 CSSE tags input and evaluates it in context across SQL, XSS, and shell
@@ -59,7 +59,7 @@ per-language and non-composable~\cite{owasp_xss}, is what forces these
 per-context schemes. Matchertext instead offers one rule for locating the hole
 before any context-specific encoder runs.
 
-\subsection{Defining injection}
+\paragraph{Defining injection.}
 Formal framings ground the inertness property of \cref{sec:threat}.
 Language-theoretic security frames the root cause as processing rich input
 without first recognizing it~\cite{momot16langsec}. Su and Wassermann define

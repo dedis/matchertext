@@ -5,20 +5,20 @@ per-context, and hand-applied at every use site.
 The \emph{matchertext} discipline proposes
 one syntactic structural rule instead: the ASCII matcher
 pairs \verb|()|, \verb|[]|, and \verb|{}| must always match.
-A host can then delimit an untrusted value with a matcher pair and read it to
-matcher balance, so escaping the slot would require an unmatched matcher, which
-is not valid matchertext.
+A host language can then delimit an untrusted value with a matcher pair and read
+it to matcher balance, so escaping the slot would require an unmatched matcher,
+which is not valid matchertext.
 Verbatim embedding is not the same as injection resistance.
-We state the security guarantee as \emph{inertness}: the host's parse of a program does not depend on what its holes contain.
+We state the security guarantee as \emph{inertness}: the host language's parse of a program does not depend on what its holes contain.
 Inertness is strictly stronger than the closure property and reduces to three premises: that the boundary is located correctly,
 that the parser does not re-enter the hole, and that the interpreter treats its contents as data.
-We discharge the first with a machine-checked proof; the other two are per-host
-obligations.
+We discharge the first with a machine-checked proof; the other two are per
+host language.
 We then ask how much of the real landscape this could reach.
 We start from a reproducible corpus of \textbf{\dataInjectionCVEs} injection CVEs,
 classified by the embedded syntax each attack targets.
 We measure the structure of recorded attack strings under a matchertext-aware
-host rather than a deployed one.
+host language rather than a deployed one.
 We find that \textbf{\dataContainedShare} of those with a recoverable payload are structurally
 contained.
 At most \textbf{\dataHostableShare} of all injection CVEs target a matcher-delimitable syntax.

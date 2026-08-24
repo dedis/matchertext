@@ -8,34 +8,36 @@ angle bracket opens an HTML tag. The accepted defense escapes, parameterizes, or
 sanitizes the value so it can no longer be read as structure.
 
 These transforms work one context at a time, which is the whole problem. Each
-is written for a single host and a single syntactic position, chosen by hand at
-each use site, so securing one context means maintaining a separate defense for
+is written for a single \emph{host language} (the surrounding language an
+untrusted value is embedded into) and a single syntactic position, chosen by hand
+at each use site, so securing one context means maintaining a separate defense for
 every other. What is missing is the option to defend the boundary once, with a
-check that does not change from host to host.
+check that does not change from one host language to the next.
 
 That option is absent since conventional defenses attack the
 \emph{collision}, rewriting the value so its characters cannot be confused with
-the host's. This forces each defence to model that syntax: a sanitizer shadows the host
-parser, and every divergence is a bypass. The web has no universal escaper because
-parse context is per-language and does not compose~\cite{owasp_xss}.
+the host language's. This forces each defence to model that syntax: a sanitizer
+shadows the host-language parser, and every divergence is a bypass. The web has no
+universal escaper because parse context is per-language and does not
+compose~\cite{owasp_xss}.
 
-So we ask: can one host-independent check replace the per-host collection, what
+So we ask: can one language-independent check replace the per-host-language collection, what
 does it guarantee against an attacker who knows the check and writes against it,
 and how much of real injection can it reach?
 
 Matchertext~\cite{matchertext} answers by attacking the \emph{boundary} instead:
 its rule names no language, only that the ASCII matcher pairs \verb|()|,
-\verb|[]|, and \verb|{}| must always match. A host wraps an untrusted value in a
-matcher pair and ends it by matcher balance. Hosted as
+\verb|[]|, and \verb|{}| must always match. A host language wraps an untrusted
+value in a matcher pair and ends it by matcher balance. Hosted as
 \verb|WHERE name = [|\emph{value}\verb|]|, the payload \verb|' OR '1'='1| cannot
 break out, since escaping would need an unmatched \verb|]| that is not valid
 matchertext. One recognizer inspects only the six matcher characters and serves
-every host. The rule was built for verbatim embedding~\cite{matchertext}. Using
+every host language. The rule was built for verbatim embedding~\cite{matchertext}. Using
 it for security is where this paper begins.
 
 Each question becomes one part of the design. Because an embedding rule is not yet
-a security property, we state the guarantee as \emph{inertness}, that a host's
-parse does not depend on what its holes contain and
+a security property, we state the guarantee as \emph{inertness}, that a host
+language's parse does not depend on what its holes contain and
 discharge its boundary premise with a machine-checked Lean proof
 (\cref{sec:threat}). Because the convention must be retrofitted, we show it
 resisting SQL, HTML, LDAP, and PDF injection, free where a format already delimits
@@ -44,7 +46,7 @@ no rule reaches every context, execution sinks and non-matcher syntax stay out o
 reach, so the ceiling we report is a property of injection, not this design.
 
 We measure the reach over a reproducible corpus of \dataInjectionCVEs injection
-CVEs, replaying recorded attack strings under a matchertext-aware host
+CVEs, replaying recorded attack strings under a matchertext-aware host language
 (\cref{sec:corpus,sec:results,sec:prevent}): \dataContainedShare of attacks with a
 usable payload are contained, and at most \dataHostableShare target a delimitable
 syntax. A matchertext-aware SQLite fork we build admits no breakout over the

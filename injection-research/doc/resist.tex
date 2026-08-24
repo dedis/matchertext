@@ -8,7 +8,7 @@ always-embeddability theorem of matchertext forbids in valid
 matchertext~\cite{matchertext}.
 We develop this first for SQL injection, then for cross-site scripting, whose
 several distinct HTML escaping contexts collapse to one discipline.
-The same argument then covers two settings where the host already delimits with
+The same argument then covers two settings where the host language already delimits with
 matchers, so the discipline asks for no new syntax.
 These are LDAP directory filters, whose parenthesised assertions are
 matcher-delimited already, and the PDF document format, whose literal strings
@@ -53,7 +53,7 @@ Rather than reject them, we pass them through a total encoder
 \textsc{ToMatchertext}$(v)$ that escapes only the \emph{unmatched} matchers in
 $v$~\cite{matchertext}, and decode on read.
 Defined on every input, it never rejects. Because its escapes are themselves
-balanced, its output is always valid matchertext, its sole and host-independent
+balanced, its output is always valid matchertext, its sole and language-independent
 obligation (\cref{sec:appendix:tomatchertext}), checkable in isolation by the
 \textsc{Verify} scan and saying nothing about SQL.
 The failure mode is therefore benign: an encoder bug yields mis-encoded
@@ -82,7 +82,7 @@ no part of the inertness claim, which rests only on output $\in L$
 A decoder bug corrupts a value. It cannot manufacture a breakout, since the region
 is already inertly delimited before decoding begins.
 
-Under a matchertext-aware host that ends each value by matcher balance,
+Under a matchertext-aware host language that ends each value by matcher balance,
 matchertext offers a \emph{structural} property: no valid-matchertext value,
 in any position, can escape its delimiters or alter the surrounding query
 structure, closing off the sub-class of injection that depends on breaking out
@@ -111,7 +111,7 @@ three contexts, where it is correct only for element content.
 
 Matcher-delimiting collapses the three to a single discipline, exactly as for
 SQL.
-Each hole is read verbatim up to a matched close bracket and the host performs no
+Each hole is read verbatim up to a matched close bracket and the host language performs no
 transformation, using matchertext markup forms~\cite{matchertext}
 (\eg \verb|<div [|\emph{v}\verb|]>|, \verb|value=[|\emph{v}\verb|]|, and
 \verb|<![MDATA[|\emph{v}\verb|]]>|).
@@ -183,7 +183,7 @@ runs but can no longer escape its string to \emph{introduce} one.
 A1 route & Example & Changes & New syntax & Compatibility & Trusted delta \\
 \hline
 Reuse native matchers & \verb|(uid=|$v$\verb|)|, \verb|/URI (|$v$\verb|)| & nothing & none & full & none \\
-Extend the host grammar & \verb|WHERE name = [|$v$\verb|]| & host parser & hole form & per host & boundary reader \\
+Extend the host-lang.\ grammar & \verb|WHERE name = [|$v$\verb|]| & host parser & hole form & per host lang.\ & boundary reader \\
 Replace the host language & MinML for markup & host parser & wholly new & none & whole parser \\
 \hline
 \end{tabular}
@@ -198,7 +198,7 @@ Matchertext literal & \verb|M"(WHERE name = [|$v$\verb|])"| & lexer reads to bal
 Structural interpolation & \verb|M{}"(WHERE name = [{v}])"| & holes fixed before binding & literal + interpolation \\
 \hline
 \end{tabular}
-\caption{Routes to premise A1, an aware host (top; \emph{trusted delta} is what
+\caption{Routes to premise A1, an aware host language (top; \emph{trusted delta} is what
 each adds to the trusted computing base of \cref{sec:threat}), and to premise
 A2, the value reaching a hole (bottom; only the interpolating form makes the
 template's structure independent of $v$ at composition time).}
@@ -208,7 +208,7 @@ template's structure independent of $v$ at composition time).}
 
 Adoption is two problems, not one, and the hosting syntaxes
 of~\cite{matchertext} answer only the second.
-Premise A1 of \cref{sec:threat} constrains the \emph{host}: the SQL engine, HTML
+Premise A1 of \cref{sec:threat} constrains the \emph{host language}: the SQL engine, HTML
 parser, or directory server that interprets the composed text must end the
 embedded value by matcher balance.
 Premise A2 constrains the \emph{application} that composes it: the untrusted value
@@ -216,7 +216,7 @@ must reach a matcher-delimited hole rather than be concatenated in beside one.
 The two are discharged by changes to different languages, by different people,
 and are worth separating.
 
-\paragraph{Making the host aware (A1).}
+\paragraph{Making the host language aware (A1).}
 \Cref{tab:resist:a1} compares the routes.
 Reusing a construct the format \emph{already} delimits with matchers is free:
 LDAP search filters and PDF literal strings
@@ -224,8 +224,8 @@ LDAP search filters and PDF literal strings
 The discipline coincides with the format, and A1 costs no new syntax and no
 new trusted code.
 It also reaches only the formats built that way.
-Extending a host's grammar with a hole form reaches the syntaxes where injection
-actually concentrates, at the price of a change inside the host's parser.
+Extending a host language's grammar with a hole form reaches the syntaxes where injection
+actually concentrates, at the price of a change inside the host language's parser.
 The change is not always conservative: T-SQL already gives
 \verb|[|$\dots$\verb|]| a meaning as a delimited identifier.
 A hole form for SQL must either pick different delimiters or accept that it is not
@@ -252,7 +252,7 @@ ship behind a flag without endangering existing code.
 
 
 Together the two premises replace an obligation on the programmer at every use
-site with an obligation on two parsers: A1 relocates a bounded part of the host's
+site with an obligation on two parsers: A1 relocates a bounded part of the host language's
 parser, and A2 adds a lexical form to the application language.
 Neither removes a parser from the trusted base, and neither is meant to.
 
@@ -260,7 +260,7 @@ Neither removes a parser from the trusted base, and neither is meant to.
 \label{sec:resist:baselines}
 
 \Cref{sec:bg:sanitizer} contrasts matchertext with hand-escaping and sanitizers.
-The strongest defenses for these hosts are not sanitizers and
+The strongest defenses for these host languages are not sanitizers and
 matchertext should be measured against those stronger defenses instead.
 
 \emph{Parameterized queries} are the strongest of them: a prepared statement
@@ -274,19 +274,19 @@ construction \cref{sec:resist:sql} covers directly with
 markup, selecting the escaper from the syntactic context rather than leaving the
 choice to the programmer.
 Browser-side mechanisms such as Trusted Types enforce a related discipline at the
-host.
+host language.
 \emph{Taint tracking} is orthogonal to all of these defenses: it decides \emph{which}
 values are untrusted, not what happens when one reaches a hole.
 
 Matchertext differs from all of these baselines in what it is a defense \emph{of}.
-Each baseline is a mechanism for one host: prepared statements know SQL,
+Each baseline is a mechanism for one host language: prepared statements know SQL,
 auto-escapers know markup, and neither transfers to LDAP filters, PDF strings, or
 URIs, each of which needs a defense written and maintained separately.
 Inertness is stated over a hole rather than over a value, and \textsc{Verify}
 inspects six characters and knows nothing about the language around them, so one
-check serves every host and covers identifier positions as readily as values.
+check serves every host language and covers identifier positions as readily as values.
 That single check is the narrow waist of \cref{sec:bg:waist} claimed as a security property:
-$N$ hosts need $N$ defenses today, and one discipline instead of $N$ is the
+$N$ host languages need $N$ defenses today, and one discipline instead of $N$ is the
 distinctive claim.
 Two consequences follow: correctness stops depending on a per-context choice,
 removing the failure mode that defeated every participant in the study of
@@ -294,7 +294,7 @@ removing the failure mode that defeated every participant in the study of
 transformation, a bug in it rejects data instead of admitting a breakout.
 
 The cost is where the obligation lands.
-The baselines ask for a library; matchertext asks the host to read to matcher
+The baselines ask for a library; matchertext asks the host language to read to matcher
 balance, which \cref{tab:resist:a1} shows is free where the format already
 delimits with matchers, as in LDAP and PDF, and a parser change where it does
 not.
