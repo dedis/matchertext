@@ -1,11 +1,13 @@
-\documentclass[fullpage,twocolumn]{article}
+\documentclass[letterpaper,twocolumn,10pt]{article}
+\usepackage{usenix}
+% Stops flushbottom stretching paragraph glue into multi-line voids on
+% float-heavy pages.
+\raggedbottom
 \pdfoutput=1
 
-\usepackage{times}
 \usepackage{xspace}
-\usepackage{cite} % sort citation numbers
-\usepackage[hyperindex,breaklinks,colorlinks,
-	    linkcolor=blue,citecolor=blue,urlcolor=black]{hyperref}
+% Link colors darkened so grayscale print keeps near-body-text contrast.
+\hypersetup{hyperindex,breaklinks,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=black}
 \usepackage{cleveref}
 \usepackage{graphicx}
 \usepackage{tikz}
@@ -25,7 +27,6 @@
 \DeclareUnicodeCharacter{00B7}{\pmbdglyph{\cdot}}
 \usepackage{booktabs}
 \usepackage{xurl} % allow long URLs in the bibliography to break anywhere
-\usepackage[T1]{fontenc}
 \usepackage{listings}
 \lstdefinelanguage{Lean}{
   morekeywords={inductive,theorem,def,where,variable,import,Prop,Set,List,Type,noncomputable,open},
@@ -82,19 +83,16 @@
 %%%%%%%%%%%%%%%%%%%%%%
 
 \begin{document}
+% Pins the anonymized foundation paper as reference [1] under unsrt.
+\nocite{matchertext}
 
-\title{Matchertext: Structural Injection Resistance by Construction \\
-	\Large{%
-	~\\
-	\url{https://github.com/dedis/matchertext}}}
+\title{Matchertext: Structural Injection Resistance by Construction}
 
-\author{Bryan Ford, Antoine Bastide \\ EPFL}
+\author{\rm Anonymous submission}
 
 \maketitle
 
 \input{abs}
-
-\tableofcontents
 
 \input{intro}
 \input{motivation}
@@ -111,14 +109,14 @@
 
 \input{concl}
 
-\appendix
-\onecolumn
-\input{embeded_boundary}
-\newpage
-\input{to_matchertext}
-\twocolumn
-
-\bibliographystyle{plain}
+\bibliographystyle{unsrt}
 \bibliography{refs}
+
+\newpage
+\appendix
+\input{ethics}
+\input{openscience}
+\input{embeded_boundary}
+\input{to_matchertext}
 
 \end{document}

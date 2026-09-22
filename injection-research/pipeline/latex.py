@@ -201,16 +201,27 @@ def skeleton_count(con, skeleton):
 
 
 def tbl_syntax(con, top=6):
-    lines = ["\\begin{tabular}{lrr}", "\\toprule",
-             "Injection syntax & CVEs & with PoC \\\\", "\\midrule"]
-    for syn, n, withpoc in con.execute("""
-            SELECT c.syntax_type, COUNT(*),
-                   COUNT(DISTINCT CASE WHEN p.cve_id IS NOT NULL THEN c.cve_id END)
+    """The top syntaxes by count, then an aggregated remainder and a total,
+    so the CVEs column sums to \\dataInjectionCVEs and the with-PoC column to
+    \\dataInjectionWithPoc rather than leaving the tail unaccounted for."""
+    rows = con.execute("""
+            SELECT c.syntax_type, COUNT(*) n,
+                   COUNT(DISTINCT CASE WHEN p.cve_id IS NOT NULL THEN c.cve_id END) w
             FROM classification c
             LEFT JOIN (SELECT DISTINCT cve_id FROM poc) p USING(cve_id)
-            WHERE c.syntax_type <> 'unknown'
-            GROUP BY 1 ORDER BY 2 DESC LIMIT ?""", (top,)):
-        lines.append(f"{DISPLAY.get(syn, syn):<19} & {num(n):>9} & {num(withpoc):>7} \\\\")
+            GROUP BY 1 ORDER BY n DESC""").fetchall()
+    lines = ["\\begin{tabular}{lrr}", "\\toprule",
+             "Injection syntax & CVEs & with PoC \\\\", "\\midrule"]
+    for syn, n, w in rows[:top]:
+        lines.append(f"{DISPLAY.get(syn, syn):<19} & {num(n):>9} & {num(w):>7} \\\\")
+    other = rows[top:]
+    lines.append("\\midrule")
+    lines.append(f"{('Other (%d types)' % len(other)):<19} "
+                 f"& {num(sum(n for _, n, _ in other)):>9} "
+                 f"& {num(sum(w for _, _, w in other)):>7} \\\\")
+    lines.append("\\midrule")
+    lines.append(f"{'Total':<19} & {num(sum(n for _, n, _ in rows)):>9} "
+                 f"& {num(sum(w for _, _, w in rows)):>7} \\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
     return "\n".join(lines) + "\n"
 
@@ -335,17 +346,17 @@ def sqli_macros(con):
             "(SELECT MIN(value_id) FROM mt_sqli_case)"))),
         ("SqliFamilies", num(q("SELECT COUNT(DISTINCT family) FROM mt_sqli_value"))),
         ("SqliEffective", num(eff)),
+        # The only treatment-arm cases that do not compile: payloads carrying a
+        # zero byte, which ends a SQLite statement.
+        ("SqliIdentMtMalformed", num(q(
+            "SELECT COUNT(*) FROM mt_sqli_case c JOIN mt_sqli_arm a USING(arm_id) "
+            "WHERE a.name='ident_mt' AND c.verdict='MALFORMED'"))),
+        ("SqliNulPayloads", num(q(
+            "SELECT COUNT(*) FROM mt_sqli_value WHERE instr(value, char(0))>0"))),
         # the matchertext holes: zero breakouts
         ("SqliMtBreakout", num(brk.get("mt", 0))),
         ("SqliMtStrictBreakout", num(brk.get("mt_strict", 0))),
         ("SqliIdentMtBreakout", num(brk.get("ident_mt", 0))),
-        # The only cases in a treatment arm that fail to compile: payloads
-        # carrying a zero byte, which ends a SQLite statement.
-        ("SqliIdentMtMalformed", num(q(
-            """SELECT COUNT(*) FROM mt_sqli_case c JOIN mt_sqli_arm a USING(arm_id)
-               WHERE a.name='ident_mt' AND c.verdict='MALFORMED'"""))),
-        ("SqliNulPayloads", num(q(
-            "SELECT COUNT(*) FROM mt_sqli_value WHERE instr(value, char(0))>0"))),
         # the controls, over the effective set
         ("SqliConcatBreakout", num(effb.get("concat", 0))),
         ("SqliIdentConcatBreakout", num(effb.get("ident_concat", 0))),

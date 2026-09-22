@@ -22,10 +22,9 @@ weakness hierarchy used for classification.
 \href{https://access.redhat.com/security/data}{Red~Hat}, and
 \href{https://security-tracker.debian.org/tracker/}{Debian} add further CWE,
 CVSS, severity, and fix-state signals through their CVE aliases.
-Because the same CVE can carry different weakness labels from different sources,
-enrichment is kept \emph{source-separated}: each CWE or CVSS row is tagged with
-its origin rather than merged, which both preserves provenance and lets us
-measure cross-source disagreement.
+Enrichment is kept \emph{source-separated}, each CWE or CVSS row tagged with its
+origin rather than merged, preserving provenance and exposing cross-source
+disagreement.
 
 \paragraph{Proof-of-concept payloads.}
 Six PoC databases supply real attack strings:
@@ -38,24 +37,23 @@ modules, the
 the \href{https://github.com/trickest/cve}{trickest/cve} exploit index, and
 \href{https://github.com/vulhub/vulhub}{Vulhub}'s reproduction environments.
 The first three, and Vulhub's worked exploit requests, are cloned locally so
-that a payload can be extracted; PoC-in-GitHub and trickest contribute links
-only.
-A trickest entry separates candidate exploit repositories from advisory
-write-ups, and only the former are counted as PoC evidence.
-PoC references are unified in a single table, with a local path where a payload
-is extractable.
-Because exploit code is dual-use, the corpus stores only links, identifiers, and
-locally-extracted payload fragments; no exploit files are redistributed.
+that a payload can be extracted.
+PoC-in-GitHub and trickest contribute links only.
+Of a trickest entry, only the candidate exploit repositories, not the
+advisory write-ups, count as PoC evidence.
+References are unified in one table with a local path where a payload is
+extractable; because exploit code is dual-use, the corpus stores only links,
+identifiers, and locally-extracted fragments, redistributing no exploit files.
 
 \paragraph{Scale.}
 The pinned snapshot comprises \textbf{\dataCVERecords} CVE records
 (\textbf{\dataPublishedCVEs} in the \texttt{PUBLISHED} state).
 Across all categories the PoC databases link to \dataPocTrickestCVEs CVEs (trickest),
 \dataPocExploitdbCVEs (Exploit-DB), \dataPocGithubCVEs (PoC-in-GitHub), \dataPocNucleiCVEs (Nuclei),
-\dataPocMetasploitCVEs (Metasploit), and \dataPocVulhubCVEs (Vulhub); their
+\dataPocMetasploitCVEs (Metasploit), and \dataPocVulhubCVEs (Vulhub). Their
 coverage of the injection subset is reported with the results in
 \cref{sec:results}.
 A key methodological caveat is that these sources have different, sometimes
-mutable, update cadences (NVD in particular re-scores CVEs continuously), so
-the analysis fixes a dated snapshot and treats ``field missing in source'' as
-distinct from ``property absent in the vulnerability.''
+mutable, update cadences (NVD in particular re-scores CVEs continuously).
+The analysis therefore fixes a dated snapshot and treats ``field missing in
+source'' as distinct from ``property absent in the vulnerability.''

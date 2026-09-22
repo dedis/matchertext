@@ -1,5 +1,14 @@
 \section{Corpus and classification}
 \label{sec:corpus}
 
+The preceding sections fixed what matchertext guarantees and at what cost;
+the rest of the paper measures how far that guarantee reaches across recorded
+injection. That measurement needs a corpus wide enough to be representative and
+pinned tightly enough to be reproducible. This section builds one:
+\cref{sec:data} unifies the CVE record with enrichment and proof-of-concept
+databases, and \cref{sec:classify} labels each injection CVE by the embedded
+syntax its attack targets, the axis on which containment turns
+(\cref{sec:prevent}).
+
 \input{data}
 \input{classify}
