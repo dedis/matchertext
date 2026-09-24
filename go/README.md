@@ -31,34 +31,30 @@ make build-lsp   # the language server
 make build-wasm  # the WebAssembly binary
 ```
 
-`build` is a wrapper over the native command, so this package builds on its own
-just as well:
+`build` and `build-lsp` are wrappers over the native commands, so both build
+on their own just as well:
 
 ```sh
 go build -o minml ./go/markup/minml/cmd/
-```
-
-The other two cannot: `build-lsp` copies Tree-sitter queries out of `dev/`
-before compiling, and `build-wasm` writes its output into the VS Code
-extension under `dev/` as well as `out/wasm/`.
-
-`make build-lsp` copies the Tree-sitter highlight queries into the package
-before building, because the server embeds them at build time. Building by hand
-means copying them first:
-
-```sh
-cp -R dev/tree-sitter/queries go/markup/minml/lsp/queries
 go build -o minml-lsp ./go/markup/minml/cmd/lsp/
 ```
 
+`build-wasm` cannot: it writes its output into the VS Code extension under
+`dev/` as well as `out/wasm/`.
+
 ## Language server
 
-`minml-lsp` serves `.m` and `.minml` files. It parses with Tree-sitter, so it
-tolerates errors and keeps working on incomplete documents.
+`minml-lsp` serves `.m` and `.minml` files. It parses with the same parser as
+the converter, so its diagnostics are exactly the documents the converter
+rejects. The parser recovers from each syntax error, so the server keeps
+working on incomplete documents. The editor sends only the changed text, and
+the server reparses only the elements around each edit.
 
-- **Diagnostics** for syntax errors, such as unmatched brackets
-- **Completion** for HTML5 tags and attributes, chosen by context
-- **Hover** documentation for HTML5 tags and every MinML construct
+- **Diagnostics** for every syntax error, such as unmatched brackets
+- **Completion** for HTML5 tags, and for attributes inside `{...}`
+- **Hover** documentation for HTML5 tags, character references, and MinML constructs
+- **Semantic highlighting** of element and attribute names, brackets,
+  references, comments, and raw text
 
 ### Running it by hand
 
@@ -91,8 +87,9 @@ make vscode-live-preview
 
 installs the extension and the server together. Then open a `.m` file:
 
-- Type `div[unclosed` and a "Missing ]" diagnostic should appear
-- Type `[` for tag completions or `{` for attribute completions
+- Type `div[unclosed` and an "unmatched opener [" diagnostic should appear
+- Press Ctrl+Space for tag completions, or type `{` after a tag name for
+  attribute completions. MinML is prose, so completions do not open while typing
 - Hover a tag such as `div`, or a construct such as `-[a comment]`
 
 If nothing appears, open the **Output** panel and select **MinML Language

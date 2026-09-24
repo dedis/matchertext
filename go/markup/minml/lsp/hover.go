@@ -3,75 +3,60 @@ package lsp
 import (
 	"fmt"
 
+	"github.com/dedis/matchertext/go/markup/minml"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
-	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
 func (s *Server) Hover(_ *glsp.Context, params *protocol.HoverParams) (*protocol.Hover, error) {
-	var result *protocol.Hover
-	s.Store.WithDocument(params.TextDocument.URI, func(doc *Document) {
-		node := doc.NodeAt(params.Position.Line, params.Position.Character)
-		if node == nil {
-			return
-		}
-		text := hoverText(node, doc.TextBytes)
-		if text == "" {
-			return
-		}
-		start := node.StartPosition()
-		end := node.EndPosition()
-		result = &protocol.Hover{
-			Contents: protocol.MarkupContent{
-				Kind:  protocol.MarkupKindMarkdown,
-				Value: text,
-			},
-			Range: &protocol.Range{
-				Start: protocol.Position{Line: uint32(start.Row), Character: uint32(start.Column)},
-				End:   protocol.Position{Line: uint32(end.Row), Character: uint32(end.Column)},
-			},
-		}
-	})
-	return result, nil
+	d := s.Store.Get(params.TextDocument.URI)
+	if d == nil {
+		return nil, nil
+	}
+	i := d.markAt(d.Offset(params.Position))
+	if i < 0 {
+		return nil, nil
+	}
+	m := d.Marks[i]
+	text := hoverText(m.Kind, d.Text[m.Start:m.End])
+	if text == "" {
+		return nil, nil
+	}
+	r := d.Range(m.Start, m.End)
+	return &protocol.Hover{
+		Contents: protocol.MarkupContent{Kind: protocol.MarkupKindMarkdown, Value: text},
+		Range:    &r,
+	}, nil
 }
 
-func hoverText(node *sitter.Node, src []byte) string {
-	raw := node.Utf8Text(src)
-
-	switch node.Kind() {
-	case "tag_name":
-		if info, ok := HTMLElements[raw]; ok {
-			return fmt.Sprintf("### `%s`\n\n%s", raw, info.Description)
+// hoverText describes the construct of kind k whose source is src.
+// The descriptions follow what the MinML to HTML converter does.
+func hoverText(k Kind, src string) string {
+	switch k {
+	case KindTag:
+		switch src {
+		case `"`, "'":
+			return "**Quotation** — `" + src + "[...]`\n\nThe content is MinML markup, enclosed in directed quotation marks."
 		}
-		return fmt.Sprintf("### `%s`\n\nMinML element tag.", raw)
+		if info, ok := HTMLElements[src]; ok {
+			return fmt.Sprintf("### `%s`\n\n%s", src, info.Description)
+		}
+		return fmt.Sprintf("### `%s`\n\nMinML element, converted to `<%s>`.", src, src)
 
-	case "attr_name":
-		return fmt.Sprintf("### Attribute: `%s`", raw)
+	case KindAttrName:
+		return fmt.Sprintf("### Attribute: `%s`", src)
 
-	case "comment":
-		return "**Comment** — `-[...]`\n\nContent between the brackets is ignored by the renderer."
+	case KindReference:
+		if s, ok := minml.LookupReference(src[1 : len(src)-1]); ok {
+			return fmt.Sprintf("**Character reference** `%s` → `%s`", src, s)
+		}
+		return fmt.Sprintf("`%s` is not a character reference; it is converted to the literal text.", src)
 
-	case "raw_block":
-		return "**Raw block** — `+[...]`\n\nContent between the brackets is passed through to the output verbatim, without MinML processing."
+	case KindComment:
+		return "**Comment** — `-[...]`\n\nConverted to an HTML comment."
 
-	case "quoted_string":
-		return "**Quoted string** — `\"[...]`\n\nBracket characters inside are treated as literal text, not as element delimiters."
-
-	case "processing_instruction":
-		return "**Processing instruction** — `?[...]`\n\nAn implementation-specific directive. Semantics depend on the processor."
-
-	case "named_ref":
-		return fmt.Sprintf("**Named character reference** — `[%s]`\n\nInserts the Unicode character identified by this name.", raw)
-
-	case "decimal_ref":
-		return fmt.Sprintf("**Decimal character reference** — `[%s]`\n\nInserts the Unicode code point (decimal).", raw)
-
-	case "hex_ref":
-		return fmt.Sprintf("**Hex character reference** — `[%s]`\n\nInserts the Unicode code point (hexadecimal).", raw)
-
-	case "matcher_escape":
-		return "**Matcher escape**\n\nInserts a literal bracket that would otherwise be a structural delimiter.\n\n```\n[[<]]  [[>]]  [(<)]  [(>)]\n```"
+	case KindRaw:
+		return "**Raw text** — `+[...]`\n\nThe content is not parsed as MinML; it is written as escaped text."
 	}
-
 	return ""
 }

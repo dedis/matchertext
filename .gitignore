@@ -2,7 +2,8 @@
 **/.idea
 /minml
 minml-lsp
-lsp
+minml-lsp.exe
+/lsp
 **/minml.exe
 LLVM/ignore
 LLVM/include/LanguageModel.generated.hpp
@@ -21,36 +22,17 @@ dev/vscode/dist
 
 
 
-# gitignore from dev/tree-sitter
-
-# Rust artifacts
-dev/tree-sitter/target/
-
-# Node artifacts
-dev/tree-sitter/build/
-dev/tree-sitter/prebuilds/
-
-# Swift artifacts
-dev/tree-sitter/.build/
-
-# Go artifacts
-dev/tree-sitter/_obj/
-
 # Python artifacts
-dev/tree-sitter/.venv/
-dev/tree-sitter/dist/
 *.egg-info
 *.whl
 
-# C artifacts (tree-sitter generated libraries)
+# C artifacts
 *.a
 *.so
 *.so.*
 *.dylib
 *.dll
 *.pc
-
-# Grammar volatiles
 *.obj
 *.o
 
@@ -58,9 +40,6 @@ dev/tree-sitter/dist/
 *.tar.gz
 *.tgz
 *.zip
-
-dev/tree-sitter/src
-dev/tree-sitter/build
 
 # Lean artifacts
 lean/.lake/

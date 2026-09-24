@@ -38,18 +38,18 @@ instructions here.
 | [`doc`](doc)                               | LaTeX source for the matchertext paper                                               |
 | [`lean`](lean)                             | Machine-checked proofs of the properties both papers rely on                         |
 | [`go`](go)                                 | Go reference implementation: the matchertext scanner, MinML, and the language server |
-| [`dev`](dev)                               | Editor tooling: a Tree-sitter grammar and a VS Code extension                        |
+| [`dev`](dev)                               | Editor tooling: a VS Code extension                                                  |
 | [`LLVM`](LLVM)                             | Clang-based tool that measures matchertext compliance across source trees            |
 | [`injection-research`](injection-research) | The injection study: CVE pipeline, corpus, and a matchertext-aware SQLite            |
 
 Smaller items with no README of their own: `perl/escapes.pl` and
 `raku/escapes.raku` sketch matcher escape sequences for those languages, and
-`test/index.m` is a sample MinML document.
+`test/` holds sample MinML documents.
 
 ## Building
 
 The MinML tooling is built from the repository root, which is a single entry
-point rather than the home of the work. Three of these targets have no other
+point rather than the home of the work. Two of these targets have no other
 home: they read from one directory and write into another, and
 `vscode-live-preview` needs the `minml-lsp` binary left at the root.
 
@@ -58,10 +58,9 @@ home: they read from one directory and write into another, and
 | `make build`               | the `minml` CLI                                       |
 | `make build-lsp`           | the `minml-lsp` language server                       |
 | `make build-wasm`          | the WebAssembly parser, for the browser and VS Code   |
-| `make gen-parser`          | the Tree-sitter C parser from `grammar.js`            |
 | `make vscode-live-preview` | the VS Code extension, installed locally              |
 
-`build` and `gen-parser` are one-line wrappers over the native command for
+`build` and `build-lsp` are one-line wrappers over the native command for
 their directory; the linked README gives that command directly. Everything
 else in the repository builds from its own directory.
 

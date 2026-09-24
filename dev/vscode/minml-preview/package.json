@@ -59,6 +59,15 @@
         }
       ]
     },
+    "configurationDefaults": {
+      "[minml]": {
+        "editor.quickSuggestions": {
+          "comments": "off",
+          "strings": "off",
+          "other": "off"
+        }
+      }
+    },
     "configuration": {
       "type": "object",
       "title": "MinML",
@@ -66,7 +75,7 @@
         "minml.lspPath": {
           "type": "string",
           "default": "",
-          "description": "Absolute path to the minml-lsp binary. Leave empty to use the binary bundled with the extension."
+          "description": "Absolute path to the minml-lsp binary. Leave empty to use the binary bundled with the extension, or minml-lsp on PATH if none is bundled."
         },
         "minml.debug": {
           "type": "boolean",

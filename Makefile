@@ -1,19 +1,17 @@
 GOROOT := $(shell go env GOROOT)
 
-.PHONY: all build gen-parser build-lsp build-wasm vscode-live-preview
+.PHONY: all build build-lsp build-wasm vscode-live-preview
 
 all: build
 
-build:
-	go build -o minml ./go/markup/minml/cmd/
+# Windows needs the .exe suffix that `go build -o` does not add
+EXE := $(if $(filter Windows_NT,$(OS)),.exe,)
 
-gen-parser:
-	cd dev/tree-sitter && tree-sitter generate
+build:
+	go build -o minml$(EXE) ./go/markup/minml/cmd/
 
 build-lsp:
-	rm -rf go/markup/minml/lsp/queries
-	cp -R dev/tree-sitter/queries go/markup/minml/lsp/queries
-	go build -o minml-lsp ./go/markup/minml/cmd/lsp/
+	go build -o minml-lsp$(EXE) ./go/markup/minml/cmd/lsp/
 
 EXT_NAME := $(shell node -p "require('./dev/vscode/minml-preview/package.json').publisher + '.' + require('./dev/vscode/minml-preview/package.json').name + '-' + require('./dev/vscode/minml-preview/package.json').version")
 
@@ -38,14 +36,14 @@ vscode-live-preview: build-wasm build-lsp
 	@echo "Building VS Code extension..."
 	cd dev/vscode/minml-preview && npm ci && npm run compile
 	@echo "Installing extension to $(VSCODE_EXT_DIR)..."
-	@echo "Removing stale minml extension installations..."
+	@echo "Removing stale minml-preview installations..."
 	rm -rf "$(VSCODE_EXT_DIR)"
-	@find "$(VSCODE_EXT_GLOB)" -maxdepth 1 -name "*minml*" ! -path "$(VSCODE_EXT_DIR)" -exec rm -rf {} + 2>/dev/null || true
+	@find "$(VSCODE_EXT_GLOB)" -maxdepth 1 -name "*minml-preview*" ! -path "$(VSCODE_EXT_DIR)" -exec rm -rf {} + 2>/dev/null || true
 	mkdir -p "$(VSCODE_EXT_DIR)"
 	cp -R dev/vscode/minml-preview/dist "$(VSCODE_EXT_DIR)/"
 	cp -R dev/vscode/minml-preview/media "$(VSCODE_EXT_DIR)/"
 	cp dev/vscode/minml-preview/package.json "$(VSCODE_EXT_DIR)/"
 	cp dev/vscode/minml-preview/language-configuration.json "$(VSCODE_EXT_DIR)/"
-	cp minml-lsp "$(VSCODE_EXT_DIR)/"
-	chmod +x "$(VSCODE_EXT_DIR)/minml-lsp"
+	cp minml-lsp$(EXE) "$(VSCODE_EXT_DIR)/"
+	chmod +x "$(VSCODE_EXT_DIR)/minml-lsp$(EXE)"
 	@echo "Done! Please restart VS Code to use the extension."

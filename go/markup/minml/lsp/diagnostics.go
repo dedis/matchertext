@@ -1,64 +1,40 @@
 package lsp
 
 import (
-	"fmt"
+	"unicode/utf8"
 
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
-	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-func (s *Server) publishDiagnostics(ctx *glsp.Context, uri string, version int32) {
-	var diags []protocol.Diagnostic
-	found := s.Store.WithDocument(uri, func(doc *Document) {
-		diags = collectDiagnostics(doc.Tree.RootNode(), diags)
-	})
-	if !found {
-		return
-	}
-
-	if diags == nil {
-		diags = []protocol.Diagnostic{}
-	}
-
-	v := uint32(version)
+func (s *Server) publishDiagnostics(ctx *glsp.Context, uri string, d *Document) {
+	v := uint32(d.Version)
 	ctx.Notify(protocol.ServerTextDocumentPublishDiagnostics, protocol.PublishDiagnosticsParams{
 		URI:         uri,
 		Version:     &v,
-		Diagnostics: diags,
+		Diagnostics: d.diagnostics(),
 	})
 }
 
-func collectDiagnostics(node *sitter.Node, diags []protocol.Diagnostic) []protocol.Diagnostic {
-	if node.IsError() || node.IsMissing() {
-		msg := "Syntax error"
-		if node.IsMissing() {
-			msg = fmt.Sprintf("Missing %s", node.Kind())
+// diagnostics returns one diagnostic per problem.
+// A syntax error covers the character at the error.
+func (d *Document) diagnostics() []protocol.Diagnostic {
+	diags := make([]protocol.Diagnostic, 0, len(d.Problems))
+	errSeverity := protocol.DiagnosticSeverityError
+	hintSeverity := protocol.DiagnosticSeverityHint
+	source := serverName
+	for _, p := range d.Problems {
+		severity, end := &hintSeverity, p.End
+		if !p.Hint {
+			_, n := utf8.DecodeRuneInString(d.Text[p.Offset:])
+			severity, end = &errSeverity, p.Offset+n
 		}
-
-		start := node.StartPosition()
-		end := node.EndPosition()
-
-		severity := protocol.DiagnosticSeverityError
-		source := serverName
-		diag := protocol.Diagnostic{
-			Range: protocol.Range{
-				Start: protocol.Position{Line: uint32(start.Row), Character: uint32(start.Column)},
-				End:   protocol.Position{Line: uint32(end.Row), Character: uint32(end.Column)},
-			},
-			Severity: &severity,
+		diags = append(diags, protocol.Diagnostic{
+			Range:    d.Range(p.Offset, end),
+			Severity: severity,
 			Source:   &source,
-			Message:  msg,
-		}
-		diags = append(diags, diag)
-		// Do not recurse into error recovery subtrees — their children are
-		// reconstructed tokens, not independent syntax errors.
-		return diags
+			Message:  p.Message,
+		})
 	}
-
-	for i := uint(0); i < node.ChildCount(); i++ {
-		diags = collectDiagnostics(node.Child(i), diags)
-	}
-
 	return diags
 }

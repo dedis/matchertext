@@ -1,15 +1,20 @@
 package minml
 
 import (
+	"strconv"
+
 	"github.com/dedis/matchertext/go/markup/ast"
 	"github.com/dedis/matchertext/go/markup/html"
+	"github.com/dedis/matchertext/go/markup/xml"
 )
 
 type Transformer = ast.Transformer
 
 // EntityTransformer is an optional ast.Transformer
-// that recognizes and converts both standard HTML named character entities,
-// and the MinML symbolic character entities, into UTF-8 characters.
+// that converts character references into UTF-8 characters:
+// standard HTML named entities, MinML symbolic entities,
+// and numeric references #N or #xH to valid XML characters.
+// Any other reference becomes the literal text [name] it was written as.
 var EntityTransformer = eTransform{}
 
 type eTransform struct{}
@@ -17,21 +22,38 @@ type eTransform struct{}
 func (_ eTransform) Transform(ns []ast.Node) ([]ast.Node, error) {
 	for i, n := range ns {
 		if ref, ok := n.(ast.Reference); ok {
-
-			// XXX handle numeric entities as well?
-
-			// Apply the standard HTML named entities
-			s, ok := html.Entity[ref.Reference()]
+			name := ref.Reference()
+			s, ok := LookupReference(name)
 			if !ok {
-				// Then apply the MinML symbolic entities
-				s, ok = Entity[ref.Reference()]
+				s = "[" + name + "]"
 			}
-			if ok {
-				ns[i] = ast.NewText(s)
-			}
+			ns[i] = ast.NewText(s)
 		}
 	}
 	return ns, nil
+}
+
+// LookupReference returns the characters that reference name stands for,
+// or false if name is not a reference that EntityTransformer resolves.
+func LookupReference(name string) (string, bool) {
+	if s, ok := html.Entity[name]; ok {
+		return s, true
+	}
+	if s, ok := Entity[name]; ok {
+		return s, true
+	}
+	if len(name) < 2 || name[0] != '#' {
+		return "", false
+	}
+	digits, base := name[1:], 10
+	if digits[0] == 'x' {
+		digits, base = digits[1:], 16
+	}
+	n, err := strconv.ParseUint(digits, base, 32)
+	if err != nil || !xml.IsChar(rune(n)) {
+		return "", false
+	}
+	return string(rune(n)), true
 }
 
 // QuoteTransformer is an optional ast.Transformer

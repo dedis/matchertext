@@ -32,11 +32,18 @@ type Parser struct {
 	line int   // line number starting from 1
 	col  int   // column number starting from 1 (counting bytes)
 
+	unclosed bool // the last ReadPair returned without consuming its closer
+	depth    int  // number of pairs whose content ReadPair is parsing
+
 	// If HandleError is non-nil,
 	// then the parser invokes it on encountering any syntax error
 	// (but not on I/O errors such as end-of-file).
 	// HandleError may return the same or a different error
 	// to stop parsing, or may return nil to continue despite the error.
+	// Continuing closes an unmatched opener at end-of-file,
+	// closes a pair at a mismatched closer and leaves that closer unread,
+	// leaves the unexpected byte unread where an opener was expected,
+	// and skips an unmatched closer in ReadAll.
 	HandleError func(err error) error
 }
 
@@ -59,6 +66,8 @@ func (p *Parser) init(r io.ByteReader) *Parser {
 	p.r = r
 	p.b = -1
 	p.last = -1
+	p.depth = 0
+	p.unclosed = false
 
 	// initialize logical position counters
 	p.ofs = 0
@@ -82,15 +91,20 @@ func (p *Parser) init(r io.ByteReader) *Parser {
 //
 // Returns nil on successful parsing until end-of-file (EOF).
 func (p *Parser) ReadAll(h Handler) error {
-	c, e := p.ReadText(h)
-	if e == io.EOF {
-		return nil // successful complete parse
+	for {
+		c, e := p.ReadText(h)
+		if e == io.EOF {
+			return nil // successful complete parse
+		}
+		if e != nil {
+			return e // other error
+		}
+		e = p.Fail(fmt.Sprintf("unmatched closer %v", string(byte(c))))
+		if e != nil {
+			return e
+		}
+		p.getc() // recover by skipping the closer that ReadText left unread
 	}
-	if e == nil {
-		return p.SyntaxError(fmt.Sprintf(
-			"unmatched closer %v", string(byte(c))))
-	}
-	return e // other error
 }
 
 // Parse text from a matchertext stream until encountering
@@ -142,42 +156,59 @@ func (p *Parser) ReadText(h Handler) (closer int, err error) {
 // Returns nil if the whole matcher-delimited sequence was parsed successfully,
 // or a non-nil error if anything goes wrong.
 func (p *Parser) ReadPair(h Handler, o, c byte) error {
+	p.unclosed = true
 
 	// First consume the opener and make sure it is the expected one.
 	b, e := p.getc()
 	if e == io.EOF || (e == nil && b != o) {
-		return p.SyntaxError(fmt.Sprintf(
-			"expecting opener %v", string(o)))
+		if e == nil {
+			p.ungetc(b)
+		}
+		return p.Fail(fmt.Sprintf("expecting opener %v", string(o)))
 	}
 	if e != nil {
 		return e
 	}
+	ofs, line, col := p.ofs, p.line, p.col
 
 	// Parse the intervening text delimited by the matcher pair.
+	p.depth++
 	_, e = p.ReadText(h)
+	p.depth--
 	if e == io.EOF {
-		return p.SyntaxError(fmt.Sprintf(
-			"unmatched opener %v", string(b)))
+		p.unclosed = true
+		return p.fail(&SyntaxError{fmt.Sprintf("unmatched opener %v", string(o)), ofs, line, col})
 	}
 	if e != nil {
 		return e
 	}
 
 	// Ensure that the content was closed by the correct matcher.
+	// ReadText returned at a closer, so this read cannot reach end-of-file.
 	b, e = p.getc()
-	if e == io.EOF {
-		return p.SyntaxError(fmt.Sprintf(
-			"unmatched opener %v", string(b)))
-	}
 	if e != nil {
 		return e
 	}
 	if b != c {
-		return p.SyntaxError(fmt.Sprintf(
+		p.ungetc(b)
+		p.unclosed = true
+		return p.Fail(fmt.Sprintf(
 			"opener %v closed with mismatched %v",
 			string(o), string(b)))
 	}
+	p.unclosed = false
 	return nil
+}
+
+// Depth returns the number of matcher pairs enclosing the current position.
+func (p *Parser) Depth() int {
+	return p.depth
+}
+
+// Unclosed reports whether the last ReadPair to return did not consume its closer.
+// That happens only when HandleError let parsing continue after a syntax error.
+func (p *Parser) Unclosed() bool {
+	return p.unclosed
 }
 
 func (p *Parser) getc() (b byte, e error) {
@@ -202,6 +233,7 @@ func (p *Parser) getc() (b byte, e error) {
 	// read the next byte from the input stream
 	b, e = p.r.ReadByte()
 	if e != nil {
+		p.last = -1 // stay at the end-of-file position on repeated reads
 		return
 	}
 
@@ -211,6 +243,20 @@ func (p *Parser) getc() (b byte, e error) {
 
 func (p *Parser) ungetc(b byte) {
 	p.b = int(b)
+}
+
+// Fail reports a syntax error at the current position.
+// It returns HandleError's result if HandleError is set, or else the error.
+// A nil result means the caller should recover and continue parsing.
+func (p *Parser) Fail(msg string) error {
+	return p.fail(p.SyntaxError(msg))
+}
+
+func (p *Parser) fail(e *SyntaxError) error {
+	if p.HandleError != nil {
+		return p.HandleError(e)
+	}
+	return e
 }
 
 // Create an object describing a syntax error while parsing matchertext.
@@ -267,6 +313,11 @@ type SyntaxError struct {
 // Error returns a human-readable description of the error.
 func (e *SyntaxError) Error() string {
 	return fmt.Sprintf("%v:%v %v", e.line, e.col, e.msg)
+}
+
+// Message returns the description of the error without its position.
+func (e *SyntaxError) Message() string {
+	return e.msg
 }
 
 // Offset returns the byte position at which the error occurred.

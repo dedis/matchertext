@@ -104,14 +104,43 @@ func (p *Parser) SetReader(r io.Reader) {
 // ReadAll reads an entire stream of MinML markup until end-of-file (EOF).
 // Returns a non-nil error if anything goes wrong.
 func (p *Parser) ReadAll(hm HandlerMarkup) error {
-	e := p.ReadMarkup(hm)
-	if e == nil {
-		return p.syntaxError("expected end of file")
+	for {
+		e := p.ReadMarkup(hm)
+		if e == io.EOF {
+			return nil
+		}
+		if e != nil {
+			return e
+		}
+		if e := p.syntaxError("expected end of file"); e != nil {
+			return e
+		}
+		p.mp.ReadByte() // recover by skipping the unmatched closer
 	}
-	if e != io.EOF {
-		return e
-	}
-	return nil
+}
+
+// SetErrorHandler sets the handler for syntax errors.
+// See matchertext.Parser.HandleError for how parsing continues
+// when the handler returns nil.
+func (p *Parser) SetErrorHandler(h func(err error) error) {
+	p.mp.HandleError = h
+}
+
+// Offset returns the byte offset of the last byte read from the input,
+// or of the end of the input after the parser has reached it.
+func (p *Parser) Offset() int64 {
+	return p.mp.Offset()
+}
+
+// Depth returns the number of matcher pairs enclosing the current position.
+func (p *Parser) Depth() int {
+	return p.mp.Depth()
+}
+
+// Unclosed reports whether the last matcher pair parsed did not consume its closer,
+// which happens only when the error handler let parsing continue.
+func (p *Parser) Unclosed() bool {
+	return p.mp.Unclosed()
 }
 
 // ReadMarkup reads markup within a MinML stream,
@@ -223,6 +252,12 @@ func (p *Parser) literalPair(o, c byte) (e error) {
 	// Parse matchertext until we see the corresponding closer
 	e = p.mp.ReadPair(p.mh, o, c)
 	if e != nil {
+		return
+	}
+	if p.mp.Unclosed() {
+		// Error recovery: the pair has no closer to buffer or suck space after,
+		// and the enclosing pair must not see this opener as its last matcher.
+		p.lmb = 0
 		return
 	}
 
@@ -468,7 +503,9 @@ func (ah aHandler) Byte(b byte) error {
 	// Ensure the attribute name is actually a valid XML name
 	name := p.buf.Bytes()
 	if !xml.IsName(name) {
-		return p.syntaxError("invalid attribute name")
+		if e := p.syntaxError("invalid attribute name"); e != nil {
+			return e
+		}
 	}
 	p.buf.Reset() // consume the name
 
@@ -481,13 +518,25 @@ func (ah aHandler) Byte(b byte) error {
 }
 
 func (ah aHandler) Open(o, c byte) error {
-	return ah.p.syntaxError("attribute name expected")
+	p := ah.p
+	if e := p.syntaxError("attribute name expected"); e != nil {
+		return e
+	}
+
+	// Recover by skipping the pair
+	n := p.buf.Len()
+	e := p.mp.ReadPair(p.rh, o, c)
+	p.buf.Truncate(n)
+	return e
 }
 
 // Handle any residual bytes in the buffer while parsing attributes
 func (p *Parser) aFlush() error {
 	if p.buf.Len() > 0 {
-		return p.syntaxError("attribute value expected")
+		if e := p.syntaxError("attribute value expected"); e != nil {
+			return e
+		}
+		p.buf.Reset() // recover by dropping the name without a value
 	}
 	return nil
 }
@@ -518,7 +567,9 @@ func (p *Parser) ReadAttribute(name []byte, ht HandlerText) error {
 			return e
 		}
 		if b != '}' && !xml.IsSpace(b) {
-			return p.syntaxError("end of attribute value expected")
+			if e := p.syntaxError("end of attribute value expected"); e != nil {
+				return e
+			}
 		}
 	} else {
 		// Parse unquoted attribute value text
@@ -616,8 +667,10 @@ func (rh rHandler) Open(o, c byte) (e error) {
 		return
 	}
 
-	// Write the literal closer
-	p.buf.WriteByte(c)
+	// Write the literal closer, unless error recovery left the pair without one
+	if !p.mp.Unclosed() {
+		p.buf.WriteByte(c)
+	}
 	return
 }
 
@@ -661,6 +714,8 @@ func (p *Parser) handleComment() (e error) {
 	return
 }
 
-func (p *Parser) syntaxError(msg string) *matchertext.SyntaxError {
-	return p.mp.SyntaxError(msg)
+// Report a syntax error at the current position.
+// A nil result means the error handler chose to continue parsing.
+func (p *Parser) syntaxError(msg string) error {
+	return p.mp.Fail(msg)
 }

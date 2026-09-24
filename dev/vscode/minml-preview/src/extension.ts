@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import {
@@ -16,9 +17,8 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Prefer a user-configured path, then the binary bundled alongside the
   // extension (installed by `make vscode-live-preview`), then fall back to PATH.
-  const serverPath =
-    config.get<string>("lspPath") ||
-    path.join(context.extensionPath, binaryName);
+  const bundled = path.join(context.extensionPath, binaryName);
+  const serverPath = config.get<string>("lspPath") || (fs.existsSync(bundled) ? bundled : binaryName);
 
   const debug = config.get<boolean>("debug") || false;
 
@@ -93,11 +93,13 @@ function getWebviewOptions(extensionUri: vscode.Uri): vscode.WebviewOptions {
 class LivePreviewPanel {
   public static currentPanel: LivePreviewPanel | undefined;
   public static readonly viewType = "MinMLPreview";
+  private static readonly debounceMs = 100;
 
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
   private _document: vscode.TextDocument;
   private _disposables: vscode.Disposable[] = [];
+  private _pending: NodeJS.Timeout | undefined;
 
   public static createOrShow(extensionUri: vscode.Uri, viewColumn: vscode.ViewColumn) {
     const editor = vscode.window.activeTextEditor;
@@ -156,8 +158,13 @@ class LivePreviewPanel {
     );
 
     vscode.workspace.onDidChangeTextDocument(
-      (_) => {
-        this._update();
+      (e) => {
+        if (e.document !== this._document) {
+          return;
+        }
+        // Convert once typing pauses rather than on every keystroke
+        clearTimeout(this._pending);
+        this._pending = setTimeout(() => this._update(), LivePreviewPanel.debounceMs);
       },
       null,
       this._disposables,
@@ -197,6 +204,7 @@ class LivePreviewPanel {
   }
 
   public dispose() {
+    clearTimeout(this._pending);
     LivePreviewPanel.currentPanel = undefined;
     this._panel.dispose();
     while (this._disposables.length) {
