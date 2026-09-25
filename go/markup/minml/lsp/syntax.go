@@ -14,7 +14,6 @@ type Kind uint8
 const (
 	KindTag       Kind = iota // element name
 	KindAttrName              // attribute name
-	KindBracket               // '{' '}' '[' ']' delimiting attributes or content
 	KindReference             // character reference [name]
 	KindComment               // comment -[...]
 	KindRaw                   // raw text +[...]
@@ -148,18 +147,11 @@ func (r *recorder) Element(name []byte) error {
 	if r.src[open] == '{' {
 		r.block = len(r.syn.Blocks)
 		r.syn.Blocks = append(r.syn.Blocks, AttrBlock{Tag: string(name), Open: open})
-		r.mark(KindBracket, open, open+1)
 	}
 	e := r.p.ReadElement(name, r)
 	r.block = outer
 	r.elem = outerElem
-	if e != nil {
-		return e
-	}
-	if !r.p.Unclosed() {
-		r.mark(KindBracket, r.offset(), r.offset()+1)
-	}
-	return nil
+	return e
 }
 
 func (r *recorder) Attribute(name []byte) error {
@@ -174,19 +166,10 @@ func (r *recorder) Attribute(name []byte) error {
 }
 
 func (r *recorder) Content() error {
-	// The '[' follows the attribute block, or was peeked if there is none.
-	open := r.offset()
 	if r.block >= 0 {
-		b := &r.syn.Blocks[r.block]
-		b.Close = open
-		if !r.p.Unclosed() {
-			r.mark(KindBracket, open, open+1)
-			open++
-		}
+		// The last byte read is the block's '}', or where error recovery closed the block.
+		r.syn.Blocks[r.block].Close = r.offset()
 		r.block = -1
-	}
-	if open < len(r.src) && r.src[open] == '[' {
-		r.mark(KindBracket, open, open+1)
 	}
 	r.parents = append(r.parents, r.elem)
 	e := r.p.ReadContent(r)

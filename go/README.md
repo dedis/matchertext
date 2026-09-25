@@ -53,8 +53,8 @@ the server reparses only the elements around each edit.
 - **Diagnostics** for every syntax error, such as unmatched brackets
 - **Completion** for HTML5 tags, and for attributes inside `{...}`
 - **Hover** documentation for HTML5 tags, character references, and MinML constructs
-- **Semantic highlighting** of element and attribute names, brackets,
-  references, comments, and raw text
+- **Semantic highlighting** of element and attribute names, references,
+  comments, and raw text. Brackets get no tokens; each editor colors them itself
 
 ### Running it by hand
 

@@ -1,0 +1,31 @@
+<idea-plugin>
+  <id>org.dedis.matchertext.minml</id>
+  <name>MinML</name>
+  <vendor>DEDIS</vendor>
+  <description><![CDATA[
+    MinML language support through the minml-lsp language server:
+    diagnostics, hover, completion, and semantic highlighting.
+  ]]></description>
+
+  <depends>com.intellij.modules.platform</depends>
+  <depends>com.redhat.devtools.lsp4ij</depends>
+
+  <extensions defaultExtensionNs="com.intellij">
+    <fileType name="MinML" implementationClass="org.dedis.matchertext.minml.MinmlFileType" fieldName="INSTANCE"
+              language="MinML" extensions="minml"/>
+    <lang.parserDefinition language="MinML" implementationClass="org.dedis.matchertext.minml.MinmlParserDefinition"/>
+    <lang.syntaxHighlighterFactory language="MinML"
+                                   implementationClass="org.dedis.matchertext.minml.MinmlSyntaxHighlighterFactory"/>
+    <lang.braceMatcher language="MinML" implementationClass="org.dedis.matchertext.minml.MinmlBraceMatcher"/>
+    <lang.commenter language="MinML" implementationClass="org.dedis.matchertext.minml.MinmlCommenter"/>
+    <completion.confidence language="MinML" order="first"
+                           implementationClass="org.dedis.matchertext.minml.MinmlCompletionConfidence"/>
+  </extensions>
+
+  <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+    <server id="minml" name="MinML" factoryClass="org.dedis.matchertext.minml.MinmlServerFactory">
+      <description><![CDATA[MinML language server]]></description>
+    </server>
+    <languageMapping language="MinML" serverId="minml" languageId="minml"/>
+  </extensions>
+</idea-plugin>

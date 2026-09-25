@@ -7,13 +7,14 @@ import (
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
+// Brackets get no tokens: editors color them natively (VS Code bracket pair colorization,
+// the Neovim and JetBrains plugins' syntax rules), and they are over half of all tokens.
 var tokenTypes = []string{
-	"type",     // element name
-	"property", // attribute name
-	"operator", // attribute and content brackets
-	"constant", // character reference
-	"string",   // raw text, quotation element name
-	"comment",  // comment
+	"type",       // element name
+	"property",   // attribute name
+	"enumMember", // character reference; LSP has no standard "constant" type
+	"string",     // raw text, quotation element name
+	"comment",    // comment
 }
 
 var tokenModifiers = []string{}
@@ -22,19 +23,17 @@ func tokenType(k Kind, src string) uint32 {
 	switch k {
 	case KindTag:
 		if src == `"` || src == "'" {
-			return 4
+			return 3
 		}
 		return 0
 	case KindAttrName:
 		return 1
-	case KindBracket:
-		return 2
 	case KindReference:
-		return 3
+		return 2
 	case KindRaw:
-		return 4
+		return 3
 	}
-	return 5 // KindComment
+	return 4 // KindComment
 }
 
 func (s *Server) SemanticTokensFull(_ *glsp.Context, params *protocol.SemanticTokensParams) (*protocol.SemanticTokens, error) {

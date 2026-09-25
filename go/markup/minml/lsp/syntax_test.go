@@ -51,8 +51,6 @@ func checkSyntax(t *testing.T, src string) {
 			ok = m.End < len(src) && (src[m.End] == '[' || src[m.End] == '{')
 		case KindAttrName:
 			ok = src[m.End] == '='
-		case KindBracket:
-			ok = len(s) == 1 && strings.Contains("[]{}", s)
 		case KindReference:
 			ok = s[0] == '[' && s[len(s)-1] == ']'
 		case KindComment:
@@ -132,10 +130,8 @@ func TestTokens(t *testing.T) {
 	d := newDocument("é[a]\n-[x\ny]", 0, nil)
 	want := []uint32{
 		0, 0, 1, 0, 0, // é
-		0, 1, 1, 2, 0, // [
-		0, 2, 1, 2, 0, // ]
-		1, 0, 3, 5, 0, // -[x
-		1, 0, 2, 5, 0, // y]
+		1, 0, 3, 4, 0, // -[x
+		1, 0, 2, 4, 0, // y]
 	}
 	if got := d.tokens(); !equal(got, want) {
 		t.Errorf("tokens = %v, want %v", got, want)
@@ -221,9 +217,9 @@ func TestLineEnds(t *testing.T) {
 		t.Errorf("Offset past line end = %d, want 3", o)
 	}
 	want := []uint32{
-		0, 0, 3, 5, 0, // -[a
-		1, 0, 1, 5, 0, // b
-		1, 0, 2, 5, 0, // c]
+		0, 0, 3, 4, 0, // -[a
+		1, 0, 1, 4, 0, // b
+		1, 0, 2, 4, 0, // c]
 	}
 	if got := d.tokens(); !equal(got, want) {
 		t.Errorf("tokens = %v, want %v", got, want)

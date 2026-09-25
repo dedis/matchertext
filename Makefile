@@ -1,6 +1,6 @@
 GOROOT := $(shell go env GOROOT)
 
-.PHONY: all build build-lsp build-wasm vscode-live-preview
+.PHONY: all build build-lsp build-wasm vscode-live-preview neovim-plugin jetbrains-plugin
 
 all: build
 
@@ -12,6 +12,14 @@ build:
 
 build-lsp:
 	go build -o minml-lsp$(EXE) ./go/markup/minml/cmd/lsp/
+
+neovim-plugin: build-lsp
+	mkdir -p dev/neovim/bin
+	cp minml-lsp$(EXE) dev/neovim/bin/
+
+# Needs JDK 21 in JAVA_HOME; every JetBrains IDE bundles one.
+jetbrains-plugin:
+	cd dev/jetbrains && ./gradlew buildPlugin
 
 EXT_NAME := $(shell node -p "require('./dev/vscode/minml-preview/package.json').publisher + '.' + require('./dev/vscode/minml-preview/package.json').name + '-' + require('./dev/vscode/minml-preview/package.json').version")
 

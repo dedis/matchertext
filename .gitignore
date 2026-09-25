@@ -19,6 +19,11 @@ out/wasm/wasm_exec.js
 dev/vscode/.vscode-test/
 dev/vscode/out
 dev/vscode/dist
+dev/neovim/bin
+dev/jetbrains/.gradle/
+dev/jetbrains/.intellijPlatform/
+dev/jetbrains/.kotlin/
+dev/jetbrains/build/
 
 
 
