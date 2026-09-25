@@ -47,6 +47,10 @@ inductively (\ie generatively) as follows:
 	is also a matchertext string in $L$.
 \end{itemize}
 
+Formally, $L$ is the \emph{Dyck Language}~\cite{chomsky63algebraic} over $\Pi$ where the nonmatchers are classified
+as neutral symbols. Equivalently, a string is matchertext if and only if it becomes a Dyck work once all the
+nonmatchers are removed from it. With $|\Pi| = 1$ this is the language of balanced parentheses.
+
 Intuitively, this definition captures the basic rule
 that \emph{matchers must match} in matchertext.
 Openers can be introduced into valid matchertext
