@@ -43,6 +43,11 @@
         "title": "Open Preview to the Side",
         "category": "MinML",
         "icon": "$(layout-sidebar-right)"
+      },
+      {
+        "command": "minml.toggleComment",
+        "title": "Toggle Comment",
+        "category": "MinML"
       }
     ],
     "menus": {
@@ -59,6 +64,19 @@
         }
       ]
     },
+    "keybindings": [
+      {
+        "command": "minml.toggleComment",
+        "key": "ctrl+/",
+        "mac": "cmd+/",
+        "when": "editorTextFocus && !editorReadonly && editorLangId == minml"
+      },
+      {
+        "command": "minml.toggleComment",
+        "key": "shift+alt+a",
+        "when": "editorTextFocus && !editorReadonly && editorLangId == minml"
+      }
+    ],
     "configurationDefaults": {
       "[minml]": {
         "editor.quickSuggestions": {

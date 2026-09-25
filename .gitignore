@@ -22,6 +22,7 @@ dev/vscode/dist
 dev/neovim/bin
 dev/emacs/bin
 dev/sublime/bin
+dev/zed/target/
 dev/jetbrains/.gradle/
 dev/jetbrains/.intellijPlatform/
 dev/jetbrains/.kotlin/

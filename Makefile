@@ -1,6 +1,6 @@
 GOROOT := $(shell go env GOROOT)
 
-.PHONY: all build build-lsp build-wasm vscode-live-preview neovim-plugin emacs-plugin sublime-plugin jetbrains-plugin
+.PHONY: all build build-lsp build-wasm vscode-live-preview neovim-plugin emacs-plugin sublime-plugin jetbrains-plugin gen-parser test-grammar zed-extension
 
 all: build
 
@@ -28,6 +28,24 @@ sublime-plugin: build-lsp
 # Needs JDK 21 in JAVA_HOME; every JetBrains IDE bundles one.
 jetbrains-plugin:
 	cd dev/jetbrains && ./gradlew buildPlugin
+
+# The generated src/ is committed, because Zed and Helix build the grammar from it.
+gen-parser:
+	cd dev/tree-sitter && tree-sitter generate
+
+# Checks that the grammar and the Go parser accept the same documents with the same constructs.
+test-grammar:
+	cd dev/tree-sitter && tree-sitter test && go test ./...
+
+# A copy of dev/zed whose grammar comes from this repository at its current commit,
+# for "zed: install dev extension". Commit the grammar first.
+zed-extension:
+	rm -rf out/zed-extension
+	mkdir -p out/zed-extension
+	cp -RL dev/zed/Cargo.toml dev/zed/Cargo.lock dev/zed/src dev/zed/languages out/zed-extension/
+	sed -e '/^\[grammars.minml\]/,/^$$/s|^repository = .*|repository = "file://$(CURDIR)"|' \
+	    -e "/^\[grammars.minml\]/,/^$$/s|^rev = .*|rev = \"$$(git rev-parse HEAD)\"|" \
+	    dev/zed/extension.toml > out/zed-extension/extension.toml
 
 EXT_NAME := $(shell node -p "require('./dev/vscode/minml-preview/package.json').publisher + '.' + require('./dev/vscode/minml-preview/package.json').name + '-' + require('./dev/vscode/minml-preview/package.json').version")
 

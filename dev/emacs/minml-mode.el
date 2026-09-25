@@ -49,6 +49,52 @@ beside this file, then minml-lsp on the variable `exec-path'."
     table)
   "Syntax table for `minml-mode'.")
 
+(defun minml--syntax-propertize (start end)
+  "Mark each comment between START and END as a generic comment.
+A comment runs from the \"-\" of \"-[\" to the \"]\" that balances its \"[\".
+The \"-\" must be a whole element name: at the start of a line, or after
+whitespace or a matcher, with an optional space sucker \"<\" in between."
+  (remove-text-properties start end '(minml-open nil))
+  (goto-char start)
+  (while (search-forward "-[" end t)
+    (let* ((dash (- (point) 2))
+           (before (if (eq (char-before dash) ?<) (1- dash) dash))
+           (close (and (or (= before (point-min))
+                           (memq (char-before before) '(?\s ?\t ?\n ?\r ?\[ ?\] ?\( ?\) ?\{ ?\})))
+                       ;; Only the matchers count, not the comments marked so far.
+                       (let ((parse-sexp-lookup-properties nil))
+                         (condition-case nil (scan-lists (1+ dash) 1 0)
+                           (scan-error 'open))))))
+      (cond
+       ((not close))
+       ((eq close 'open)
+        ;; Text after it can still close it.
+        (put-text-property dash (1+ dash) 'minml-open t))
+       (t
+        (put-text-property dash (1+ dash) 'syntax-table (string-to-syntax "!"))
+        (put-text-property (1- close) close 'syntax-table (string-to-syntax "!"))
+        ;; A later chunk that starts inside the comment propertizes all of it again.
+        (put-text-property dash close 'syntax-multiline t)
+        (goto-char close))))))
+
+(defvar-local minml--matcher-deleted nil
+  "Whether the text that the current change deletes has a matcher.")
+
+(defun minml--before-change (beg end)
+  "Record whether the change deletes a matcher between BEG and END."
+  (setq minml--matcher-deleted
+        (save-excursion (goto-char beg) (re-search-forward "[][(){}]" end t))))
+
+(defun minml--after-change (beg end _len)
+  "Propertize again from the first comment whose end the change at BEG can move.
+Only a change of matchers can: it can end the comment BEG is in, or an unclosed
+\"-[\" before BEG.  END is the end of the inserted text."
+  (when (or minml--matcher-deleted
+            (save-excursion (goto-char beg) (re-search-forward "[][(){}]" end t)))
+    (let ((open (text-property-any (point-min) beg 'minml-open t))
+          (ppss (save-excursion (syntax-ppss beg))))
+      (syntax-ppss-flush-cache (min (or open beg) (if (nth 4 ppss) (nth 8 ppss) beg))))))
+
 (defvar minml-font-lock-keywords
   '(("[][{}()]" . 'font-lock-bracket-face))
   "Highlighting that the language server leaves to the editor.")
@@ -60,6 +106,15 @@ beside this file, then minml-lsp on the variable `exec-path'."
   (setq-local comment-end "]")
   (setq-local comment-start-skip "-\\[\\s-*")
   (setq-local comment-end-skip "\\s-*\\]")
+  ;; A comment ends at the "]" that balances its "-[", so brackets inside need no quoting.
+  (setq-local comment-quote-nested nil)
+  (setq-local syntax-propertize-function #'minml--syntax-propertize)
+  (add-hook 'syntax-propertize-extend-region-functions
+            #'syntax-propertize-multiline 'append t)
+  (add-hook 'before-change-functions #'minml--before-change nil t)
+  (add-hook 'after-change-functions #'minml--after-change nil t)
+  ;; Brackets in a comment do not count, because its closing "]" is a comment fence.
+  (setq-local parse-sexp-ignore-comments t)
   (setq-local font-lock-defaults '(minml-font-lock-keywords))
   (when minml-start-eglot
     (eglot-ensure)))

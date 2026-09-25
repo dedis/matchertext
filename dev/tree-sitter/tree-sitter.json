@@ -1,0 +1,41 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "minml",
+      "highlights": "queries/highlights.scm",
+      "camelcase": "MinML",
+      "title": "MinML",
+      "scope": "text.minml",
+      "file-types": [
+        "minml"
+      ],
+      "injection-regex": "^minml$",
+      "class-name": "TreeSitterMinml",
+      "indents": "queries/indents.scm"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "MinML grammar for tree-sitter, equivalent to the Go parser in go/markup/minml",
+    "authors": [
+      {
+        "name": "Philip Hamelink",
+        "email": "philip.hamelink@epfl.ch"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/dedis/matchertext"
+    }
+  },
+  "bindings": {
+    "c": false,
+    "go": true,
+    "node": false,
+    "python": false,
+    "rust": false,
+    "swift": false,
+    "zig": false
+  }
+}

@@ -1,0 +1,11 @@
+name = "MinML"
+grammar = "minml"
+path_suffixes = ["minml"]
+# Close brackets also before these characters, as VS Code does, so nested brackets close.
+autoclose_before = ";:.,=}])>"
+block_comment ={ start = "-[", end = "]", prefix = "", tab_size = 0 }
+brackets = [
+  { start = "[", end = "]", close = true, newline = true },
+  { start = "{", end = "}", close = true, newline = false },
+  { start = "(", end = ")", close = true, newline = false },
+]

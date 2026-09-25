@@ -1,4 +1,11 @@
 {
   "command": ["$minml_lsp"],
   "selector": "text.minml",
+  // The HTML scopes, which color schemes color: the default "property" and
+  // "enumMember" scopes look like plain text in Mariana.
+  "semantic_tokens": {
+    "type": "entity.name.tag.minml",
+    "property": "entity.other.attribute-name.minml",
+    "enumMember": "constant.character.entity.minml",
+  },
 }

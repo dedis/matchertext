@@ -61,6 +61,12 @@ type Syntax struct {
 	Syncs    []Sync      // in document order
 }
 
+// Parse returns the syntax of src.
+// The tree-sitter grammar's tests compare their trees against it.
+func Parse(src string) Syntax {
+	return parseSyntax(src, 0)
+}
+
 // parseSyntax parses src with the reference MinML parser and records
 // the source ranges of its constructs. Syntax errors do not stop the parse.
 // marks is the expected number of marks, to size the mark slice once.

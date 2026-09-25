@@ -8,6 +8,7 @@
   ]]></description>
 
   <depends>com.intellij.modules.platform</depends>
+  <depends>com.intellij.modules.xml</depends>
   <depends>com.redhat.devtools.lsp4ij</depends>
 
   <extensions defaultExtensionNs="com.intellij">
@@ -27,5 +28,7 @@
       <description><![CDATA[MinML language server]]></description>
     </server>
     <languageMapping language="MinML" serverId="minml" languageId="minml"/>
+    <semanticTokensColorsProvider serverId="minml"
+                                  class="org.dedis.matchertext.minml.MinmlSemanticTokensColorsProvider"/>
   </extensions>
 </idea-plugin>

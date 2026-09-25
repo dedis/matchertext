@@ -1,16 +1,65 @@
 %YAML 1.2
 ---
-# Brackets only. The minml-lsp language server colors everything else
+# Brackets, comments, and raw text. The minml-lsp language server colors everything else
 # when the LSP package's "semantic_highlighting" setting is on.
+# Comments need their scope here: toggle_comment finds the comment to remove by its scope.
 name: MinML
 scope: text.minml
 file_extensions:
   - minml
+variables:
+  # "-" and "+" open a comment and raw text only as a whole element name: at the start of a
+  # line, or after whitespace, a matcher, or a space sucker "<" that follows one of these.
+  name_start: (?:^|(?<=[\s\[\](){}])|(?<=^<)|(?<=[\s\[\](){}]<))
 contexts:
   main:
+    - match: '{{name_start}}-\['
+      scope: punctuation.definition.comment.begin.minml
+      push: comment
+    - match: '{{name_start}}\+\['
+      scope: punctuation.definition.string.begin.minml
+      push: raw
     - match: '[\[\]]'
       scope: punctuation.section.brackets.minml
     - match: '[{}]'
       scope: punctuation.section.braces.minml
     - match: '[()]'
       scope: punctuation.section.parens.minml
+
+  comment:
+    - meta_scope: comment.block.minml
+    - match: '\]'
+      scope: punctuation.definition.comment.end.minml
+      pop: true
+    - include: pairs
+
+  raw:
+    - meta_scope: string.unquoted.minml
+    - match: '\]'
+      scope: punctuation.definition.string.end.minml
+      pop: true
+    - include: pairs
+
+  # Matchers inside comments and raw text balance, so a "]" in a pair does not end them.
+  pairs:
+    - match: '\['
+      push: brackets
+    - match: '\('
+      push: parens
+    - match: '\{'
+      push: braces
+
+  brackets:
+    - match: '\]'
+      pop: true
+    - include: pairs
+
+  parens:
+    - match: '\)'
+      pop: true
+    - include: pairs
+
+  braces:
+    - match: '\}'
+      pop: true
+    - include: pairs

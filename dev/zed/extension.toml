@@ -1,0 +1,18 @@
+id = "minml"
+name = "MinML"
+version = "0.0.1"
+schema_version = 1
+authors = ["DEDIS"]
+description = "MinML syntax highlighting and the minml-lsp language server"
+repository = "https://github.com/dedis/matchertext"
+
+# Zed builds the grammar from a git commit. `make zed-extension` writes a copy of this
+# extension that uses the local repository and its current commit instead.
+[grammars.minml]
+repository = "https://github.com/dedis/matchertext"
+rev = "main"
+path = "dev/tree-sitter"
+
+[language_servers.minml-lsp]
+name = "minml-lsp"
+languages = ["MinML"]

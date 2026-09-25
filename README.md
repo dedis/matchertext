@@ -38,7 +38,7 @@ instructions here.
 | [`doc`](doc)                               | LaTeX source for the matchertext paper                                               |
 | [`lean`](lean)                             | Machine-checked proofs of the properties both papers rely on                         |
 | [`go`](go)                                 | Go reference implementation: the matchertext scanner, MinML, and the language server |
-| [`dev`](dev)                               | Editor tooling: a VS Code extension                                                  |
+| [`dev`](dev)                               | Editor support: tree-sitter grammar, VS Code, Neovim, Emacs, Sublime Text, Zed, Helix, JetBrains |
 | [`LLVM`](LLVM)                             | Clang-based tool that measures matchertext compliance across source trees            |
 | [`injection-research`](injection-research) | The injection study: CVE pipeline, corpus, and a matchertext-aware SQLite            |
 
@@ -59,6 +59,7 @@ home: they read from one directory and write into another, and
 | `make build-lsp`           | the `minml-lsp` language server                       |
 | `make build-wasm`          | the WebAssembly parser, for the browser and VS Code   |
 | `make vscode-live-preview` | the VS Code extension, installed locally              |
+| `make gen-parser`          | the tree-sitter parser from `grammar.js`              |
 
 `build` and `build-lsp` are one-line wrappers over the native command for
 their directory; the linked README gives that command directly. Everything
