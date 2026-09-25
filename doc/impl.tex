@@ -187,6 +187,23 @@ and the grammar change a C-like host needs is correspondingly small:
 the discipline it must impose inside an embedding
 is the one it already imposes everywhere else.
 
+\subsection{Matchertext for CHICKEN Scheme}
+
+The \href{https://wiki.call-cc.org/eggref/6/matchertext}{\texttt{matchertext} egg}
+for CHICKEN Scheme, by Hernán Ibarra Mejia,
+adds the above embedded compiler grammar
+as a reader extension, enabled by \verb|(import matchertext)|.
+Since CHICKEN Scheme is not a C-style language, the \verb|M| prefix
+is rewritten as \verb|#M| to use the language's
+\href{https://wiki.call-cc.org/man/5/Module%20(chicken%20read-syntax)}{reader's dispatch character}.
+This allows the \verb|#M| prefix to have no prior meaning and in turn not clash with the existing language,
+so the extension is conservative for the same reason as in C-like languages.
+So \verb|#M"(\([{{}]))"| convert to the string \verb|\([{{}])| without escapes,
+and \verb|#M{}"({greeting}, world)"| interpolates the Scheme expression
+\verb|greeting| into the literal.
+The egg currently accepts only parentheses around the literal's content.
+Its source is available at \url{https://git.sr.ht/~nagbu/matchertext}.
+
 \subsection{MinML: minified matchertext markup}
 
 One early experiment in matchertext-friendly syntax design
@@ -239,8 +256,12 @@ Braces		& \verb|{}|	& \verb|[{<}]|	& \verb|[{>}]|	\\
 An experimental library and command-line tool
 to parse MinML and convert it to HTML or XML,
 written in Go,
-is available at \url{https://github.com/dedis/matchertext}.
-An \href{https://github.com/bford/hugo}{extention}
+is available at \url{https://github.com/dedis/matchertext/tree/main/go/matchertext}.
+An \href{https://github.com/bford/hugo}{extension}
 to the \href{https://gohugo.io}{Hugo}
 static website generator supports web authoring in MinML.
 
+In addition, a Language Server Protocol Server (LSP) for MinML is available at
+\url{https://github.com/dedis/matchertext/tree/main/dev/vscode/minml-preview}
+and provides syntax highlighting, diagnostics, hover and completion for Visual Studio Code, JetBrains IDEs,
+NeoVim, Sublime Text, Emacs, Zed and Helix.
