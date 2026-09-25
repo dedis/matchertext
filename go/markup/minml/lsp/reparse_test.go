@@ -73,3 +73,37 @@ func TestReparseMatchesFullParse(t *testing.T) {
 		}
 	}
 }
+
+func TestTokenEdit(t *testing.T) {
+	inserts := []string{"", "a", "x[", "]", "p[y]", "\n", "é", "-[", "[amp]", "div{a="}
+	rng := rand.New(rand.NewSource(5))
+	for n := 0; n < 20000; n++ {
+		d := newDocument(randomMinML(rng, 3), 0, nil)
+		s := rng.Intn(len(d.Text) + 1)
+		e := s + rng.Intn(min(len(d.Text)-s, 6)+1)
+		old, new := d.tokens(), d.edit(s, e, inserts[rng.Intn(len(inserts))], 0).tokens()
+		edit := tokenEdit(old, new)
+		if edit.Start%5 != 0 || edit.DeleteCount%5 != 0 || len(edit.Data)%5 != 0 {
+			t.Fatalf("edit %+v is not in whole tokens", edit)
+		}
+		got := append(append(append([]uint32{}, old[:edit.Start]...), edit.Data...), old[edit.Start+edit.DeleteCount:]...)
+		if !reflect.DeepEqual(got, new) && len(got)+len(new) > 0 {
+			t.Fatalf("edit %+v applied to %v gives %v, want %v", edit, old, got, new)
+		}
+	}
+}
+
+func TestSwapTokens(t *testing.T) {
+	s := NewStore()
+	id1, prev := s.swapTokens("u", []uint32{1}, "")
+	if prev != nil {
+		t.Fatal("first result has a previous result")
+	}
+	id2, prev := s.swapTokens("u", []uint32{2}, id1)
+	if !reflect.DeepEqual(prev, []uint32{1}) || id2 == id1 {
+		t.Fatalf("got %v, %q after %q", prev, id2, id1)
+	}
+	if _, prev = s.swapTokens("u", []uint32{3}, id1); prev != nil {
+		t.Fatal("a stale result id returned tokens")
+	}
+}

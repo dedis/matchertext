@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"sort"
+	"strconv"
 	"sync"
 	"unicode/utf8"
 
@@ -128,15 +129,38 @@ func (d *Document) markAt(o int) int {
 	return -1
 }
 
-// Store holds the open documents.
+// Store holds the open documents, and the last semantic tokens sent for each,
+// which a delta request needs.
 // The TCP transport serves several connections at once, so access is locked.
 type Store struct {
 	mu        sync.RWMutex
 	documents map[string]*Document
+	tokens    map[string]tokenResult
+	resultIDs uint64
+}
+
+type tokenResult struct {
+	id   string
+	data []uint32 // never modified after it is stored
 }
 
 func NewStore() *Store {
-	return &Store{documents: make(map[string]*Document)}
+	return &Store{documents: make(map[string]*Document), tokens: make(map[string]tokenResult)}
+}
+
+// swapTokens stores data as the latest tokens of uri and returns its new result id.
+// It also returns the stored tokens if their id is prev, and nil otherwise.
+func (s *Store) swapTokens(uri string, data []uint32, prev string) (string, []uint32) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.resultIDs++
+	id := strconv.FormatUint(s.resultIDs, 10)
+	old, ok := s.tokens[uri]
+	s.tokens[uri] = tokenResult{id, data}
+	if ok && old.id == prev {
+		return id, old.data
+	}
+	return id, nil
 }
 
 // Update parses text and stores it as the current version of uri.
@@ -165,6 +189,7 @@ func (s *Store) Get(uri string) *Document {
 func (s *Store) Delete(uri string) {
 	s.mu.Lock()
 	delete(s.documents, uri)
+	delete(s.tokens, uri)
 	s.mu.Unlock()
 }
 
@@ -172,5 +197,6 @@ func (s *Store) Delete(uri string) {
 func (s *Store) CloseAll() {
 	s.mu.Lock()
 	s.documents = make(map[string]*Document)
+	s.tokens = make(map[string]tokenResult)
 	s.mu.Unlock()
 }

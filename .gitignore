@@ -20,6 +20,8 @@ dev/vscode/.vscode-test/
 dev/vscode/out
 dev/vscode/dist
 dev/neovim/bin
+dev/emacs/bin
+dev/sublime/bin
 dev/jetbrains/.gradle/
 dev/jetbrains/.intellijPlatform/
 dev/jetbrains/.kotlin/

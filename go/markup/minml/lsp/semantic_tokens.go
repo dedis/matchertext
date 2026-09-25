@@ -41,7 +41,49 @@ func (s *Server) SemanticTokensFull(_ *glsp.Context, params *protocol.SemanticTo
 	if d == nil {
 		return &protocol.SemanticTokens{Data: []uint32{}}, nil
 	}
-	return &protocol.SemanticTokens{Data: d.tokens()}, nil
+	data := d.tokens()
+	id, _ := s.Store.swapTokens(params.TextDocument.URI, data, "")
+	return &protocol.SemanticTokens{ResultID: &id, Data: data}, nil
+}
+
+// SemanticTokensFullDelta answers with the edit from the client's previous result,
+// or with all tokens if the server no longer holds that result.
+func (s *Server) SemanticTokensFullDelta(_ *glsp.Context, params *protocol.SemanticTokensDeltaParams) (any, error) {
+	d := s.Store.Get(params.TextDocument.URI)
+	if d == nil {
+		return &protocol.SemanticTokens{Data: []uint32{}}, nil
+	}
+	data := d.tokens()
+	id, prev := s.Store.swapTokens(params.TextDocument.URI, data, params.PreviousResultID)
+	if prev == nil {
+		return &protocol.SemanticTokens{ResultID: &id, Data: data}, nil
+	}
+	edits := []protocol.SemanticTokensEdit{}
+	if e := tokenEdit(prev, data); e.DeleteCount > 0 || len(e.Data) > 0 {
+		edits = append(edits, e)
+	}
+	return &protocol.SemanticTokensDelta{ResultId: &id, Edits: edits}, nil
+}
+
+// tokenEdit returns one edit that turns old into new: new's tokens between the common
+// prefix and the common suffix, in whole tokens of 5 integers.
+// Positions in the encoding are relative, so an edit inside one line changes only that line's tokens.
+func tokenEdit(old, new []uint32) protocol.SemanticTokensEdit {
+	p := 0
+	for p < len(old) && p < len(new) && old[p] == new[p] {
+		p++
+	}
+	p -= p % 5
+	q := 0
+	for q < len(old)-p && q < len(new)-p && old[len(old)-1-q] == new[len(new)-1-q] {
+		q++
+	}
+	q -= q % 5
+	return protocol.SemanticTokensEdit{
+		Start:       uint32(p),
+		DeleteCount: uint32(len(old) - p - q),
+		Data:        new[p : len(new)-q],
+	}
 }
 
 // tokens encodes the marks as LSP semantic tokens, split at line ends.

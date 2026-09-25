@@ -1,6 +1,6 @@
 GOROOT := $(shell go env GOROOT)
 
-.PHONY: all build build-lsp build-wasm vscode-live-preview neovim-plugin jetbrains-plugin
+.PHONY: all build build-lsp build-wasm vscode-live-preview neovim-plugin emacs-plugin sublime-plugin jetbrains-plugin
 
 all: build
 
@@ -16,6 +16,14 @@ build-lsp:
 neovim-plugin: build-lsp
 	mkdir -p dev/neovim/bin
 	cp minml-lsp$(EXE) dev/neovim/bin/
+
+emacs-plugin: build-lsp
+	mkdir -p dev/emacs/bin
+	cp minml-lsp$(EXE) dev/emacs/bin/
+
+sublime-plugin: build-lsp
+	mkdir -p dev/sublime/bin
+	cp minml-lsp$(EXE) dev/sublime/bin/
 
 # Needs JDK 21 in JAVA_HOME; every JetBrains IDE bundles one.
 jetbrains-plugin:

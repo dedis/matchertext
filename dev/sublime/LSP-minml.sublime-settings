@@ -1,0 +1,4 @@
+{
+  "command": ["$minml_lsp"],
+  "selector": "text.minml",
+}

@@ -37,6 +37,8 @@ func NewServer(debug bool) *Server {
 		TextDocumentCompletion:         s.Completion,
 		TextDocumentHover:              s.Hover,
 		TextDocumentSemanticTokensFull: s.SemanticTokensFull,
+
+		TextDocumentSemanticTokensFullDelta: s.SemanticTokensFullDelta,
 	}
 	s.Server = server.NewServer(&s.Handler, serverName, debug)
 	return s
@@ -52,13 +54,14 @@ func (s *Server) Initialize(_ *glsp.Context, params *protocol.InitializeParams) 
 		TriggerCharacters: []string{"{"},
 	}
 	capabilities.HoverProvider = true
+	delta := true
 	capabilities.SemanticTokensProvider = protocol.SemanticTokensRegistrationOptions{
 		SemanticTokensOptions: protocol.SemanticTokensOptions{
 			Legend: protocol.SemanticTokensLegend{
 				TokenTypes:     tokenTypes,
 				TokenModifiers: tokenModifiers,
 			},
-			Full: true,
+			Full: protocol.SemanticDelta{Delta: &delta},
 		},
 	}
 

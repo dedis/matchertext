@@ -1,0 +1,16 @@
+%YAML 1.2
+---
+# Brackets only. The minml-lsp language server colors everything else
+# when the LSP package's "semantic_highlighting" setting is on.
+name: MinML
+scope: text.minml
+file_extensions:
+  - minml
+contexts:
+  main:
+    - match: '[\[\]]'
+      scope: punctuation.section.brackets.minml
+    - match: '[{}]'
+      scope: punctuation.section.braces.minml
+    - match: '[()]'
+      scope: punctuation.section.parens.minml
