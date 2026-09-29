@@ -1,31 +1,19 @@
-; Tags
+; Capture names that Helix, Zed, and Neovim themes all define, directly or by prefix.
+
 (tag_name) @tag
 
-; Attributes
-(attr_name) @tag.attribute
-(attr_block "{" @punctuation.bracket "}" @punctuation.bracket)
+(attr_name) @attribute
 
-; Content blocks
-(content_block "[" @punctuation.bracket "]" @punctuation.bracket)
+"=" @punctuation.delimiter
 
-; Character references
-(char_ref "[" @punctuation.bracket "]" @punctuation.bracket)
-(named_ref) @constant.builtin
-(decimal_ref) @constant.builtin
-(hex_ref) @constant.builtin
+(reference) @constant.character.escape
 
-; Strings and Raw blocks
-(quoted_string) @string
-(raw_block) @string.special
-
-; Comments
 (comment) @comment
 
-; Processing instructions
-(processing_instruction) @keyword.directive
+(raw) @string
 
-; Space-suckers
-["<" ">"] @punctuation.delimiter
-
-; Escape sequences
-(matcher_escape) @string.escape
+; Only brackets that delimit structure: brackets inside comments and raw text keep their color.
+(content ["[" "]"] @punctuation.bracket)
+(attributes ["{" "}"] @punctuation.bracket)
+(quoted_value ["[" "]"] @punctuation.bracket)
+(literal ["[" "]" "{" "}" "(" ")"] @punctuation.bracket)

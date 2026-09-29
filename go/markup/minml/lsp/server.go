@@ -37,6 +37,8 @@ func NewServer(debug bool) *Server {
 		TextDocumentCompletion:         s.Completion,
 		TextDocumentHover:              s.Hover,
 		TextDocumentSemanticTokensFull: s.SemanticTokensFull,
+
+		TextDocumentSemanticTokensFullDelta: s.SemanticTokensFullDelta,
 	}
 	s.Server = server.NewServer(&s.Handler, serverName, debug)
 	return s
@@ -45,20 +47,21 @@ func NewServer(debug bool) *Server {
 func (s *Server) Initialize(_ *glsp.Context, params *protocol.InitializeParams) (any, error) {
 	s.Log.Infof("initializing server %s %s", serverName, version)
 	capabilities := s.Handler.CreateServerCapabilities()
-	syncKind := protocol.TextDocumentSyncKindFull
+	syncKind := protocol.TextDocumentSyncKindIncremental
 	capabilities.TextDocumentSync = &syncKind
 	capabilities.CompletionProvider = &protocol.CompletionOptions{
-		// { triggers attribute completions; tag completions fire on identifier characters
+		// { triggers attribute completions
 		TriggerCharacters: []string{"{"},
 	}
 	capabilities.HoverProvider = true
+	delta := true
 	capabilities.SemanticTokensProvider = protocol.SemanticTokensRegistrationOptions{
 		SemanticTokensOptions: protocol.SemanticTokensOptions{
 			Legend: protocol.SemanticTokensLegend{
 				TokenTypes:     tokenTypes,
 				TokenModifiers: tokenModifiers,
 			},
-			Full: true,
+			Full: protocol.SemanticDelta{Delta: &delta},
 		},
 	}
 
@@ -90,34 +93,22 @@ func (s *Server) SetTrace(_ *glsp.Context, params *protocol.SetTraceParams) erro
 
 func (s *Server) DidOpen(context *glsp.Context, params *protocol.DidOpenTextDocumentParams) error {
 	s.Log.Debugf("didOpen: %s", params.TextDocument.URI)
-	if err := s.Store.Update(params.TextDocument.URI, params.TextDocument.Text, params.TextDocument.Version); err != nil {
-		s.Log.Errorf("failed to parse document on open: %v", err)
-		return nil
-	}
-	s.publishDiagnostics(context, params.TextDocument.URI, params.TextDocument.Version)
+	d := s.Store.Update(params.TextDocument.URI, params.TextDocument.Text, params.TextDocument.Version)
+	s.publishDiagnostics(context, params.TextDocument.URI, d)
 	return nil
 }
 
 func (s *Server) DidChange(context *glsp.Context, params *protocol.DidChangeTextDocumentParams) error {
 	s.Log.Debugf("didChange: %s", params.TextDocument.URI)
-	if len(params.ContentChanges) == 0 {
-		return nil
-	}
-
-	// We expect a single full-document sync change.
-	change, ok := params.ContentChanges[0].(protocol.TextDocumentContentChangeEventWhole)
-	if !ok {
-		// Receiving incremental changes when we advertised full sync is a client-side error.
-		err := fmt.Errorf("minml-lsp requires full document sync (TextDocumentSyncKindFull)")
+	prev := s.Store.Get(params.TextDocument.URI)
+	if prev == nil {
+		err := fmt.Errorf("didChange for %s, which is not open", params.TextDocument.URI)
 		s.Log.Error(err.Error())
 		return err
 	}
-
-	if err := s.Store.Update(params.TextDocument.URI, change.Text, params.TextDocument.Version); err != nil {
-		s.Log.Errorf("failed to parse document on change: %v", err)
-		return err
-	}
-	s.publishDiagnostics(context, params.TextDocument.URI, params.TextDocument.Version)
+	d := applyChanges(prev, params.ContentChanges, params.TextDocument.Version)
+	s.Store.Set(params.TextDocument.URI, d)
+	s.publishDiagnostics(context, params.TextDocument.URI, d)
 	return nil
 }
 

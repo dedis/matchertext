@@ -43,6 +43,11 @@
         "title": "Open Preview to the Side",
         "category": "MinML",
         "icon": "$(layout-sidebar-right)"
+      },
+      {
+        "command": "minml.toggleComment",
+        "title": "Toggle Comment",
+        "category": "MinML"
       }
     ],
     "menus": {
@@ -59,6 +64,28 @@
         }
       ]
     },
+    "keybindings": [
+      {
+        "command": "minml.toggleComment",
+        "key": "ctrl+/",
+        "mac": "cmd+/",
+        "when": "editorTextFocus && !editorReadonly && editorLangId == minml"
+      },
+      {
+        "command": "minml.toggleComment",
+        "key": "shift+alt+a",
+        "when": "editorTextFocus && !editorReadonly && editorLangId == minml"
+      }
+    ],
+    "configurationDefaults": {
+      "[minml]": {
+        "editor.quickSuggestions": {
+          "comments": "off",
+          "strings": "off",
+          "other": "off"
+        }
+      }
+    },
     "configuration": {
       "type": "object",
       "title": "MinML",
@@ -66,7 +93,7 @@
         "minml.lspPath": {
           "type": "string",
           "default": "",
-          "description": "Absolute path to the minml-lsp binary. Leave empty to use the binary bundled with the extension."
+          "description": "Absolute path to the minml-lsp binary. Leave empty to use the binary bundled with the extension, or minml-lsp on PATH if none is bundled."
         },
         "minml.debug": {
           "type": "boolean",

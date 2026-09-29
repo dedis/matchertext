@@ -1,143 +1,136 @@
 package lsp
 
 import (
-	_ "embed"
-	"sort"
+	"unicode/utf8"
 
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
-	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-//go:embed queries/highlights.scm
-var highlightsQuery string
-
+// Brackets get no tokens: editors color them natively (VS Code bracket pair colorization,
+// the Neovim and JetBrains plugins' syntax rules), and they are over half of all tokens.
 var tokenTypes = []string{
-	"type",     // @tag
-	"property", // @tag.attribute
-	"operator", // @punctuation.bracket, @punctuation.delimiter
-	"constant", // @constant.builtin
-	"string",   // @string, @string.special, @string.escape
-	"comment",  // @comment
-	"keyword",  // @keyword.directive
+	"type",       // element name
+	"property",   // attribute name
+	"enumMember", // character reference; LSP has no standard "constant" type
+	"string",     // raw text, quotation element name
+	"comment",    // comment
 }
 
-var tokenModifiers = []string{
-	"defaultLibrary",
+var tokenModifiers = []string{}
+
+func tokenType(k Kind, src string) uint32 {
+	switch k {
+	case KindTag:
+		if src == `"` || src == "'" {
+			return 3
+		}
+		return 0
+	case KindAttrName:
+		return 1
+	case KindReference:
+		return 2
+	case KindRaw:
+		return 3
+	}
+	return 4 // KindComment
 }
 
 func (s *Server) SemanticTokensFull(_ *glsp.Context, params *protocol.SemanticTokensParams) (*protocol.SemanticTokens, error) {
-	var tokens []uint32
+	d := s.Store.Get(params.TextDocument.URI)
+	if d == nil {
+		return &protocol.SemanticTokens{Data: []uint32{}}, nil
+	}
+	data := d.tokens()
+	id, _ := s.Store.swapTokens(params.TextDocument.URI, data, "")
+	return &protocol.SemanticTokens{ResultID: &id, Data: data}, nil
+}
 
-	s.Store.WithDocument(params.TextDocument.URI, func(doc *Document) {
-		query, err := sitter.NewQuery(doc.Tree.Language(), highlightsQuery)
-		if err != nil {
-			s.Log.Errorf("failed to create query: %v", err)
-			return
+// SemanticTokensFullDelta answers with the edit from the client's previous result,
+// or with all tokens if the server no longer holds that result.
+func (s *Server) SemanticTokensFullDelta(_ *glsp.Context, params *protocol.SemanticTokensDeltaParams) (any, error) {
+	d := s.Store.Get(params.TextDocument.URI)
+	if d == nil {
+		return &protocol.SemanticTokens{Data: []uint32{}}, nil
+	}
+	data := d.tokens()
+	id, prev := s.Store.swapTokens(params.TextDocument.URI, data, params.PreviousResultID)
+	if prev == nil {
+		return &protocol.SemanticTokens{ResultID: &id, Data: data}, nil
+	}
+	edits := []protocol.SemanticTokensEdit{}
+	if e := tokenEdit(prev, data); e.DeleteCount > 0 || len(e.Data) > 0 {
+		edits = append(edits, e)
+	}
+	return &protocol.SemanticTokensDelta{ResultId: &id, Edits: edits}, nil
+}
+
+// tokenEdit returns one edit that turns old into new: new's tokens between the common
+// prefix and the common suffix, in whole tokens of 5 integers.
+// Positions in the encoding are relative, so an edit inside one line changes only that line's tokens.
+func tokenEdit(old, new []uint32) protocol.SemanticTokensEdit {
+	p := 0
+	for p < len(old) && p < len(new) && old[p] == new[p] {
+		p++
+	}
+	p -= p % 5
+	q := 0
+	for q < len(old)-p && q < len(new)-p && old[len(old)-1-q] == new[len(new)-1-q] {
+		q++
+	}
+	q -= q % 5
+	return protocol.SemanticTokensEdit{
+		Start:       uint32(p),
+		DeleteCount: uint32(len(old) - p - q),
+		Data:        new[p : len(new)-q],
+	}
+}
+
+// tokens encodes the marks as LSP semantic tokens, split at line ends.
+// A single forward scan converts offsets to UTF-16 positions, so the cost is linear in the text.
+func (d *Document) tokens() []uint32 {
+	data := make([]uint32, 0, 5*len(d.Marks))
+	var o int                    // scan offset
+	var line, col uint32         // position of o
+	var lastLine, lastCol uint32 // position of the previous token
+	advance := func(to int) {
+		if to < o {
+			panic("lsp: marks out of document order")
 		}
-		defer query.Close()
-
-		cursor := sitter.NewQueryCursor()
-		defer cursor.Close()
-
-		captures := cursor.Captures(query, doc.Tree.RootNode(), doc.TextBytes)
-
-		type rawToken struct {
-			line, col, length uint32
-			tokenType         uint32
-		}
-		var rawTokens []rawToken
-
-		captureNames := query.CaptureNames()
-		for {
-			match, captureIndex := captures.Next()
-			if match == nil {
-				break
-			}
-			capture := match.Captures[captureIndex]
-			name := captureNames[capture.Index]
-
-			var tokenType uint32
-			found := true
-			switch name {
-			case "tag":
-				tokenType = 0 // type
-			case "tag.attribute":
-				tokenType = 1 // property
-			case "punctuation.bracket", "punctuation.delimiter":
-				tokenType = 2 // operator
-			case "constant.builtin":
-				tokenType = 3 // constant
-			case "string", "string.special", "string.escape":
-				tokenType = 4 // string
-			case "comment":
-				tokenType = 5 // comment
-			case "keyword.directive":
-				tokenType = 6 // keyword
-			default:
-				found = false
-			}
-
-			if found {
-				start := capture.Node.StartPosition()
-				end := capture.Node.EndPosition()
-
-				if start.Row == end.Row {
-					rawTokens = append(rawTokens, rawToken{
-						line:      uint32(start.Row),
-						col:       uint32(start.Column),
-						length:    uint32(end.Column - start.Column),
-						tokenType: tokenType,
-					})
-				} else {
-					// Split multi-line token
-					for row := start.Row; row <= end.Row; row++ {
-						var col uint32
-						var length uint32
-						if row == start.Row {
-							col = uint32(start.Column)
-							length = uint32(doc.lineLength(row) - start.Column)
-						} else if row == end.Row {
-							col = 0
-							length = uint32(end.Column)
-						} else {
-							col = 0
-							length = uint32(doc.lineLength(row))
-						}
-						if length > 0 {
-							rawTokens = append(rawTokens, rawToken{
-								line:      uint32(row),
-								col:       col,
-								length:    length,
-								tokenType: tokenType,
-							})
-						}
-					}
+		for o < to {
+			if d.Text[o] == '\r' || d.Text[o] == '\n' {
+				if isLineEnd(d.Text, o) {
+					line++
+					col = 0
 				}
+				o++
+				continue
+			}
+			r, n := utf8.DecodeRuneInString(d.Text[o:])
+			col += utf16Units(r)
+			o += n
+		}
+	}
+	for _, m := range d.Marks {
+		typ := tokenType(m.Kind, d.Text[m.Start:m.End])
+		for start := m.Start; start < m.End; {
+			advance(start)
+			startLine, startCol := line, col
+			end := min(m.End, d.lineEnd(int(line)))
+			advance(end)
+			if col > startCol {
+				deltaCol := startCol
+				if startLine == lastLine {
+					deltaCol -= lastCol
+				}
+				data = append(data, startLine-lastLine, deltaCol, col-startCol, typ, 0)
+				lastLine, lastCol = startLine, startCol
+			}
+			start = m.End // the mark ends on this line, unless another line follows
+			if int(line)+1 < len(d.lines) {
+				start = min(start, d.lines[line+1])
 			}
 		}
-
-		sort.Slice(rawTokens, func(i, j int) bool {
-			if rawTokens[i].line != rawTokens[j].line {
-				return rawTokens[i].line < rawTokens[j].line
-			}
-			return rawTokens[i].col < rawTokens[j].col
-		})
-
-		var lastLine, lastCol uint32
-		for _, t := range rawTokens {
-			deltaLine := t.line - lastLine
-			deltaCol := t.col
-			if deltaLine == 0 {
-				deltaCol = t.col - lastCol
-			}
-			tokens = append(tokens, deltaLine, deltaCol, t.length, t.tokenType, 0)
-			lastLine = t.line
-			lastCol = t.col
-		}
-	})
-
-	return &protocol.SemanticTokens{
-		Data: tokens,
-	}, nil
+	}
+	return data
 }

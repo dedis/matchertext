@@ -6,19 +6,19 @@
       "highlights": "queries/highlights.scm",
       "camelcase": "MinML",
       "title": "MinML",
-      "scope": "source.minml",
+      "scope": "text.minml",
       "file-types": [
-        "minml",
-        "m"
+        "minml"
       ],
       "injection-regex": "^minml$",
-      "class-name": "TreeSitterMinml"
+      "class-name": "TreeSitterMinml",
+      "indents": "queries/indents.scm"
     }
   ],
   "metadata": {
     "version": "0.1.0",
     "license": "MIT",
-    "description": "Minml grammar for tree-sitter",
+    "description": "MinML grammar for tree-sitter, equivalent to the Go parser in go/markup/minml",
     "authors": [
       {
         "name": "Philip Hamelink",
@@ -26,7 +26,7 @@
       }
     ],
     "links": {
-      "repository": "https://github.com/tree-sitter/tree-sitter-minml"
+      "repository": "https://github.com/dedis/matchertext"
     }
   },
   "bindings": {

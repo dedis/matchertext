@@ -1,7 +1,3 @@
-; ============================================================
-; Success cases
-; ============================================================
-
 ================================================================================
 Empty source file
 ================================================================================
@@ -16,8 +12,7 @@ Single word
 Hello
 --------------------------------------------------------------------------------
 
-(source_file
-  (word))
+(source_file)
 
 ================================================================================
 Text with non-letter characters
@@ -25,9 +20,7 @@ Text with non-letter characters
 Hello 42!
 --------------------------------------------------------------------------------
 
-(source_file
-  (word)
-  (text))
+(source_file)
 
 ================================================================================
 Basic element
@@ -37,9 +30,8 @@ em[hello]
 
 (source_file
   (element
-    tag: (tag_name)
-    content: (content_block
-      (word))))
+    name: (tag_name)
+    content: (content)))
 
 ================================================================================
 Empty element
@@ -49,8 +41,8 @@ hr[]
 
 (source_file
   (element
-    tag: (tag_name)
-    content: (content_block)))
+    name: (tag_name)
+    content: (content)))
 
 ================================================================================
 Nested elements
@@ -60,12 +52,11 @@ p[em[hi]]
 
 (source_file
   (element
-    tag: (tag_name)
-    content: (content_block
+    name: (tag_name)
+    content: (content
       (element
-        tag: (tag_name)
-        content: (content_block
-          (word))))))
+        name: (tag_name)
+        content: (content)))))
 
 ================================================================================
 Mixed text and element content
@@ -75,14 +66,11 @@ p[Hello em[world]]
 
 (source_file
   (element
-    tag: (tag_name)
-    content: (content_block
-      (word)
-      (text)
+    name: (tag_name)
+    content: (content
       (element
-        tag: (tag_name)
-        content: (content_block
-          (word))))))
+        name: (tag_name)
+        content: (content)))))
 
 ================================================================================
 Attribute with plain value
@@ -92,13 +80,12 @@ img{src=cat.jpg}[]
 
 (source_file
   (element
-    tag: (tag_name)
-    attrs: (attr_block
+    name: (tag_name)
+    attributes: (attributes
       (attribute
         name: (attr_name)
-        value: (attr_value
-          (plain_value))))
-    content: (content_block)))
+        value: (value)))
+    content: (content)))
 
 ================================================================================
 Attribute with element value
@@ -108,21 +95,13 @@ a{href=http[//x.com/]}[click]
 
 (source_file
   (element
-    tag: (tag_name)
-    attrs: (attr_block
+    name: (tag_name)
+    attributes: (attributes
       (attribute
         name: (attr_name)
-        value: (attr_value
-          (element
-            tag: (tag_name)
-            content: (content_block
-              (text)
-              (word)
-              (text)
-              (word)
-              (text))))))
-    content: (content_block
-      (word))))
+        value: (value
+          (reference))))
+    content: (content)))
 
 ================================================================================
 Attribute with content block value
@@ -132,16 +111,12 @@ img{alt=[a cat]}[]
 
 (source_file
   (element
-    tag: (tag_name)
-    attrs: (attr_block
+    name: (tag_name)
+    attributes: (attributes
       (attribute
         name: (attr_name)
-        value: (attr_value
-          (content_block
-            (word)
-            (text)
-            (word)))))
-    content: (content_block)))
+        value: (quoted_value)))
+    content: (content)))
 
 ================================================================================
 Multiple attributes separated by whitespace
@@ -151,20 +126,15 @@ img{src=cat.jpg alt=[a cat]}[]
 
 (source_file
   (element
-    tag: (tag_name)
-    attrs: (attr_block
+    name: (tag_name)
+    attributes: (attributes
       (attribute
         name: (attr_name)
-        value: (attr_value
-          (plain_value)))
+        value: (value))
       (attribute
         name: (attr_name)
-        value: (attr_value
-          (content_block
-            (word)
-            (text)
-            (word)))))
-    content: (content_block)))
+        value: (quoted_value)))
+    content: (content)))
 
 ================================================================================
 Named character reference
@@ -173,8 +143,7 @@ Named character reference
 --------------------------------------------------------------------------------
 
 (source_file
-  (char_ref
-    (named_ref)))
+  (reference))
 
 ================================================================================
 Decimal character reference
@@ -183,8 +152,7 @@ Decimal character reference
 --------------------------------------------------------------------------------
 
 (source_file
-  (char_ref
-    (decimal_ref)))
+  (reference))
 
 ================================================================================
 Hex character reference
@@ -193,8 +161,7 @@ Hex character reference
 --------------------------------------------------------------------------------
 
 (source_file
-  (char_ref
-    (hex_ref)))
+  (reference))
 
 ================================================================================
 Char ref inside element content — not a content block
@@ -204,10 +171,9 @@ em[[reg]]
 
 (source_file
   (element
-    tag: (tag_name)
-    content: (content_block
-      (char_ref
-        (named_ref)))))
+    name: (tag_name)
+    content: (content
+      (reference))))
 
 ================================================================================
 Standalone bracket sequence is char ref not content block
@@ -216,8 +182,7 @@ Standalone bracket sequence is char ref not content block
 --------------------------------------------------------------------------------
 
 (source_file
-  (char_ref
-    (named_ref)))
+  (reference))
 
 ================================================================================
 Quoted string
@@ -226,7 +191,9 @@ Quoted string
 --------------------------------------------------------------------------------
 
 (source_file
-  (quoted_string))
+  (element
+    (tag_name)
+    (content)))
 
 ================================================================================
 Raw block
@@ -235,7 +202,7 @@ Raw block
 --------------------------------------------------------------------------------
 
 (source_file
-  (raw_block))
+  (raw))
 
 ================================================================================
 Comment
@@ -253,7 +220,9 @@ Processing instruction
 --------------------------------------------------------------------------------
 
 (source_file
-  (processing_instruction))
+  (element
+    (tag_name)
+    (content)))
 
 ================================================================================
 Space sucker prefix
@@ -263,9 +232,8 @@ Space sucker prefix
 
 (source_file
   (element
-    tag: (tag_name)
-    content: (content_block
-      (word))))
+    name: (tag_name)
+    content: (content)))
 
 ================================================================================
 Space sucker suffix
@@ -275,9 +243,8 @@ em[hi]>
 
 (source_file
   (element
-    tag: (tag_name)
-    content: (content_block
-      (word))))
+    name: (tag_name)
+    content: (content)))
 
 ================================================================================
 Both space suckers
@@ -287,9 +254,8 @@ Both space suckers
 
 (source_file
   (element
-    tag: (tag_name)
-    content: (content_block
-      (word))))
+    name: (tag_name)
+    content: (content)))
 
 ================================================================================
 Matcher escape open square bracket
@@ -298,7 +264,7 @@ Matcher escape open square bracket
 --------------------------------------------------------------------------------
 
 (source_file
-  (matcher_escape))
+  (reference))
 
 ================================================================================
 Matcher escape close square bracket
@@ -307,7 +273,7 @@ Matcher escape close square bracket
 --------------------------------------------------------------------------------
 
 (source_file
-  (matcher_escape))
+  (reference))
 
 ================================================================================
 Matcher escape open paren bracket
@@ -316,7 +282,7 @@ Matcher escape open paren bracket
 --------------------------------------------------------------------------------
 
 (source_file
-  (matcher_escape))
+  (reference))
 
 ================================================================================
 Matcher escape close paren bracket
@@ -325,7 +291,7 @@ Matcher escape close paren bracket
 --------------------------------------------------------------------------------
 
 (source_file
-  (matcher_escape))
+  (reference))
 
 ================================================================================
 Multiple top-level elements
@@ -335,14 +301,11 @@ h1[Title] p[Body]
 
 (source_file
   (element
-    tag: (tag_name)
-    content: (content_block
-      (word)))
-  (text)
+    name: (tag_name)
+    content: (content))
   (element
-    tag: (tag_name)
-    content: (content_block
-      (word))))
+    name: (tag_name)
+    content: (content)))
 
 ================================================================================
 Comment inline in element content
@@ -352,13 +315,9 @@ p[hello -[note] world]
 
 (source_file
   (element
-    tag: (tag_name)
-    content: (content_block
-      (word)
-      (text)
-      (comment)
-      (text)
-      (word))))
+    name: (tag_name)
+    content: (content
+      (comment))))
 
 ================================================================================
 Raw block in element content
@@ -368,11 +327,9 @@ p[Raw: +[<b>bold</b>]]
 
 (source_file
   (element
-    tag: (tag_name)
-    content: (content_block
-      (word)
-      (text)
-      (raw_block))))
+    name: (tag_name)
+    content: (content
+      (raw))))
 
 ================================================================================
 Comment with nested bracket pair
@@ -390,7 +347,7 @@ Raw block with nested brackets
 --------------------------------------------------------------------------------
 
 (source_file
-  (raw_block))
+  (raw))
 
 ================================================================================
 Quoted string with nested brackets
@@ -399,7 +356,11 @@ Quoted string with nested brackets
 --------------------------------------------------------------------------------
 
 (source_file
-  (quoted_string))
+  (element
+    (tag_name)
+    (content
+      (literal
+        (reference)))))
 
 ================================================================================
 Angle brackets in element content
@@ -409,9 +370,8 @@ p[2 < 3]
 
 (source_file
   (element
-    tag: (tag_name)
-    content: (content_block
-      (text))))
+    name: (tag_name)
+    content: (content)))
 
 ================================================================================
 Space-sucker prefix with space before tag is NOT a space sucker
@@ -420,66 +380,35 @@ Space-sucker prefix with space before tag is NOT a space sucker
 --------------------------------------------------------------------------------
 
 (source_file
-  (text)
   (element
-    tag: (tag_name)
-    content: (content_block
-      (word))))
-
-; ============================================================
-; Error cases
-; ============================================================
+    name: (tag_name)
+    content: (content)))
 
 ================================================================================
 Unclosed element bracket
+:error
 ================================================================================
 em[hello
 --------------------------------------------------------------------------------
 
-(source_file
-  (word)
-  (ERROR
-    (word)))
-
 ================================================================================
 Unclosed element with only tag
+:error
 ================================================================================
 em[
 --------------------------------------------------------------------------------
 
-(source_file
-  (ERROR
-    (word)))
-
 ================================================================================
 Attribute without value
+:error
 ================================================================================
 a{href}[link]
 --------------------------------------------------------------------------------
 
-(source_file
-  (element
-    tag: (tag_name)
-    attrs: (attr_block
-      (ERROR
-        (word)))
-    content: (content_block
-      (word))))
-
 ================================================================================
 Attribute with spaces around equals sign
+:error
 ================================================================================
 a{src = cat.jpg}[]
 --------------------------------------------------------------------------------
 
-(source_file
-  (element
-    tag: (tag_name)
-    attrs: (attr_block
-      (attribute
-        name: (attr_name)
-        (ERROR)
-        (ERROR)
-        value: (attr_value
-          (plain_value))))
-    content: (content_block)))

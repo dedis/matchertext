@@ -1,9 +1,14 @@
-(content_block [
-  "[" @indent
-  "]" @outdent
-])
+; Helix indentation: the content of a matcher pair is indented, its closer is not.
 
-(attr_block [
-  "{" @indent
-  "}" @outdent
-])
+[
+  (content)
+  (attributes)
+  (quoted_value)
+  (literal)
+] @indent
+
+[
+  "]"
+  "}"
+  ")"
+] @outdent

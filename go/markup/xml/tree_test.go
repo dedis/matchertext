@@ -91,3 +91,12 @@ func TestTreeWriter(t *testing.T) {
 		}
 	}
 }
+
+func TestInvalidReference(t *testing.T) {
+	for _, name := range []string{"", "&", "1", "a<b>", "#x", "#12a"} {
+		sb := &strings.Builder{}
+		if err := NewTreeWriter(sb).WriteAST([]ast.Node{aRef(name)}); err == nil {
+			t.Errorf("reference %q: expected error, got output %q", name, sb.String())
+		}
+	}
+}

@@ -28,6 +28,17 @@ var transformTests = []testCase{
 		aText("\u2013"), aText("\u00B1"), aText("\u2192")),
 	tc("\t <[(<)]> \r <[::]> \n", aText("("), aText("\u2237")),
 
+	// Numeric references
+	tc("[#174][#x41]", aText("\u00AE"), aText("A")),
+
+	// Unresolved references stay literal text
+	tc("[&]", aText("[&]")),
+	tc("[1]", aText("[1]")),
+	tc("[#xD800]", aText("[#xD800]")),
+	tc("[#0]", aText("[#0]")),
+	tc("[#x]", aText("[#x]")),
+	tc("[a<b>]", aText("[a<b>]")),
+
 	// Quoted strings
 	tc("'[quote]", aText("\u2018"), aText("quote"), aText("\u2019")),
 	tc("\"[quote]", aText("\u201C"), aText("quote"), aText("\u201D")),
@@ -45,6 +56,18 @@ func TestTransform(t *testing.T) {
 			t.Errorf("%v '%v': expected error, got %v", i, dt.s, n)
 		} else if e == nil && dt.n != nil && !ast.Equal(n, dt.n) {
 			t.Errorf("%v '%v': wrong output %v", i, dt.s, n)
+		}
+	}
+}
+
+func TestConvertReferences(t *testing.T) {
+	for _, c := range []struct{ in, out string }{
+		{"p[[amp] [#174] [&] [1]]", "<p>&amp; \u00AE [&amp;] [1]</p>"},
+		{"p[ [a<svg/onload=alert`1`>]]", "<p> [a&lt;svg/onload=alert`1`&gt;]</p>"},
+	} {
+		out, err := ConvertString(c.in)
+		if err != nil || out != c.out {
+			t.Errorf("%q: got %q, %v; want %q", c.in, out, err, c.out)
 		}
 	}
 }

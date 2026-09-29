@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import {
@@ -16,9 +17,9 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Prefer a user-configured path, then the binary bundled alongside the
   // extension (installed by `make vscode-live-preview`), then fall back to PATH.
+  const bundled = path.join(context.extensionPath, binaryName);
   const serverPath =
-    config.get<string>("lspPath") ||
-    path.join(context.extensionPath, binaryName);
+    config.get<string>("lspPath") || (fs.existsSync(bundled) ? bundled : binaryName);
 
   const debug = config.get<boolean>("debug") || false;
 
@@ -72,6 +73,55 @@ export function activate(context: vscode.ExtensionContext) {
       LivePreviewPanel.createOrShow(context.extensionUri, vscode.ViewColumn.Beside);
     }),
   );
+
+  context.subscriptions.push(
+    vscode.commands.registerTextEditorCommand("minml.toggleComment", toggleComment),
+  );
+}
+
+// A MinML comment ends at the "]" that balances its "-[". VS Code's comment commands end it at
+// the first "]" instead, so they break lines with brackets; the keys for both run this command.
+// It comments or uncomments each selection, or the line of each empty selection.
+function toggleComment(editor: vscode.TextEditor, edit: vscode.TextEditorEdit) {
+  const doc = editor.document;
+  const lines = new Set<number>();
+  for (const sel of editor.selections) {
+    if (sel.isEmpty && lines.has(sel.active.line)) {
+      continue;
+    }
+    lines.add(sel.active.line);
+    const range = sel.isEmpty ? doc.lineAt(sel.active.line).range : sel;
+    const text = doc.getText(range);
+    const start = text.length - text.trimStart().length;
+    const end = text.trimEnd().length;
+    if (start >= end) {
+      continue;
+    }
+    const body = text.slice(start, end);
+    const offset = doc.offsetAt(range.start);
+    edit.replace(
+      new vscode.Range(doc.positionAt(offset + start), doc.positionAt(offset + end)),
+      isComment(body) ? body.slice(2, -1).replace(/^ /, "").replace(/ $/, "") : `-[ ${body} ]`,
+    );
+  }
+}
+
+// isComment tells whether text is one comment: "-[", text that does not close it, and "]".
+// The text between need not balance, so that commenting lines such as "p[" and uncommenting
+// them restores them.
+function isComment(text: string): boolean {
+  if (!text.startsWith("-[") || !text.endsWith("]")) {
+    return false;
+  }
+  let depth = 0;
+  for (let i = 1; i < text.length - 1; i++) {
+    if ("([{".includes(text[i])) {
+      depth++;
+    } else if (")]}".includes(text[i]) && --depth === 0) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export function deactivate(): Thenable<void> | undefined {
@@ -93,11 +143,13 @@ function getWebviewOptions(extensionUri: vscode.Uri): vscode.WebviewOptions {
 class LivePreviewPanel {
   public static currentPanel: LivePreviewPanel | undefined;
   public static readonly viewType = "MinMLPreview";
+  private static readonly debounceMs = 100;
 
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
   private _document: vscode.TextDocument;
   private _disposables: vscode.Disposable[] = [];
+  private _pending: NodeJS.Timeout | undefined;
 
   public static createOrShow(extensionUri: vscode.Uri, viewColumn: vscode.ViewColumn) {
     const editor = vscode.window.activeTextEditor;
@@ -156,8 +208,13 @@ class LivePreviewPanel {
     );
 
     vscode.workspace.onDidChangeTextDocument(
-      (_) => {
-        this._update();
+      (e) => {
+        if (e.document !== this._document) {
+          return;
+        }
+        // Convert once typing pauses rather than on every keystroke
+        clearTimeout(this._pending);
+        this._pending = setTimeout(() => this._update(), LivePreviewPanel.debounceMs);
       },
       null,
       this._disposables,
@@ -197,6 +254,7 @@ class LivePreviewPanel {
   }
 
   public dispose() {
+    clearTimeout(this._pending);
     LivePreviewPanel.currentPanel = undefined;
     this._panel.dispose();
     while (this._disposables.length) {

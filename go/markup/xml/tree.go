@@ -102,10 +102,12 @@ func (e *TreeWriter) rawText(s string) error {
 	return err
 }
 
-// Write a reference to XML output
+// Write a reference to XML output.
+// A name that is not a valid reference could break or inject markup, so it is an error.
 func (e *TreeWriter) reference(name string) error {
-
-	// XXX check that it's actually a valid XML reference string?
+	if !IsReference([]byte(name)) {
+		return encError(fmt.Sprintf("invalid character reference %q", name))
+	}
 
 	if err := e.w.WriteByte('&'); err != nil {
 		return err

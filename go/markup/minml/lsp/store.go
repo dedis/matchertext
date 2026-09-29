@@ -1,124 +1,202 @@
 package lsp
 
 import (
-	"fmt"
+	"sort"
+	"strconv"
 	"sync"
+	"unicode/utf8"
 
-	minml "github.com/dedis/matchertext/dev/tree-sitter/bindings/go"
-	sitter "github.com/tree-sitter/go-tree-sitter"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
+// Document is an immutable parsed version of an open file.
 type Document struct {
-	URI       string
-	Text      string
-	TextBytes []byte
-	Tree      *sitter.Tree
-	Version   int32
+	Text    string
+	Version int32
+	lines   []int // byte offset of the start of each line; LSP ends lines at "\n", "\r\n", or "\r"
+	Syntax
 }
 
+// newDocument parses text. prev is the previous version of the same file, or nil.
+func newDocument(text string, version int32, prev *Document) *Document {
+	marks := 0
+	if prev != nil {
+		marks = len(prev.Marks) + len(prev.Marks)/8 // room for the edit
+	}
+	return &Document{Text: text, Version: version, lines: lineStarts(text), Syntax: parseSyntax(text, marks)}
+}
+
+func lineStarts(text string) []int {
+	lines := []int{0}
+	for i := 0; i < len(text); i++ {
+		if isLineEnd(text, i) {
+			lines = append(lines, i+1)
+		}
+	}
+	return lines
+}
+
+// applyChanges returns d after the didChange content changes, in order.
+// A ranged change reparses only around the edit; a change without a range replaces the whole text.
+func applyChanges(d *Document, changes []any, version int32) *Document {
+	for _, c := range changes {
+		switch c := c.(type) {
+		case protocol.TextDocumentContentChangeEventWhole:
+			d = newDocument(c.Text, version, d)
+		case protocol.TextDocumentContentChangeEvent:
+			d = d.edit(d.Offset(c.Range.Start), d.Offset(c.Range.End), c.Text, version)
+		}
+	}
+	return d
+}
+
+// edit returns d with the bytes [s, e) replaced by ins.
+func (d *Document) edit(s, e int, ins string, version int32) *Document {
+	text := d.Text[:s] + ins + d.Text[e:]
+	return &Document{
+		Text:    text,
+		Version: version,
+		lines:   spliceLines(d.lines, text, s, e, len(ins)),
+		Syntax:  reparse(&d.Syntax, text, s, e, len(ins)),
+	}
+}
+
+// isLineEnd reports whether text[i] is the last byte of a line terminator.
+func isLineEnd(text string, i int) bool {
+	return text[i] == '\n' || text[i] == '\r' && (i+1 == len(text) || text[i+1] != '\n')
+}
+
+// lineEnd returns the offset of the terminator of line l, or the end of the text.
+func (d *Document) lineEnd(l int) int {
+	if l+1 == len(d.lines) {
+		return len(d.Text)
+	}
+	end := d.lines[l+1] - 1
+	if end > d.lines[l] && d.Text[end] == '\n' && d.Text[end-1] == '\r' {
+		end--
+	}
+	return end
+}
+
+// utf16Units returns the length of r in UTF-16 code units, the LSP default position encoding.
+func utf16Units(r rune) uint32 {
+	if r >= 0x10000 {
+		return 2
+	}
+	return 1
+}
+
+func utf16Len(s string) uint32 {
+	n := uint32(0)
+	for _, r := range s {
+		n += utf16Units(r)
+	}
+	return n
+}
+
+// Position converts byte offset o to an LSP position.
+func (d *Document) Position(o int) protocol.Position {
+	line := sort.SearchInts(d.lines, o+1) - 1
+	return protocol.Position{Line: uint32(line), Character: utf16Len(d.Text[d.lines[line]:o])}
+}
+
+// Range converts the byte range [start, end) to an LSP range.
+func (d *Document) Range(start, end int) protocol.Range {
+	return protocol.Range{Start: d.Position(start), End: d.Position(end)}
+}
+
+// Offset converts an LSP position to a byte offset, clamped to the line and the document.
+func (d *Document) Offset(p protocol.Position) int {
+	if int(p.Line) >= len(d.lines) {
+		return len(d.Text)
+	}
+	o := d.lines[p.Line]
+	end := d.lineEnd(int(p.Line))
+	for u := uint32(0); o < end && u < p.Character; {
+		r, n := utf8.DecodeRuneInString(d.Text[o:])
+		u += utf16Units(r)
+		o += n
+	}
+	return o
+}
+
+// markAt returns the index of the mark containing byte offset o, or -1.
+func (d *Document) markAt(o int) int {
+	i := sort.Search(len(d.Marks), func(i int) bool { return d.Marks[i].End > o })
+	if i < len(d.Marks) && d.Marks[i].Start <= o {
+		return i
+	}
+	return -1
+}
+
+// Store holds the open documents, and the last semantic tokens sent for each,
+// which a delta request needs.
+// The TCP transport serves several connections at once, so access is locked.
 type Store struct {
+	mu        sync.RWMutex
 	documents map[string]*Document
-	// mu guards documents and serialises parser use.
-	// sitter.Parser is not goroutine-safe; holding mu for Parse() is intentional.
-	mu     sync.RWMutex
-	parser *sitter.Parser
+	tokens    map[string]tokenResult
+	resultIDs uint64
+}
+
+type tokenResult struct {
+	id   string
+	data []uint32 // never modified after it is stored
 }
 
 func NewStore() *Store {
-	parser := sitter.NewParser()
-	parser.SetLanguage(sitter.NewLanguage(minml.Language()))
-	return &Store{
-		documents: make(map[string]*Document),
-		parser:    parser,
-	}
+	return &Store{documents: make(map[string]*Document), tokens: make(map[string]tokenResult)}
 }
 
-func (s *Store) Update(uri string, text string, version int32) error {
+// swapTokens stores data as the latest tokens of uri and returns its new result id.
+// It also returns the stored tokens if their id is prev, and nil otherwise.
+func (s *Store) swapTokens(uri string, data []uint32, prev string) (string, []uint32) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	// Close the old tree before replacing it to free CGo-backed memory.
-	if old, ok := s.documents[uri]; ok {
-		old.Tree.Close()
+	s.resultIDs++
+	id := strconv.FormatUint(s.resultIDs, 10)
+	old, ok := s.tokens[uri]
+	s.tokens[uri] = tokenResult{id, data}
+	if ok && old.id == prev {
+		return id, old.data
 	}
-
-	textBytes := []byte(text)
-	tree := s.parser.Parse(textBytes, nil)
-	if tree == nil {
-		return fmt.Errorf("parser returned nil tree for %s", uri)
-	}
-
-	s.documents[uri] = &Document{
-		URI:       uri,
-		Text:      text,
-		TextBytes: textBytes,
-		Tree:      tree,
-		Version:   version,
-	}
-	return nil
+	return id, nil
 }
 
-// WithDocument calls fn with the named document while holding the read lock,
-// preventing the tree from being closed by a concurrent Update while fn runs.
-// Returns false if the document is not in the store.
-func (s *Store) WithDocument(uri string, fn func(*Document)) bool {
+// Update parses text and stores it as the current version of uri.
+func (s *Store) Update(uri string, text string, version int32) *Document {
+	d := newDocument(text, version, s.Get(uri))
+	s.mu.Lock()
+	s.documents[uri] = d
+	s.mu.Unlock()
+	return d
+}
+
+// Set stores d as the current version of uri.
+func (s *Store) Set(uri string, d *Document) {
+	s.mu.Lock()
+	s.documents[uri] = d
+	s.mu.Unlock()
+}
+
+// Get returns the current version of uri, or nil if it is not open.
+func (s *Store) Get(uri string) *Document {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	doc, ok := s.documents[uri]
-	if !ok {
-		return false
-	}
-	fn(doc)
-	return true
-}
-
-func (d *Document) NodeAt(line, char uint32) *sitter.Node {
-	// The LSP cursor sits AFTER the last typed character, which is the exclusive
-	// end of the token's range. Step back one column so NamedDescendantForPointRange
-	// lands inside the token rather than returning the parent node.
-	col := char
-	if col > 0 {
-		col--
-	}
-	point := sitter.Point{Row: uint(line), Column: uint(col)}
-	return d.Tree.RootNode().NamedDescendantForPointRange(point, point)
-}
-
-func (d *Document) lineLength(row uint) uint {
-	start := uint(0)
-	currentRow := uint(0)
-	for i, b := range d.TextBytes {
-		if currentRow == row {
-			start = uint(i)
-			for j := i; j < len(d.TextBytes); j++ {
-				if d.TextBytes[j] == '\n' {
-					return uint(j) - start
-				}
-			}
-			return uint(len(d.TextBytes)) - start
-		}
-		if b == '\n' {
-			currentRow++
-		}
-	}
-	return 0
+	return s.documents[uri]
 }
 
 func (s *Store) Delete(uri string) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if doc, ok := s.documents[uri]; ok {
-		doc.Tree.Close()
-		delete(s.documents, uri)
-	}
+	delete(s.documents, uri)
+	delete(s.tokens, uri)
+	s.mu.Unlock()
 }
 
-// CloseAll closes all open document trees, freeing CGo-backed memory.
+// CloseAll forgets all open documents.
 func (s *Store) CloseAll() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, doc := range s.documents {
-		doc.Tree.Close()
-	}
 	s.documents = make(map[string]*Document)
+	s.tokens = make(map[string]tokenResult)
+	s.mu.Unlock()
 }

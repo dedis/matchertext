@@ -1,0 +1,19 @@
+# MinML for Helix: add these entries to ~/.config/helix/languages.toml,
+# replace /path/to/matchertext, then run `hx --grammar build`.
+# The queries come from dev/tree-sitter/queries; see dev/README.md.
+
+[[language]]
+name = "minml"
+scope = "text.minml"
+file-types = ["minml"]
+block-comment-tokens = { start = "-[", end = "]" }
+indent = { tab-width = 2, unit = "  " }
+auto-pairs = { "[" = "]", "{" = "}", "(" = ")" }
+language-servers = ["minml-lsp"]
+
+[language-server.minml-lsp]
+command = "minml-lsp"
+
+[[grammar]]
+name = "minml"
+source = { path = "/path/to/matchertext/dev/tree-sitter" }
