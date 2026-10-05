@@ -32,7 +32,8 @@ Run these from the repository root.
 `make vscode-live-preview` needs Node and npm, and it removes any stale
 `minml-preview` installation before copying the new one in.
 
-In every editor, highlighting, diagnostics, hover, and completion come from the
+In every editor, `.minml` and `.m` files are MinML, also where Objective-C or MATLAB
+claims `.m`. Highlighting, diagnostics, hover, and completion come from the
 `minml-lsp` language server, which parses with the converter's own parser.
 The server sends no tokens for brackets; each editor colors them itself.
 
@@ -49,10 +50,7 @@ runtime path, for example with lazy.nvim:
 { dir = "/path/to/matchertext/dev/neovim" }
 ```
 
-`.minml` files are MinML. A `.m` file is MinML when its first non-blank line starts
-with an element or a MinML construct; otherwise Neovim's own `.m` detection
-(Objective-C, MATLAB, and others) decides. Completion opens only on request, as
-in VS Code.
+Completion opens only on request, as in VS Code.
 
 ## Emacs
 
@@ -65,7 +63,7 @@ Needs Emacs 29 or later; semantic highlighting needs Emacs 31, whose eglot has
 ```
 
 `minml-mode` starts eglot itself; set `minml-start-eglot` to nil to start it by
-hand. `.m` files are detected as in Neovim.
+hand.
 
 ## Sublime Text
 
@@ -80,9 +78,9 @@ ln -s "$PWD/dev/sublime" ~/Library/"Application Support/Sublime Text/Packages/LS
 Install it as a directory, not a `.sublime-package` archive, so the bundled server
 can run. The LSP package turns semantic highlighting off by default; set
 `"semantic_highlighting": true` in **Preferences | Package Settings | LSP |
-Settings** to get the server's colors. Without it, only brackets are colored.
-The package claims `.minml` only; for `.m` files use **View | Syntax | Open all
-with current extension as | MinML**.
+Settings** to get the server's colors. Without it, only brackets, comments, raw
+text, and the document type are colored. The package's `MinML.sublime-settings`
+gives `.m` to MinML rather than to Sublime's Objective-C syntax.
 
 ## Helix
 
@@ -91,14 +89,14 @@ Add the entries in [`helix/languages.toml`](helix/languages.toml) to
 `~/.config/helix/languages.toml`, with the path to this repository, then:
 
 ```sh
-mkdir -p ~/.config/helix/runtime/queries
+mkdir -p ~/.config/helix/runtime/queries ~/.config/helix/runtime/grammars
 ln -s "$PWD/dev/tree-sitter/queries" ~/.config/helix/runtime/queries/minml
 hx --grammar build
 ```
 
 Put `minml-lsp` on `PATH` (`make build-lsp` builds it), or set its full path as the
-`command` of `language-server.minml-lsp`. Helix has no content check for `.m` files,
-so only `.minml` is MinML.
+`command` of `language-server.minml-lsp`. With these entries, Helix gives `.m`
+to MinML rather than to its own Objective-C and MATLAB languages.
 
 Helix asks for completions whenever typing pauses inside a word, and it can turn
 that off only for all languages at once, with `auto-completion = false` under
@@ -135,7 +133,7 @@ an inner `]` it removes that `]`. Undo, and delete the `-[ ` and ` ]` by hand.
 Run `make jetbrains-plugin`, then install the zip with **Settings | Plugins |
 Install Plugin from Disk**. The plugin needs LSP4IJ from the Marketplace.
 
-The plugin registers `.minml` only, because `.m` belongs to Objective-C in CLion
-and other IDEs. To open `.m` files as MinML, add `*.m` to the MinML file type in
-**Settings | Editor | File Types**. Completion opens automatically only after `{`,
-as in VS Code, and otherwise on request.
+The plugin registers `.minml` and `.m`. In CLion, whose bundled Objective-C support
+also claims `.m`, the IDE gives `.m` to MinML and shows a notification to confirm or
+revert. Completion opens automatically only after `{`, as in VS Code, and otherwise
+on request.

@@ -13,7 +13,7 @@
 
   <extensions defaultExtensionNs="com.intellij">
     <fileType name="MinML" implementationClass="org.dedis.matchertext.minml.MinmlFileType" fieldName="INSTANCE"
-              language="MinML" extensions="minml"/>
+              language="MinML" extensions="minml;m"/>
     <lang.parserDefinition language="MinML" implementationClass="org.dedis.matchertext.minml.MinmlParserDefinition"/>
     <lang.syntaxHighlighterFactory language="MinML"
                                    implementationClass="org.dedis.matchertext.minml.MinmlSyntaxHighlighterFactory"/>

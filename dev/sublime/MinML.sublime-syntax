@@ -7,6 +7,7 @@ name: MinML
 scope: text.minml
 file_extensions:
   - minml
+  - m
 variables:
   # "-" and "+" open a comment and raw text only as a whole element name: at the start of a
   # line, or after whitespace, a matcher, or a space sucker "<" that follows one of these.
