@@ -134,6 +134,11 @@ func (ap *astParser) Comment(text []byte) error {
 	return nil
 }
 
+func (ap *astParser) Doctype(kind []byte) error {
+	ap.m = append(ap.m, ast.NewDoctype(string(kind)))
+	return nil
+}
+
 // Take a newly-produced AST node and apply all appropriate transformers to it,
 // returning the resulting list of markup nodes.
 func (ap *astParser) xform(ns []ast.Node) ([]ast.Node, error) {

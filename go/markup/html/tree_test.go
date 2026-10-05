@@ -60,6 +60,9 @@ var encTests = []encTest{
 	et("&#123;", aRef("#123")),
 	et("&#xabcd;", aRef("#xabcd")),
 
+	// Document type
+	et("<!DOCTYPE html>", ast.NewDoctype("html")),
+
 	// Elements
 	et("<p></p>", aElem("p")),
 	et("<em>emphasis</em>", aElem("em", aText("emphasis"))),
@@ -96,6 +99,19 @@ func TestInvalidReference(t *testing.T) {
 		sb := &strings.Builder{}
 		if err := NewTreeWriter(sb).WriteAST([]ast.Node{aRef(name)}); err == nil {
 			t.Errorf("reference %q: expected error, got output %q", name, sb.String())
+		}
+	}
+}
+
+func TestInvalidDoctype(t *testing.T) {
+	for _, ns := range [][]ast.Node{
+		{ast.NewDoctype("xml")},
+		{aText("x"), ast.NewDoctype("html")},
+		{aElem("p", ast.NewDoctype("html"))},
+	} {
+		sb := &strings.Builder{}
+		if err := NewTreeWriter(sb).WriteAST(ns); err == nil {
+			t.Errorf("%v: expected error, got output %q", ns, sb.String())
 		}
 	}
 }

@@ -10,7 +10,8 @@ import (
 )
 
 type TreeWriter struct {
-	w util.AtomWriter
+	w     util.AtomWriter
+	depth int // number of elements enclosing the nodes being written
 }
 
 // NewTreeWriter creates and returns a new encoder that writes output to w.
@@ -36,6 +37,9 @@ func (e *TreeWriter) WriteAST(ns []ast.Node) (err error) {
 		case ast.Comment:
 			err = e.comment(n.Comment())
 
+		case ast.Doctype:
+			err = e.doctype(n.Doctype(), i)
+
 		default:
 			err = encError(fmt.Sprintf("unknown node %v", n))
 		}
@@ -46,6 +50,15 @@ func (e *TreeWriter) WriteAST(ns []ast.Node) (err error) {
 
 	// Flush the output stream in case it's buffered
 	return util.Flush(e.w)
+}
+
+// Write the HTML document type, which only the first node of the document may declare.
+func (e *TreeWriter) doctype(kind string, i int) error {
+	if kind != "html" || i != 0 || e.depth != 0 {
+		return encError(fmt.Sprintf("document type %q is not html, or not the first node", kind))
+	}
+	_, err := e.w.WriteString("<!DOCTYPE html>")
+	return err
 }
 
 func (e *TreeWriter) text(s string, esc xml.Escaper) error {
@@ -149,7 +162,10 @@ func (e *TreeWriter) element(elt ast.Element) (err error) {
 	}
 
 	// recursively write the element content
-	if err := e.WriteAST(content); err != nil {
+	e.depth++
+	err = e.WriteAST(content)
+	e.depth--
+	if err != nil {
 		return err
 	}
 

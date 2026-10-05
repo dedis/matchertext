@@ -17,6 +17,7 @@ const (
 	KindReference             // character reference [name]
 	KindComment               // comment -[...]
 	KindRaw                   // raw text +[...]
+	KindDoctype               // document type ![html] or ![xml]
 )
 
 // Mark is a highlighted source range [Start, End) in bytes.
@@ -136,10 +137,12 @@ func (r *recorder) Element(name []byte) error {
 
 	// Only the parent's content pair, and those of its ancestors, may enclose a sync.
 	// A fresh parser would drop a leading '<' as a space sucker, so such a name is no sync.
+	// Nor is a name that starts with '!': an edit after it can turn it into a document type,
+	// which a fresh parser started there would take for the start of the file.
 	outerElem := r.elem
 	r.elem = noSync
 	parent := r.parents[len(r.parents)-1]
-	if parent != noSync && r.p.Depth() == len(r.parents)-1 && name[0] != '<' {
+	if parent != noSync && r.p.Depth() == len(r.parents)-1 && name[0] != '<' && name[0] != '!' {
 		if r.stop != nil && r.stop(start, parent) {
 			return errStop
 		}
@@ -203,6 +206,22 @@ func (r *recorder) verbatim(k Kind, n int) {
 		end++
 	}
 	r.mark(k, start, end)
+}
+
+func (r *recorder) Doctype(kind []byte) error {
+	end := r.offset() + 1
+	r.mark(KindDoctype, end-len(kind)-3, end)
+	return nil
+}
+
+// Doctype returns the document type that the text declares, "html" or "xml", or "".
+// The parser accepts a document type only at the start of the text.
+func (syn *Syntax) Doctype(text string) string {
+	if len(syn.Marks) > 0 && syn.Marks[0].Kind == KindDoctype {
+		m := syn.Marks[0]
+		return text[m.Start+2 : m.End-1]
+	}
+	return ""
 }
 
 func (r *recorder) Reference(name []byte) error {

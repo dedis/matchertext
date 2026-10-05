@@ -71,3 +71,16 @@ func TestConvertReferences(t *testing.T) {
 		}
 	}
 }
+
+func TestConvertDoctype(t *testing.T) {
+	for _, c := range []struct{ in, out string }{
+		{"p[x]", "<p>x</p>"},
+		{"![html]\nbr[]", "<!DOCTYPE html>\n<br/>"},
+		{"![xml]\nbr[+[a<b]]", "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<br><![CDATA[a<b]]></br>"},
+	} {
+		out, err := ConvertString(c.in)
+		if err != nil || out != c.out {
+			t.Errorf("%q: got %q, %v; want %q", c.in, out, err, c.out)
+		}
+	}
+}

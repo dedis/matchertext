@@ -4,14 +4,15 @@
  * @license MIT
  *
  * This grammar accepts exactly the documents the Go parser in go/markup/minml
- * accepts, and gives elements, attributes, references, comments, and raw text
- * the same source ranges. bindings/go/minml_test.go checks this against the Go
+ * accepts, and gives the document type, elements, attributes, references, comments,
+ * and raw text the same source ranges. bindings/go/minml_test.go checks this against the Go
  * parser on a corpus and on random documents; keep both in step.
  *
  * The decisions that depend on context are made by src/scanner.c:
  *   - a run of non-space, non-matcher characters directly before '[' or '{' is
  *     an element name; a leading '<' is a space sucker, not part of the name;
- *     the names "-" and "+" open a comment and raw text instead;
+ *     the names "-" and "+" open a comment and raw text instead,
+ *     and the name "!" opens the document type, valid only as the first bytes of the file;
  *   - "[...]" is a character reference when its content is not empty, is not
  *     "<" or ">", and has no whitespace and no matchers, or is one of the
  *     escapes "[(<)]", "[[>]]", ...;
@@ -36,10 +37,14 @@ module.exports = grammar({
     $._raw_start,
     $.reference,
     $.attr_name,
+    $._doctype_start,
   ],
 
   rules: {
-    source_file: ($) => repeat($._markup),
+    source_file: ($) => seq(optional($.doctype), repeat($._markup)),
+
+    // The document type: ![html] or ![xml], as the first bytes of the file.
+    doctype: ($) => seq($._doctype_start, choice("html", "xml"), "]"),
 
     // Text, elements, and matcher pairs, as at top level and in element content.
     _markup: ($) =>

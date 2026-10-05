@@ -172,6 +172,21 @@ var decodeTests = []testCase{
 	tc(" <-[x]> ", aComment("x")),
 	tc("-[> abc <]", aComment("> abc <")),
 	tc("-[> ({[]}) <]", aComment("> ({[]}) <")),
+
+	// Document types, only as the first bytes of the input
+	tc("![html]", ast.NewDoctype("html")),
+	tc("![xml]\np[x]", ast.NewDoctype("xml"), aText("\n"), aElem("p", aText("x"))),
+	tc("![svg]"),         // error: neither html nor xml
+	tc("![HTML]"),        // error: neither html nor xml
+	tc("![ html ]"),      // error: neither html nor xml
+	tc("![]"),            // error: neither html nor xml
+	tc(" ![html]"),       // error: not at the start
+	tc("<![html]"),       // error: not at the start
+	tc("-[c]![html]"),    // error: not at the start
+	tc("![html]![html]"), // error: not at the start
+	tc("p[![html]]"),     // error: not at the start
+	tc("![html"),         // error: unmatched opener
+	tc("x![html]", aElem("x!", aText("html"))),
 }
 
 func TestParser(t *testing.T) {

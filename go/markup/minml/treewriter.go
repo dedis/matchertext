@@ -31,6 +31,17 @@ func (e *TreeWriter) WriteAST(ns []ast.Node) (err error) {
 	// Pretend the entire markup is surrounded by a bracket pair.
 	e.last, e.pref = '[', false
 
+	// Write the document type, which only the first node may declare
+	if kind := ast.DoctypeOf(ns); kind != "" {
+		if err := checkDoctype(kind); err != nil {
+			return err
+		}
+		if err := e.strings("![", kind, "]"); err != nil {
+			return err
+		}
+		ns = ns[1:]
+	}
+
 	// Write the markup content
 	if err := e.nodes(ns); err != nil {
 		return err
@@ -57,6 +68,9 @@ func (e *TreeWriter) nodes(ns []ast.Node) (err error) {
 
 		case ast.Comment:
 			err = e.comment(n.Comment())
+
+		case ast.Doctype:
+			err = encError("document type is not the first node")
 
 		default:
 			err = encError(fmt.Sprintf("unknown node %v", n))
@@ -208,6 +222,14 @@ func (e *TreeWriter) element(elt ast.Element) (err error) {
 func (e *TreeWriter) comment(s string) error {
 
 	return e.open("-", "[", s, "]")
+}
+
+// checkDoctype returns an error unless kind is a MinML document type.
+func checkDoctype(kind string) error {
+	if kind != "html" && kind != "xml" {
+		return encError(fmt.Sprintf("document type %q is neither html nor xml", kind))
+	}
+	return nil
 }
 
 type encError string

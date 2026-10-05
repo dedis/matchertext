@@ -12,6 +12,8 @@
 
 (raw) @string
 
+(doctype) @keyword
+
 ; Only brackets that delimit structure: brackets inside comments and raw text keep their color.
 (content ["[" "]"] @punctuation.bracket)
 (attributes ["{" "}"] @punctuation.bracket)

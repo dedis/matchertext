@@ -47,6 +47,14 @@ type HandlerComment interface {
 	Comment(text []byte) error // Handle the text comprising a comment
 }
 
+// HandlerDoctype is an interface that a client may optionally implement,
+// as an extension to HandlerText, to obtain the document type ![html] or ![xml].
+// If the client's HandlerText does not implement this extension,
+// the parser checks the document type and discards it.
+type HandlerDoctype interface {
+	Doctype(kind []byte) error // Handle the document type, "html" or "xml"
+}
+
 // The above three handler interfaces bundled into one struct
 type handlers struct {
 	m HandlerMarkup
@@ -225,6 +233,9 @@ func (mh mHandler) Open(o, c byte) (e error) {
 
 				case '-': // comment
 					return p.comment()
+
+				case '!': // document type
+					return p.doctype()
 				}
 			}
 
@@ -712,6 +723,45 @@ func (p *Parser) handleComment() (e error) {
 	p.h = h
 
 	return
+}
+
+// Read a document type construct ![html] or ![xml],
+// which must be the first bytes of the input.
+func (p *Parser) doctype() error {
+
+	// At the start of the input, the '[' just read is the second byte.
+	start := p.mp.Offset() == 1
+	if !start {
+		if e := p.syntaxError("document type ![...] must start the file"); e != nil {
+			return e
+		}
+	}
+
+	// Parse and buffer the raw matchertext content between the brackets
+	if e := p.mp.ReadPair(p.rh, '[', ']'); e != nil {
+		return e
+	}
+	kind := p.buf.Bytes()
+	p.buf.Reset()
+	p.sawMatcher(']')
+
+	// Error recovery has already reported an unclosed or misplaced document type.
+	if p.mp.Unclosed() || !start {
+		return nil
+	}
+	if string(kind) != "html" && string(kind) != "xml" {
+		return p.syntaxError("document type must be ![html] or ![xml]")
+	}
+
+	// Save and restore the handlers around the handler upcall,
+	// in case the handler recursively invokes parser methods.
+	h := p.h
+	var e error
+	if d, ok := h.t.(HandlerDoctype); ok {
+		e = d.Doctype(kind)
+	}
+	p.h = h
+	return e
 }
 
 // Report a syntax error at the current position.

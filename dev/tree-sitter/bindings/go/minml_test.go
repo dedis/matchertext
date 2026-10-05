@@ -21,6 +21,7 @@ var kinds = map[string]lsp.Kind{
 	"reference": lsp.KindReference,
 	"comment":   lsp.KindComment,
 	"raw":       lsp.KindRaw,
+	"doctype":   lsp.KindDoctype,
 }
 
 // treeMarks returns the constructs of a tree in document order, as the Go parser reports them:
@@ -99,6 +100,8 @@ func TestCasesMatchGoParser(t *testing.T) {
 		"<p[a]> <q[b]>", "p[[[<]] [(>)]]", "x[y{z}]", "p[\r\nq[a]\r\n]", "-{x}", "+{x}", "a-[x]",
 		"<-[x]", "<<[x]", "< [x]", "[<]", "[>]", "[a(b)c]", "p{a=f(x y) b=x[amp]y}[]", "p{=x}[]",
 		"p{a=}[] q{a= b=c}[]", "p{}[]", "p{ }[]", "[{<}] [{>}]", "?[pi]", "p[a]]b", "{x}", "(x)",
+		"![html]", "![xml]\np[x]", "![svg]", "![]", "![ html]", " ![html]", "<![html]", "-[c]![html]",
+		"![html]![xml]", "p[![html]]", "![html", "x![html]", "!x[y]", "!{a=b}[c]", "![html]{a=b}",
 	} {
 		check(t, parser, src)
 	}
@@ -107,7 +110,8 @@ func TestCasesMatchGoParser(t *testing.T) {
 func TestRandomMatchesGoParser(t *testing.T) {
 	parser := newParser(t)
 	alphabet := []string{"a", "p", "é", "😀", " ", "\n", "[", "]", "{", "}", "(", ")", "<", ">", "-", "+",
-		`"`, "'", "=", "#", "&", "?", "x[", "p{a=b}[", "-[", "+[", "[amp]", "[[<]]", "\t", "\r"}
+		`"`, "'", "=", "#", "&", "?", "x[", "p{a=b}[", "-[", "+[", "[amp]", "[[<]]", "\t", "\r",
+		"!", "![", "![html]", "![xml]", "html", "xml"}
 	rng := rand.New(rand.NewSource(1))
 	for n := 0; n < 200000; n++ {
 		var b strings.Builder
@@ -152,7 +156,7 @@ func TestStructuredMatchesGoParser(t *testing.T) {
 	parser := newParser(t)
 	rng := rand.New(rand.NewSource(2))
 	for n := 0; n < 50000; n++ {
-		check(t, parser, randomDocument(rng, 4))
+		check(t, parser, []string{"", "", "![html]", "![xml]\n"}[rng.Intn(4)]+randomDocument(rng, 4))
 	}
 }
 
@@ -161,10 +165,11 @@ func TestStructuredMatchesGoParser(t *testing.T) {
 // promise the same error recovery.
 func TestIncrementalParseMatchesFreshParse(t *testing.T) {
 	parser := newParser(t)
-	inserts := []string{"", "a", "<", "x[", "]", "p{a=b}[y]", "[", "{", "(", ")", "\n", "é", " <", "-[", "[amp]", "="}
+	inserts := []string{"", "a", "<", "x[", "]", "p{a=b}[y]", "[", "{", "(", ")", "\n", "é", " <", "-[", "[amp]", "=",
+		"!", "![html]", "html"}
 	rng := rand.New(rand.NewSource(3))
 	for n := 0; n < 20000; n++ {
-		src := []byte(randomDocument(rng, 4))
+		src := []byte([]string{"", "", "![html]", "![xml]\n"}[rng.Intn(4)] + randomDocument(rng, 4))
 		tree := parser.Parse(src, nil)
 		for k := 0; k < 5; k++ {
 			s := rng.Intn(len(src) + 1)

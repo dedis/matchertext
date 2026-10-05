@@ -15,7 +15,7 @@ typedef struct {
   bool name_next;
 } Scanner;
 
-enum TokenType { TEXT, TAG_NAME, COMMENT_START, RAW_START, REFERENCE, ATTR_NAME };
+enum TokenType { TEXT, TAG_NAME, COMMENT_START, RAW_START, REFERENCE, ATTR_NAME, DOCTYPE_START };
 
 // MinML whitespace is XML whitespace.
 static bool is_space(int32_t c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
@@ -107,9 +107,10 @@ static bool scan_reference(TSLexer *lexer) {
 // Text up to the next matcher, or up to an element name: a run of non-space,
 // non-matcher characters directly before '[' or '{'. A leading '<' in the run
 // is a space sucker, so the name starts after it, and a run "<" is no name.
-// The names "-" and "+" before '[' open a comment and raw text.
+// The names "-" and "+" before '[' open a comment and raw text,
+// and the name "!" opens the document type, which is valid only at the start of the file.
 // name_here tells that the run at the token start already had its sucker removed.
-static bool scan_markup(Scanner *s, TSLexer *lexer, bool name_here) {
+static bool scan_markup(Scanner *s, TSLexer *lexer, const bool *valid_symbols, bool name_here) {
   unsigned pos = 0;     // characters consumed
   int run = -1;         // where the current run of name characters starts
   unsigned run_len = 0;
@@ -136,6 +137,13 @@ static bool scan_markup(Scanner *s, TSLexer *lexer, bool name_here) {
           }
           advance(lexer);
           return accept(lexer, name_first == '-' ? COMMENT_START : RAW_START);
+        }
+        if (name_len == 1 && name_first == '!') {
+          if (c != '[' || !valid_symbols[DOCTYPE_START]) {
+            return false;
+          }
+          advance(lexer);
+          return accept(lexer, DOCTYPE_START);
         }
         return accept(lexer, TAG_NAME);
       }
@@ -212,7 +220,7 @@ bool tree_sitter_minml_external_scanner_scan(void *payload, TSLexer *lexer, cons
     return scan_reference(lexer);
   }
   if (valid_symbols[TEXT] && valid_symbols[TAG_NAME]) {
-    return scan_markup(s, lexer, name_here);
+    return scan_markup(s, lexer, valid_symbols, name_here);
   }
   return false;
 }

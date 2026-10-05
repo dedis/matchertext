@@ -3,11 +3,54 @@
   "name": "minml",
   "rules": {
     "source_file": {
-      "type": "REPEAT",
-      "content": {
-        "type": "SYMBOL",
-        "name": "_markup"
-      }
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "doctype"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_markup"
+          }
+        }
+      ]
+    },
+    "doctype": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "_doctype_start"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "STRING",
+              "value": "html"
+            },
+            {
+              "type": "STRING",
+              "value": "xml"
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": "]"
+        }
+      ]
     },
     "_markup": {
       "type": "CHOICE",
@@ -570,6 +613,10 @@
     {
       "type": "SYMBOL",
       "name": "attr_name"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_doctype_start"
     }
   ],
   "inline": [],

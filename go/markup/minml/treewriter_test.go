@@ -18,6 +18,10 @@ func et(out string, ns ...ast.Node) encTest {
 
 var encTests = []encTest{
 
+	// Document types
+	et("![html]", ast.NewDoctype("html")),
+	et("![xml]p[]", ast.NewDoctype("xml"), aElem("p")),
+
 	// Simple text
 	et(""),
 	et("abc", aText("abc")),
@@ -82,6 +86,19 @@ func TestTreeWriter(t *testing.T) {
 		s := sb.String()
 		if s != et.out {
 			t.Errorf("%v: expected %v output %v", i, et.out, s)
+		}
+	}
+}
+
+func TestInvalidDoctype(t *testing.T) {
+	for _, ns := range [][]ast.Node{
+		{ast.NewDoctype("svg")},
+		{aText("x"), ast.NewDoctype("html")},
+		{aElem("p", ast.NewDoctype("html"))},
+	} {
+		sb := &strings.Builder{}
+		if err := NewTreeWriter(sb).WriteAST(ns); err == nil {
+			t.Errorf("%v: expected error, got output %q", ns, sb.String())
 		}
 	}
 }

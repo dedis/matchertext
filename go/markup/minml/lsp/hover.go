@@ -18,7 +18,7 @@ func (s *Server) Hover(_ *glsp.Context, params *protocol.HoverParams) (*protocol
 		return nil, nil
 	}
 	m := d.Marks[i]
-	text := hoverText(m.Kind, d.Text[m.Start:m.End])
+	text := hoverText(m.Kind, d.Text[m.Start:m.End], d.Doctype(d.Text) == "xml")
 	if text == "" {
 		return nil, nil
 	}
@@ -30,15 +30,15 @@ func (s *Server) Hover(_ *glsp.Context, params *protocol.HoverParams) (*protocol
 }
 
 // hoverText describes the construct of kind k whose source is src.
-// The descriptions follow what the MinML to HTML converter does.
-func hoverText(k Kind, src string) string {
+// The descriptions follow what the MinML converter does: to XML if xml is set, else to HTML.
+func hoverText(k Kind, src string, xml bool) string {
 	switch k {
 	case KindTag:
 		switch src {
 		case `"`, "'":
 			return "**Quotation** — `" + src + "[...]`\n\nThe content is MinML markup, enclosed in directed quotation marks."
 		}
-		if info, ok := HTMLElements[src]; ok {
+		if info, ok := HTMLElements[src]; ok && !xml {
 			return fmt.Sprintf("### `%s`\n\n%s", src, info.Description)
 		}
 		return fmt.Sprintf("### `%s`\n\nMinML element, converted to `<%s>`.", src, src)
@@ -53,10 +53,22 @@ func hoverText(k Kind, src string) string {
 		return fmt.Sprintf("`%s` is not a character reference; it is converted to the literal text.", src)
 
 	case KindComment:
+		if xml {
+			return "**Comment** — `-[...]`\n\nConverted to an XML comment."
+		}
 		return "**Comment** — `-[...]`\n\nConverted to an HTML comment."
 
 	case KindRaw:
+		if xml {
+			return "**Raw text** — `+[...]`\n\nThe content is not parsed as MinML; it is written as a CDATA section."
+		}
 		return "**Raw text** — `+[...]`\n\nThe content is not parsed as MinML; it is written as escaped text."
+
+	case KindDoctype:
+		if xml {
+			return "**Document type** — `![xml]`\n\nThe document converts to XML, after the declaration `<?xml version=\"1.0\" encoding=\"UTF-8\"?>`."
+		}
+		return "**Document type** — `![html]`\n\nThe document converts to HTML, after `<!DOCTYPE html>`."
 	}
 	return ""
 }

@@ -133,7 +133,7 @@ non-blank line starts with an element, attributes, or a MinML construct."
        (string-suffix-p ".m" buffer-file-name)
        (save-excursion
          (skip-chars-forward " \t\r\n")
-         (looking-at "<?[[:alnum:]_:.-]+[[{]\\|[-+?\"'][[]"))))
+         (looking-at "<?[[:alnum:]_:.-]+[[{]\\|[-+?!\"'][[]"))))
 
 ;;;###autoload
 (add-to-list 'magic-mode-alist '(minml--m-file-p . minml-mode))

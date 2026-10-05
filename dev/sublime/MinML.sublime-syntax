@@ -1,6 +1,6 @@
 %YAML 1.2
 ---
-# Brackets, comments, and raw text. The minml-lsp language server colors everything else
+# The document type, brackets, comments, and raw text. The minml-lsp language server colors everything else
 # when the LSP package's "semantic_highlighting" setting is on.
 # Comments need their scope here: toggle_comment finds the comment to remove by its scope.
 name: MinML
@@ -12,7 +12,15 @@ variables:
   # line, or after whitespace, a matcher, or a space sucker "<" that follows one of these.
   name_start: (?:^|(?<=[\s\[\](){}])|(?<=^<)|(?<=[\s\[\](){}]<))
 contexts:
+  # The document type ![html] or ![xml] is valid only as the first bytes of the file.
   main:
+    - match: '\A!\[(?:html|xml)\]'
+      scope: keyword.other.doctype.minml
+      set: body
+    - match: '(?=[\s\S])'
+      set: body
+
+  body:
     - match: '{{name_start}}-\['
       scope: punctuation.definition.comment.begin.minml
       push: comment

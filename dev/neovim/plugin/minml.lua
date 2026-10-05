@@ -8,7 +8,7 @@ local function detect_m(path, bufnr)
   end
   for _, line in ipairs(vim.api.nvim_buf_get_lines(bufnr, 0, 100, false)) do
     if line:find("%S") then
-      if line:find("^%s*<?[%w_:.-]+[%[{]") or line:find("^%s*[?+%-\"'][%[]") then
+      if line:find("^%s*<?[%w_:.-]+[%[{]") or line:find("^%s*[?+%-\"'!][%[]") then
         return "minml"
       end
       break
