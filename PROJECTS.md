@@ -57,3 +57,4 @@ children: "Hello " + matchertext(name)
 
 ## MinML static website generator (can be a cybersecurity project)
 
+Same idea as the web framework but with static website generators

@@ -1,6 +1,5 @@
 # Current TODOs
 
-- [ ] Fix MinML → HTML: `script` and `style` content is HTML-escaped (`<` → `&lt;`, `&&` → `&amp;&amp;`, `>` → `&gt;`). Browsers, Vue and Svelte read it as raw text and do not decode entities, so the JavaScript and CSS break. Cause: `element()` in `go/markup/html/tree.go` escapes the content of every element.
 - [ ] CLI Rich Text for matchertext
 - [ ] Test SVG → XML → SVG for no loss
 - [ ] MathML in MinML
