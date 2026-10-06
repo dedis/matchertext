@@ -77,6 +77,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "_escape_reference"
+        },
+        {
+          "type": "SYMBOL",
           "name": "literal"
         }
       ]
@@ -315,6 +319,15 @@
         }
       ]
     },
+    "_escape_reference": {
+      "type": "ALIAS",
+      "content": {
+        "type": "SYMBOL",
+        "name": "_escape"
+      },
+      "named": true,
+      "value": "reference"
+    },
     "quoted_value": {
       "type": "SEQ",
       "members": [
@@ -347,6 +360,14 @@
             },
             {
               "type": "SYMBOL",
+              "name": "_backslash"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "_escape_reference"
+            },
+            {
+              "type": "SYMBOL",
               "name": "_value_pair_unbracketed"
             }
           ]
@@ -362,7 +383,15 @@
               },
               {
                 "type": "SYMBOL",
+                "name": "_backslash"
+              },
+              {
+                "type": "SYMBOL",
                 "name": "reference"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "_escape_reference"
               },
               {
                 "type": "SYMBOL",
@@ -378,11 +407,19 @@
       "members": [
         {
           "type": "SYMBOL",
-          "name": "_plain"
+          "name": "_value_text"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_backslash"
         },
         {
           "type": "SYMBOL",
           "name": "reference"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_escape_reference"
         },
         {
           "type": "SYMBOL",
@@ -577,9 +614,13 @@
       "type": "PATTERN",
       "value": "[^()\\[\\]{}]+"
     },
+    "_value_text": {
+      "type": "PATTERN",
+      "value": "[^()\\[\\]{}\\\\]+"
+    },
     "_word": {
       "type": "PATTERN",
-      "value": "[^ \\t\\r\\n()\\[\\]{}]+"
+      "value": "[^ \\t\\r\\n()\\[\\]{}\\\\]+"
     },
     "_space": {
       "type": "PATTERN",
@@ -617,6 +658,14 @@
     {
       "type": "SYMBOL",
       "name": "_doctype_start"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_escape"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_backslash"
     }
   ],
   "inline": [],

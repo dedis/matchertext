@@ -24,6 +24,8 @@ type HandlerMarkup interface {
 // which may contain plain text and character references.
 // The parser will invoke Text for each contiguous sequence of normal text,
 // and will invoke Reference on encountering a character reference.
+// The name of a reference [name] is the text between its brackets,
+// and the name of a matcher escape such as \o() or \c[] is the escape itself.
 type HandlerText interface {
 	Text(text []byte, raw bool) error // Handle plain UTF-8 text
 	Reference(name []byte) error      // Handle a character reference
@@ -77,6 +79,7 @@ type Parser struct {
 	ah aHandler // matchertext callback for attribute parsing
 	vh vHandler // matchertext callback for unquoted value parsing
 	rh rHandler // matchertext callback for raw matchertext parsing
+	xh xHandler // matchertext callback for escape pair parsing
 
 	buf bytes.Buffer // bytes read so far but not yet consumed
 	lmb byte         // last matcher seen for space sucking, 0 if none
@@ -94,6 +97,7 @@ func (p *Parser) init() {
 	p.ah.p = p
 	p.vh.p = p
 	p.rh.p = p
+	p.xh.p = p
 
 	// Clear the parsing state
 	p.buf.Reset()
@@ -205,6 +209,11 @@ func (mh mHandler) Byte(b byte) error {
 // The non-matchers immediately preceding the opener is buffered in p.buf.
 func (mh mHandler) Open(o, c byte) (e error) {
 	p := mh.p
+
+	// A buffered \o or \c makes this pair a matcher escape
+	if p.escaping() {
+		return p.escape(o, c)
+	}
 
 	// Check for elements only when we see bracket or brace openers,
 	// and only if we're parsing general rather than text-only markup.
@@ -327,6 +336,63 @@ func (p *Parser) literalPair(o, c byte) (e error) {
 		}
 	}
 	return
+}
+
+// Report whether the buffered text ends with \o or \c,
+// which makes the next matcher pair an escape.
+func (p *Parser) escaping() bool {
+	b := p.buf.Bytes()
+	l := len(b)
+	return l >= 2 && b[l-2] == '\\' && (b[l-1] == 'o' || b[l-1] == 'c')
+}
+
+// Read a matcher escape: the buffered \o or \c and the empty pair o c that follows,
+// which stand for the opener or the closer of the pair.
+// The client handles the escape as a character reference named by the escape.
+func (p *Parser) escape(o, c byte) error {
+	name := [4]byte{'\\', p.buf.Bytes()[p.buf.Len()-1], o, c}
+	p.buf.Truncate(p.buf.Len() - 2)
+
+	// Suck space after the previous construct, and handle the text before the escape
+	if e := p.mFlush(false); e != nil {
+		return e
+	}
+
+	// Read the pair, which must be empty
+	p.xh.failed = false
+	if e := p.mp.ReadPair(&p.xh, o, c); e != nil {
+		return e
+	}
+	if p.xh.failed || p.mp.Unclosed() {
+		return nil // error recovery drops the escape
+	}
+	return p.handleReference(name[:])
+}
+
+// Matchertext handler for the content of an escape pair, which must be empty
+type xHandler struct {
+	p      *Parser
+	failed bool // a syntax error was reported for the pair content
+}
+
+func (xh *xHandler) Byte(b byte) error {
+	return xh.fail()
+}
+
+func (xh *xHandler) Open(o, c byte) error {
+	if e := xh.fail(); e != nil {
+		return e
+	}
+	return xh.p.mp.ReadPair(xh, o, c) // recover by skipping the nested pair
+}
+
+// Report the first byte or pair in the content of an escape pair.
+func (xh *xHandler) fail() error {
+	if xh.failed {
+		return nil
+	}
+	xh.failed = true
+	return xh.p.syntaxError(`escape \o or \c must be followed by an empty pair, such as \o() or \c[]`)
 }
 
 // Read a matching bracket pair with the markup handler, then flush the output.
@@ -615,8 +681,12 @@ func (vh vHandler) Byte(b byte) error {
 	return p.buf.WriteByte(b)
 }
 
-// Matcher-delimited sequences within an unquoted value are literal
+// Matcher-delimited sequences within an unquoted value are literal,
+// except for matcher escapes
 func (vh vHandler) Open(o, c byte) error {
+	if vh.p.escaping() {
+		return vh.p.escape(o, c)
+	}
 	return vh.p.literalPair(o, c)
 }
 

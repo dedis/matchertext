@@ -47,7 +47,11 @@ func hoverText(k Kind, src string, xml bool) string {
 		return fmt.Sprintf("### Attribute: `%s`", src)
 
 	case KindReference:
-		if s, ok := minml.LookupReference(src[1 : len(src)-1]); ok {
+		name := src
+		if !minml.IsEscape(src) {
+			name = src[1 : len(src)-1]
+		}
+		if s, ok := minml.LookupReference(name); ok {
 			return fmt.Sprintf("**Character reference** `%s` → `%s`", src, s)
 		}
 		return fmt.Sprintf("`%s` is not a character reference; it is converted to the literal text.", src)

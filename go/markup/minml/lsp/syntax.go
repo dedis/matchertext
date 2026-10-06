@@ -14,7 +14,7 @@ type Kind uint8
 const (
 	KindTag       Kind = iota // element name
 	KindAttrName              // attribute name
-	KindReference             // character reference [name]
+	KindReference             // character reference [name] or matcher escape such as \o()
 	KindComment               // comment -[...]
 	KindRaw                   // raw text +[...]
 	KindDoctype               // document type ![html] or ![xml]
@@ -227,6 +227,9 @@ func (syn *Syntax) Doctype(text string) string {
 func (r *recorder) Reference(name []byte) error {
 	end := r.offset() + 1
 	start := end - len(name) - 2
+	if minml.IsEscape(string(name)) {
+		start = end - len(name) // an escape has no brackets around its name
+	}
 	r.mark(KindReference, start, end)
 	if _, ok := minml.LookupReference(string(name)); !ok {
 		r.syn.Problems = append(r.syn.Problems, Problem{start, end,

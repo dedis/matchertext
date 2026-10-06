@@ -15,7 +15,7 @@ typedef struct {
   bool name_next;
 } Scanner;
 
-enum TokenType { TEXT, TAG_NAME, COMMENT_START, RAW_START, REFERENCE, ATTR_NAME, DOCTYPE_START };
+enum TokenType { TEXT, TAG_NAME, COMMENT_START, RAW_START, REFERENCE, ATTR_NAME, DOCTYPE_START, ESCAPE, BACKSLASH };
 
 // MinML whitespace is XML whitespace.
 static bool is_space(int32_t c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
@@ -104,23 +104,59 @@ static bool scan_reference(TSLexer *lexer) {
   return accept(lexer, REFERENCE);
 }
 
+// At the opener after "\o" or "\c": a matcher escape needs the matching closer next.
+static bool scan_escape_pair(TSLexer *lexer) {
+  int32_t closer = closer_of(lexer->lookahead);
+  advance(lexer);
+  if (lexer->lookahead != closer) {
+    return false;
+  }
+  advance(lexer);
+  return accept(lexer, ESCAPE);
+}
+
+// In an attribute value at '\': a matcher escape such as "\o()", or a lone backslash.
+static bool scan_backslash(TSLexer *lexer) {
+  advance(lexer);
+  lexer->mark_end(lexer);
+  lexer->result_symbol = BACKSLASH;
+  if (lexer->lookahead != 'o' && lexer->lookahead != 'c') {
+    return true;
+  }
+  advance(lexer);
+  if (closer_of(lexer->lookahead) == 0) {
+    return true;
+  }
+  return scan_escape_pair(lexer);
+}
+
 // Text up to the next matcher, or up to an element name: a run of non-space,
 // non-matcher characters directly before '[' or '{'. A leading '<' in the run
 // is a space sucker, so the name starts after it, and a run "<" is no name.
 // The names "-" and "+" before '[' open a comment and raw text,
 // and the name "!" opens the document type, which is valid only at the start of the file.
+// A run that ends with "\o" or "\c" before an opener ends in a matcher escape instead.
 // name_here tells that the run at the token start already had its sucker removed.
 static bool scan_markup(Scanner *s, TSLexer *lexer, const bool *valid_symbols, bool name_here) {
   unsigned pos = 0;     // characters consumed
   int run = -1;         // where the current run of name characters starts
   unsigned run_len = 0;
   int32_t run_first = 0, run_second = 0;
+  int32_t last = 0, before_last = 0; // the last two characters of the run
   while (!lexer->eof(lexer)) {
     int32_t c = lexer->lookahead;
     if (is_space(c)) {
       run = -1;
     } else if (is_matcher(c)) {
       bool sucker = run_first == '<' && !(name_here && run == 0);
+      if (closer_of(c) != 0 && run >= 0 && run_len >= 2 && before_last == '\\' && (last == 'o' || last == 'c')) {
+        if (pos > 2) {
+          // The text before the escape; mark_end was set at its backslash.
+          lexer->result_symbol = TEXT;
+          return true;
+        }
+        return scan_escape_pair(lexer);
+      }
       if ((c == '[' || c == '{') && run >= 0 && !(sucker && run_len == 1)) {
         unsigned name_start = (unsigned)run + (sucker ? 1 : 0);
         if (name_start > 0) {
@@ -154,9 +190,25 @@ static bool scan_markup(Scanner *s, TSLexer *lexer, const bool *valid_symbols, b
         run_len = 0;
         run_first = c;
         lexer->mark_end(lexer);
-      } else if (run_len == 1) {
-        run_second = c;
+      } else {
+        if (run_len == 1) {
+          run_second = c;
+        }
+        if (c == '\\') {
+          // Text before an escape must end at its backslash, but a name in this run
+          // must start at mark_end. If the name would start after the token start,
+          // end the text there, so that the run starts the next token.
+          bool sucker = run_first == '<' && !(name_here && run == 0);
+          if (run > 0 || sucker) {
+            s->name_next = sucker;
+            lexer->result_symbol = TEXT;
+            return true;
+          }
+          lexer->mark_end(lexer);
+        }
       }
+      before_last = last;
+      last = c;
       run_len++;
       advance(lexer);
       pos++;
@@ -221,6 +273,9 @@ bool tree_sitter_minml_external_scanner_scan(void *payload, TSLexer *lexer, cons
   }
   if (valid_symbols[TEXT] && valid_symbols[TAG_NAME]) {
     return scan_markup(s, lexer, valid_symbols, name_here);
+  }
+  if (valid_symbols[BACKSLASH] && lexer->lookahead == '\\') {
+    return scan_backslash(lexer);
   }
   return false;
 }

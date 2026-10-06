@@ -6,13 +6,13 @@ import (
 
 	"github.com/dedis/matchertext/go/internal/util"
 	"github.com/dedis/matchertext/go/markup/ast"
+	"github.com/dedis/matchertext/go/matchertext"
 )
 
 // TreeWriter writes a markup AST to an output stream in MinML syntax.
 //
-// The literal text content in the AST must already be valid matchertext:
-// that is, all literal matchers must match within the same markup sequence.
-// MatcherTransformer may be used to escape unmatched matchers if needed.
+// Literal matchers that do not match within the same markup sequence
+// are written as matcher escapes such as \o() and \c[].
 type TreeWriter struct {
 	bw util.AtomWriter // output stream to write to
 
@@ -52,16 +52,21 @@ func (e *TreeWriter) WriteAST(ns []ast.Node) (err error) {
 }
 
 func (e *TreeWriter) nodes(ns []ast.Node) (err error) {
-	for i := range ns {
+	if ns, err = MatcherTransformer.Transform(ns); err != nil {
+		return err
+	}
+	for i := 0; i < len(ns); i++ {
 		switch n := ns[i].(type) {
 		case ast.RawText:
 			err = e.text(n.Text(), n.IsRaw(), escMarkup)
 
 		case ast.Text: // Plain text sequence, raw or cooked
-			err = e.text(n.Text(), false, escMarkup)
+			s, k := textRun(ns[i:])
+			i += k - 1
+			err = e.text(s, false, escMarkup)
 
 		case ast.Reference:
-			err = e.reference(n.Reference())
+			err = e.reference(n.Reference(), escMarkup)
 
 		case ast.Element:
 			err = e.element(n)
@@ -89,11 +94,20 @@ func (e *TreeWriter) text(text string, raw bool, esc escaper) error {
 		return e.open("+", "[", text, "]")
 	}
 
-	// Normal text: just "escape" false elements or character references
+	// Normal text: just "escape" false elements, character references, or matcher escapes
 	escelt := (esc & escElement) != 0
 	escref := (esc & escReference) != 0
 	for i := 0; i < len(text); i++ {
 		b := text[i]
+		if b == '\\' && i+2 < len(text) && (text[i+1] == 'o' || text[i+1] == 'c') &&
+			matchertext.IsOpener(text[i+2]) {
+
+			// write the backslash as a reference so that the pair is no escape
+			if err := e.reference("#92", esc); err != nil {
+				return err
+			}
+			continue
+		}
 		if ((b == '[' || b == '{') && escelt && isNameByte(e.last)) ||
 			(b == ']' && escref && e.pref && isNameByte(e.last)) {
 
@@ -144,12 +158,39 @@ func (e *TreeWriter) writeByte(b byte) error {
 	return e.bw.WriteByte(b)
 }
 
-// Write a reference to XML output
-func (e *TreeWriter) reference(name string) error {
+// Write a character reference or a matcher escape
+func (e *TreeWriter) reference(name string, esc escaper) error {
+	if IsEscape(name) {
+		return e.strings(name)
+	}
 
 	// XXX verify that name is a valid MinML reference name?
 
-	return e.strings("[", name, "]")
+	// separate the bracket from prior text that would be an element name
+	pad := ""
+	if esc&escElement != 0 && isNameByte(e.last) {
+		pad = " <"
+	}
+	return e.strings(pad, "[", name, "]")
+}
+
+// textRun joins the text of the plain Text nodes at the start of ns
+// and returns the number of those nodes,
+// so that text sees each \o or \c together with the byte after it.
+func textRun(ns []ast.Node) (string, int) {
+	s := ns[0].(ast.Text).Text()
+	k := 1
+	for ; k < len(ns); k++ {
+		if _, raw := ns[k].(ast.RawText); raw {
+			break
+		}
+		t, ok := ns[k].(ast.Text)
+		if !ok {
+			break
+		}
+		s += t.Text()
+	}
+	return s, k
 }
 
 func (e *TreeWriter) element(elt ast.Element) (err error) {
@@ -174,14 +215,18 @@ func (e *TreeWriter) element(elt ast.Element) (err error) {
 			}
 
 			// write the attribute value
-			for _, n := range val {
-				switch n := n.(type) {
+			if val, err = MatcherTransformer.Transform(val); err != nil {
+				return err
+			}
+			for j := 0; j < len(val); j++ {
+				switch n := val[j].(type) {
 				case ast.Text:
-					err = e.text(n.Text(), false,
-						escReference)
+					s, k := textRun(val[j:])
+					j += k - 1
+					err = e.text(s, false, escValue)
 
 				case ast.Reference:
-					err = e.reference(n.Reference())
+					err = e.reference(n.Reference(), escValue)
 
 				default:
 					err = encError(fmt.Sprintf(

@@ -109,23 +109,23 @@ func (_ qTransform) Transform(ns []ast.Node) ([]ast.Node, error) {
 
 // MatcherTransformer is an optional ast.Transformer
 // that converts unmatched matchers in literal text
-// into MinML-style matcher character references.
+// into MinML matcher escapes such as \o() and \c[].
 var MatcherTransformer = &ast.MatcherTransformer{Escaper: minmlEscaper}
 
 func minmlEscaper(b byte) string {
 	switch b {
 	case '(':
-		return "(<)"
+		return `\o()`
 	case ')':
-		return "(>)"
+		return `\c()`
 	case '[':
-		return "[<]"
+		return `\o[]`
 	case ']':
-		return "[>]"
+		return `\c[]`
 	case '{':
-		return "{<}"
+		return `\o{}`
 	case '}':
-		return "{>}"
+		return `\c{}`
 	default:
 		panic("Escaper argument must be a matcher")
 	}

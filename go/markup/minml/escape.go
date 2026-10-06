@@ -5,8 +5,7 @@ package minml
 type escaper int
 
 const (
-	escUnmatched escaper = 1 << iota // Escape unmatched matchers XXX
-	escReference                     // Escape [ref] as [> ref <]
+	escReference escaper = 1 << iota // Escape [ref] as [> ref <]
 	escElement                       // Escape tag[...] as tag <[...]
 
 	escMarkup = escReference | escElement // escaping in general markup

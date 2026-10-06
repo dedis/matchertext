@@ -1,6 +1,7 @@
 package minml
 
 import (
+	"math/rand"
 	"strings"
 	"testing"
 
@@ -74,6 +75,23 @@ var encTests = []encTest{
 	et("a <{x y}", aText("a{x y}")),
 	et("a <{b}c", aText("a{b}c")),
 	et("a <{b}c <{d}", aText("a{b}c{d}")),
+	et("a <[lt]", aText("a"), aRef("lt")),
+	et("x{y=[a[lt]]}[]", aElem("x", aAttr("y", aText("a"), aRef("lt")))),
+
+	// Unmatched matchers and matcher escapes
+	et(`\o()`, aRef(`\o()`)),
+	et(`\o()`, aText("(")),
+	et(`f\o()x`, aText("f(x")),
+	et(`a\c[]b\o{}`, aText("a]b{")),
+	et(`\o()\c[]\c()`, aText("(]"), aText(")")),
+	et(`p[\o()]`, aElem("p", aText("("))),
+	et(`x{y=[\c()]}[]`, aElem("x", aAttr("y", aText(")")))),
+	et(`[#92]o()`, aText(`\o()`)),
+	et(`[#92]o()`, aText(`\o`), aText("()")),
+	et(`a <[#92]c <[x <]`, aText(`a\c[x]`)),
+	et(`x{y=[a[#92]c{}]}[]`, aElem("x", aAttr("y", aText(`a\c{}`)))),
+	et(`\o\o()`, aText(`\o(`)),
+	et(`\o <[lt]`, aText(`\o`), aRef("lt")),
 }
 
 func TestTreeWriter(t *testing.T) {
@@ -86,6 +104,35 @@ func TestTreeWriter(t *testing.T) {
 		s := sb.String()
 		if s != et.out {
 			t.Errorf("%v: expected %v output %v", i, et.out, s)
+		}
+	}
+}
+
+// Text written by TreeWriter parses back to the same text.
+func TestTreeWriterRoundTrip(t *testing.T) {
+	alphabet := []string{"a", " ", "\\", "o", "c", "(", ")", "[", "]", "{", "}"}
+	rng := rand.New(rand.NewSource(1))
+	for n := 0; n < 20000; n++ {
+		var b strings.Builder
+		for k := rng.Intn(12); k > 0; k-- {
+			b.WriteString(alphabet[rng.Intn(len(alphabet))])
+		}
+		in := b.String()
+
+		sb := &strings.Builder{}
+		if err := NewTreeWriter(sb).WriteAST([]ast.Node{aText(in)}); err != nil {
+			t.Fatalf("%q: %v", in, err)
+		}
+		ns, err := NewTreeParser(strings.NewReader(sb.String())).WithTransformer(EntityTransformer).ParseAST()
+		if err != nil {
+			t.Fatalf("%q written as %q: %v", in, sb.String(), err)
+		}
+		var out strings.Builder
+		for _, n := range ns {
+			out.WriteString(n.(ast.Text).Text())
+		}
+		if out.String() != in {
+			t.Fatalf("%q written as %q reads back as %q", in, sb.String(), out.String())
 		}
 	}
 }

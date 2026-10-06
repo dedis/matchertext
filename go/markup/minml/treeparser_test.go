@@ -77,6 +77,26 @@ var decodeTests = []testCase{
 	tc("[#x@]", aRef("#x@")),
 	tc("[#xg]", aRef("#xg")),
 
+	// Matcher escapes
+	tc(`\o()`, aRef(`\o()`)),
+	tc(`\c()\o[]\c[]\o{}\c{}`, aRef(`\c()`), aRef(`\o[]`), aRef(`\c[]`), aRef(`\o{}`), aRef(`\c{}`)),
+	tc(`f\o()x`, aText("f"), aRef(`\o()`), aText("x")),
+	tc(`a\o[]b`, aText("a"), aRef(`\o[]`), aText("b")),
+	tc(`\\o()`, aText(`\`), aRef(`\o()`)),
+	tc(`[\o()]`, aText("["), aRef(`\o()`), aText("]")),
+	tc(`p[\c{}]`, aElem("p", aRef(`\c{}`))),
+	tc(`p[]> \o()> x`, aElem("p"), aRef(`\o()`), aText("> x")),
+	tc(`p{a=\o()}[]`, aElem("p", aAttr("a", aRef(`\o()`)))),
+	tc(`p{a=x\c{}y}[]`, aElem("p", aAttr("a", aText("x"), aRef(`\c{}`), aText("y")))),
+	tc(`p{a=[x\c[]]}[]`, aElem("p", aAttr("a", aText("x"), aRef(`\c[]`)))),
+	tc(`\ox() \o <() \c`, aText(`\ox() \o <() \c`)),
+	tc(`+[\o()]`, aRawText(`\o()`)),
+	tc(`-[\c(]`),  // error: unmatched opener in a comment
+	tc(`\o(x)`),   // error: escape pair not empty
+	tc(`\c[p[]]`), // error: escape pair not empty
+	tc(`\o(]`),    // error: mismatched matchers
+	tc(`\o(`),     // error: unmatched opener
+
 	// Elements
 	tc("p[]", aElem("p")),
 	tc("p[q]", aElem("p", aText("q"))),

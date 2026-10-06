@@ -185,6 +185,40 @@ Standalone bracket sequence is char ref not content block
   (reference))
 
 ================================================================================
+Matcher escapes
+================================================================================
+p[f\o()x \c[] a\o{}]
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    name: (tag_name)
+    content: (content
+      (reference)
+      (reference)
+      (reference))))
+
+================================================================================
+Matcher escapes in attribute values
+================================================================================
+p{a=\o() b=[x\c[]]}[]
+--------------------------------------------------------------------------------
+
+(source_file
+  (element
+    name: (tag_name)
+    attributes: (attributes
+      (attribute
+        name: (attr_name)
+        value: (value
+          (reference)))
+      (attribute
+        name: (attr_name)
+        value: (quoted_value
+          (reference))))
+    content: (content)))
+
+================================================================================
 Quoted string
 ================================================================================
 "[hello said the cat]

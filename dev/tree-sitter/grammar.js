@@ -16,6 +16,8 @@
  *   - "[...]" is a character reference when its content is not empty, is not
  *     "<" or ">", and has no whitespace and no matchers, or is one of the
  *     escapes "[(<)]", "[[>]]", ...;
+ *   - "\o" or "\c" before an opener is a matcher escape such as "\o()",
+ *     a reference whose pair must be empty;
  *   - an attribute name is an XML name followed by '='.
  *
  * Matchers ( ) [ ] { } must balance everywhere, as in all matchertext.
@@ -38,6 +40,8 @@ module.exports = grammar({
     $.reference,
     $.attr_name,
     $._doctype_start,
+    $._escape,
+    $._backslash,
   ],
 
   rules: {
@@ -54,6 +58,7 @@ module.exports = grammar({
         $.comment,
         $.raw,
         $.reference,
+        $._escape_reference,
         $.literal,
       ),
 
@@ -96,17 +101,22 @@ module.exports = grammar({
         optional(field("value", choice($.value, $.quoted_value))),
       ),
 
+    // A matcher escape such as \o() is a reference.
+    _escape_reference: ($) => alias($._escape, $.reference),
+
     // A bracketed value holds text, references, and pairs, but no elements.
     quoted_value: ($) => seq("[", repeat($._value_markup), "]"),
 
     // An unbracketed value ends at whitespace outside matcher pairs.
+    // A backslash is a token of its own, so that the scanner sees each escape.
     value: ($) =>
       seq(
-        choice($._word, $._value_pair_unbracketed),
-        repeat(choice($._word, $.reference, $._value_pair)),
+        choice($._word, $._backslash, $._escape_reference, $._value_pair_unbracketed),
+        repeat(choice($._word, $._backslash, $.reference, $._escape_reference, $._value_pair)),
       ),
 
-    _value_markup: ($) => choice($._plain, $.reference, $._value_pair),
+    _value_markup: ($) =>
+      choice($._value_text, $._backslash, $.reference, $._escape_reference, $._value_pair),
 
     _value_pair: ($) =>
       choice($._value_pair_unbracketed, seq("[", repeat($._value_markup), "]")),
@@ -132,7 +142,9 @@ module.exports = grammar({
 
     _plain: (_) => /[^()\[\]{}]+/,
 
-    _word: (_) => /[^ \t\r\n()\[\]{}]+/,
+    _value_text: (_) => /[^()\[\]{}\\]+/,
+
+    _word: (_) => /[^ \t\r\n()\[\]{}\\]+/,
 
     _space: (_) => /[ \t\r\n]+/,
   },

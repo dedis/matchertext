@@ -102,6 +102,9 @@ func TestCasesMatchGoParser(t *testing.T) {
 		"p{a=}[] q{a= b=c}[]", "p{}[]", "p{ }[]", "[{<}] [{>}]", "?[pi]", "p[a]]b", "{x}", "(x)",
 		"![html]", "![xml]\np[x]", "![svg]", "![]", "![ html]", " ![html]", "<![html]", "-[c]![html]",
 		"![html]![xml]", "p[![html]]", "![html", "x![html]", "!x[y]", "!{a=b}[c]", "![html]{a=b}",
+		`p[f\o()x]`, `\c[]`, `p{a=\o{} b=[x\c()]}[y]`, `[\o()]`, `\o(x)`, `\o(`, `\o(]`, `a <\o[]`,
+		`x\o[y]`, `ab\cd[e]`, `<a\o()`, `<\o()`, `\\o()`, `x <a\b[c]`, `a\ b[c]`, `+[\o(]`, `-[\c{]`,
+		`p{a=x\o()y\z}[]`, `p{a=\o(x)}[]`, `p{a=[\c[y]]}[]`, `p{a=\}[]`, `p{a=\o}[]`, `p{a=[\\o{}]}[]`,
 	} {
 		check(t, parser, src)
 	}
@@ -111,7 +114,7 @@ func TestRandomMatchesGoParser(t *testing.T) {
 	parser := newParser(t)
 	alphabet := []string{"a", "p", "é", "😀", " ", "\n", "[", "]", "{", "}", "(", ")", "<", ">", "-", "+",
 		`"`, "'", "=", "#", "&", "?", "x[", "p{a=b}[", "-[", "+[", "[amp]", "[[<]]", "\t", "\r",
-		"!", "![", "![html]", "![xml]", "html", "xml"}
+		"!", "![", "![html]", "![xml]", "html", "xml", `\`, `\o`, `\c`, "o", "c"}
 	rng := rand.New(rand.NewSource(1))
 	for n := 0; n < 200000; n++ {
 		var b strings.Builder
@@ -136,13 +139,14 @@ func randomDocument(rng *rand.Rand, depth int) string {
 		case depth > 0 && rng.Intn(3) == 0:
 			b.WriteString(pick("p", "div", "<em", "a-b", `"`, "'", "?", "h1.x", "é"))
 			if rng.Intn(2) == 0 {
-				b.WriteString("{" + pick("", " ") + pick("a=b", "c=[d [amp] e]", "f=g(h i)", "j=", "k=x[amp]y", "l=[]") +
+				b.WriteString("{" + pick("", " ") + pick("a=b", "c=[d [amp] e]", "f=g(h i)", "j=", "k=x[amp]y", "l=[]",
+					`r=\c()`, `s=[t\o[]]`, `u=v\w`) +
 					pick("", " m=n", " o=[p q]") + pick("", " ") + "}")
 			}
 			b.WriteString("[" + randomDocument(rng, depth-1) + "]")
 		case rng.Intn(3) == 0:
 			b.WriteString(pick("[amp]", "[#174]", "[[<]]", "[(>)]", "-[c (x) [y]]", "+[r {z}]", "(t [u])", "{v}",
-				"[a b]", " <", "> ", "[<]", "\n", "x"))
+				"[a b]", " <", "> ", "[<]", "\n", "x", `\o()`, `a\c[]b`, `\o{}`, `\`))
 		case rng.Intn(6) == 0:
 			b.WriteString(pick("[", "]", "{", "}", "(", ")", "=", "p{", "a b=", "-{", "+{"))
 		default:
@@ -166,7 +170,7 @@ func TestStructuredMatchesGoParser(t *testing.T) {
 func TestIncrementalParseMatchesFreshParse(t *testing.T) {
 	parser := newParser(t)
 	inserts := []string{"", "a", "<", "x[", "]", "p{a=b}[y]", "[", "{", "(", ")", "\n", "é", " <", "-[", "[amp]", "=",
-		"!", "![html]", "html"}
+		"!", "![html]", "html", `\`, `\o`, `\c()`}
 	rng := rand.New(rand.NewSource(3))
 	for n := 0; n < 20000; n++ {
 		src := []byte([]string{"", "", "![html]", "![xml]\n"}[rng.Intn(4)] + randomDocument(rng, 4))

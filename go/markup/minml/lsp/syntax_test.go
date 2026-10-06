@@ -52,7 +52,7 @@ func checkSyntax(t *testing.T, src string) {
 		case KindAttrName:
 			ok = src[m.End] == '='
 		case KindReference:
-			ok = s[0] == '[' && s[len(s)-1] == ']'
+			ok = s[0] == '[' && s[len(s)-1] == ']' || minml.IsEscape(s)
 		case KindComment:
 			ok = strings.HasPrefix(s, "-[")
 		case KindRaw:
@@ -76,6 +76,7 @@ func TestSyntaxCases(t *testing.T) {
 		"]x]", "p[a]]b", "[abc", "[ab(c]", "+[raw <b>]", "+[a (b]", "-[a\nb]\nc[d]",
 		"<p[a]> <q[b]>", "p[[[<]] [(>)]]", "x[y{z}]", "p[\r\nq[a]\r\n]",
 		"![html]", "![xml]\np[x]", "![svg]", " ![html]", "<![html]", "p[![xml]]", "![html", "![html]![html]",
+		`p[f\o()x]`, `\c[]`, `p{a=\o{} b=[x\c()]}[y]`, `[\o()]`, `\o(x)`, `\o(`, `\o(]`, `a <\o[]`,
 	} {
 		checkSyntax(t, src)
 	}
@@ -83,7 +84,7 @@ func TestSyntaxCases(t *testing.T) {
 
 func TestSyntaxRandom(t *testing.T) {
 	alphabet := []string{"a", "p", "é", "😀", " ", "\n", "[", "]", "{", "}", "(", ")",
-		"<", ">", "-", "+", `"`, "'", "=", "#", "&", "!", "![html]", "![xml]"}
+		"<", ">", "-", "+", `"`, "'", "=", "#", "&", "!", "![html]", "![xml]", `\`, `\o`, `\c`}
 	rng := rand.New(rand.NewSource(1))
 	for n := 0; n < 50000; n++ {
 		var b strings.Builder
@@ -187,6 +188,7 @@ func TestHover(t *testing.T) {
 	for _, c := range []struct{ src, want string }{
 		{"[amp]", "`&`"},
 		{"[[<]]", "`[`"},
+		{`\c{}`, "`}`"},
 		{"[zz]", "literal text"},
 		{"[#174]", "`®`"},
 		{"-[x]", "HTML comment"},
