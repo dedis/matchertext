@@ -6,6 +6,15 @@
 - [ ] MathML in MinML
 - [ ] Test SVG → XML → SVG for no loss
 
+# Future Split when needed
+
+Split repo into 4:
+
+- [ ] Main go parser for Matchertext and MinML so that it can be used outside
+- [ ] Main paper + experimentation
+- [ ] Injection research + usenix paper
+- [ ] Tooling LSPs
+
 # Potential Student project
 
 ## Bachelor Project: MinML --> LaTeX
