@@ -8,7 +8,8 @@
       "title": "MinML",
       "scope": "text.minml",
       "file-types": [
-        "minml"
+        "minml",
+        "m"
       ],
       "injection-regex": "^minml$",
       "class-name": "TreeSitterMinml",

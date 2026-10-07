@@ -17,6 +17,20 @@ language built on it, and the tooling around both.
 | `markup/minml/cmd/lsp` | The `minml-lsp` binary                                                                                          |
 | `wasm`                 | WebAssembly entry point for the browser tools and the VS Code extension                                         |
 
+## Document type
+
+A MinML file may start with `![html]` or `![xml]`, as its first bytes, to declare
+the language it converts to. Anywhere else, and with any other content, it is a
+syntax error.
+
+| First bytes | Output                                                      |
+|-------------|-------------------------------------------------------------|
+| `![html]`   | HTML, after `<!DOCTYPE html>`                               |
+| `![xml]`    | XML, after `<?xml version="1.0" encoding="UTF-8"?>`; raw text `+[...]` becomes a CDATA section |
+| anything else | HTML, without a document type                             |
+
+`minml from-xml` starts its output with `![xml]`, so the file converts back to XML.
+
 `matchertext` is used as an independent oracle by the injection study: the C
 scanner in `../injection-research/sqlite` is differentially tested against it,
 so the two implementations share no code by design.
@@ -51,10 +65,10 @@ working on incomplete documents. The editor sends only the changed text, and
 the server reparses only the elements around each edit.
 
 - **Diagnostics** for every syntax error, such as unmatched brackets
-- **Completion** for HTML5 tags, and for attributes inside `{...}`
+- **Completion** for HTML5 tags, and for attributes inside `{...}`, except in `![xml]` documents
 - **Hover** documentation for HTML5 tags, character references, and MinML constructs
-- **Semantic highlighting** of element and attribute names, references,
-  comments, and raw text. Brackets get no tokens; each editor colors them itself
+- **Semantic highlighting** of the document type, element and attribute names,
+  references, comments, and raw text. Brackets get no tokens; each editor colors them itself
 
 ### Running it by hand
 

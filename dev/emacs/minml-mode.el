@@ -122,21 +122,7 @@ Only a change of matchers can: it can end the comment BEG is in, or an unclosed
 (add-to-list 'eglot-server-programs '(minml-mode . minml--server-command))
 
 ;;;###autoload
-(add-to-list 'auto-mode-alist '("\\.minml\\'" . minml-mode))
-
-;;;###autoload
-(defun minml--m-file-p ()
-  "Whether the current .m file is MinML.
-Objective-C and MATLAB also use .m, so a .m file is MinML only if its first
-non-blank line starts with an element, attributes, or a MinML construct."
-  (and buffer-file-name
-       (string-suffix-p ".m" buffer-file-name)
-       (save-excursion
-         (skip-chars-forward " \t\r\n")
-         (looking-at "<?[[:alnum:]_:.-]+[[{]\\|[-+?\"'][[]"))))
-
-;;;###autoload
-(add-to-list 'magic-mode-alist '(minml--m-file-p . minml-mode))
+(add-to-list 'auto-mode-alist '("\\.\\(?:minml\\|m\\)\\'" . minml-mode))
 
 (provide 'minml-mode)
 ;;; minml-mode.el ends here

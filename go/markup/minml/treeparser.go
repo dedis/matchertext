@@ -115,7 +115,13 @@ func (ap *astParser) Attribute(name []byte) error {
 	if e := ap.p.ReadAttribute(name, ap); e != nil {
 		return e
 	}
-	attr := ast.NewAttribute(nameStr, ap.m...)
+
+	// Transform the attribute value as appropriate
+	vs, err := ap.xform(ap.m)
+	if err != nil {
+		return err
+	}
+	attr := ast.NewAttribute(nameStr, vs...)
 
 	ap.m, ap.a = om, append(oa, attr)
 	return nil
@@ -131,6 +137,11 @@ func (ap *astParser) Comment(text []byte) error {
 
 	// Create a new Comment node
 	ap.m = append(ap.m, ast.NewComment(string(text)))
+	return nil
+}
+
+func (ap *astParser) Doctype(kind []byte) error {
+	ap.m = append(ap.m, ast.NewDoctype(string(kind)))
 	return nil
 }
 

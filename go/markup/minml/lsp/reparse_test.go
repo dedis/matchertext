@@ -12,7 +12,7 @@ import (
 // randomMinML returns a document with nested elements, attributes, and random noise.
 func randomMinML(rng *rand.Rand, depth int) string {
 	pieces := []string{"a", "é", " ", "\n", "\r\n", "[amp]", "[1]", "-[c (x)]", "+[r]", `"[q]`,
-		"(", ")", "[", "]", "{", "}", "<", ">", "="}
+		"(", ")", "[", "]", "{", "}", "<", ">", "=", "!", "![xml]"}
 	var b strings.Builder
 	for k := rng.Intn(6); k > 0; k-- {
 		switch {
@@ -59,10 +59,10 @@ func checkSameDocument(t *testing.T, what string, got, want *Document) {
 
 func TestReparseMatchesFullParse(t *testing.T) {
 	inserts := []string{"", "a", "x[", "]", "p[y]", "[", "{", "}", "(", ")", "\n", "\r", "é", " <", "> ",
-		"-[", "+[", "[amp]", "=", "div{a=", "q[w] ", "]]", "[["}
+		"-[", "+[", "[amp]", "=", "div{a=", "q[w] ", "]]", "[[", "!", "![html]", "html", "x"}
 	rng := rand.New(rand.NewSource(3))
 	for n := 0; n < 20000; n++ {
-		d := newDocument(randomMinML(rng, 4), 0, nil)
+		d := newDocument([]string{"", "", "![html]", "![xml]\n"}[rng.Intn(4)]+randomMinML(rng, 4), 0, nil)
 		for k := 0; k < 4; k++ {
 			s := rng.Intn(len(d.Text) + 1)
 			e := s + rng.Intn(min(len(d.Text)-s, 6)+1)
@@ -75,7 +75,7 @@ func TestReparseMatchesFullParse(t *testing.T) {
 }
 
 func TestTokenEdit(t *testing.T) {
-	inserts := []string{"", "a", "x[", "]", "p[y]", "\n", "é", "-[", "[amp]", "div{a="}
+	inserts := []string{"", "a", "x[", "]", "p[y]", "\n", "é", "-[", "[amp]", "div{a=", "![html]"}
 	rng := rand.New(rand.NewSource(5))
 	for n := 0; n < 20000; n++ {
 		d := newDocument(randomMinML(rng, 3), 0, nil)

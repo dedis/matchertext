@@ -52,11 +52,13 @@ func checkSyntax(t *testing.T, src string) {
 		case KindAttrName:
 			ok = src[m.End] == '='
 		case KindReference:
-			ok = s[0] == '[' && s[len(s)-1] == ']'
+			ok = s[0] == '[' && s[len(s)-1] == ']' || minml.IsEscape(s)
 		case KindComment:
 			ok = strings.HasPrefix(s, "-[")
 		case KindRaw:
 			ok = strings.HasPrefix(s, "+[")
+		case KindDoctype:
+			ok = m.Start == 0 && (s == "![html]" || s == "![xml]")
 		}
 		if !ok {
 			t.Fatalf("%q: mark %+v covers %q", src, m, s)
@@ -73,6 +75,8 @@ func TestSyntaxCases(t *testing.T) {
 		"p{a=b} x", "p{a=b]", "p{(x)=1}[y]", "p{1a=b}[y]", "p{a=[x]y}[z]", "p{a b=c}[d]",
 		"]x]", "p[a]]b", "[abc", "[ab(c]", "+[raw <b>]", "+[a (b]", "-[a\nb]\nc[d]",
 		"<p[a]> <q[b]>", "p[[[<]] [(>)]]", "x[y{z}]", "p[\r\nq[a]\r\n]",
+		"![html]", "![xml]\np[x]", "![svg]", " ![html]", "<![html]", "p[![xml]]", "![html", "![html]![html]",
+		`p[f\o()x]`, `\c[]`, `p{a=\o{} b=[x\c()]}[y]`, `[\o()]`, `\o(x)`, `\o(`, `\o(]`, `a <\o[]`,
 	} {
 		checkSyntax(t, src)
 	}
@@ -80,7 +84,7 @@ func TestSyntaxCases(t *testing.T) {
 
 func TestSyntaxRandom(t *testing.T) {
 	alphabet := []string{"a", "p", "é", "😀", " ", "\n", "[", "]", "{", "}", "(", ")",
-		"<", ">", "-", "+", `"`, "'", "=", "#", "&"}
+		"<", ">", "-", "+", `"`, "'", "=", "#", "&", "!", "![html]", "![xml]", `\`, `\o`, `\c`}
 	rng := rand.New(rand.NewSource(1))
 	for n := 0; n < 50000; n++ {
 		var b strings.Builder
@@ -184,12 +188,15 @@ func TestHover(t *testing.T) {
 	for _, c := range []struct{ src, want string }{
 		{"[amp]", "`&`"},
 		{"[[<]]", "`[`"},
+		{`\c{}`, "`}`"},
 		{"[zz]", "literal text"},
 		{"[#174]", "`®`"},
 		{"-[x]", "HTML comment"},
 		{"+[x]", "escaped text"},
 		{`"[x]`, "Quotation"},
 		{"div[x]", "### `div`"},
+		{"![html]", "<!DOCTYPE html>"},
+		{"![xml]", "<?xml"},
 	} {
 		d := newDocument(c.src, 0, nil)
 		i := d.markAt(0)
@@ -197,7 +204,7 @@ func TestHover(t *testing.T) {
 			t.Fatalf("%q: no mark at 0", c.src)
 		}
 		m := d.Marks[i]
-		if got := hoverText(m.Kind, c.src[m.Start:m.End]); !strings.Contains(got, c.want) {
+		if got := hoverText(m.Kind, c.src[m.Start:m.End], d.Doctype(d.Text) == "xml"); !strings.Contains(got, c.want) {
 			t.Errorf("%q: hover %q does not contain %q", c.src, got, c.want)
 		}
 	}
@@ -264,5 +271,29 @@ func TestApplyChanges(t *testing.T) {
 		if got := applyChanges(d, c.changes, 1).Text; got != c.want {
 			t.Errorf("got %q, want %q", got, c.want)
 		}
+	}
+}
+
+func TestXMLDocument(t *testing.T) {
+	src := "![xml]\ndiv{id=x}[a -[c] +[r]]"
+	d := newDocument(src, 0, nil)
+	if got := d.Doctype(src); got != "xml" {
+		t.Fatalf("doctype %q, want xml", got)
+	}
+	for _, at := range []string{"div{", "div{id=x}[a"} {
+		if items := d.completions(strings.Index(src, at)+len(at), false); len(items) != 0 {
+			t.Errorf("after %q: %d HTML completions in an XML document", at, len(items))
+		}
+	}
+	for _, c := range []struct{ at, want string }{
+		{"div", "MinML element"}, {"-[c]", "XML comment"}, {"+[r]", "CDATA"},
+	} {
+		m := d.Marks[d.markAt(strings.Index(src, c.at))]
+		if got := hoverText(m.Kind, src[m.Start:m.End], true); !strings.Contains(got, c.want) {
+			t.Errorf("hover on %q: %q does not contain %q", c.at, got, c.want)
+		}
+	}
+	if got := d.tokens()[:5]; !equal(got, []uint32{0, 0, 6, 5, 0}) {
+		t.Errorf("doctype token %v", got)
 	}
 }

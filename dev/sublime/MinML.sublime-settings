@@ -1,0 +1,5 @@
+// .m is MinML's extension too. Sublime gives an extension that several syntaxes list
+// to one of them, here Objective-C; this setting gives it to MinML.
+{
+  "extensions": ["minml", "m"],
+}

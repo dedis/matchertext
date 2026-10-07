@@ -9,7 +9,8 @@ import (
 )
 
 type TreeWriter struct {
-	w util.AtomWriter
+	w     util.AtomWriter
+	depth int // number of elements enclosing the nodes being written
 }
 
 // NewTreeWriter creates and returns a TreeWriter that writes output to w.
@@ -24,7 +25,7 @@ func (e *TreeWriter) WriteAST(ns []ast.Node) (err error) {
 		switch n := ns[i].(type) {
 
 		case ast.RawText: // Plain text sequence, raw or cooked
-			e.text(n.Text(), n.IsRaw(), EscBasic)
+			err = e.text(n.Text(), n.IsRaw(), EscBasic)
 
 		case ast.Text: // Plain (cooked) text sequence
 			err = e.text(n.Text(), false, EscBasic)
@@ -38,6 +39,9 @@ func (e *TreeWriter) WriteAST(ns []ast.Node) (err error) {
 		case ast.Comment:
 			err = e.comment(n.Comment())
 
+		case ast.Doctype:
+			err = e.doctype(n.Doctype(), i)
+
 		default:
 			err = encError(fmt.Sprintf("unknown node %v", n))
 		}
@@ -49,6 +53,16 @@ func (e *TreeWriter) WriteAST(ns []ast.Node) (err error) {
 	// Flush the output stream in case it's buffered
 	err = util.Flush(e.w)
 	return
+}
+
+// Write the XML declaration for the XML document type,
+// which only the first node of the document may declare.
+func (e *TreeWriter) doctype(kind string, i int) error {
+	if kind != "xml" || i != 0 || e.depth != 0 {
+		return encError(fmt.Sprintf("document type %q is not xml, or not the first node", kind))
+	}
+	_, err := e.w.WriteString(`<?xml version="1.0" encoding="UTF-8"?>`)
+	return err
 }
 
 func (e *TreeWriter) text(s string, raw bool, esc Escaper) error {
@@ -185,7 +199,10 @@ func (e *TreeWriter) element(name string, attr []ast.Attribute,
 	}
 
 	// recursively write the element content
-	if err := e.WriteAST(content); err != nil {
+	e.depth++
+	err = e.WriteAST(content)
+	e.depth--
+	if err != nil {
 		return err
 	}
 

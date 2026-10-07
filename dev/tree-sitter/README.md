@@ -29,13 +29,13 @@ make test-grammar   # from the repository root
 | `tag_name` | a run of non-space, non-matcher characters directly before `[` or `{` |
 | `attributes`, `attribute`, `attr_name` | `{name=value ...}`, names are XML names |
 | `value`, `quoted_value` | `name=value` ends at whitespace; `name=[...]` holds text and references |
-| `reference` | `[amp]`, `[#174]`, `[[<]]`: no whitespace and no matchers inside |
+| `reference` | `[amp]`, `[#174]`, `[[<]]`: no whitespace and no matchers inside; or a matcher escape `\o()`, `\c[]`, ... |
 | `comment`, `raw` | `-[...]` and `+[...]`: only matchers must balance inside |
 | `literal` | any other matcher pair: `(...)`, `[...]`, `{...}` |
 
 `src/scanner.c` makes the decisions that depend on the next characters: whether a
-run of characters is an element name, whether `[...]` is a reference, and whether
-a run is an attribute name. `grammar.js` explains each rule.
+run of characters is an element name, whether `[...]` is a reference, where a
+matcher escape such as `\o()` starts, and whether a run is an attribute name. `grammar.js` explains each rule.
 
 ## Building
 

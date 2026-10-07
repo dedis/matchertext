@@ -11,7 +11,11 @@ is particularly new or technically challenging
 from a formal language perspective.
 Previous work like \emph{Dyck Language}~\cite{chomsky63algebraic} already
 encompass a big part of the discipline matchertext puts forward, since matchertext
-is itself a Dyck Language with extra neutral symbols.
+is itself a Dyck Language with extra neutral symbols. In addition,
+every context-free language is a Dyck language with its brackets
+erased~\cite{chomsky63algebraic}. Matchertext keeps the brackets visible
+so a host can find where embedded text ends without parsing it.
+
 However, surprisingly little prior work has focused on
 the ubiquitous practice of synactically embedding
 strings of one language into those of another,

@@ -5,7 +5,7 @@
 [[language]]
 name = "minml"
 scope = "text.minml"
-file-types = ["minml"]
+file-types = ["minml", "m"]
 block-comment-tokens = { start = "-[", end = "]" }
 indent = { tab-width = 2, unit = "  " }
 auto-pairs = { "[" = "]", "{" = "}", "(" = ")" }
