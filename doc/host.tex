@@ -347,7 +347,7 @@ that these embedding contexts can create.
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{lrl}
 \multicolumn{3}{@{}p{\linewidth}@{}}{\textbf{(a) Embedding strings in other languages as element content, in standard HTML or with matchertext hosting extensions (+M):}} \\
-& HTML	& \verb|<code>printf("Hello world!");/code>| \\
+& HTML	& \verb|<code>printf("Hello world!");</code>| \\
 & +M	& \verb|<code [printf("Hello world!");]>| \\
 & HTML	& \verb|<code>printf("Example &lt;b&gt;bold&lt;/b&gt; and &amp;bigstar; reference in HTML");]>| \\
 & +M	& \verb|<code [printf("Example <b>bold</b> and &bigstar; reference in HTML");]>| \\
@@ -362,7 +362,7 @@ that these embedding contexts can create.
 & HTML	& \verb|<button onclick="emitCharacter('\'')">Emit Apostrophe</button>| \\
 & +M	& \verb|<button onclick=[emitCharacter("'")]>Emit Apostrophe</button>| \\
 \\
-\multicolumn{3}{@{}p{\linewidth}@{}}{\textbf{(b) Embedding strings in within CDATA (character data) sections, in standard XHTML or with matchertext extensions (+M):}} \\
+\multicolumn{3}{@{}p{\linewidth}@{}}{\textbf{(c) Embedding strings in within CDATA (character data) sections, in standard XHTML or with matchertext extensions (+M):}} \\
 & XHTML	& \verb|<code>example <![CDATA[<b>bold</b>]]> markup</code>| \\
 & +M	& \verb|<code>example <![MDATA[<b>bold</b>]]> markup</code>| \\
 & XHTML	& \verb|<code>example <![CDATA[<![CDATA[character data]]]]><![CDATA[>]]> markup</code>| \\

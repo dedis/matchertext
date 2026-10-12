@@ -5,7 +5,7 @@ To begin grounding the matchertext discipline in evidence
 rather than argument,
 we summarize an initial empirical evaluation of matchertext
 on a large corpus of real-world code,
-carried out as a large-scale measurement study~\cite{bastide26matchertext}.
+carried out as a large-scale measurement study~\anoncite{bastide26matchertext}.
 The study treats every string literal and comment in the corpus
 as a candidate embedded string,
 and measures how close existing code already is
@@ -119,7 +119,7 @@ Files		& 12.39\,M	& 86.77\%	& 86.91\%	\\
 \end{footnotesize}
 \end{center}
 \caption{Matchertext compliance rate and sample size by stream,
-	under the strict and relaxed rules~\cite{bastide26matchertext}.}
+	under the strict and relaxed rules~\anoncite{bastide26matchertext}.}
 \label{tab:eval:compliance}
 \end{table}
 
@@ -189,7 +189,7 @@ URL		& 1.3\%		& 983		& 3		\\
 \end{center}
 \caption{Largest embedded-string categories by share of string samples,
 	with their accumulated violations and toothpicks;
-	categories below 1\% of samples are omitted~\cite{bastide26matchertext}.}
+	categories below 1\% of samples are omitted~\anoncite{bastide26matchertext}.}
 \label{tab:eval:categories}
 \end{table}
 
@@ -270,7 +270,7 @@ OCaml		& 18	& 399\,k	& 96.65\%	& 19.86\%	& 87		\\
 	contributing organizations, string-sample count,
 	string-literal compliance rate, toothpick reduction,
 	and the deepest raw matcher nesting observed in any single sample.
-	OCaml is shown as the lowest-reduction language in the corpus~\cite{bastide26matchertext}.}
+	OCaml is shown as the lowest-reduction language in the corpus~\anoncite{bastide26matchertext}.}
 \label{tab:eval:hostlang}
 \end{table*}
 
@@ -305,7 +305,7 @@ and the long, sparse tail.
 \end{center}
 \caption{Number of samples reaching each maximum raw nesting depth,
 	for string literals and comments
-	(log--log scale; only non-zero counts plotted)~\cite{bastide26matchertext}.}
+	(log--log scale; only non-zero counts plotted)~\anoncite{bastide26matchertext}.}
 \label{fig:eval:nesting}
 \end{figure}
 
@@ -406,7 +406,7 @@ remain open for future work:
 	but measuring its effect on real defect rates
 	is beyond what a static corpus analysis can capture.
 \end{itemize}
-The corpus and analyzer used here~\cite{bastide26matchertext}
+The corpus and analyzer used here~\anoncite{bastide26matchertext}
 provide a concrete basis for pursuing these questions,
 and for extending the measurement
 beyond the infrastructure-heavy code studied so far.
