@@ -1,13 +1,11 @@
-\documentclass[fullpage,twocolumn]{article}
+\documentclass[acmsmall,screen,review,anonymous,nonacm]{acmart}
 \pdfoutput=1
 
-\usepackage{times}
 \usepackage{xspace}
-\usepackage{cite} % sort citation numbers
-\usepackage{amsthm}
 \usepackage{xurl}
-\usepackage[hyperindex,breaklinks,colorlinks,
-	    linkcolor=blue,citecolor=blue,urlcolor=black]{hyperref}
+\hypersetup{breaklinks,colorlinks,
+	    linkcolor=blue,citecolor=blue,urlcolor=black}
+\setlength{\emergencystretch}{3em}	% break lines around long \verb text
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage{cleveref}
@@ -15,8 +13,6 @@
 \newtheorem{lemma}{Lemma}
 \newtheorem{definition}{Definition}
 \crefname{algorithm}{Algorithm}{Algorithms}
-\usepackage{graphicx}
-\usepackage[T1]{fontenc}
 \usepackage{listings}
 \lstdefinelanguage{Lean}{
   morekeywords={inductive,theorem,def,where,variable,import,Prop,Set,List,Type},
@@ -92,19 +88,22 @@
 
 \begin{document}
 
-\title{Matchertext: Towards Verbatim Interlanguage Embedding \\
-	\Large{%\texttt{preliminary draft - not yet for redistribution} \\
-	~\\
-	%Working project repository:
-	\url{https://github.com/dedis/matchertext}}}
+\title{Matchertext: Towards Verbatim Interlanguage Embedding}
 
-\author{Bryan Ford, Antoine Bastide \\ EPFL}
-
-\maketitle
+\author{Bryan Ford}
+\affiliation{%
+  \institution{EPFL}
+  \city{Lausanne}
+  \country{Switzerland}}
+\author{Antoine Bastide}
+\affiliation{%
+  \institution{EPFL}
+  \city{Lausanne}
+  \country{Switzerland}}
 
 \input{abs}
 
-\tableofcontents
+\maketitle
 
 \input{intro}
 \input{bg}
@@ -117,16 +116,46 @@
 \input{rel}
 \input{concl}
 
-\appendix
-\onecolumn
-\input{always_embeddability}
-\twocolumn
+\section*{AI Use}
 
-\bibliographystyle{plain}
+\xxx{State which AI tools were used to create code, proofs, data, tests,
+or other research artifacts, and how they were used.}
+
+\begin{acks}
+We wish to thank
+Henry Corrigan-Gibbs,
+Russ Cox,
+Philip Hamelink,
+Hernán Ibarra Mejia,
+and
+Terence Parr
+for valuable feedback on earlier drafts of this paper.
+
+\xxx{samller contributions and funding acknowledgments here}
+\end{acks}
+
+\section*{Data-Availability Statement}
+
+The artifact comprises
+the Lean~4 proofs of the embeddability results (\cref{app:lean}),
+the Go library and command-line tool that converts MinML to HTML or XML,
+and the source-code analyzer and corpus-collection scripts
+used in the evaluation (\cref{sec:eval}),
+together with the analyzer's raw results.
+The corpus itself (about 1.5~TiB) is not included;
+the scripts rebuild it by cloning the repositories,
+whose later changes can cause small differences
+from the numbers reported here.
+We will submit the artifact to Artifact Evaluation.
+
+\bibliographystyle{ACM-Reference-Format}
 \arxiv{
 \bibliography{lang,net,sec,soc,thesis}
 }{
 \bibliography{main,thesis}
 }
+
+\appendix
+\input{always_embeddability}
 
 \end{document}

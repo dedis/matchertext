@@ -344,8 +344,9 @@ that these embedding contexts can create.
 \begin{figure*}
 \begin{center}
 \begin{footnotesize}
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{lrl}
-\multicolumn{3}{l}{\textbf{(a) Embedding strings in other languages as element content, in standard HTML or with matchertext hosting extensions (+M):}} \\
+\multicolumn{3}{@{}p{\linewidth}@{}}{\textbf{(a) Embedding strings in other languages as element content, in standard HTML or with matchertext hosting extensions (+M):}} \\
 & HTML	& \verb|<code>printf("Hello world!");/code>| \\
 & +M	& \verb|<code [printf("Hello world!");]>| \\
 & HTML	& \verb|<code>printf("Example &lt;b&gt;bold&lt;/b&gt; and &amp;bigstar; reference in HTML");]>| \\
@@ -355,13 +356,13 @@ that these embedding contexts can create.
 & HTML	& \verb|<script>document.getElementById("demo").innerHTML = "a <" + "/script> end tag";]>| \\
 & +M	& \verb|<script [document.getElementById("demo").innerHTML = "a </script> end tag";]>| \\
 \\
-\multicolumn{3}{l}{\textbf{(b) Embedding strings in other languages within element attributes, in standard HTML or with matchertext extensions (+M):}} \\
+\multicolumn{3}{@{}p{\linewidth}@{}}{\textbf{(b) Embedding strings in other languages within element attributes, in standard HTML or with matchertext extensions (+M):}} \\
 & HTML	& \verb|<button onclick="okClicked()">OK</button>| \\
 & +M	& \verb|<button onclick=[okClicked()]>OK</button>| \\
 & HTML	& \verb|<button onclick="emitCharacter('\'')">Emit Apostrophe</button>| \\
 & +M	& \verb|<button onclick=[emitCharacter("'")]>Emit Apostrophe</button>| \\
 \\
-\multicolumn{3}{l}{\textbf{(b) Embedding strings in within CDATA (character data) sections, in standard XHTML or with matchertext extensions (+M):}} \\
+\multicolumn{3}{@{}p{\linewidth}@{}}{\textbf{(b) Embedding strings in within CDATA (character data) sections, in standard XHTML or with matchertext extensions (+M):}} \\
 & XHTML	& \verb|<code>example <![CDATA[<b>bold</b>]]> markup</code>| \\
 & +M	& \verb|<code>example <![MDATA[<b>bold</b>]]> markup</code>| \\
 & XHTML	& \verb|<code>example <![CDATA[<![CDATA[character data]]]]><![CDATA[>]]> markup</code>| \\
