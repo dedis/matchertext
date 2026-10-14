@@ -74,6 +74,12 @@ func isReference(b []byte) bool {
 	return true
 }
 
+// IsEscape reports whether s is a matcher escape: \o or \c and an empty matcher pair,
+// which stands for the opener or the closer of the pair, such as \o() for '('.
+func IsEscape(s string) bool {
+	return len(s) == 4 && s[0] == '\\' && (s[1] == 'o' || s[1] == 'c') && matchertext.IsMatched(s[2], s[3])
+}
+
 // Returns true if b is a valid whitespace character in MinML
 func IsSpace(b byte) bool {
 	return xml.IsSpace(b) // MinML spaces are the same as in XML

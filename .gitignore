@@ -8,8 +8,6 @@ minml-lsp.exe
 LLVM/ignore
 LLVM/include/LanguageModel.generated.hpp
 out
-out/wasm/main.wasm
-out/wasm/wasm_exec.js
 **/dist
 
 **/node_modules

@@ -2,7 +2,7 @@
 //
 // This tool is currently extremely "minimal"
 // and could be improved in many ways:
-// e.g., to convert to either HTML or XML or other output formats;
+// e.g., to convert to other output formats;
 // to convert in the other direction from other formats to MinML;
 // or merely to validate and display information about MinML code.
 //
@@ -11,7 +11,7 @@
 //	minml [COMMAND] <input.minml> [OPTIONS]
 //
 // Commands:
-//   - convert: Parse MinML and write HTML to stdout (default)
+//   - convert: Parse MinML and write HTML, or XML after ![xml], to stdout (default)
 //   - server:  Start an HTTP server for MinML conversion
 //
 // Examples:
@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/dedis/matchertext/go/markup/ast"
 	"github.com/dedis/matchertext/go/markup/minml"
 	"github.com/dedis/matchertext/go/markup/xml"
 )
@@ -39,7 +40,7 @@ USAGE:
 
 COMMANDS:
     help                                  Print this help message
-    convert  <file.minml>                 Parse MinML and write HTML to stdout (default)
+    convert  <file.minml>                 Parse MinML and write HTML, or XML after ![xml], to stdout (default)
     from-xml <file.xml> [OPTIONS]         Convert XML to MinML (auto-creates <file>.m by default)
     server   <file|directory> [OPTIONS]   Start an HTTP server for MinML conversion
 
@@ -121,6 +122,8 @@ func main() {
 		if err != nil {
 			log.Fatalf("parsing %s: %v", inputPath, err)
 		}
+		// The MinML document declares that it converts back to XML.
+		ns = append([]ast.Node{ast.NewDoctype("xml")}, ns...)
 
 		out, err := os.Create(outputPath)
 		if err != nil {

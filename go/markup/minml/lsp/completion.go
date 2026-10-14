@@ -18,7 +18,11 @@ func (s *Server) Completion(_ *glsp.Context, params *protocol.CompletionParams) 
 
 // completions returns attribute names inside an attribute block, outside attribute values,
 // and tag names in element content. The '{' trigger character asks only for attribute names.
+// The names are HTML's, so an XML document gets none.
 func (d *Document) completions(o int, byTrigger bool) []protocol.CompletionItem {
+	if d.Doctype(d.Text) == "xml" {
+		return []protocol.CompletionItem{}
+	}
 	i := sort.Search(len(d.Blocks), func(i int) bool { return d.Blocks[i].Close >= o })
 	if i < len(d.Blocks) && d.Blocks[i].Open < o {
 		b := &d.Blocks[i]

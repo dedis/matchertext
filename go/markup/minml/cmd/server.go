@@ -192,9 +192,10 @@ func Server(path string, port string, noOpen, diskBuild bool, extensions []strin
 			for file, op := range pending {
 				relPath := filepath.Base(file)
 				if op&(fsnotify.Remove|fsnotify.Rename) != 0 {
-					htmlPath := relPath[:len(relPath)-len(filepath.Ext(relPath))] + ".html"
+					base := relPath[:len(relPath)-len(filepath.Ext(relPath))]
 					_ = target.RemoveFile(relPath)
-					_ = target.RemoveFile(htmlPath)
+					_ = target.RemoveFile(base + ".html")
+					_ = target.RemoveFile(base + ".xml")
 					log.Printf("Removed: %s", relPath)
 					rebuilt = true
 					continue
@@ -218,8 +219,9 @@ func Server(path string, port string, noOpen, diskBuild bool, extensions []strin
 }
 
 // convertFile reads a file from the BuildTarget, converts it from MinML to
-// HTML with live-reload script injection, writes the result back, and removes
-// the source file. Non-matching extensions are ignored.
+// HTML with live-reload script injection, or to XML for an ![xml] document,
+// writes the result back, and removes the source file.
+// Non-matching extensions are ignored.
 func convertFile(target server_structs.BuildTarget, relPath string, extensions []string) error {
 	isMinml, extension := minml.IsMinmlFile(relPath, extensions)
 	if !isMinml {
@@ -232,19 +234,23 @@ func convertFile(target server_structs.BuildTarget, relPath string, extensions [
 		return fmt.Errorf("reading %s: %w", relPath, err)
 	}
 
-	// Convert MinML to HTML
-	html, err := minml.ConvertString(string(data))
+	// Convert MinML to HTML or XML
+	out, err := minml.ConvertString(string(data))
 	if err != nil {
 		return fmt.Errorf("converting %s: %w", relPath, err)
 	}
 
-	// Inject live-reload script
-	html += reloadScript
+	// Inject the live-reload script into HTML; a script would make XML malformed.
+	outExt := "xml"
+	if !minml.IsXMLDocument(data) {
+		out += reloadScript
+		outExt = "html"
+	}
 
-	// Write HTML output to the build target
-	htmlPath := relPath[:len(relPath)-len(extension)] + "html"
-	if err := target.WriteFile(htmlPath, []byte(html)); err != nil {
-		return fmt.Errorf("writing %s: %w", htmlPath, err)
+	// Write the output to the build target
+	outPath := relPath[:len(relPath)-len(extension)] + outExt
+	if err := target.WriteFile(outPath, []byte(out)); err != nil {
+		return fmt.Errorf("writing %s: %w", outPath, err)
 	}
 
 	// Remove the source file

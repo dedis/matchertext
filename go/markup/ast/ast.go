@@ -60,6 +60,13 @@ type Comment interface {
 	Comment() string // the text content of the comment
 }
 
+// Doctype declares the markup language of a whole document: "html" or "xml".
+// It is the first node of the document.
+type Doctype interface {
+	Node
+	Doctype() string // the document type, "html" or "xml"
+}
+
 type text string
 
 // Create a Text markup node whose text content is string s.
@@ -234,6 +241,38 @@ func (c comment) Equal(n Node) bool {
 		return c == nc
 	}
 	return false
+}
+
+type doctype string
+
+// Create a document type node for document type s, "html" or "xml".
+func NewDoctype(s string) Doctype {
+	return doctype(s)
+}
+
+func (d doctype) Doctype() string {
+	return string(d)
+}
+
+func (d doctype) Clone() Node {
+	return d
+}
+
+func (d doctype) Equal(n Node) bool {
+	if nd, ok := n.(doctype); ok {
+		return d == nd
+	}
+	return false
+}
+
+// DoctypeOf returns the document type that the first node of document ns declares, or "".
+func DoctypeOf(ns []Node) string {
+	if len(ns) > 0 {
+		if d, ok := ns[0].(Doctype); ok {
+			return d.Doctype()
+		}
+	}
+	return ""
 }
 
 // Compare AST nodes n1 and n2 and all their descendants for deep equality.

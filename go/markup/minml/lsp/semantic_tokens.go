@@ -15,6 +15,7 @@ var tokenTypes = []string{
 	"enumMember", // character reference; LSP has no standard "constant" type
 	"string",     // raw text, quotation element name
 	"comment",    // comment
+	"keyword",    // document type
 }
 
 var tokenModifiers = []string{}
@@ -32,6 +33,8 @@ func tokenType(k Kind, src string) uint32 {
 		return 2
 	case KindRaw:
 		return 3
+	case KindDoctype:
+		return 5
 	}
 	return 4 // KindComment
 }

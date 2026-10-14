@@ -11,6 +11,14 @@ var Entity = map[string]string{
 	"{<}": "{",
 	"{>}": "}",
 
+	// Matcher escapes
+	`\o()`: "(",
+	`\c()`: ")",
+	`\o[]`: "[",
+	`\c[]`: "]",
+	`\o{}`: "{",
+	`\c{}`: "}",
+
 	// Punctuation
 	//	"-":	"\u00AD",	// soft hyphen?
 	"--":  "\u2013", // – en dash

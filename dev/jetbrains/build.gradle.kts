@@ -40,3 +40,8 @@ val buildServer = tasks.register<Exec>("buildServer") {
 tasks.prepareSandbox {
     from(buildServer) { into(intellijPlatform.projectName.map { "$it/bin" }) }
 }
+
+// The zip would store the server without its executable bit.
+tasks.buildPlugin {
+    eachFile { if (path.contains("/bin/")) permissions { unix("rwxr-xr-x") } }
+}

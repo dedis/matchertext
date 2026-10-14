@@ -28,6 +28,12 @@ var transformTests = []testCase{
 		aText("\u2013"), aText("\u00B1"), aText("\u2192")),
 	tc("\t <[(<)]> \r <[::]> \n", aText("("), aText("\u2237")),
 
+	// Matcher escapes
+	tc(`\o()\c()\o[]\c[]\o{}\c{}`,
+		aText("("), aText(")"),
+		aText("["), aText("]"),
+		aText("{"), aText("}")),
+
 	// Numeric references
 	tc("[#174][#x41]", aText("\u00AE"), aText("A")),
 
@@ -64,6 +70,20 @@ func TestConvertReferences(t *testing.T) {
 	for _, c := range []struct{ in, out string }{
 		{"p[[amp] [#174] [&] [1]]", "<p>&amp; \u00AE [&amp;] [1]</p>"},
 		{"p[ [a<svg/onload=alert`1`>]]", "<p> [a&lt;svg/onload=alert`1`&gt;]</p>"},
+		{`p{title=[\o() [(>)] [lt] [zz]]}[f\o()x]`, `<p title="( ) &lt; [zz]">f(x</p>`},
+	} {
+		out, err := ConvertString(c.in)
+		if err != nil || out != c.out {
+			t.Errorf("%q: got %q, %v; want %q", c.in, out, err, c.out)
+		}
+	}
+}
+
+func TestConvertDoctype(t *testing.T) {
+	for _, c := range []struct{ in, out string }{
+		{"p[x]", "<p>x</p>"},
+		{"![html]\nbr[]", "<!DOCTYPE html>\n<br/>"},
+		{"![xml]\nbr[+[a<b]]", "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<br><![CDATA[a<b]]></br>"},
 	} {
 		out, err := ConvertString(c.in)
 		if err != nil || out != c.out {
