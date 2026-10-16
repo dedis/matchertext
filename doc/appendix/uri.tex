@@ -1,2 +1,411 @@
-\section{URIs}
+\section{Uniform Resource Identifiers}
 \label{app:uri}
+
+Uniform resource identifier (URI) syntax~\cite{rfc3986}
+has become a ubiquitous notation for naming and locating
+not only web pages but innumerable other Internet resources.
+As a ``small'' special-purpose syntax,
+as opposed to a general-purpose programming language,
+it is arguably more often useful as an embedded rather than a host syntax,
+as we will focus on later in \cref{app:uri:embed}.
+In practice, however, innumerable other identifier syntaxes
+get embedded into URIs regularly,
+either as scheme-specific text
+(\eg file names, phone numbers, cryptographic hashes),
+or even as query parameter values.
+This common and intentional use of URI syntax
+as a uniform ``wrapper'' for other identifier syntaxes
+makes URIs worth careful consideration as a potential host syntax
+for matchertext embedding.
+
+We suggest two syntactic extensions
+to host matchertext within URIs,
+which are potentially complementary
+and could be adopted either together or individually.
+
+\begin{figure*}
+\begin{center}
+\begin{footnotesize}
+\begin{tabular}{lrl}
+%\multicolumn{3}{l}{\textbf{URI examples without and with
+%	matchertext percent-escape extension}} \\
+%& URI	& \verb|http://social.net/user/joe%40email.net/index.html| \\
+%& +M	& \verb|http://social.net/user/%[joe@email.net]/index.html| \\
+& URI	& \verb|http://dev.site/myLibrary/doc/genericContainer%3CT%3E/api/| \\
+& +M	& \verb|http://dev.site/myLibrary/doc/%[genericContainer<T>]/api/| \\
+& URI	& \verb|http://search.engine/linksto?site=http%3A%2F%2Fmy.site%2F&results=50| \\
+& +M	& \verb|http://search.engine/linksto?site=%[http://my.site/]&results=50| \\
+& URI	& \verb|http://calculator.site/?expr=(1%2B2)*3%5E4%2F5| \\
+& +M	& \verb|http://calculator.site/?expr=%[(1+2)*3^4/5]| \\
+\end{tabular}
+\end{footnotesize}
+\end{center}
+\caption{Examples of URIs without and with matchertext hosting extensions (+M).}
+\label{fig:host:uri-examples}
+\end{figure*}
+
+First, extending the existing ``percent-encoding'' scheme
+for escaping special characters
+(\eg \verb|%20| to represent an ASCII space),
+we suggest \emph{matchertext escape} sequences
+of the form \verb|%[|$m$\verb|]|.
+Like the backslash-escape form \verb|\[|$m$\verb|]|
+suggested in \cref{sec:host:c} for C-like languages,
+the matchertext $m$ is uninterpreted by the URI processor
+other than to verify that matchers match
+and find the terminating close bracket.
+For example, \verb|file:///%[a<b>c`d]| becomes
+a valid URI usable to access a local file named \verb|a<b>c`d|,
+containing characters typically allowed in Unix-derived file systems
+but traditionally forbidden in URIs.
+Since percent-encoding by the host URI processor
+is disabled within the embedded matchertext $m$,
+\verb|%[100%]| becomes valid and equivalent to \verb|100%25|.
+In effect, this matchertext escape syntax offers
+a more concise, less obfuscated way to express arbitrary portions of URIs
+in which several characters
+would otherwise have to be individually percent-encoded.
+\Cref{fig:host:uri-examples} shows a few examples of URIs
+using conventional and matchertext percent-escapes for comparison.
+
+Another potential syntactic extension is to allow
+square-bracketed sequences \verb|[|$m$\verb|]|
+to appear verbatim within the URI body,
+where $m$ is otherwise-uninterpreted matchertext.
+This is \emph{not} an escape sequence:
+the square brackets are not eliminated in URI processing,
+so \verb|[@]| is equivalent to \verb|%5B%40%5D|.
+This extension essentially serves as a matchertext-friendly quoting syntax
+that may be used in specific URI schemes,
+or within pathname components or query strings,
+to embed substrings in other identifier syntaxes (even other URIs)
+without obfuscation.
+We will explore the usefulness of this extension further
+when we consider \emph{matchertext resource identifier} or MRI syntax
+later in \cref{app:uri:mri}.
+This extension is backwards-compatible with existing (valid) URIs
+because current syntax permits brackets \emph{only}
+in special-purpose IPv6 address syntax as part of the authority field.
+
+
+\xxx{discuss issue of spaces? maybe later with MRIs}
+
+
+\subsection{Precedents for URI syntax extensions}
+
+Originally standardized as uniform resource locators or URLs~\cite{rfc1738},
+URIs traditionally allow only a small subset of ASCII characters
+to appear verbatim.
+Non-graphical characters,
+or those deemed ``unsafe'' for various reasons,
+must be escaped via percent-encoding.
+The set of allowed characters, and their purposes,
+has been ``liberalized'' multiple times historically, however.
+
+IP version 6 introduced colon-separated hexadecimal addresses
+(\eg \verb|1234::abcd|~\cite{rfc2373}),
+which conflicted with the URI's use of the colon to separate
+an IP address from a port number (\eg \verb|http://1.2.3.4:80/|).
+The square brackets \verb|[]| were therefore shifted
+from forbidden to ``reserved'' characters in URIs,
+for use \emph{only} in embedding IPv6 addresses
+into the ``authority'' field of URIs,
+like \verb|http://[1234::abcd]:80/|~\cite{rfc2732}.
+
+International Resource Identifiers or IRIs~\cite{rfc3987}
+further liberalized URI syntax,
+allow most of the graphical characters
+in the extended Unicode/UCS character sets to appear verbatim in URIs.
+IRIs preserved backwards compatibility
+in part by defining standard conversion processes back and forth
+between internationalized IRIs and legacy ASCII-only URIs.
+The set of ASCII characters allowed in IRIs remained tightly restricted,
+however.
+
+Still later, IPv6 introduced scoped identifier syntax,
+allowing an interface number or name to be specified with an IPv6 address,
+\eg \verb|1234::abcd%1| or \verb|1234::abcd%if0|~\cite{rfc4007}.
+This new syntax again conflicted with URI syntax,
+leading to further syntactic hacks involving
+mandatory percent-escaping of the percent sign
+indicating a scoped identifier~\cite{rfc6874}.
+
+These points in in URI evolution illustrate
+a repeating precedent for liberalizing URI syntax
+to accept previously-forbidden characters
+and to make URIs more ``friendly'' and accommodating
+of embedded strings derived from other languages --
+whether machine-readable (\eg IPv6 addresses)
+or human-readable (international languages).
+Adopting matchertext hosting extensions such as those above,
+permitting URIs to host other syntaxes more cleanly
+without the traditional  syntactic hacks and percent-encoding obfuscation,
+could be a useful step in allowing URIs to fulfill their ambition
+of being a uniform ``meta-syntax'' framework
+accommodating an unlimited variety of specific identifier syntaxes.
+
+\xxx{ There are probably many, many other examples
+in RFCs and elsewhere on ugly syntactic hacks to embed
+random syntax X into URIs.  Make a list and summarize it briefly.}
+
+
+\subsection{How liberal to liberalize?}
+\label{app:uri:liberal}
+
+The above considerations, however,
+raise the obvious question:
+\emph{how far should liberalization of URI syntax go?}
+Beyond the square brackets,
+which \emph{other} characters that were previously disallowed in URIs and IRIs
+eventually be permitted, and in what contexts?
+
+In terms of our current focus on hosting embedded matchertext,
+the ideal would clearly be to allow \emph{any} UCS characters in URIs --
+at least within a matchertext escape \verb|%[|$m$\verb|]|
+or a matchertext quote \verb|[|$m$\verb|]|.
+This approach would clearly provide the maximum latitude
+for embedding other syntaxes into URIs cleanly in the future.
+Further, only this ``extreme liberalization''
+would guarantee that \emph{any} matchertext,
+from any language conforming to the standard matchertext configuration
+(\cref{sec:design:concrete}),
+may be embedded verbatim into a URI without escaping.
+
+As briefly discussed earlier in \cref{sec:design:concrete:variations},
+however,
+this arguably might be ``going too far'' in the case of URIs.
+We first consider the graphical ASCII characters
+that are currently disallowed in URIs,
+then the non-graphical characters such as spaces and control codes.
+
+\paragraph{Graphical characters:}
+
+URIs traditionally forbid
+``angle brackets'' \verb|<>| and double quotes \verb|"|
+from use within URIs,
+because these characters are sometimes
+used to delimit URIs in surrounding freeform text:
+\eg \verb|<http://my.site/>| or \verb|"http://my.site/"|.
+In any ``legacy'' URI parsing context unaware of matchertext extensions,
+the appearance of these characters within a URI might indeed
+prematurely terminate the recognized URI,
+an issue we will return to later in \cref{app:uri:end}.
+In a context aware of the matchertext extensions, however,
+there is no syntactic ambiguity between angle-brackets or double-quotes
+used to surround a whole URI
+and any that may appear within embedded matchertext.
+The matchers delimiting the embedded matchertext
+unambiguously serve to differentiate "inside" from "outside":
+\eg as in \verb|<http://my.site/%[>"<]>|.
+
+The original URL standard in 1994~\cite{rfc1738}
+additionally declared all the following characters
+to be ``unsafe'' in URIs
+``because gateways and other transport agents are known to sometimes modify
+such characters'':
+
+\begin{center}
+\verb|{ } |\texttt{|}\verb| \ ^ ~ [ ] `|
+\end{center}
+
+Nearly 30 years later,
+the ``gateways and other transport agents'' that text containing URIs
+tend to pass through have no doubt evolved drastically
+(or been replaced entirely).
+It is far from clear, therefore,
+that URIs today face the same modification perils as those of 1994.
+The text justifying the exclusion of these characters
+was dropped from the latest URI standard~\cite{rfc3986},
+though the characters themselves remain forbidden
+apart from the square brackets.
+IRIs introduced thousands of other new characters into the allowed set
+without dire consequences.
+With adequate care taken for backwards compatibility (as was done with IRIs),
+it may be high time to consider allowing
+the rest of the ASCII printing characters above into URIs --
+\emph{at least} in embedded matchertext hosted within URIs.
+
+\paragraph{Non-graphical characters:}
+
+URIs also traditionally disallow non-graphical characters such as spaces,
+as well as control characters such as newlines and tabs,
+for a different purpose: the goal of \emph{transcribability}.
+It was difficult in 1994 to transcribe by hand
+a string containing spaces, newlines, tabs, or other control codes,
+and it is probably just as difficult to do so today.
+In an era of proliferating QR codes,
+the only question might be to what extent manual transcribability
+is still a crucial goal for URIs.
+
+Nevertheless,
+manual transcription remains an important and not-uncommon use of URIs,
+and compromising the transcribability goal
+would arguably represent a much more fundamental shift
+in the principles underlying URIs
+than decisions about allowing or disallowing particular printing characters.
+This consideration therefore suggests that we
+cease the liberalization of URIs just short of
+allowing non-graphical characters.
+
+Further, the transcribability goal is served
+only if the \emph{entire} URI is readily transcribable,
+including any embedded matchertext substrings it may contain.
+Thus,
+as briefly mentioned earlier in \cref{sec:design:concrete:variations:tight},
+the URI context may justify a \emph{tightened} matchertext configuration
+whose alphabet $\Sigma$ is reduced to exclude non-graphical characters.
+The cost is that arbitrary matchertext is not necessarily copyable verbatim
+from C-like languages into URIs,
+but this compatibility cost may be justified in this case.
+
+\subsection{Embedding Uniform resource identifiers}
+\label{app:uri:embed}
+
+Since uniform resource identifier (URI) syntax represents
+a special-purpose ``little language'' just for expressing identifiers,
+URIs are predominately embedded in other contexts --
+software source code, documentation markup, configuration files, etc.
+Especially since URIs are intended to be human-readable,
+it would thus seems useful if URIs
+could be maximally ``friendly'' for embedding.
+
+\subsubsection{The near-matchertext-compliance of URIs}
+
+Conventional URI syntax~\cite{rfc3986}
+already ``nearly'' complies with the ``matchers must match'' rule
+and is thus, usually, embeddable verbatim in a matchertext context.
+Curly braces are formally disallowed in URIs.
+Square brackets are allowed \emph{only} to surround IPv6 addresses
+in the authority field,
+in properly-matched fashion.
+Thus, the only unmatched matchers that \emph{can} exist
+in a strictly-valid URI are parentheses.
+Even these, when appearing in URIs,
+often still come in matched pairs anyway.\footnote{\begin{tiny}
+	For example:
+	\texttt{https://en.wikipedia.org/wiki/URI\_(disambiguation)}
+	\end{tiny}}
+
+In the rare cases when unmatched parentheses are ``needed'' in a URI,
+they may always be percent-escaped as \verb|%28| or \verb|%29|.
+For example, the string `\verb|open(|'
+becomes `\verb|open%28|' in a matchertext URI,
+`\verb|close)|'
+becomes `\verb|close%29|',
+and `\verb|close)open(|' becomes
+`\verb|close%29open%28|'.
+The string `\verb|open(close)|'
+need not be rewritten at all in a matchertext URI,
+since the matchers it contains already happen to match.
+
+We could always consider escaping extensions
+such as \verb|%o()| and \verb|%c()|,
+but it is far from clear that their likely-marginal need
+would justify the syntactic complexity in this case.
+Even if URI syntax is liberalized further to allow
+square brackets and/or curly braces in components,
+it is unclear how commonly unmatched matchers would be needed,
+since it is not particularly common to write parsing or scanning code
+within a URI for example.
+
+
+\subsubsection{The URI end-finding problem}
+\label{app:uri:end}
+
+Nevertheless,
+URI syntax does suffer from at least one significant usability flaw
+arising from its frequent use as an embedded syntax.
+URIs can and often do appear almost ``anywhere''
+in freeform human-readable text --
+\eg typed or copied into E-mails, notes, documents, etc.
+Smart text editors often try to detect URIs on entry
+and automatically turn them into hyperlinks --
+but these heuristics can easily break because
+there is no unambiguous syntactic separation between the URI
+and its surrounding (particularly following) text.
+Suppose for example that I type or copy this text into an E-mail:
+
+\begin{footnotesize}
+\begin{quote}
+\texttt{My site is https://\anon[example.com]{bford.info}/index.html.}
+\end{quote}
+\end{footnotesize}
+
+The trailing period (\verb|.|) \emph{could} be part of the URI,
+but in this case was probably intended to terminate my English sentence.
+I could try to ``armor'' the URI, like this:
+
+\begin{footnotesize}
+\begin{quote}
+\texttt{See my site (https://\anon[example.com]{bford.info}/index.html).}
+\end{quote}
+\end{footnotesize}
+
+But the close parenthesis, as well, \emph{could} be part of the URI
+and be sucked into the link by a ``greedy'' URI auto-recognizer,
+resulting in a broken link.
+A careful reader of Appendix C of the URI specification~\cite{rfc3986}
+might find the recommendation to delimit URIs
+with angle brackets \verb|<>| --
+but rather few people seem to be aware of this recommendation in practice,
+let alone are following it.
+
+
+\subsubsection{Matchertext resource identifiers (MRIs)}
+\label{app:uri:mri}
+
+Given how commonly URIs are embedded in both freeform human-readable text
+as well as other machine-readable syntaxes of all kinds,
+we suggest that a more useful and ambitious potential evolution
+would make URI syntax \emph{self-delimiting}.
+In particular,
+let us consider an alternative potential URI syntax
+in which we surround the URI's body -- everything after the scheme name --
+with square brackets instead of separating it from the body with a colon.
+Thus, \verb|http://my.site/| becomes \verb|http[//my.site/]|.
+This alternate syntax uses only characters
+that are already used (and reserved) in current URI syntax,
+and it remains readily recognizable in freeform embedded contexts,
+but now the end can always be found unambiguously with no heuristic guessing.
+
+Let's call this new syntax
+a \emph{matchertext resource identifier} or MRI.
+Since MRI syntax is distinct and not readily confused with traditional URIs,
+it could enforce the rule that all URI body content within the brackets
+must be matchertext --
+\ie that unmatched matchers in the body must be percent-encoded --
+for verbatim embedding of other syntaxes (or other MRIs) in the body.
+Just as IRIs~\cite{rfc3987} liberalized URI syntax
+while preserving backward compatibility
+by defining automatic conversions in both directions,
+MRI syntax could similarly be converted automatically
+to or from traditional URI and IRI syntax.
+
+Assume that MRI syntax includes the extensions
+discussed at the start of this appendix --
+in particular the rule that a square bracket sequence \verb|[|$m$\verb|]|
+nested within the URI body protects the embedded matchertext $m$
+from percent-encoding in the outer context.
+With this syntax, MRIs cleanly nest with no escaping needed,
+not even to introduce a matchertext embedding context.
+An embedded MRI appearing in a path or query string component
+of a host MRI never need be escaped, for example,
+as illustrated by the examples in \cref{fig:search-query}.
+
+Moreover, MRI syntax could potentially be \emph{simpler}
+than traditional URI syntax,
+because complex and rarely-used sub-syntaxes such as IPv4 and IPv6 addresses
+could be ``broken out'' of the main MRI syntax
+and handled instead as embedded MRIs in the host MRI's authority field.
+For example,
+the URI `\verb|http://1.2.3.4:80/|' would become
+the 2-level MRI `\verb|http[//ip4[1.2.3.4]:80/|', and
+the URI `\verb|http://[1234::abcd]:80/|' would become
+the MRI `\verb|http://ip6[1234::abcd]:80/|'.
+%IPv6 addresses with scoped identifiers
+%could avoid obfuscation in URIs~\cite{rfc6874}:
+%the URI `\verb|http://[1234::abcd%25eth0]/' becomes
+%the MRI `\verb|http://ip6[1234::abcd%eth0]/'.
+The MRI host field syntax thus needs to know
+only about domain names or nested MRIs,
+and not about IP address syntax.
