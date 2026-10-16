@@ -116,7 +116,7 @@ Beyond the matchertext rule that ASCII matchers must match,
 an embedded language's syntactic affairs are exclusively its own,
 not to be meddled in by a host language.
 While exceptions to this rule may sometimes be justified
-as we discuss below in \cref{sec:design:concrete:variations},
+(\cref{app:concrete:variations}),
 any exceptions inevitably reduce verbatim embedding compatibility.
 
 
@@ -128,7 +128,7 @@ using its \href{https://leanprover-community.github.io}{Mathlib} library,
 included as \texttt{doc/proof.lean} in the project repository.\footnote{%
 	The development relies only on the standard axioms
 	\texttt{propext} and \texttt{Quot.sound}.}
-Appendix~\ref{app:lean} reproduces the complete specification
+\Cref{app:lean} reproduces the complete specification
 the theorems are stated against.
 We summarize the result here;
 it concerns the abstract matchertext language $L$
@@ -515,96 +515,4 @@ Including all three ASCII matcher pairs in $\Pi$
 thus gives languages maximum syntactic freedom
 in defining the syntax of matchertext embeddings
 (\ie a choice among three matcher pairs rather than a single prescribed pair).
-
-
-\subsection{Matchertext configuration variations}
-\label{sec:design:concrete:variations}
-
-Even if adequately well-justified,
-we cannot expect the standard matchertext configuration
-as defined above to be a perfect or painless fit
-for all situations in which string embedding is useful.
-Including any matcher pair in $\Pi$ has the cost
-of requiring those matchers to be escaped
-in string literals and comments, for example,
-as we detail later in \cref{sec:embed}.
-There may be legitimate or even unavoidable reasons
-to use other matchertext configurations in some cases,
-keeping in mind that doing so reduces interlanguage embedding compatibility.
-
-In general, deviations from the standard matchertext configuration
-can be either \emph{tightening} (more restrictive),
-\emph{loosening} (less restrictive), or a combination.
-
-\subsubsection{Tightening variations}
-\label{sec:design:concrete:variations:tight}
-
-A matchertext configuration $(\Sigma',\Pi')$
-is a \emph{tightening} of
-the standard matchertext configuration $(\Sigma,\Pi)$ defined earlier
-if it only removes characters from the alphabet ($\Sigma' \subseteq \Sigma$)
-and/or makes additional matcher pairs sensitive ($\Pi' \supseteq \Pi$).
-A string in the tightened matchertext configuration
-may be copied verbatim to an embedding context
-expecting the standard matchertext configuration,
-but not necessarily in the other direction.
-
-As \cref{app:uri:liberal} details,
-uniform resource identifiers (URIs)~\cite{rfc3986} traditionally allow
-only graphical characters -- and no spaces or control codes for example --
-in order to make them manually transcribable.
-To serve this transcribability purpose,
-significant spaces and control codes must not appear \emph{anywhere} in a URI,
-even in an embedded matchertext substring.
-Thus, URIs may represent a justifiable use-case
-for an alternate matchertext configuration that removes
-the non-graphical characters from the alphabet.
-This would unfortunately mean that a string cannot, in general,
-be copied from a standard matchertext language into a matchertext URI
-without transformation (\ie escaping spaces and control codes).
-
-\subsubsection{Loosening variations}
-
-A matchertext configuration $(\Sigma',\Pi')$
-is a \emph{loosening} of
-the standard matchertext configuration $(\Sigma,\Pi)$
-if it only adds characters to the alphabet ($\Sigma' \supseteq \Sigma$)
-and/or removes sensitive matcher pairs ($\Pi' \subseteq \Pi$).
-A string in the standard matchertext configuration
-may be copied verbatim to an embedding context
-supporting the loosened matchertext configuration,
-but not necessarily in the other direction.
-
-A loosened matchertext configuration might be justified,
-for example, if it is deemed critical to embed strings in some language $L_e$
-that frequently makes unmatched uses of some ASCII matchers,
-and the pain of escaping or otherwise adapting that syntax is deemed too great.
-
-Mathematical notation, for example,
-sometimes uses
-``mismatched'' parentheses and square brackets
-to represent half-open/half-closed intervals.
-That is,
-$[0,1)$ typically means any real number $r$ greater than or equal to zero
-but strictly less than one ($0 \le r < 1$).
-A machine-readable language making frequent use of this mathematical notation
-might be considered too painful to embed
-in a standard matchertext configuration,
-and therefore might ``demand'' a looser configuration
-in which perhaps only the curly braces are sensitive as matcher pairs.
-
-This example seems fairly hypothetical, however,
-as extremely few machine-readable languages
-appear to support this mathematical
-half-open/half-closed interval notation anyway.
-Languages that do support some form of half-open/half-closed syntax
-often do so with other, more matchertext-friendly notation.
-Swift~\cite{apple22swift}, for example,
-supports \href{https://docs.swift.org/swift-book/LanguageGuide/BasicOperators.html#ID73}{\emph{half-open range} syntax} like \verb|1..<4|
-for the sequence of integers starting from and including 1,
-up to but not including 4.
-This syntax is perfectly compatible with the standard matchertext configuration
-because it uses the mathematical inequality operators,
-rather than unmatched matchers,
-to express the range's open upper endpoint.
 
