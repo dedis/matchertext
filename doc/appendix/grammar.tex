@@ -46,7 +46,7 @@ Its content $O\dots C$ is itself wrapped in a matcher pair,
 $O$ one of \verb|(|, \verb|[|, \verb|{| and $C$ its matching close.
 That wrapping is the crux:
 the processor finds the literal's end by matcher balance,
-at the $C$ closing the opening $O$ (\cref{alg:design:findend}),
+at the $C$ closing the opening $O$ (\cref{thm:design:findend}),
 not at the first quote it meets inside,
 so the content may hold any character, quotes included,
 as long as its matchers balance.
@@ -147,7 +147,7 @@ such as the \verb|\[|$m$\verb|]| escape of \cref{sec:host:c:escapes},
 inside which two rules apply,
 following the general hosting principle of \cref{sec:host}:
 the host disables its own escaping and other transformations,
-and locates the region's end by matcher balance (\cref{alg:design:findend})
+and locates the region's end by matcher balance (\cref{thm:design:findend})
 rather than by its usual literal or comment terminator.
 Because the surrounding code already balances its matchers,
 this region composes cleanly with it,

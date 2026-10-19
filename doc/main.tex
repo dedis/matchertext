@@ -7,7 +7,7 @@
 	    linkcolor=blue,citecolor=blue,urlcolor=black}
 \setlength{\emergencystretch}{3em}	% break lines around long \verb text
 \usepackage{algorithm}
-\usepackage{algpseudocode}
+\usepackage[noend]{algpseudocode}
 \usepackage{cleveref}
 \newtheorem{theorem}{Theorem}
 \newtheorem{lemma}{Lemma}
@@ -31,6 +31,10 @@
   showstringspaces=false,
   literate=
     {α}{{$\alpha$}}1
+    {Σ}{{$\Sigma$}}1
+    {Π}{{$\Pi$}}1
+    {≤}{{$\le$}}1
+    {≥}{{$\ge$}}1
     {∃}{{$\exists$}}1
     {∈}{{$\in$}}1
     {∨}{{$\lor$}}1
@@ -143,7 +147,7 @@ for valuable feedback on earlier drafts of this paper.
 \section*{Data-Availability Statement}
 
 The artifact comprises
-the Lean~4 proofs of the embeddability results (\cref{app:lean}),
+the Lean~4 proofs of the embeddability and boundary results (\cref{app:lean,app:boundary}),
 the Go library and command-line tool that converts MinML to HTML or XML,
 and the source-code analyzer and corpus-collection scripts
 used in the evaluation (\cref{sec:eval}),
@@ -166,6 +170,7 @@ We will submit the artifact to Artifact Evaluation.
 \crefalias{subsection}{appendix}
 \crefalias{subsubsection}{appendix}
 \input{appendix/always_embeddability}
+\input{appendix/embeded_boundary}
 \input{appendix/uri}
 \input{appendix/string_interpolation}
 \input{appendix/grammar}
