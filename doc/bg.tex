@@ -37,7 +37,7 @@ for example.
 To match the double-backslash \verb|\\| that begins
 a \href{https://en.wikipedia.org/wiki/Path_(computing)#Universal_Naming_Convention}{UNC name} (as in \verb|\\host\path\file|),
 the backslashes must be doubled to become \verb|\\\\| as an RE,
-then doubled again to become \verb|"\\\\\\\\"| as a C sring literal
+then doubled again to become \verb|"\\\\\\\\"| as a C string literal
 containing that RE.
 This confusing multi-level explosion of backslash escapes
 has been aptly dubbed
@@ -202,7 +202,7 @@ to escape all characters or sequences that might be ``sensitive''
 in the host language.
 Further, this security-critical check
 could also be more uniform across host languages --
-\ie checking only that the three ASCII matcher pairs are matched corrrectly
+\ie checking only that the three ASCII matcher pairs are matched correctly
 throughout the untrusted content,
 rather than deeply verifying and/or transforming
 based on the complex syntax of a particular host language.

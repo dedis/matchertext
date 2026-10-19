@@ -45,7 +45,7 @@ the string to be embedded?
 Could we make embedding always a simple matter of verbatim ``copy-and-paste''
 when done manually,
 or a simple matter of concatenation
-or filling a ``hole'' in a tempate
+or filling a ``hole'' in a template
 when done automatically?
 We propose that the answer can and should be \emph{yes} --
 though with important challenges, costs, and caveats of course.
@@ -93,7 +93,7 @@ MRI syntax:	& \verb|http[//historical.archive/get?site=http[//my.site/]&year=199
 \end{figure*}
 
 Consider \emph{matchertext resource identifiers} (MRIs),
-a matchertext adapation of
+a matchertext adaptation of
 uniform resource identifiers (URIs)~\cite{rfc3986} or
 internationalized resource identifiers (IRIs)~\cite{rfc3987}.
 A URI like \verb|http://my.site/path/|
@@ -164,8 +164,8 @@ must still be forbidden throughout the embedded text,
 however -- in this case the backtick (\verb|`|).
 Verbatim copy-and-paste embedding remains unsafe
 without carefully checking the embedding text
-for the forbidden host-language delimeters,
-and changing the delimeters or awkwardly rewriting the embedded text
+for the forbidden host-language delimiters,
+and changing the delimiters or awkwardly rewriting the embedded text
 (\eg by concatenating multiple strings in different quoting styles).
 Matchertext, in contrast, forbids \emph{no} characters or sequences
 in embedded strings,
@@ -296,7 +296,7 @@ MinML supports escapeless embedding of matchertext in other languages
 via a sequence like \verb|+[matchertext]|,
 as well as unmatched matcher escapes
 like those in \cref{tab:unmatched-matchers}.
-An \anon[experimental extention]{\href{https://github.com/bford/hugo}{experimental extention}}
+An \anon[experimental extension]{\href{https://github.com/bford/hugo}{experimental extension}}
 to the \href{https://gohugo.io}{Hugo} static website generator
 already allows web authoring in MinML.
 

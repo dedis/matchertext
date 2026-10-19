@@ -156,6 +156,32 @@ an attacker might make use of in practically any conceivable language.
 	escaping and interpolation syntax apply within the template?
 }
 
+\subsection{Lower-case literal variants}
+\label{app:interp:lower}
+
+If the matchertext literals of \cref{sec:host:c:literals}
+become a cross-language standard,
+each language decides the meaning, if any,
+of variants like the lower-case \verb|m"|$m$\verb|"|.
+Such language-specific choices include:
+(a) no lower-case variant (syntax error);
+(b) \verb|m"(|$m$\verb|)"| is equivalent to \verb|M"(|$m$\verb|)"|;
+\ie the \verb|M| is simply case-insensitive;
+(c) \verb|m"|$m$\verb|"| without a matcher pair around the content $m$
+might be a constrained, shorthand syntax
+usable only for matchertext strings $m$ that contain no double-quotes
+outside of matcher pairs; or
+(d) \verb|m"|$m$\verb|"| might be a ``hybrid'' syntax
+in which the host language's usual escaping mechanisms are active
+outside of matcher pairs within the embedded string,
+hence allowing any matchertext string to be represented
+at the cost of allowing the host language's escaping to ``leak''
+into the outermost context of the embedded string.
+Options (a) and (b) appear conceptually simpler and cleaner,
+with (c) and (d) mentioned mainly as potential alternatives
+that could optimize different pragmatic tradeoffs.
+\Cref{app:interp:hybrid} applies option (d) to interpolation.
+
 \subsection{Hybrid matchertext interpolation}
 \label{app:interp:hybrid}
 
