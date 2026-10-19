@@ -1,35 +1,19 @@
 \section{Evaluation}
 \label{sec:eval}
 
-To begin grounding the matchertext discipline in evidence
-rather than argument,
-we summarize an initial empirical evaluation of matchertext
-on a large corpus of real-world code,
+To ground the matchertext discipline in evidence rather than argument,
+we summarize an empirical evaluation on a large corpus of real-world code,
 carried out as a large-scale measurement study~\anoncite{bastide26matchertext}.
 The study treats every string literal and comment in the corpus
 as a candidate embedded string,
-and measures how close existing code already is
-to the embedded-language side of matchertext compliance
-(\cref{sec:host}),
-and how much character escaping
-adopting the discipline would remove.
-Following the questions we raise above in \cref{sec:intro},
-it addresses four that can be measured directly from source code:
-how matchertext-compliant existing code already is,
-and whether violations concentrate in string literals or comments
-(\cref{sec:eval:compliance});
-which embedded-language categories carry the violations
-(\cref{sec:eval:where});
-how much of the escaping burden adopting matchertext would remove
-(\cref{sec:eval:reduction});
-and how common nested, multi-level embedding is in practice
-(\cref{sec:eval:nesting}).
-The content classification additionally yields a partial view
-of what these embeddings are used for (\cref{sec:eval:purposes}),
-while the purpose behind each embedding,
-together with questions of security defects,
-lies outside what the analysis measures
-and is taken up as open questions in \cref{sec:eval:open}.
+and answers four questions that source code can answer directly:
+\begin{itemize}
+\item[\textbf{Q1}] How matchertext-compliant is existing code? (\cref{sec:eval:compliance})
+\item[\textbf{Q2}] Which embedded languages carry the violations? (\cref{sec:eval:where})
+\item[\textbf{Q3}] How much escaping would matchertext remove? (\cref{sec:eval:reduction})
+\item[\textbf{Q4}] How deeply does embedding nest in practice? (\cref{sec:eval:nesting})
+\end{itemize}
+\Cref{sec:eval:open} discusses the questions the corpus cannot answer.
 
 
 \subsection{Methodology}
@@ -81,7 +65,7 @@ yielding a \emph{toothpick reduction}.
 Finally, \emph{nesting depth} is the deepest matcher nesting a sample reaches.
 
 
-\subsection{Compliance of existing code}
+\subsection{Q1: Compliance of existing code}
 \label{sec:eval:compliance}
 
 Existing code is already highly matchertext-compliant
@@ -124,7 +108,7 @@ Files		& 12.39\,M	& 86.77\%	& 86.91\%	\\
 \end{table}
 
 
-\subsection{Where violations concentrate}
+\subsection{Q2: Where violations concentrate}
 \label{sec:eval:where}
 
 Violations are far from evenly spread across embedded-language categories.
@@ -167,6 +151,19 @@ The category leading a host's violations thus differs by host,
 but the categories intrinsically most likely to violate
 are consistent across hosts.
 
+Most string literals are not cross-language embeddings at all:
+plain prose, identifier-like tokens, and file paths
+account for about 83\% of samples (\cref{tab:eval:categories}).
+Among the languages that motivate our injection discussion,
+SQL accounts for 0.79\% of samples, CSS for 0.22\%,
+JSON for 0.19\%, and XML for 0.06\%.
+Because the corpus is infrastructure-heavy (\cref{sec:eval:methodology}),
+these figures are a lower bound for web-facing combinations
+such as SQL in application code or HTML templating.
+The classification is content-based and best-effort,
+so its finer categories are approximate,
+and it shows what is embedded, not why.
+
 \begin{table}[t]
 \begin{center}
 \begin{footnotesize}
@@ -194,7 +191,7 @@ URL		& 1.3\%		& 983		& 3		\\
 \end{table}
 
 
-\subsection{Escape reduction}
+\subsection{Q3: Escape reduction}
 \label{sec:eval:reduction}
 
 The central benefit of matchertext is the escaping it removes.
@@ -275,7 +272,7 @@ OCaml		& 18	& 399\,k	& 96.65\%	& 19.86\%	& 87		\\
 \end{table*}
 
 
-\subsection{Nested embedding}
+\subsection{Q4: Nested embedding}
 \label{sec:eval:nesting}
 
 Most embedding is shallow.
@@ -294,119 +291,23 @@ but such cases are vanishingly rare.
 Comments nest more on average than string literals,
 consistent with comments containing structured examples and prose,
 whereas string literals more often hold a single flat fragment.
-\Cref{fig:eval:nesting} plots the full depth distribution
-for both streams on log--log axes,
-showing the sharp fall-off after depth one
-and the long, sparse tail.
-
-\begin{figure}[t]
-\begin{center}
-\includegraphics[width=\columnwidth]{fig/appendix3_nesting.pdf}
-\end{center}
-\caption{Number of samples reaching each maximum raw nesting depth,
-	for string literals and comments
-	(log--log scale; only non-zero counts plotted)~\anoncite{bastide26matchertext}.}
-\label{fig:eval:nesting}
-\end{figure}
-
-
-\subsection{What embeddings are used for}
-\label{sec:eval:purposes}
-
-The content classifier that attributes violations and toothpicks above
-also gives a partial answer to a question we would otherwise leave open:
-what these embeddings are actually \emph{for}.
-The classifier labels the \emph{kind} of content in each string,
-which is a proxy for its purpose;
-it tells us that a fragment is an SQL query or a regular expression,
-but not the developer's intent in assembling it.
-
-At that granularity the picture is clear.
-Most string literals are not cross-language embeddings at all:
-plain prose, identifier-like tokens, and file paths
-together account for roughly 83\% of samples (\cref{tab:eval:categories}),
-the labels, keys, and paths of ordinary programs.
-The genuine embedded languages form the tail.
-Beyond the format strings, regular expressions, shell fragments,
-and HTML already visible in \cref{tab:eval:categories},
-the languages that motivate our injection discussion appear only sparsely here:
-SQL accounts for 1,003,602 samples (0.79\%),
-CSS for 275,165 (0.22\%),
-JSON for 244,319 (0.19\%),
-and XML for 81,395 (0.06\%).
-That these query and web-facing languages are so thin a slice
-is itself informative.
-The corpus is deliberately infrastructure-heavy
-(kernels, databases, browsers, and toolchains, \cref{sec:eval:methodology}),
-so the SQL-in-application-code and HTML-templating combinations
-that dominate web software are under-represented,
-and these figures should be read as a lower bound
-on how common such combinations are in software at large.
-
-The data also speaks, more coarsely, to which host embeds what.
-As \cref{sec:eval:where} shows,
-the category a host most engages with is legible
-from where its violations and escaping concentrate:
-regular expressions and embedded binary data in JavaScript,
-escaped binary-like blobs and URL-bearing strings in Python,
-and ordinary prose in C++ and Java.
-The intrinsically bracket-heavy mini-languages, regular expressions,
-shell, and CSS, are the ones that recur as embeddings across hosts,
-whereas the bulk categories differ between hosts mainly in volume.
-
-Two caveats bound these readings.
-The classification is content-based and best-effort,
-so the finer categories, especially heuristic ones
-such as the pseudo-binary and pseudo-URL buckets,
-are approximate rather than exact (\cref{sec:eval:methodology}).
-And content type is only a proxy:
-it characterizes what is embedded and how often,
-not the human purpose behind each embedding,
-which the corpus cannot recover
-and which we leave to the usability studies noted below.
+\Cref{app:nesting} plots the full depth distribution.
 
 
 \subsection{Discussion and open questions}
 \label{sec:eval:open}
 
-Taken together, these results suggest that the adoption cost
-we anticipate above is small in practice
-while the benefit is large.
-Real code is already overwhelmingly valid matchertext
-at the fragment level --
-better than 98\% of string literals and better than 97\% of comments
-need no change at all --
-so for most code the transition would touch
-only a small minority of fragments.
-At the same time, rewriting the compliant majority as raw literals
-removes nearly all of their escaping,
-the corpus-wide 94.78\% reduction
-being the empirical form of the relief from leaning toothpick syndrome
-that matchertext aims to deliver.
-The violations that remain fall exactly where \cref{sec:embed} predicts:
-in regular expressions, shell fragments, format strings, and CSS,
-whose syntax legitimately uses brackets singly,
-and the near-identical strict and relaxed rates confirm
-that the difficulty is genuinely unmatched matchers --
-addressable by the targeted lone-matcher escapes
-of \cref{tab:unmatched-matchers}
-rather than any change to nesting discipline.
-
-This evaluation is nonetheless only a first step.
-It measures embedded-language compliance and escaping,
-but two questions we raise in \cref{sec:intro}
-remain open for future work:
-\begin{itemize}
-\item	How does matchertext affect the usability to users or developers
-	of common constructs in common embedding use-cases,
-	such as synthesizing or editing HTTP or SQL queries?
-\item	How does matchertext affect the frequency of syntax-related,
-	and especially security-related, bugs in typical code?
-	The structural injection resistance bears directly on this,
-	but measuring its effect on real defect rates
-	is beyond what a static corpus analysis can capture.
-\end{itemize}
-The corpus and analyzer used here~\anoncite{bastide26matchertext}
-provide a concrete basis for pursuing these questions,
-and for extending the measurement
-beyond the infrastructure-heavy code studied so far.
+The results suggest that the adoption cost is small
+and the benefit large.
+Over 98\% of string literals and 97\% of comments need no change,
+and rewriting the compliant majority as raw string literals
+removes 94.78\% of the toothpicks.
+The remaining violations fall where \cref{sec:embed} predicts,
+in syntaxes that use brackets singly,
+and the near-identical strict and relaxed rates show that
+the lone-matcher escapes of \cref{tab:unmatched-matchers} address them.
+Two questions from \cref{sec:intro} remain open:
+how matchertext affects usability in common embedding tasks,
+such as editing HTTP or SQL queries,
+and how it affects the rate of syntax-related and security-related bugs,
+which a static corpus analysis cannot measure.
