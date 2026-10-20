@@ -390,7 +390,27 @@ With this syntax, MRIs cleanly nest with no escaping needed,
 not even to introduce a matchertext embedding context.
 An embedded MRI appearing in a path or query string component
 of a host MRI never need be escaped, for example,
-as illustrated by the examples in \cref{fig:search-query}.
+as illustrated by the examples in \cref{fig:search-query},
+where traditional URI syntax must instead escape
+the colon (\verb|:|) and slash (\verb|/|) characters
+of the embedded URI as \verb|%3A| and \verb|%2F|, respectively.
+
+\begin{figure*}[h]
+\begin{center}
+\begin{small}
+\begin{tabular}{ll}
+URI syntax:	& \verb|http://search.engine/linksto?site=http%3A%2F%2Fmy.site%2F&results=50| \\
+MRI syntax:	& \verb|http[//search.engine/linksto?site=http[//my.site/]&results=50]| \\
+\\
+URI syntax:	& \verb|http://historical.archive/get?site=http%3A%2F%2Fmy.site%2F&year=1998| \\
+MRI syntax:	& \verb|http[//historical.archive/get?site=http[//my.site/]&year=1998]| \\
+\end{tabular}
+\end{small}
+\end{center}
+\caption{Example queries containing embedded resource identifiers
+	in URI and MRI syntax for comparison.}
+\label{fig:search-query}
+\end{figure*}
 
 Moreover, MRI syntax could potentially be \emph{simpler}
 than traditional URI syntax,
