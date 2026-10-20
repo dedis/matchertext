@@ -31,6 +31,24 @@ and static analysis tools~\cite{khabibullin15development}.
 This work does not attempt to explore syntax design practices
 that could make languages more cleanly embeddable in the first place, however.
 
+Other work prevents injection attacks
+by preserving the syntactic structure of the embedding.
+Su and Wassermann~\cite{su06essence} define a command injection attack
+as input that changes the intended syntactic structure
+of a generated query or document.
+They mark each input substring with meta-characters
+and parse the result with an augmented grammar
+that rejects inputs that do not form a complete syntactic unit.
+Bravenboer et al.~\cite{bravenboer07preventing}
+embed the grammar of a guest language such as SQL
+into a host language such as Java,
+and generate code that applies the necessary escaping automatically.
+Both approaches need the grammar of the embedded language.
+Matchertext preserves structure without any grammar:
+the host checks only that untrusted content is matchertext
+(\cref{sec:design:abstract:verify}),
+and needs no escaping.
+
 Significantly more work has focused on
 \emph{domain specific embedded languages}
 or DSELs~\cite{hudak98modular},
@@ -67,12 +85,25 @@ however,
 and do not support general cross-language embedding
 in the way matchertext does.
 
+Closest to matchertext,
+Wyvern's type-specific languages~\cite{omar14safely}
+delimit generic literals with curly braces, square brackets,
+or angle brackets,
+and require only that the delimiter characters
+inside the literal body be balanced.
+The type expected at the literal's position
+selects the logic that parses the body.
+Wyvern thus also finds the end of a literal by bracket balance alone,
+without parsing its content.
+Its rule applies only within Wyvern, however,
+and only to the delimiter in use,
+whereas matchertext asks every language
+to balance all three ASCII matcher pairs,
+so that any matchertext string embeds verbatim
+in any matchertext-aware host.
+
 \xxx{ in this space, not sure if we should go into more detail:
 \href{https://www.cambridge.org/core/services/aop-cambridge-core/content/view/4B0A7526CC16907F445CCF27277E9B9B/S0956796802004574a.pdf/div-class-title-compiling-embedded-languages-div.pdf}{Compiling embedded languages},
 \href{https://ieeexplore.ieee.org/document/685738}{Modular domain specific languages and tools}
 \href{https://scg.unibe.ch/archive/papers/Reng10aEmbeddingLanguages.pdf}{Embedding Languages Without Breaking Tools}
 }
-
-This related work is preliminary and no doubt incomplete;
-proposals for relevant additions are welcome.
-
