@@ -1,30 +1,9 @@
 \section{Implementations of matchertext}
 \label{sec:impl}
 
-This section reports early but growing work on realizing matchertext.
-We describe MinML, a matchertext-based markup syntax
-with an existing experimental implementation.
-Further work implementing matchertext extensions
-for several languages and embedding-oriented syntaxes is underway,
-and this section is intended to be expanded
-as we gain experience implementing and using them.
-
-For those wishing to help with implementation and experimentation,
-the following are some of the key work items
-enabling us to start experimenting with matchertext in the context
-of any particular language of interest:
-\begin{itemize}
-\item	An implementation of those extensions for hosting and/or embedding,
-	selectively enabled via configuration parameters
-	for backward compatibility,
-	in some mature processor for the language of interest
-	(\eg a compiler, interpreter, or library implementation).
-\item	A configurable extension to the language processor
-	that optionally causes it
-	to check and enforce the matchertext discipline
-	in processed text:
-	\ie to verify that matchers match in source files or strings.
-\end{itemize}
+This section describes two implementations of matchertext:
+a reader extension for CHICKEN Scheme
+and MinML, a matchertext-based markup syntax.
 
 \subsection{Matchertext for CHICKEN Scheme}
 
@@ -92,18 +71,13 @@ Braces		& \verb|{}|	& \verb|[{<}]|	& \verb|[{>}]|	\\
 \end{tabular}
 \end{center}
 
-An experimental library and command-line tool
-to parse MinML and convert it to HTML or XML,
-written in Go,
-is available at \anon{\url{https://github.com/dedis/matchertext/tree/main/go/matchertext}}.
-An \anon[extension]{\href{https://github.com/bford/hugo}{extension}}
-to the \href{https://gohugo.io}{Hugo}
-static website generator supports web authoring in MinML.
-
-In addition, a Language Server Protocol Server (LSP) for MinML is available at
-\anon{\url{https://github.com/dedis/matchertext/tree/main/dev/vscode/minml-preview}}
-and provides syntax highlighting, diagnostics, hover and completion for Visual Studio Code, JetBrains IDEs,
-NeoVim, Sublime Text, Emacs, Zed and Helix.
-
-A pandoc extension for MinML can also be found at \anon{\url{https://github.com/dedis/pandoc}} where converting to and
-from MinML has been added as first class support.
+MinML tools include
+a Go library and command-line tool that convert MinML to HTML or XML
+(\anon{\url{https://github.com/dedis/matchertext/tree/main/go/matchertext}}),
+an \anon[extension]{\href{https://github.com/bford/hugo}{extension}}
+to the \href{https://gohugo.io}{Hugo} static website generator,
+a Language Server Protocol server with diagnostics, hover, and completion
+for Visual Studio Code, JetBrains IDEs, and five other editors
+(\anon{\url{https://github.com/dedis/matchertext/tree/main/dev/vscode/minml-preview}}),
+and a pandoc extension that converts to and from MinML
+(\anon{\url{https://github.com/dedis/pandoc}}).
