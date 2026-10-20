@@ -57,17 +57,12 @@ Openers can be introduced into valid matchertext
 only when paired with a matching closer, and vice versa,
 but nonmatchers may be interspersed throughout with no constraints.
 
-We consider matchertext to constitute a purely syntactic rule
-with no associated semantic meaning.
-While we can formally define it as a syntactic language,
-in practice we will refer to it as a \emph{syntactic discipline}
-rather than a language
-because it assigns no specific meaning or purpose to the strings in $L$,
-and no structure apart from the basic rule that matchers must match.
-The meanings and structural purposes of all characters --
-both matchers and nonmatchers --
-are deliberately left entirely open
-for any particular ``matchertext-aware'' language to define.
+Matchertext is a purely syntactic rule.
+We call it a \emph{syntactic discipline} rather than a language
+because it assigns no meaning to the strings in $L$
+and no structure beyond the rule that matchers must match;
+each matchertext-aware language defines
+the meaning of all characters, matchers and nonmatchers alike.
 
 \subsubsection{Escapeless embedding in matchertext}
 \label{sec:design:abstract:embed}
@@ -102,22 +97,13 @@ the closer string $s_c$ that terminates the embedding
 because it contains at least one close matcher
 that would be unmatched, and thus illegal, if it were part of $m$.
 
-In order to guarantee that verbatim embedding always works reliably,
-a host language not only can but \emph{must} refrain
-from applying either transformations (\eg escapes)
-or restrictions (\eg disallowing certain characters or sequences)
-within the embedded matchertext it is hosting.
-We can view embedded matchertext as analogous to a diplomatic embassy,
-whose host country is required by international law to respect and protect
-the ``inviolability'' of the embassy's ``premises''
-and not enter or otherwise meddle in
-the embassy's internal affairs~\cite[Article 22]{un61vienna}.
-Beyond the matchertext rule that ASCII matchers must match,
-an embedded language's syntactic affairs are exclusively its own,
-not to be meddled in by a host language.
-While exceptions to this rule may sometimes be justified
-(\cref{app:concrete:variations}),
-any exceptions inevitably reduce verbatim embedding compatibility.
+To guarantee that verbatim embedding always works,
+a host language \emph{must not} apply
+transformations (\eg escapes)
+or restrictions (\eg forbidden characters or sequences)
+within the embedded matchertext.
+Exceptions to this rule (\cref{app:concrete:variations})
+reduce verbatim embedding compatibility.
 
 
 \subsubsection{A formal guarantee of embeddability}
@@ -289,34 +275,18 @@ since any nonmatchers of $s_c$ before it have depth $0$.
 \subsection{Concrete matchertext in practice}
 \label{sec:design:concrete}
 
-The abstract definition of matchertext above
-and its basic structural rule apply in principle
-to any matchertext configuration $(\Sigma,\Pi)$.
-In practice, however,
-we must standardize on particular choices of $\Sigma$ and $\Pi$
-across a set of languages of interest
-in order to achieve escapeless embedding among them.
-We wish to identify a particular, concrete matchertext configuration
-that fits existing syntactic syntactic practices as well as possible,
-and facilitates escapeless embedding across 
-minimally-adapted variants of today's popular machine-readable languages.
-
+The abstract definition applies to any configuration $(\Sigma,\Pi)$,
+but escapeless embedding requires a set of languages to agree on one.
 We therefore propose a \emph{standard matchertext configuration}
-whose alphabet $\Sigma$ is the Unicode/UCS character set~\cite{iso10646ucs},
-and whose matcher pairs $\Pi$ consist of
+that fits existing practice:
+its alphabet $\Sigma$ is the Unicode/UCS character set~\cite{iso10646ucs},
+on which machine-readable languages have already converged,
+and its matcher pairs $\Pi$ are
 the ASCII parentheses \verb|()|,
 square brackets \verb|[]|,
 and curly braces \verb|{}|.
-
-The choice of UCS as the character set $\Sigma$
-is justified by the fact that machine-readable languages
-have largely converged on this standard,
-so it is in effect already decided.
-In fact, the programming language community has also largely converged
-on UTF-8 as the standard way to encode UCS plain text
-into flat byte-stream source files --
-although encoding is not a primary concern for matchertext
-since it operates below the character-set abstraction.
+Matchertext operates on characters,
+so the encoding (usually UTF-8) does not matter.
 
 \subsubsection{Standardizing on matcher pairs}
 \label{sec:design:concrete:standard}
@@ -339,85 +309,39 @@ these character classes denote characters whose standard purpose
 is to serve as open and close punctuation in matched pairs.
 
 \paragraph{Why not the ``angle brackets'' \texttt{<>}?}
-Many programming language also use the ASCII characters \verb|<| and \verb|>|
-in matching pairs,
-such as for generic types in C++ and Java,
-or markup in SGML-derived languages such as HTML and XML.
-These characters are not standardized as open/close punctuation, however,
-but as mathematical less-than and greater-than inequality symbols.
-Further, they are used for this purpose in mathematical expressions,
-in \emph{unmatched} fashion,
-much more pervasively than their occasional use as matchers.
-Requiring these characters to be matched in matchertext
-would not only conflict with their primary standardized purposes
-(\ie would ``defy the authority'' of UCS),
-but would make it extremely cumbersome to express
-standard mathematical inequalities
-(\eg \verb|a < b| in \verb|if| expressions)
-in almost all programming languages.
-Omitting \verb|<>| from the matched pairs $\Pi$
-of the standard matchertext configuration does not
-conflict with or prevent their paired use in specific languages --
-as we will see when we focus on SGML-derived languages later
-in \cref{sec:host:ml} and \cref{sec:embed:ml}.
-Omitting them from $\Pi$
-means only that we do not impose a ``universal'' rule
-that they \emph{must} be used \emph{strictly} as matchers,
-without exception, throughout all valid matchertext.
+Many languages use \verb|<| and \verb|>| in pairs,
+for generic types in C++ and Java or for markup in HTML and XML.
+UCS standardizes them, however,
+as the less-than and greater-than symbols,
+and programs use them unmatched far more often,
+as in \verb|if (a < b)|.
+Requiring them to match would make inequalities cumbersome
+in almost all languages.
+Omitting \verb|<>| from $\Pi$ does not prevent their paired use
+in specific languages (\cref{sec:host:ml,sec:embed:ml});
+it only avoids a universal rule that they must always match.
 
 \paragraph{Why only the ASCII open/close punctuation?}
-The full UCS standard of course includes
-much more open and close punctuation.
-UCS also includes
-\href{https://www.compart.com/en/unicode/category/Pi}{Initial Punctuation (Pi)}
-and 
-\href{https://www.compart.com/en/unicode/category/Pf}{Final Punctuation (Pf)}
-character classes specifically for quotation marks
-intended for use in pairs
-(\eg «quote» or “quote”).
-None of these extended UCS characters are commonly used
-in machine-readable language syntax, however --
-no doubt in part merely by tradition,
-but also for the pragmatic reason that only the ASCII punctuation symbols
-are directly typeable on most keyboard layouts.
-Moreover, the open/close and initial/final punctuation
-in the extended UCS blocks
-do not occur strictly in pairs.
-For example,
-there are three different left double-quote characters
-(codes 201C, 201E, and 201F)
-that potentially match with the right double-quote character (code 201D),
-depending on linguistic culture and typographical style.
-Thus, deciding \emph{which} character pairs should or should not match
-would become a much more complex question.
-While specific languages are free to use any UCS punctuation
-for their own language-specific structural or stylistic purposes,
-it seems simplest and safest to restrict the matchertext set $\Pi$ of
-\emph{strictly-matching} pairs to the ASCII matchers alone.
+UCS has much more open and close punctuation,
+and \href{https://www.compart.com/en/unicode/category/Pi}{Initial Punctuation (Pi)}
+and \href{https://www.compart.com/en/unicode/category/Pf}{Final Punctuation (Pf)}
+classes for paired quotation marks (\eg «quote» or “quote”).
+Machine-readable syntaxes rarely use them,
+partly because most keyboards cannot type them directly.
+They also do not occur strictly in pairs:
+three left double quotes (U+201C, U+201E, and U+201F)
+can match the right double quote U+201D,
+depending on culture and typographic style.
+Languages may use any UCS punctuation for their own purposes,
+but restricting the strictly-matching set $\Pi$
+to the ASCII matchers is simplest and safest.
 
 \paragraph{Why all three ASCII matcher pairs?}
-
-We could of course be even more selective
-in choosing the set of matcher pairs $\Pi$.
-We could take only one matcher pair, for example:
-either parentheses \emph{or} square brackets \emph{or} curly braces.
-However, all of these matcher pairs are used quite pervasively,
-in a variety of different structural roles in different languages,
-and it is not readily apparent what principle would justify
-choosing one of these matcher pairs over the others
-to play a distinguished, globally-enforced matching role in matchertext.
-Moreover, interspersing multiple distinct matcher pairs in structured text
-in practice provides useful redundancy
-that helps detect errors more quickly and localize them more precisely.
-For example, it is much clearer where the missing close bracket is
-in the string \verb|[{}([){}]|
-than in the similar but more homogeneous string \verb|[[][[][]]|.
-Finally,
-any host language must use \emph{some} matcher pair
-to delimit embedded matchertext strings,
-as discussed above in \cref{sec:design:abstract:embed}.
-Including all three ASCII matcher pairs in $\Pi$
-thus gives languages maximum syntactic freedom
-in defining the syntax of matchertext embeddings
-(\ie a choice among three matcher pairs rather than a single prescribed pair).
-
+All three pairs are used pervasively in different structural roles,
+and no principle selects one of them for a global matching role.
+Mixing distinct pairs also gives redundancy that localizes errors:
+the missing close bracket is easier to find in \verb|[{}([){}]|
+than in \verb|[[][[][]]|.
+Finally, every host must use some matcher pair
+to delimit embedded matchertext (\cref{sec:design:abstract:embed}),
+so including all three gives languages a choice of delimiter.
