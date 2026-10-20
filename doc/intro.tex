@@ -45,7 +45,7 @@ the string to be embedded?
 Could we make embedding always a simple matter of verbatim ``copy-and-paste''
 when done manually,
 or a simple matter of concatenation
-or filling a ``hole'' in a tempate
+or filling a ``hole'' in a template
 when done automatically?
 We propose that the answer can and should be \emph{yes} --
 though with important challenges, costs, and caveats of course.
@@ -74,39 +74,6 @@ are valid matchertext,
 while the strings
 `\verb|(|', `\verb|{a]|', `\verb|[(])|', and `\verb|}{|'
 are plain text but are not valid matchertext.
-
-\begin{figure*}[t]
-\begin{center}
-\begin{small}
-\begin{tabular}{ll}
-URI syntax:	& \verb|http://search.engine/linksto?site=http%3A%2F%2Fmy.site%2F&results=50| \\
-MRI syntax:	& \verb|http[//search.engine/linksto?site=http[//my.site/]&results=50]| \\
-\\
-URI syntax:	& \verb|http://historical.archive/get?site=http%3A%2F%2Fmy.site%2F&year=1998| \\
-MRI syntax:	& \verb|http[//historical.archive/get?site=http[//my.site/]&year=1998]| \\
-\end{tabular}
-\end{small}
-\end{center}
-\caption{Example queries containing embedded resource identifiers
-	in URI and MRI syntax for comparison.}
-\label{fig:search-query}
-\end{figure*}
-
-Consider \emph{matchertext resource identifiers} (MRIs),
-a matchertext adapation of
-uniform resource identifiers (URIs)~\cite{rfc3986} or
-internationalized resource identifiers (IRIs)~\cite{rfc3987}.
-A URI like \verb|http://my.site/path/|
-may always be transformed to or from
-equivalent MRI syntax like \verb|http[//my.site/path]|.
-An MRI is embeddable verbatim, with no transformation,
-into another MRI or into another matchertext-aware language.
-Figure~\ref{fig:search-query} shows two example search queries
-containing embedded resource identifiers,
-contrasting ``copy-and-paste'' embeddable MRI syntax
-with traditional URI syntax where the sensitive
-colon (\verb|:|) and slash (\verb|/|) characters
-must be escaped as \verb|%3A| and \verb|%2F%|, respectively.
 
 \begin{figure*}[t]
 \begin{center}
@@ -164,8 +131,8 @@ must still be forbidden throughout the embedded text,
 however -- in this case the backtick (\verb|`|).
 Verbatim copy-and-paste embedding remains unsafe
 without carefully checking the embedding text
-for the forbidden host-language delimeters,
-and changing the delimeters or awkwardly rewriting the embedded text
+for the forbidden host-language delimiters,
+and changing the delimiters or awkwardly rewriting the embedded text
 (\eg by concatenating multiple strings in different quoting styles).
 Matchertext, in contrast, forbids \emph{no} characters or sequences
 in embedded strings,
@@ -193,6 +160,7 @@ where unmatched matchers may commonly appear.
 \begin{table*}[t]
 \begin{center}
 \begin{footnotesize}
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{ll||ll|ll|ll||ll|ll}
 &		& \multicolumn{6}{|l||}{Escapes for C-like languages}
 		& \multicolumn{4}{|l}{Escapes for SGML-derived languages} \\
@@ -284,7 +252,7 @@ while the questions of usability and of security-related bugs
 remain largely open for future work.
 
 One early pragmatic experiment with matchertext, however,
-is MinML~\cite{ford22minml},
+is MinML~\anoncite{ford22minml},
 a concise but general-purpose alternative syntax
 for SGML-derived markup languages such as HTML and XML.
 MinML uses matcher characters for structure
@@ -295,7 +263,7 @@ MinML supports escapeless embedding of matchertext in other languages
 via a sequence like \verb|+[matchertext]|,
 as well as unmatched matcher escapes
 like those in \cref{tab:unmatched-matchers}.
-An \href{https://github.com/bford/hugo}{experimental extention}
+An \anon[experimental extension]{\href{https://github.com/bford/hugo}{experimental extension}}
 to the \href{https://gohugo.io}{Hugo} static website generator
 already allows web authoring in MinML.
 
@@ -318,20 +286,4 @@ XXX to be tested empirically.
 }
 
 \xxx{ paper roadmap}
-
-
-\subsection*{An open research project}
-
-This draft represents a ``work-in-progress'' snapshot
-of an experimental open research project.
-Anyone with adequate interest, skills, and motivation
-is welcome to contribute to this research project,
-and potentially become a co-author upon making a substantial contribution.
-(Smaller contributions will receive acknowledgments in the final paper.)
-To propose a contribution, please use Pull Requests (PRs)
-on the project's \href{https://github.com/dedis/matchertext}{GitHub repository}.
-We do not have time and cannot promise to answer all E-mails,
-or provide detailed guidance,
-before an interested potential contributor has proactively
-created and submitted some significant and well-considered contribution.
 

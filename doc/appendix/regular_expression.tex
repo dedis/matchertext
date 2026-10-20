@@ -1,0 +1,158 @@
+\section{Regular Expression Syntax}
+\label{app:regex}
+
+Despite being a ``small'' synax for the special purpose
+of matching patterns in strings,
+regular expressions (REs) and their use are complex enough in practice
+that multiple entire books have been written
+about them~\cite{fitzgerald12introducing,friedl06mastering,goyvaerts12regular}.
+Two regular expression syntaxes were standardized
+by POSIX~\cite{ieee17posix},
+while the \href{https://www.perl.org}{Perl language} and the
+\href{https://www.pcre.org}{Perl Compatible Regular Expressions (PCRE) library}
+it inspired
+define advanced syntax that has become popular
+in numerous other languages and applications.
+
+In filling their basic role of matching patterns in text,
+REs must inherently must embedd strings
+comprising the patterns to be matched --
+and those embedded strings can be in any syntax.
+Thus, being able to host embedded strings of any language
+with minimal obfuscation
+in principle facilitates an RE's basic pattern-matching role.
+
+Since the most common RE syntax uses backslash escapes
+similar to those in C-like languages,
+the same matchertext escape extensions,
+such as \verb|\[|$m$\verb|]|, could work for REs.
+Because of the large number of punctuation characters
+that are sensitive in REs, however,
+some popular RE syntaxes such as
+\href{https://www.pcre.org/original/doc/html/pcrepattern.html}{PCRE}
+guarantee the rule that if a backslash
+``is followed by a character that is not a number or a letter,
+it takes away any special meaning that character may have.''
+This way, a user can just conservatively
+escape \emph{all} literal punctuation appearing in an RE,
+instead of remembering which punctuation \emph{must} be escaped.
+Preserving this rule may suggest a longer, letter-based
+matchertext escape sequence
+such as \verb|\m[|$m$\verb|]|.
+
+Another alternative would be to use some non-backslash-escape syntax,
+such as \verb|{{|$m$\verb|}}|.
+This alternative syntax uses the same curly braces
+that REs already commonly use
+for repetition quantifiers like $c$\verb|{1,3}|,
+but in a syntactically non-conflicting fashion
+since the inner braces cannot be mistaken for repetition quantifiers.
+With this alternative syntax,
+the pathological ``\href{https://en.wikipedia.org/wiki/Leaning_toothpick_syndrome}{leaning toothpick syndrome}'' example RE,
+matching the double-backslash \verb|\\| in a UNC name (see \cref{sec:bg}),
+becomes the more readable RE \verb|{{\\}}|.
+Embedding this RE in a C-like string literal with matchertext extensions
+in turn becomes \verb|M"({{\\}})"| or \verb|"\[{{\\}}]"|,
+for a more manageable two or three leaning toothpicks,
+in contrast with the traditionally-required eight in \verb|"\\\\\\\\"|.
+
+\subsection{Embedding regular expressions}
+\label{app:regex:embed}
+
+Typical regular expression (RE) syntax is C-like
+in terms of using backslashes to escape sensitive punctuation characters
+within text to be matched.
+Similar escape sequences like \verb|\o| and \verb|\c| for unmatched matchers
+could therefore be introduced as \cref{sec:embed:c} discusses.
+
+One complication is that the popular
+\href{https://www.pcre.org/original/doc/html/pcrepattern.html}{PCRE syntax}
+already uses \verb|\o{|$n$\verb|}|
+for character escapes with octal numeric value $n$.
+This octal-escape usage of \verb|\o|
+technically does not conflict syntactically
+with \verb|\o{}|, however,
+since the $n$ in an octal escape cannot be the empty string.
+
+PCRE syntax also offers \verb|\c|$x$ as a way to enter control characters,
+by flipping bit 6 of ASCII character $x$.
+This is a syntactic conflict with the proposed matchertext escapes,
+but perhaps a tolerable one.
+The sequence \verb|\c(| would constitue
+a bizarre and unlikely way to express a simple literal letter `\verb|h|',
+and \verb|\c{| would be a strange synonym for a semicolon `\verb|;|' --
+neither of which need escaping at all.
+The sequence \verb|\c[| might be slightly more likely to see use
+to express the ASCII escape (ESC) control code (hex 1B) --
+but PCRE already provides the more-concise and obvious sequence \verb|\e|
+to express this control code.
+
+\subsubsection{Character classes}
+\label{app:regex:class}
+
+Backslash escapes are normally disabled in
+bracketed RE character class notation like \verb|[a-z0-9]|.
+The matchertext discipline does not present a problem
+when expressing a character class containing \emph{both} matchers of a pair.
+For example,
+the character class \verb|[()[]{}]| matches any matcher character,
+while \verb|[^[]]| matches anything but a square bracket.
+Including just one unmatched matcher in a character class
+becomes less convenient, however.
+A slightly-cumbersome workaround
+is simply to shift unmatched matchers outside the character class:
+\eg \verb|[a-z{]| might be rewritten as \verb=([a-z]|\o{})=.
+
+A more-appealing syntactic extension might be to introduce the rule
+that a less-chan character \verb|<| in a character class,
+when immediately surrounded by a pair of matchers,
+``selects'' only the open matcher for literal inclusion.
+The example above therefore becomes \verb|[a-z{<}]|.
+A greater-than character \verb|>| between a matcher pair
+similarly selects only the close matcher:
+\verb|[^[>]]| matches anything but a close bracket.
+One might view the \verb|<| or \verb|>| character either
+as a matchertext-insensitive angle-bracket
+``standing in'' for the desired sensitive matcher,
+or as an arrow ``pointing'' left or right to the desired matcher.
+
+
+
+\xxx{
+Regular expressions in
+XXX %\href{https://www.tcl.tk/man/tcl8.4/TclCmd/re_syntax.html#M32}{Tcl}
+and
+XXX %\href{https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions/Character_Classes#types}{JavaScript}
+also use \texttt{\\c}$X$ as an escape sequence for control code characters,
+though with different precise rules.
+Using this syntax with an opener as the character $X$
+appears to be illegal in JavaScript regular expressions,
+and perhaps legal but unlikely to be used in Tcl regular expressions.
+}
+
+\xxx{
+Question: how often are these escape sequences used,
+and how often are the equivalent sequences for introducing control codes used
+(\eg single-letter sequences, or octal or hex numeric sequences)?
+Which specific escape sequences does this escape sequence get used for
+and with which characters $X$?
+
+Relevant: \href{https://www.tcl.tk/man/tcl8.5/tutorial/Tcl21.html}{More Quoting Hell - Regular Expressions 102}.
+Also \href{https://wiki.tcl-lang.org/page/Quoting+hell}{Quoting hell}
+}
+
+
+
+\xxx{Trouble spots in syntax tradition.
+When are unmatched matchers traditionally used
+in actual language syntax, not just as literal text embedded within syntax?
+Mathematical half-open range/set notation.
+How problematic is this?
+Other examples?
+}
+
+\xxx{Future: other oft-embedded languages to look at.  For example:
+	SQL
+	JSON
+}
+

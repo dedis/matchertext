@@ -1,8 +1,8 @@
-\section{Machine-checked: \textsc{Verify}}
+\section{Machine-checked: always-embeddability}
 \label{app:lean}
 
 The declaration heads below summarize the Lean~4 development in
-\texttt{lean/always\_embeddability.lean} that establishes \cref{thm:design:embed}
+\nolinkurl{lean/always_embeddable.lean} that establishes \cref{thm:design:embed}
 (there named \texttt{embedding\_closed\_under\_context}),
 faithful to the abstract definitions of \cref{sec:design:abstract}.
 The disjointness of openers and closers assumed there ($O \cap C = \emptyset$)
@@ -66,3 +66,23 @@ theorem embedding_closed_under_context
     {s_o s_c : List α} (hs : AllMatch Pi s_o s_c) :
     MT Pi (s_o ++ m ++ s_c) := by ...
 \end{lstlisting}
+
+\paragraph{Proof sketches of the lemmas}
+
+\begin{proof}[Proof sketch of \cref{lem:design:concat}]
+By induction on the derivation of $a \in L$.
+If $a$ is a string of nonmatchers,
+a second induction on the derivation of $b \in L$
+either extends that nonmatcher string, when $b$ is also flat,
+or splits off the outermost matched pair of $b$
+and reattaches $a$ on its left via the nesting rule.
+If $a$ itself has the form $a_1||o||a_2||c||a_3$,
+then $a||b = a_1||o||a_2||c||(a_3||b)$,
+which lies in $L$ by the induction hypothesis on $a_3$
+and one application of the nesting rule.
+\end{proof}
+
+\begin{proof}[Proof sketch of \cref{lem:design:wrap}]
+Immediate from the nesting rule of \cref{sec:design:abstract}
+with $m_1$ and $m_3$ both empty and $m_2 = m$.
+\end{proof}
