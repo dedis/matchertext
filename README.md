@@ -23,12 +23,11 @@ character can end the value early.
 Each directory documents itself; follow the link rather than looking for
 instructions here.
 
-| Directory                                  | Contents                                                                                         |
-|--------------------------------------------|--------------------------------------------------------------------------------------------------|
-| [`lean`](lean)                             | Machine-checked proofs of the properties both papers rely on                                     |
-| [`go`](go)                                 | Go reference implementation: the matchertext scanner, MinML, and the language server             |
-| [`dev`](dev)                               | Editor support: tree-sitter grammar, VS Code, Neovim, Emacs, Sublime Text, Zed, Helix, JetBrains |
-| [`injection-research`](injection-research) | The injection study: CVE pipeline and corpus                                                     |
+| Directory                                  | Contents                                                                              |
+|--------------------------------------------|---------------------------------------------------------------------------------------|
+| [`go`](go)                                 | Go reference implementation: the matchertext scanner, MinML, and the language server  |
+| [`injection-research`](injection-research) | The injection study: CVE pipeline and corpus                                          |
+| [`lean`](lean)                             | Machine-checked proofs of the properties both papers rely on                          |
 
 Smaller items with no README of their own: `perl/escapes.pl` and
 `raku/escapes.raku` sketch matcher escape sequences for those languages, and
@@ -37,21 +36,11 @@ Smaller items with no README of their own: `perl/escapes.pl` and
 ## Building
 
 The MinML tooling is built from the repository root, which is a single entry
-point rather than the home of the work. Two of these targets have no other
-home: they read from one directory and write into another, and
-`vscode-live-preview` needs the `minml-lsp` binary left at the root.
+point rather than the home of the work.
 
 | Command                    | Produces                                              |
 |----------------------------|-------------------------------------------------------|
 | `make build`               | the `minml` CLI                                       |
-| `make build-lsp`           | the `minml-lsp` language server                       |
-| `make build-wasm`          | the WebAssembly parser, for the browser and VS Code   |
-| `make vscode-live-preview` | the VS Code extension, installed locally              |
-| `make gen-parser`          | the tree-sitter parser from `grammar.js`              |
-
-`build` and `build-lsp` are one-line wrappers over the native command for
-their directory; the linked README gives that command directly. Everything
-else in the repository builds from its own directory.
 
 ## Contributing
 
