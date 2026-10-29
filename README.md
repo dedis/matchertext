@@ -25,10 +25,10 @@ instructions here.
 
 | Directory                                  | Contents                                                                             |
 |--------------------------------------------|--------------------------------------------------------------------------------------|
-| [`lean`](lean)                             | Machine-checked proofs of the properties both papers rely on                         |
-| [`go`](go)                                 | Go reference implementation: the matchertext scanner, MinML, and the language server |
-| [`dev`](dev)                               | Editor support: tree-sitter grammar, VS Code, Neovim, Emacs, Sublime Text, Zed, Helix, JetBrains |
 | [`data`](data)                             | Clang-based tool that measures matchertext compliance across source trees            |
+| [`dev`](dev)                               | Editor support: tree-sitter grammar, VS Code, Neovim, Emacs, Sublime Text, Zed, Helix, JetBrains |
+| [`go`](go)                                 | Go reference implementation: the matchertext scanner, MinML, and the language server |
+| [`lean`](lean)                             | Machine-checked proofs of the properties both papers rely on                         |
 
 Smaller items with no README of their own: `perl/escapes.pl` and
 `raku/escapes.raku` sketch matcher escape sequences for those languages, and
