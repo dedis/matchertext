@@ -361,7 +361,7 @@ would make URI syntax \emph{self-delimiting}.
 In particular,
 let us consider an alternative potential URI syntax
 in which we surround the URI's body -- everything after the scheme name --
-with square brackets instead of separating it from the body with a colon.
+with square brackets instead of separating it from the scheme name with a colon.
 Thus, \verb|http://my.site/| becomes \verb|http[//my.site/]|.
 This alternate syntax uses only characters
 that are already used (and reserved) in current URI syntax,
@@ -419,9 +419,9 @@ could be ``broken out'' of the main MRI syntax
 and handled instead as embedded MRIs in the host MRI's authority field.
 For example,
 the URI `\verb|http://1.2.3.4:80/|' would become
-the 2-level MRI `\verb|http[//ip4[1.2.3.4]:80/|', and
+the 2-level MRI `\verb|http[//ip4[1.2.3.4]:80/]|', and
 the URI `\verb|http://[1234::abcd]:80/|' would become
-the MRI `\verb|http://ip6[1234::abcd]:80/|'.
+the MRI `\verb|http[//ip6[1234::abcd]:80/]|'.
 %IPv6 addresses with scoped identifiers
 %could avoid obfuscation in URIs~\cite{rfc6874}:
 %the URI `\verb|http://[1234::abcd%25eth0]/' becomes

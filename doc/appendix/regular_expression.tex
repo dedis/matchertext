@@ -90,13 +90,14 @@ to express this control code.
 \subsubsection{Character classes}
 \label{app:regex:class}
 
-Backslash escapes are normally disabled in
-bracketed RE character class notation like \verb|[a-z0-9]|.
+In POSIX syntax, backslash escapes are disabled in
+bracketed RE character class notation like \verb|[a-z0-9]|,
+and a \verb|]| closes the class unless it comes first.
 The matchertext discipline does not present a problem
 when expressing a character class containing \emph{both} matchers of a pair.
 For example,
-the character class \verb|[()[]{}]| matches any matcher character,
-while \verb|[^[]]| matches anything but a square bracket.
+the character class \verb|[][(){}]| matches any matcher character,
+while \verb|[^][]| matches anything but a square bracket.
 Including just one unmatched matcher in a character class
 becomes less convenient, however.
 A slightly-cumbersome workaround
@@ -111,6 +112,11 @@ The example above therefore becomes \verb|[a-z{<}]|.
 A greater-than character \verb|>| between a matcher pair
 similarly selects only the close matcher:
 \verb|[^[>]]| matches anything but a close bracket.
+Under this rule, the RE parser reads each such three-character unit
+before it looks for the end of the class,
+so the class ends at the final bracket.
+The rule changes the meaning of existing classes that contain such a unit:
+today \verb|[a-z{<}]| also matches \verb|<| and \verb|}|.
 One might view the \verb|<| or \verb|>| character either
 as a matchertext-insensitive angle-bracket
 ``standing in'' for the desired sensitive matcher,

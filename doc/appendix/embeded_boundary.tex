@@ -43,7 +43,7 @@ theorem depth_prefix_nonneg
     {m : List α} (hm : MT Pi m) :
     ∀ p, p <+: m → 0 ≤ depth Pi p := by ...
 
--- Theorem (L1): placing a matchertext value m in a hole closed by c and reading to
+-- Theorem (embedding boundary): placing a matchertext value m in a hole closed by c and reading to
 -- balance recovers exactly m: every prefix of m stays at depth ≥ 0, m itself returns
 -- to 0, and c is the first character to drive the depth negative, so the balance
 -- boundary is precisely |m|. It follows from the three lemmas above: the boundary

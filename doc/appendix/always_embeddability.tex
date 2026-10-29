@@ -1,15 +1,18 @@
 \section{Machine-checked: always-embeddability}
 \label{app:lean}
 
-The declaration heads below summarize the Lean~4 development in
-\nolinkurl{lean/always_embeddable.lean} that establishes \cref{thm:design:embed}
-(there named \texttt{embedding\_closed\_under\_context}),
-faithful to the abstract definitions of \cref{sec:design:abstract}.
+The declaration heads below summarize the Lean~4 development
+that establishes \cref{thm:design:embed}
+(there named \texttt{embedding\_closed\_under\_context}).
+\nolinkurl{lean/core.lean} holds the definitions,
+faithful to the abstract definitions of \cref{sec:design:abstract},
+and \nolinkurl{lean/always_embeddable.lean} holds the proof.
 The disjointness of openers and closers assumed there ($O \cap C = \emptyset$)
 appears as the premise \texttt{hdisj};
-tactic proof bodies are elided and given in full in the source file.
+tactic proof bodies are elided and given in full in the source files.
 
 \begin{lstlisting}
+-- lean/core.lean
 import Mathlib
 
 variable {α : Type*}         -- the alphabet
@@ -31,6 +34,9 @@ inductive MT (Pi : Set (α × α)) : List α → Prop where
   | nest (m₁ m₂ m₃ : List α) (o c : α) (hp : (o, c) ∈ Pi)
          (h₁ : MT Pi m₁) (h₂ : MT Pi m₂) (h₃ : MT Pi m₃) :
       MT Pi (m₁ ++ [o] ++ m₂ ++ [c] ++ m₃)
+
+-- lean/always_embeddable.lean
+import core
 
 -- Lemma: the empty string is matchertext.
 theorem mt_nil : MT Pi ([] : List α) := by ...
