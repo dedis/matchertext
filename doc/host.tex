@@ -165,7 +165,7 @@ including host-language escape sequences:
 
 The choice of square brackets for the proposed matchertext escape sequence
 is somewhat arbitrary:
-we could instead use use parentheses or curly braces,
+we could instead use parentheses or curly braces,
 or a longer sequence such as \verb|\m[|$m$\verb|]|.
 Any choice may conflict with existing syntax in \emph{some} language:
 \eg
@@ -209,7 +209,7 @@ Standard General Markup Languages (SGML)~\cite{iso8879sgml,goossens95sgml}
 itself has waned in popularity,
 its derivatives HTML~\cite{whatwg22html} and XML~\cite{w3c08xml}
 are now ubiquitous in Web content and programming.
-Wherever the differences between these markup languages is not important,
+Wherever the differences between these markup languages are not important,
 we will refer to them all as \ml languages.
 
 In their basic role as markup languages
@@ -262,7 +262,7 @@ that these embedding contexts can create.
 & HTML	& \verb|<button onclick="emitCharacter('\'')">Emit Apostrophe</button>| \\
 & +M	& \verb|<button onclick=[emitCharacter("'")]>Emit Apostrophe</button>| \\
 \\
-\multicolumn{3}{@{}p{\linewidth}@{}}{\textbf{(c) Embedding strings in within CDATA (character data) sections, in standard XHTML or with matchertext extensions (+M):}} \\
+\multicolumn{3}{@{}p{\linewidth}@{}}{\textbf{(c) Embedding strings within CDATA (character data) sections, in standard XHTML or with matchertext extensions (+M):}} \\
 & XHTML	& \verb|<code>example <![CDATA[<![CDATA[character data]]]]><![CDATA[>]]> markup</code>| \\
 & +M	& \verb|<code>example <![MDATA[<![CDATA[character data]]>]]> markup</code>| \\
 & XHTML	& \verb|<code>example <![CDATA[<![CDATA[<![CDATA[double embedded]]]]]]>| \\

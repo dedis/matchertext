@@ -130,7 +130,7 @@ leading to further syntactic hacks involving
 mandatory percent-escaping of the percent sign
 indicating a scoped identifier~\cite{rfc6874}.
 
-These points in in URI evolution illustrate
+These points in URI evolution illustrate
 a repeating precedent for liberalizing URI syntax
 to accept previously-forbidden characters
 and to make URIs more ``friendly'' and accommodating
@@ -157,7 +157,7 @@ raise the obvious question:
 \emph{how far should liberalization of URI syntax go?}
 Beyond the square brackets,
 which \emph{other} characters that were previously disallowed in URIs and IRIs
-eventually be permitted, and in what contexts?
+should eventually be permitted, and in what contexts?
 
 In terms of our current focus on hosting embedded matchertext,
 the ideal would clearly be to allow \emph{any} UCS characters in URIs --
@@ -195,7 +195,7 @@ there is no syntactic ambiguity between angle-brackets or double-quotes
 used to surround a whole URI
 and any that may appear within embedded matchertext.
 The matchers delimiting the embedded matchertext
-unambiguously serve to differentiate "inside" from "outside":
+unambiguously serve to differentiate ``inside'' from ``outside'':
 \eg as in \verb|<http://my.site/%[>"<]>|.
 
 The original URL standard in 1994~\cite{rfc1738}
@@ -266,7 +266,7 @@ a special-purpose ``little language'' just for expressing identifiers,
 URIs are predominately embedded in other contexts --
 software source code, documentation markup, configuration files, etc.
 Especially since URIs are intended to be human-readable,
-it would thus seems useful if URIs
+it would thus seem useful if URIs
 could be maximally ``friendly'' for embedding.
 
 \subsubsection{The near-matchertext-compliance of URIs}

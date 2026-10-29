@@ -5,7 +5,7 @@ Having focused above on host language considerations,
 we now switch focus to considerations for languages
 to \emph{be embedded} as matchertext.
 The languages of interest for embedding
-overlaps heavily with those of interest as host languages;
+overlap heavily with those of interest as host languages;
 we separate these discussions mainly to emphasize the orthogonality
 of host- and embedded-language issues and cleanly separate them.
 
@@ -24,7 +24,7 @@ and are by no means essential.
 \label{sec:embed:c}
 
 Almost certainly the most common context in which unmatched matchers
-appear in most today's existing source code is within string literals.
+appear in most of today's existing source code is within string literals.
 This is especially true of code designed to print, or parse,
 machine-readable code in almost any syntax.
 Structured pretty-printing code frequently includes code sequences like this:
@@ -103,7 +103,7 @@ provided the existing use requires a non-empty string between the matchers --
 as Raku does in the above cases, for example.
 % see raku/escapes.raku for a trivial script with which to verify this.
 In any case, different languages need not agree
-on specific escapes sequences for unmatched matchers
+on specific escape sequences for unmatched matchers
 and are free to make their own stylistic choices.
 
 

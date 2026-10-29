@@ -1,7 +1,7 @@
 \section{Regular Expression Syntax}
 \label{app:regex}
 
-Despite being a ``small'' synax for the special purpose
+Despite being a ``small'' syntax for the special purpose
 of matching patterns in strings,
 regular expressions (REs) and their use are complex enough in practice
 that multiple entire books have been written
@@ -15,7 +15,7 @@ define advanced syntax that has become popular
 in numerous other languages and applications.
 
 In filling their basic role of matching patterns in text,
-REs must inherently must embedd strings
+REs must inherently embed strings
 comprising the patterns to be matched --
 and those embedded strings can be in any syntax.
 Thus, being able to host embedded strings of any language
@@ -78,7 +78,7 @@ PCRE syntax also offers \verb|\c|$x$ as a way to enter control characters,
 by flipping bit 6 of ASCII character $x$.
 This is a syntactic conflict with the proposed matchertext escapes,
 but perhaps a tolerable one.
-The sequence \verb|\c(| would constitue
+The sequence \verb|\c(| would constitute
 a bizarre and unlikely way to express a simple literal letter `\verb|h|',
 and \verb|\c{| would be a strange synonym for a semicolon `\verb|;|' --
 neither of which need escaping at all.
@@ -104,7 +104,7 @@ is simply to shift unmatched matchers outside the character class:
 \eg \verb|[a-z{]| might be rewritten as \verb=([a-z]|\o{})=.
 
 A more-appealing syntactic extension might be to introduce the rule
-that a less-chan character \verb|<| in a character class,
+that a less-than character \verb|<| in a character class,
 when immediately surrounded by a pair of matchers,
 ``selects'' only the open matcher for literal inclusion.
 The example above therefore becomes \verb|[a-z{<}]|.
