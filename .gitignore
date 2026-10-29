@@ -5,8 +5,8 @@ minml-lsp
 minml-lsp.exe
 /lsp
 **/minml.exe
-LLVM/ignore
-LLVM/include/LanguageModel.generated.hpp
+data/ignore
+data/include/LanguageModel.generated.hpp
 out
 **/dist
 

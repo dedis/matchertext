@@ -18,16 +18,6 @@ that delimits a hole with a matcher pair can find the end of an embedded value
 by counting balance, so no character inside the value needs escaping and no
 character can end the value early.
 
-For the idea in full, see
-[the matchertext paper](https://bford.info/pub/lang/matchertext/).
-
-## Two papers live here
-
-| Paper                                           | Source                                     | Subject                                                                                                                    |
-|-------------------------------------------------|--------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
-| Towards Verbatim Interlanguage Embedding        | [`doc`](doc)                               | The discipline itself: definition, host-language extensions, MinML, and a compliance study of real-world code              |
-| Structural Injection Resistance by Construction | [`injection-research`](injection-research) | What the discipline is worth against injection: a security property, a SQLite implementation, and a CVE corpus measurement |
-
 ## Directory map
 
 Each directory documents itself; follow the link rather than looking for
@@ -35,12 +25,10 @@ instructions here.
 
 | Directory                                  | Contents                                                                             |
 |--------------------------------------------|--------------------------------------------------------------------------------------|
-| [`doc`](doc)                               | LaTeX source for the matchertext paper                                               |
 | [`lean`](lean)                             | Machine-checked proofs of the properties both papers rely on                         |
 | [`go`](go)                                 | Go reference implementation: the matchertext scanner, MinML, and the language server |
 | [`dev`](dev)                               | Editor support: tree-sitter grammar, VS Code, Neovim, Emacs, Sublime Text, Zed, Helix, JetBrains |
-| [`LLVM`](LLVM)                             | Clang-based tool that measures matchertext compliance across source trees            |
-| [`injection-research`](injection-research) | The injection study: CVE pipeline, corpus, and a matchertext-aware SQLite            |
+| [`data`](data)                             | Clang-based tool that measures matchertext compliance across source trees            |
 
 Smaller items with no README of their own: `perl/escapes.pl` and
 `raku/escapes.raku` sketch matcher escape sequences for those languages, and

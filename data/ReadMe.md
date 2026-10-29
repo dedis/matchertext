@@ -9,7 +9,7 @@ This tool parses multi-language source trees with LLVM/Clang and reports:
 
 ## Build
 
-From the `LLVM/` directory:
+From the `data/` directory:
 
 ```sh
 make train build
