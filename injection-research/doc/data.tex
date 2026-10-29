@@ -7,7 +7,7 @@ copy of the record.
 All sources are snapshot-pinned by git commit or content hash in a manifest, so
 the corpus is reproducible.
 
-\paragraph{Identity and enrichment.}
+\paragraph{Identity and enrichment}
 The \href{https://github.com/CVEProject/cvelistV5}{MITRE CVE List}
 (\texttt{cvelistV5}) is the canonical record of identity, CNA provenance, and
 description.
@@ -26,7 +26,7 @@ Enrichment is kept \emph{source-separated}, each CWE or CVSS row tagged with its
 origin rather than merged, preserving provenance and exposing cross-source
 disagreement.
 
-\paragraph{Proof-of-concept payloads.}
+\paragraph{Proof-of-concept payloads}
 Six PoC databases supply real attack strings:
 \href{https://gitlab.com/exploit-database/exploitdb}{Exploit-DB}, the
 \href{https://github.com/projectdiscovery/nuclei-templates}{Nuclei detection
@@ -45,7 +45,7 @@ References are unified in one table with a local path where a payload is
 extractable; because exploit code is dual-use, the corpus stores only links,
 identifiers, and locally-extracted fragments, redistributing no exploit files.
 
-\paragraph{Scale.}
+\paragraph{Scale}
 The pinned snapshot comprises \textbf{\dataCVERecords} CVE records
 (\textbf{\dataPublishedCVEs} in the \texttt{PUBLISHED} state).
 Across all categories the PoC databases link to \dataPocTrickestCVEs CVEs (trickest),

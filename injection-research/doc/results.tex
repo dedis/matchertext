@@ -3,14 +3,14 @@
 
 \begin{table}[t]
 \centering
-\small
-\input{generated/tbl-syntax}
 \caption{Largest injection syntax types, of \dataInjectionCVEs injection CVEs, with
 the count carrying at least one linked proof-of-concept.}
 \label{tab:syntax}
+\small
+\input{generated/tbl-syntax}
 \end{table}
 
-\paragraph{Syntax distribution.}
+\paragraph{Syntax distribution}
 \Cref{tab:syntax} shows that injection is overwhelmingly concentrated in two
 syntaxes (HTML/DOM and SQL together account for \dataTopTwoShare of injection CVEs)
 with a long tail of shell, code-eval, header, template, LDAP, XML, and
@@ -21,7 +21,7 @@ Exploitation signals are sparse but consistent with severity: \dataInjectionKev 
 appear in the CISA Known-Exploited catalog, and command injection, though
 only a tenth of the corpus, carries a disproportionate share of them.
 
-\paragraph{Proof-of-concept coverage.}
+\paragraph{Proof-of-concept coverage}
 \textbf{\dataInjectionWithPoc} injection CVEs (\dataInjectionWithPocShare) carry at least one linked PoC.
 The PoC databases overlap, so unifying them raises payload coverage well
 above any single source. Of these, \textbf{\dataPayloadBackedCVEs} yield an extractable payload. The remainder
@@ -29,7 +29,7 @@ are links only or exploits from which no literal attack string can be recovered,
 that construct their payload programmatically. This linkage is what makes the containment analysis
 of \cref{sec:prevent} possible, since it supplies the real attack strings.
 
-\paragraph{Sub-classification.}
+\paragraph{Sub-classification}
 Beyond the two primary axes, each injection CVE is labelled on orthogonal
 facets, each from its strongest available signal, and stored in long form so a
 CVE can carry one label per dimension at once.
@@ -42,7 +42,7 @@ SQL injections resolve into blind-boolean (\dataSubTechniqueBlindBoolean), union
 blind-time (\dataSubTechniqueBlindTime), and authentication-bypass (\dataSubTechniqueAuthBypass) attacks.
 XSS resolves into stored (\dataSubTechniqueStored), reflected (\dataSubTechniqueReflected), and DOM-based (\dataSubTechniqueDomBased).
 
-\paragraph{Syntactic groups.}
+\paragraph{Syntactic groups}
 For the \textbf{\dataPayloadBackedCVEs} injection CVEs with an extractable PoC payload, we
 reduce each payload to a \emph{syntactic skeleton}.
 String literals, numbers, and identifiers are abstracted to placeholders

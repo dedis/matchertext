@@ -30,7 +30,7 @@ matcher only when the parser reads it.}
 \label{fig:threat:pipeline}
 \end{figure*}
 
-\paragraph{Asset and trusted base.}
+\paragraph{Asset and trusted base}
 Consider a host-language program with a hole $P[\cdot]$ into which an untrusted value
 $v$ is placed. The asset is the invariant that the \emph{structure} of the
 host language's parse of $P[v]$ is independent of the content of $v$. The value
@@ -46,7 +46,7 @@ The boundary-locating step of (i) is the load-bearing part. Premise L1 below
 discharges its principle by machine-checked proof, so the host language is trusted only
 for that step's \emph{implementation}.
 
-\paragraph{Attacker.}
+\paragraph{Attacker}
 The attacker supplies $v$ and may choose \emph{arbitrary} bytes, character
 encodings, Unicode, length, and matcher-nesting depth, and may submit strings
 that are \emph{not} valid matchertext.
@@ -57,7 +57,7 @@ host language that the recorded corpus payloads (\cref{sec:results}) target.
 The attacker does not control the host-language source, the configuration $(\Sigma,\Pi)$,
 or the trusted components above.
 
-\paragraph{Security property (inertness).}
+\paragraph{Security property (inertness)}
 Let $\textsc{Verify}(v)\Leftrightarrow v\in L$: for every host-language program
 $P[\cdot]$ and every $v$ with $\textsc{Verify}(v)$, the host-language parse of $P[v]$
 places the content of $v$ at a single terminal. That terminal's bytes do not
@@ -70,7 +70,7 @@ inertness states that the \emph{host-language parser treats the delimited conten
 data}. Closure is a lemma toward inertness, not inertness itself: it
 constrains the \emph{string}, not the host language's \emph{parser}.
 
-\paragraph{Deployment premises.}
+\paragraph{Deployment premises}
 Inertness holds under four premises, each necessary:
 \begin{itemize}
 \item[\textbf{A1}] \emph{Aware host language.} The host language that interprets the composed text
@@ -106,7 +106,7 @@ Inertness holds under four premises, each necessary:
 	not meaning.
 \end{itemize}
 
-\paragraph{From closure to inertness.}
+\paragraph{From closure to inertness}
 We model the aware host language of A1 as a grammar $G$ with one distinguished production
 $\mathit{hole}\rightarrow s_o\,\mathit{content}\,s_c$. Here $\mathit{content}$ is
 recovered by the matcher-balance locator and enters $G$ as a single terminal.
@@ -138,7 +138,7 @@ formalism of~\cite{matchertext}. This paper discharges L1 once for all host lang
 (\cref{sec:appendix:lean}), and the per-host-language L2 and L3 for a matchertext-aware
 SQLite in \cref{sec:prevent:exec}.
 
-\paragraph{Scope.}
+\paragraph{Scope}
 In scope is \emph{structural} injection: an attacker-controlled value that
 alters the host-language parse by escaping its region.
 Out of scope, and excluded from the containment claims throughout, are execution

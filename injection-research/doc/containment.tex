@@ -27,7 +27,7 @@ with \cref{tab:mech}.}
 \label{fig:prevent:tree}
 \end{figure*}
 
-\paragraph{Simulating containment.}
+\paragraph{Simulating containment}
 For each of the \dataPayloadBackedCVEs payload-backed CVEs, we reuse its syntactic
 skeleton and decide whether the target syntax is matcher-delimitable and, if so,
 whether the skeleton passes \textsc{Verify}, contained inertly if it does and by
@@ -37,16 +37,16 @@ a live parser.
 
 \begin{table}[t]
 \centering
-\small
-\input{generated/tbl-mech}
 \caption{Containment outcome by syntax over all \dataPayloadBackedCVEs
 payload-backed CVEs. Delimitable contexts (upper block) are contained by inert
-embedding or rejection; \emph{Outside} counts CVEs failing a premise of
+embedding or rejection; \textulc{\emph{Outside}} counts CVEs failing a premise of
 \cref{sec:threat}.}
 \label{tab:mech}
+\small
+\input{generated/tbl-mech}
 \end{table}
 
-\paragraph{Results.}
+\paragraph{Results}
 Of the \dataPayloadBackedCVEs payload-backed injection CVEs, the recorded
 payloads of \textbf{\dataContained} (\textbf{\dataContainedShare}) are contained
 by a matcher-delimited slot that a matchertext-aware host language reads to
@@ -63,7 +63,7 @@ quote- and tag-delimited host languages, and an attacker aware of a
 matcher-delimited slot would balance the matchers, shifting cases from rejection to
 inert embedding without affecting containment, since both routes hold the value.
 
-\paragraph{Where matchertext cannot help.}
+\paragraph{Where matchertext cannot help}
 The remaining \dataOutsideCVEs payload-backed CVEs are outside both conditions,
 split by the premise of \cref{sec:threat} they fail. \dataOutsideSemantic target
 execution/semantic sinks (server-side templates, expression languages, code
@@ -73,7 +73,7 @@ yet still executes. The other \dataOutsideNonmatcher target non-matcher contexts
 matcher pair bounds: shell separators (\verb|;|~\verb-|-~\verb|&|), CR/LF header
 breaks, and XML/XXE angle brackets.
 
-\paragraph{From the measured subset to the whole corpus.}
+\paragraph{From the measured subset to the whole corpus}
 The outcomes so far cover only the \dataPayloadBackedCVEs payload-backed CVEs.
 How far does the reach extend across all \dataInjectionCVEs injection CVEs, most
 carrying no payload to replay? We estimate it by \emph{projection}: carrying the
@@ -103,13 +103,14 @@ The resulting central estimate is
 
 \begin{table}[t]
 \centering
-\small
-\input{generated/tbl-strata}
 \caption{Post-stratification strata: per-syntax rates from the payload-backed
 subset, weighted by each syntax's corpus share. A dagger would mark a syntax
 with no payload-backed CVE, falling back to the structural rule of
 \cref{sec:threat}.}
 \label{tab:strata}
+\small
+\setlength{\tabcolsep}{5pt}
+\input{generated/tbl-strata}
 \end{table}
 Against a single denominator, the full \dataInjectionCVEs injection CVEs, the reach
 runs from a floor of \textbf{\dataFloorShare} to a ceiling of
@@ -119,7 +120,7 @@ CVE without a recoverable payload as uncontained, a hard lower bound; the
 \dataContainedShare above is instead the contained share \emph{within} the
 payload-backed subset.
 
-\paragraph{Does the payload-backed subset cover enough to trust?}
+\paragraph{Coverage of the payload-backed subset}
 Only \dataPayloadBackedCVEs of the \dataInjectionCVEs injection CVEs carry a
 replayable payload. That gap is
 payload availability, a property of the disclosure ecosystem, not a containment
@@ -143,11 +144,11 @@ implementation.
 To test them we build one matchertext-aware host language, a modified SQLite
 engine,\footnote{The fork and the driver of this experiment are available in an
 anonymized repository:
-\url{https://anonymous.4open.science/r/matchertext-sqlite-4301/}.} and run the
+\url{https://anonymous.4open.science/r/matchertext-sqlite-041B/}.} and run the
 recorded SQL payloads through it, from the CVE-derived SQL subset and the
 standalone SQL corpora.
 
-\paragraph{The modified engine.}
+\paragraph{The modified engine}
 Our driver realizes the discipline of \cref{sec:resist} directly: it places a
 value in the SQL text inside an \verb|M'(...)'| literal, wraps an identifier in
 \verb|[|$\dots$\verb|]| that the engine reads to matcher balance (A1), and
@@ -159,7 +160,7 @@ outside a hole, is unprotected. An opt-in strict mode refuses the legacy prepare
 entry points, turning A2 into an invariant the engine enforces; the measurement
 reports the additive default and strict build side by side.
 
-\paragraph{Fixtures and oracle.}
+\paragraph{Fixtures and oracle}
 We place each of the \dataSqliPayloads distinct SQL payloads (\dataSqliFamilies
 families) through every compatible hole-arm pair and compare it against the same
 hole holding a benign value.
@@ -189,18 +190,18 @@ is \dataSqliEffective payloads.
 
 \begin{table*}[t]
 \centering
-\small
-\input{generated/tbl-sqli-arms}
 \caption{Executed outcome by delivery path over the \dataSqliPayloads SQL
 payloads (\dataSqliCases cases), the additive default beside the opt-in strict
 build. Matcher-delimited holes (lower block) contain every payload; the
-concatenation controls (upper block) are the paths that break out. \emph{Not
-SQL} counts fragments that do not parse against SQLite; \emph{Refused},
+concatenation controls (upper block) are the paths that break out. \textulc{\emph{Not
+SQL}} counts fragments that do not parse against SQLite; \textulc{\emph{Refused}},
 statements rejected before the parser.}
 \label{tab:sqli}
+\small
+\input{generated/tbl-sqli-arms}
 \end{table*}
 
-\paragraph{Results.}
+\paragraph{Results}
 Over the effective set no matchertext hole admitted a breakout (\cref{tab:sqli}):
 \dataSqliMtBreakout through the \verb|M'(...)'| value hole, \dataSqliMtStrictBreakout
 through the verify-then-embed route, and \dataSqliIdentMtBreakout through the
@@ -229,7 +230,7 @@ absence. The value hole embeds each payload inertly, the verified route refuses 
 \cref{sec:resist}), and the identifier hole holds each as a single name, the one
 position a bound parameter cannot fill.
 
-\paragraph{Falsifiability.}
+\paragraph{Falsifiability}
 A zero is evidence only if the oracle could have reported a one.
 We rebuild the scanner deliberately broken, once so the boundary locator stops
 at the first closer and once so \textsc{Verify} always accepts, and rerun.

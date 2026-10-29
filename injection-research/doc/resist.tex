@@ -177,6 +177,12 @@ runs but can no longer escape its string to \emph{introduce} one.
 
 \begin{table*}[t]
 \centering
+\caption{Routes to premise A1, an aware host language (top; \textulc{\emph{trusted delta}} is what
+each adds to the trusted computing base of \cref{sec:threat}), and to premise
+A2, the value reaching a hole (bottom; only the interpolating form makes the
+template's structure independent of $v$ at composition time).}
+\label{tab:resist:a1}
+\label{tab:resist:a2}
 \small
 \begin{tabular}{llllll}
 \hline
@@ -198,12 +204,6 @@ Matchertext literal & \verb|M"(WHERE name = [|$v$\verb|])"| & lexer reads to bal
 Structural interpolation & \verb|M{}"(WHERE name = [{v}])"| & holes fixed before binding & literal + interpolation \\
 \hline
 \end{tabular}
-\caption{Routes to premise A1, an aware host language (top; \emph{trusted delta} is what
-each adds to the trusted computing base of \cref{sec:threat}), and to premise
-A2, the value reaching a hole (bottom; only the interpolating form makes the
-template's structure independent of $v$ at composition time).}
-\label{tab:resist:a1}
-\label{tab:resist:a2}
 \end{table*}
 
 Adoption is two problems, not one, and the hosting syntaxes
@@ -216,7 +216,7 @@ must reach a matcher-delimited hole rather than be concatenated in beside one.
 The two are discharged by changes to different languages, by different people,
 and are worth separating.
 
-\paragraph{Making the host language aware (A1).}
+\paragraph{Making the host language aware (A1)}
 \Cref{tab:resist:a1} compares the routes.
 Reusing a construct the format \emph{already} delimits with matchers is free:
 LDAP search filters and PDF literal strings
@@ -235,7 +235,7 @@ Replacing the host language obtains A1 by construction and reaches everything it
 covers, but only for new deployments, since nothing previously written parses.
 
 
-\paragraph{Making the composition safe (A2).}
+\paragraph{Making the composition safe (A2)}
 A1 is worth nothing if the value never reaches the hole, and today that is left to
 developer discipline: nothing stops a programmer from concatenating into the query
 around a hole rather than into it.
