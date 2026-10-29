@@ -1,7 +1,0 @@
-* text=auto eol=lf
-
-# Generated source files
-src/*.json linguist-generated
-src/parser.c linguist-generated
-src/tree_sitter/* linguist-generated
-

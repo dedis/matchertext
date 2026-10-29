@@ -1,9 +1,0 @@
-**/.DS_Store
-parser
-build
-build-test
-./ignore
-./include/LanguageModel.generated.hpp
-result/**
-train/__pycache__
-repos/**
