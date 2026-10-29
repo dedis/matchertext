@@ -19,7 +19,7 @@ by counting balance, so no character inside the value needs escaping and no
 character can end the value early.
 
 For the idea in full, see
-[the matchertext paper](https://bford.info/pub/lang/matchertext/).
+[the matchertext paper](doc).
 
 ## Two papers live here
 
