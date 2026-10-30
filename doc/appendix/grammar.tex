@@ -39,14 +39,14 @@ The delimiter is shown here as a double quote,
 but any string delimiter the language already uses would serve equally well,
 for instance \verb|'|, \verb|"|, \verb|"""|, \verb|'''|, or a backtick.
 
-The proposed form is \verb|M|$d$\verb|"|$O\dots C$\verb|"|,
+The proposed form is \verb|M|$d$\verb|"|$o\dots c$\verb|"|,
 an ordinary string literal carrying a mandatory \verb|M| prefix
 and an optional specifier $d$.
-Its content $O\dots C$ is itself wrapped in a matcher pair,
-$O$ one of \verb|(|, \verb|[|, \verb|{| and $C$ its matching close.
+Its content $o\dots c$ is itself wrapped in a matcher pair,
+$o$ one of \verb|(|, \verb|[|, \verb|{| and $c$ its matching close.
 That wrapping is the crux:
 the processor finds the literal's end by matcher balance,
-at the $C$ closing the opening $O$ (\cref{thm:design:findend}),
+at the $c$ closing the opening $o$ (\cref{thm:design:findend}),
 not at the first quote it meets inside,
 so the content may hold any character, quotes included,
 as long as its matchers balance.

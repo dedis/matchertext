@@ -14,7 +14,7 @@ as a reader extension, enabled by \verb|(import matchertext)|.
 Since CHICKEN Scheme is not a C-style language, the \verb|M| prefix
 is rewritten as \verb|#M| to use the language's
 \href{https://wiki.call-cc.org/man/5/Module%20(chicken%20read-syntax)}{reader's dispatch character}.
-This allows the \verb|#M| prefix to have no prior meaning and in turn not clash with the existing language,
+The \verb|#M| prefix has no prior meaning in the language,
 so the extension is conservative for the same reason as in C-like languages.
 So \verb|#M"(\([{}]))"| converts to the string \verb|\([{}])| without escapes,
 and \verb|#M{}"({greeting}, world)"| interpolates the Scheme expression

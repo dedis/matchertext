@@ -18,6 +18,9 @@ include regular expressions (REs),
 uniform resource identifiers (URIs),
 JavaScript Object Notation (JSON),
 and Structured Query Language (SQL).
+We use REs as the running example here;
+\cref{sec:bg:security} returns to SQL,
+and \cref{app:uri,app:regex} treat URIs and REs in depth.
 
 Perhaps the most classic ``little language'' is regular expression (RE) syntax,
 commonly used for pattern-based searches and replacements in freeform text.
@@ -140,6 +143,7 @@ required \emph{no} expansion with increased depth.
 See for example \href{http://www.zedwood.com/article/how-to-properly-escape-inline-javascript}{How to properly escape inline javascript} }
 
 \subsection{When security goes wrong}
+\label{sec:bg:security}
 
 The syntactic complexity of correctly embedding strings into code
 has created several broad classes of security vulnerabilities,

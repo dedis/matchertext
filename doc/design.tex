@@ -67,13 +67,13 @@ the meaning of all characters, matchers and nonmatchers alike.
 \subsubsection{Escapeless embedding in matchertext}
 \label{sec:design:abstract:embed}
 
-Suppose there is a set of languages $\mathcal{L} = \{L_1,\dots,L_k\}$
+Suppose there is a set of languages $\mathcal{L} = \{L_1,\dots,L_n\}$
 whose members all agree on a common  matchertext configuration $(\Sigma,\Pi)$.
 Any language $L_h \in \mathcal{L}$ can \emph{host}
 embedded strings in any other language $L_e \in \mathcal{L}$
 without escaping or other transformations to the strings from $L_e$,
 provided $L_h$ enforces the following simple \emph{embedding rule}.
-Any embedded matchertext string $m \in L_e$ 
+Any embedded string $m \in L_e \cap L$
 must be delimited (surrounded) by
 some pair of strings $s_o, s_c$ defined by the host language $L_h$,
 such that the full embedding sequence is $s_o || m || s_c$ in $L_h$.
@@ -111,7 +111,7 @@ reduce verbatim embedding compatibility.
 
 The reasoning above can be proven with the \href{https://lean-lang.org}{Lean~4} proof assistant
 using its \href{https://leanprover-community.github.io}{Mathlib} library,
-included in the \texttt{lean} directory of the supplementary material.\footnote{%
+included in the \texttt{lean} directory of the artifact.\footnote{%
 	The development relies only on the standard axioms
 	\texttt{propext} and \texttt{Quot.sound},
 	plus \texttt{Classical.choice} for \cref{thm:design:findend}.}

@@ -32,8 +32,11 @@ Class	& Description
 	& Example
 	& See \\
 \hline
-	& & & & \\
-C-like	& String escape
+C-like	& Literal
+	& \verb|M"(|$m$\verb|)"|
+	& \verb|M"(now quoting's "easy" in matchertext)"|
+	& \ref{sec:host:c:literals} \\
+	& String escape
 	& \verb|"|$\dots$\verb|\[|$m$\verb|]|$\dots$\verb|"|
 	& \verb|"now \[quoting's "easy" in matchertext]"|
 	& \ref{sec:host:c} \\
@@ -128,9 +131,8 @@ would not be fully robust or general
 because ASCII double quotes do not come in matched pairs,
 as further discussed below in \cref{sec:host:c:other}.
 
-Each language may decide the meaning, if any,
-of variants such as the lower-case \verb|m"|$m$\verb|"|
-(\cref{app:interp:lower}).
+The upper-case \verb|M| leaves the lower-case \verb|m"|$m$\verb|"|
+free for language-specific variants (\cref{app:interp:lower}).
 
 \Cref{app:interp} extends matchertext literals
 with string interpolation
@@ -191,8 +193,8 @@ ASCII matchers must match.
 Two obvious alternatives seem less suitable.
 Quotes cannot delimit embedded matchertext:
 the ASCII quotes \verb|"| and \verb|'| do not come in pairs,
-and which Unicode directed quotes pair together depends on culture
-(\eg “English”, „German“, «French»),
+and Unicode quote pairing depends on culture
+(\cref{sec:design:concrete:standard}),
 so the matchertext rule alone cannot locate the end of the string.
 ASCII matchers alone,
 or combinations such as \verb|["|$m$\verb|"]| or \verb|"[|$m$\verb|]"|,
@@ -334,7 +336,7 @@ the content cannot contain further markup (child elements)
 or \ml character entity references when using this syntax.
 
 \Cref{fig:ml-emb}(a) illustrates a few examples
-of embedding JavaScript into a \verb|<code>| or \verb|<script>| element,
+of embedding code into a \verb|<code>| or \verb|<script>| element,
 either in standard HTML or with the proposed matchertext content syntax (+M).
 The first example embeds literal HTML markup within HTML.
 The second illustrates the more troublesome case

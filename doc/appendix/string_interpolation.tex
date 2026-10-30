@@ -185,7 +185,7 @@ that could optimize different pragmatic tradeoffs.
 \subsection{Hybrid matchertext interpolation}
 \label{app:interp:hybrid}
 
-The above matchertext interpolation syntax
+The matchertext interpolation syntax of \cref{app:interp:lit}
 is suggested as one that appears likely backward-compatible
 with a large number of existing languages,
 and could help provide some cross-language consistency if adopted.
@@ -194,8 +194,8 @@ interpolation syntax, however,
 sometimes related to the host language's normal escaping syntax
 as in Swift's interpolation escapes like \verb|\(name)| in string literals.
 Since a template for interpolation is intended for modification anyway,
-avoiding the need for escapes or other ``sensitive'' characters
-in such templates is unavoidable and hence arguably less important
+escapes or other ``sensitive'' characters in such templates are unavoidable,
+so avoiding them is arguably less important
 than when using literals for verbatim embedding.
 
 As a result, there may be a pragmatic argument
