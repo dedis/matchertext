@@ -45,7 +45,7 @@ the string to be embedded?
 Could we make embedding always a simple matter of verbatim ``copy-and-paste''
 when done manually,
 or a simple matter of concatenation
-or filling a ``hole'' in a tempate
+or filling a ``hole'' in a template
 when done automatically?
 We propose that the answer can and should be \emph{yes} --
 though with important challenges, costs, and caveats of course.
@@ -74,39 +74,6 @@ are valid matchertext,
 while the strings
 `\verb|(|', `\verb|{a]|', `\verb|[(])|', and `\verb|}{|'
 are plain text but are not valid matchertext.
-
-\begin{figure*}[t]
-\begin{center}
-\begin{small}
-\begin{tabular}{ll}
-URI syntax:	& \verb|http://search.engine/linksto?site=http%3A%2F%2Fmy.site%2F&results=50| \\
-MRI syntax:	& \verb|http[//search.engine/linksto?site=http[//my.site/]&results=50]| \\
-\\
-URI syntax:	& \verb|http://historical.archive/get?site=http%3A%2F%2Fmy.site%2F&year=1998| \\
-MRI syntax:	& \verb|http[//historical.archive/get?site=http[//my.site/]&year=1998]| \\
-\end{tabular}
-\end{small}
-\end{center}
-\caption{Example queries containing embedded resource identifiers
-	in URI and MRI syntax for comparison.}
-\label{fig:search-query}
-\end{figure*}
-
-Consider \emph{matchertext resource identifiers} (MRIs),
-a matchertext adapation of
-uniform resource identifiers (URIs)~\cite{rfc3986} or
-internationalized resource identifiers (IRIs)~\cite{rfc3987}.
-A URI like \verb|http://my.site/path/|
-may always be transformed to or from
-equivalent MRI syntax like \verb|http[//my.site/path]|.
-An MRI is embeddable verbatim, with no transformation,
-into another MRI or into another matchertext-aware language.
-Figure~\ref{fig:search-query} shows two example search queries
-containing embedded resource identifiers,
-contrasting ``copy-and-paste'' embeddable MRI syntax
-with traditional URI syntax where the sensitive
-colon (\verb|:|) and slash (\verb|/|) characters
-must be escaped as \verb|%3A| and \verb|%2F%|, respectively.
 
 \begin{figure*}[t]
 \begin{center}
@@ -164,8 +131,8 @@ must still be forbidden throughout the embedded text,
 however -- in this case the backtick (\verb|`|).
 Verbatim copy-and-paste embedding remains unsafe
 without carefully checking the embedding text
-for the forbidden host-language delimeters,
-and changing the delimeters or awkwardly rewriting the embedded text
+for the forbidden host-language delimiters,
+and changing the delimiters or awkwardly rewriting the embedded text
 (\eg by concatenating multiple strings in different quoting styles).
 Matchertext, in contrast, forbids \emph{no} characters or sequences
 in embedded strings,
@@ -193,6 +160,7 @@ where unmatched matchers may commonly appear.
 \begin{table*}[t]
 \begin{center}
 \begin{footnotesize}
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{ll||ll|ll|ll||ll|ll}
 &		& \multicolumn{6}{|l||}{Escapes for C-like languages}
 		& \multicolumn{4}{|l}{Escapes for SGML-derived languages} \\
@@ -257,47 +225,34 @@ Table~\ref{tab:unmatched-matchers} summarizes a few existing and proposed
 alternatives for escaping unmatched matchers
 in both C-like languages and SGML-derived languages like HTML.
 
-In the rest of this paper, 
-we develop more deeply the design and rationale for the matchertext discipline,
-then explore how a number of common languages of varying types
-might be incrementally adapted to support and leverage
-the matchertext discipline effectively.
-
-This work remains in an exploration and experimentation phase,
-but we now report an initial empirical evaluation of matchertext
-on a large corpus of real-world code in \cref{sec:eval}.
-This evaluation begins to answer several key questions:
-how common (and how painful) is the need for escaping
-in the most common cross-language embedding scenarios?
-How extensively would large existing repositories of code or data
-need to be modified in order to convert them to matchertext?
-How does matchertext affect the usability to users or developers
-of common constructs in common embedding use-cases,
-such as synthesizing or editing HTTP or SQL queries?
-How does matchertext affect the frequency of syntax-related bugs --
-especially those potentially leading to security vulnerabilities --
-in code from typical developers?
-We find that existing code is already overwhelmingly matchertext-compliant,
-and that adopting matchertext could remove the large majority
-of the backslash escapes in string literals,
-while the questions of usability and of security-related bugs
-remain largely open for future work.
-
-One early pragmatic experiment with matchertext, however,
-is MinML~\cite{ford22minml},
+One early pragmatic experiment with matchertext
+is MinML~\anoncite{ford22minml},
 a concise but general-purpose alternative syntax
 for SGML-derived markup languages such as HTML and XML.
 MinML uses matcher characters for structure
 instead of matching pairs of start and end tags:
-\eg \verb|em[emphasis]| rather than \verb|<em>emphasis</em>|,
-and \verb|"[quotation]| instead of \verb|&ldquo;quotation&rdquo;|.
-MinML supports escapeless embedding of matchertext in other languages
-via a sequence like \verb|+[matchertext]|,
-as well as unmatched matcher escapes
-like those in \cref{tab:unmatched-matchers}.
-An \href{https://github.com/bford/hugo}{experimental extention}
-to the \href{https://gohugo.io}{Hugo} static website generator
-already allows web authoring in MinML.
+\eg \verb|em[emphasis]| rather than \verb|<em>emphasis</em>|.
+\Cref{sec:impl} describes MinML and its tools.
+
+This paper makes the following contributions:
+\begin{itemize}
+\item	the matchertext discipline, with Lean~4 proofs
+	that a matched delimiter pair around matchertext always yields matchertext
+	and that a host finds the end of an embedding by matcher balance alone
+	(\cref{sec:design});
+\item	backward-compatible extensions that let C-like and SGML-derived languages
+	host matchertext (\cref{sec:host})
+	and write embeddable matchertext conveniently (\cref{sec:embed});
+\item	two implementations, a CHICKEN Scheme reader extension and MinML
+	(\cref{sec:impl}); and
+\item	an evaluation on 469.6~million string literals from 79 organizations
+	(\cref{sec:eval}): 98.57\% are already matchertext,
+	and matchertext literals would remove 94.78\% of their backslash escapes.
+\end{itemize}
+\Cref{sec:bg} reviews current embedding practice,
+\cref{sec:rel} discusses related work, and \cref{sec:concl} concludes.
+How matchertext affects usability and the rate of security bugs
+remains open (\cref{sec:eval:open}).
 
 
 \xxx{
@@ -317,21 +272,4 @@ and hence decrease the frequency of such bugs.
 XXX to be tested empirically.
 }
 
-\xxx{ paper roadmap}
-
-
-\subsection*{An open research project}
-
-This draft represents a ``work-in-progress'' snapshot
-of an experimental open research project.
-Anyone with adequate interest, skills, and motivation
-is welcome to contribute to this research project,
-and potentially become a co-author upon making a substantial contribution.
-(Smaller contributions will receive acknowledgments in the final paper.)
-To propose a contribution, please use Pull Requests (PRs)
-on the project's \href{https://github.com/dedis/matchertext}{GitHub repository}.
-We do not have time and cannot promise to answer all E-mails,
-or provide detailed guidance,
-before an interested potential contributor has proactively
-created and submitted some significant and well-considered contribution.
 

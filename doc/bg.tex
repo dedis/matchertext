@@ -18,6 +18,9 @@ include regular expressions (REs),
 uniform resource identifiers (URIs),
 JavaScript Object Notation (JSON),
 and Structured Query Language (SQL).
+We use REs as the running example here;
+\cref{sec:bg:security} returns to SQL,
+and supplementary \cref{app:uri,app:regex} say more about URIs and REs.
 
 Perhaps the most classic ``little language'' is regular expression (RE) syntax,
 commonly used for pattern-based searches and replacements in freeform text.
@@ -37,7 +40,7 @@ for example.
 To match the double-backslash \verb|\\| that begins
 a \href{https://en.wikipedia.org/wiki/Path_(computing)#Universal_Naming_Convention}{UNC name} (as in \verb|\\host\path\file|),
 the backslashes must be doubled to become \verb|\\\\| as an RE,
-then doubled again to become \verb|"\\\\\\\\"| as a C sring literal
+then doubled again to become \verb|"\\\\\\\\"| as a C string literal
 containing that RE.
 This confusing multi-level explosion of backslash escapes
 has been aptly dubbed
@@ -105,7 +108,7 @@ Some languages such as Python allow triple-quoted multiline strings
 to make it less likely that the terminating sequence is needed in the literal:
 \eg \verb|'''|$\dots$\verb|'''| or \verb|"""|$\dots$\verb|"""|.
 But such a sequence may still need to appear, of course --
-especially in written examples of exactly this syntax for example.
+especially in written examples of exactly this syntax.
 
 Some languages further mitigate this problem
 by offering an effectively-unlimited number of delimiter pairs.
@@ -140,6 +143,7 @@ required \emph{no} expansion with increased depth.
 See for example \href{http://www.zedwood.com/article/how-to-properly-escape-inline-javascript}{How to properly escape inline javascript} }
 
 \subsection{When security goes wrong}
+\label{sec:bg:security}
 
 The syntactic complexity of correctly embedding strings into code
 has created several broad classes of security vulnerabilities,
@@ -202,7 +206,7 @@ to escape all characters or sequences that might be ``sensitive''
 in the host language.
 Further, this security-critical check
 could also be more uniform across host languages --
-\ie checking only that the three ASCII matcher pairs are matched corrrectly
+\ie checking only that the three ASCII matcher pairs are matched correctly
 throughout the untrusted content,
 rather than deeply verifying and/or transforming
 based on the complex syntax of a particular host language.

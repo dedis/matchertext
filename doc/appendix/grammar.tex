@@ -1,0 +1,173 @@
+\section{A compiler grammar for matchertext}
+\label{app:grammar}
+
+Realizing the syntactic extensions of \cref{sec:host} in an existing compiler
+reduces to a single requirement:
+the additions must form a \emph{conservative extension} of the language,
+under which every previously valid program stays valid and keeps its meaning.
+Only a conservative extension can be adopted incrementally,
+enabled behind a configuration flag without endangering existing code,
+the backward compatibility that \cref{sec:host} identifies as essential to adoption.
+The general technique is to guard each new form
+with a marker the old grammar could never accept,
+so the extension fires only on input the language previously rejected.
+We give grammar rules of this kind for the two hosting extensions
+of \cref{sec:host:c} in turn,
+first the matchertext literal and then, more briefly, the matchertext escape.
+
+\subsection{Matchertext-literal grammar}
+\label{app:grammar:literal}
+
+We now cast the matchertext literal of \cref{sec:host:c:literals}
+as concrete grammar rules that a C-like language could fold into its lexer.
+
+We assume the target language already parses ordinary string literals
+with a rule of the general shape:
+\[
+\begin{array}{rcl}
+\mathit{content}
+  & ::= & \texttt{...} \\
+
+\mathit{delimiter}
+  & ::= & \texttt{"} \\
+
+\mathit{string}
+  & ::= & \mathit{delimiter}\ \mathit{content}\ \mathit{delimiter}
+\end{array}
+\]
+The delimiter is shown here as a double quote,
+but any string delimiter the language already uses would serve equally well,
+for instance \verb|'|, \verb|"|, \verb|"""|, \verb|'''|, or a backtick.
+
+The proposed form is \verb|M|$d$\verb|"|$o\dots c$\verb|"|,
+an ordinary string literal carrying a mandatory \verb|M| prefix
+and an optional specifier $d$.
+Its content $o\dots c$ is itself wrapped in a matcher pair,
+$o$ one of \verb|(|, \verb|[|, \verb|{| and $c$ its matching close.
+That wrapping is the crux:
+the processor finds the literal's end by matcher balance,
+at the $c$ closing the opening $o$ (\cref{thm:design:findend}),
+not at the first quote it meets inside,
+so the content may hold any character, quotes included,
+as long as its matchers balance.
+This is exactly the matchertext discipline,
+and \cref{thm:design:embed} then guarantees the content embeds verbatim
+without escaping.
+The optional $d$, one or more strictly nested matcher pairs,
+names the pair reserved for interpolation holes or antiquotations
+inside the literal (\cref{app:interp}),
+so a template can mark its holes unambiguously.
+The \verb|M| prefix keeps the extension conservative
+in languages whose grammars reject an identifier directly before a quote,
+such as Python, Go, and Java,
+and Rust~2021, which reserves all such prefixes for future use.
+Other languages need more care.
+In C and C++, a macro named \verb|M| can make \verb|M"|$\dots$\verb|"| valid today,
+the same incompatibility that C++11 accepted for raw-string prefixes such as \verb|R|.
+Scala reads any identifier before a quote as a string interpolator,
+and JavaScript reads an identifier before a backtick as a tagged template.
+Such languages need a marker that their grammar rejects,
+as CHICKEN Scheme does with \verb|#M| (\cref{sec:impl}).
+
+We first define the matchertext symbols used (prefixed with MT):
+\[
+\begin{array}{rcl}
+\mathit{MT\_prefix}
+  & ::= & \texttt{M} \\
+
+\mathit{MT\_d}
+  & ::= & \texttt{(}\mathit{MT\_d}\texttt{)}
+    \mid \texttt{[}\mathit{MT\_d}\texttt{]}
+    \mid \texttt{\{}\mathit{MT\_d}\texttt{\}} \mid \epsilon \\
+
+\mathit{MT\_string}
+  & ::= & \mathit{delimiter}\ \texttt{(}\,\mathit{MT\_body}\,\texttt{)}\ \mathit{delimiter} \\
+  & \mid & \mathit{delimiter}\ \texttt{\{}\,\mathit{MT\_body}\,\texttt{\}}\ \mathit{delimiter} \\
+  & \mid & \mathit{delimiter}\ \texttt{[}\,\mathit{MT\_body}\,\texttt{]}\ \mathit{delimiter} \\
+
+\mathit{MT\_body}
+  & ::= & \mathit{MT\_char}\ \mathit{MT\_body}
+    \mid \texttt{(}\,\mathit{MT\_body}\,\texttt{)}\,\mathit{MT\_body} \\
+  & \mid & \texttt{[}\,\mathit{MT\_body}\,\texttt{]}\,\mathit{MT\_body}
+    \mid \texttt{\{}\,\mathit{MT\_body}\,\texttt{\}}\,\mathit{MT\_body}
+    \mid \epsilon \\
+
+\mathit{MT\_char}
+  & ::= & \textrm{any character except } \texttt{(}\ \texttt{)}\ \texttt{[}\ \texttt{]}\ \texttt{\{}\ \texttt{\}} \\
+\end{array}
+\]
+\verb|MT_body| is the matchertext language $L$ of \cref{sec:design:abstract}
+in the standard configuration.
+It replaces the ordinary \verb|content|,
+so quotes and escapes inside it have no meaning to the host.
+
+We then introduce the extended rule \verb|string_ext|
+and use it wherever the grammar previously accepted a \verb|string|.
+Its first alternative is the unchanged \verb|string| rule,
+so every existing literal parses exactly as before,
+and its remaining alternatives add the matchertext forms:
+\[
+\begin{array}{rcl}
+\mathit{string\_ext}
+  & ::= & \mathit{string} \\
+  & \mid & \mathit{MT\_prefix}\,\mathit{MT\_d}\,\mathit{MT\_string}
+\end{array}
+\]
+
+We also give the same rules in LL(1) form,
+so a predictive parser can select each alternative from one token of lookahead.
+Here \verb|MT_string| omits the leading delimiter, which \verb|MT_content| supplies,
+letting the parser decide as soon as it sees the opening quote or an opening
+matcher after the \verb|M|:
+\[
+\begin{array}{rcl}
+\mathit{string\_ext}
+  & ::= & \mathit{string} \mid \mathit{MT\_prefix}\ \mathit{MT\_content} \\
+
+\mathit{MT\_content}
+  & ::= & \mathit{MT\_d}\ \mathit{delimiter}\ \mathit{MT\_string} \\
+
+\mathit{MT\_d}
+  & ::= & \texttt{(}\ \mathit{MT\_d}\ \texttt{)}
+          \mid \texttt{[}\ \mathit{MT\_d}\ \texttt{]} \\
+  & \mid & \texttt{\{}\ \mathit{MT\_d}\ \texttt{\}} \mid \epsilon \\
+
+\mathit{MT\_string}
+  & ::= & \texttt{(}\,\mathit{MT\_body}\,\texttt{)}\ \mathit{delimiter} \\
+  & \mid & \texttt{\{}\,\mathit{MT\_body}\,\texttt{\}}\ \mathit{delimiter} \\
+  & \mid & \texttt{[}\,\mathit{MT\_body}\,\texttt{]}\ \mathit{delimiter} \\
+\end{array}
+\]
+
+\subsection{Matchertext-escape grammar}
+\label{app:grammar:escape}
+
+The matchertext escape asks less of the grammar than a new literal form,
+at least for C-like languages,
+because the property a host must enforce inside the escape,
+that matchers balance,
+is one these languages already enforce throughout their ordinary syntax.
+The expression, block, and argument-list grammars of
+C, C++, Rust, Java, Python, and their relatives
+all require every \verb|(|, \verb|[|, and \verb|{| to be matched
+for a program to compile at all,
+so at the structural level their code is already matchertext.
+The only contexts in which they admit unmatched matchers today
+are the opaque ones, string and character literals and comments,
+whose contents the compiler does not otherwise interpret.
+
+Those contexts are also the ones backward compatibility forbids us
+to constrain for existing, non-embedded code,
+so a host does not tighten them globally.
+It instead introduces a bracketed embedding region within them,
+such as the \verb|\[|$m$\verb|]| escape of \cref{sec:host:c:escapes},
+inside which two rules apply,
+following the general hosting principle of \cref{sec:host}:
+the host disables its own escaping and other transformations,
+and locates the region's end by matcher balance (\cref{thm:design:findend})
+rather than by its usual literal or comment terminator.
+Because the surrounding code already balances its matchers,
+this region composes cleanly with it,
+and the grammar change a C-like host needs is correspondingly small:
+the discipline it must impose inside an embedding
+is the one it already imposes everywhere else.
