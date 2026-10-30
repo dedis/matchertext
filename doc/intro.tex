@@ -225,33 +225,7 @@ Table~\ref{tab:unmatched-matchers} summarizes a few existing and proposed
 alternatives for escaping unmatched matchers
 in both C-like languages and SGML-derived languages like HTML.
 
-In the rest of this paper, 
-we develop more deeply the design and rationale for the matchertext discipline,
-then explore how a number of common languages of varying types
-might be incrementally adapted to support and leverage
-the matchertext discipline effectively.
-
-This work remains in an exploration and experimentation phase,
-but we now report an initial empirical evaluation of matchertext
-on a large corpus of real-world code in \cref{sec:eval}.
-This evaluation begins to answer several key questions:
-how common (and how painful) is the need for escaping
-in the most common cross-language embedding scenarios?
-How extensively would large existing repositories of code or data
-need to be modified in order to convert them to matchertext?
-How does matchertext affect the usability to users or developers
-of common constructs in common embedding use-cases,
-such as synthesizing or editing HTTP or SQL queries?
-How does matchertext affect the frequency of syntax-related bugs --
-especially those potentially leading to security vulnerabilities --
-in code from typical developers?
-We find that existing code is already overwhelmingly matchertext-compliant,
-and that adopting matchertext could remove the large majority
-of the backslash escapes in string literals,
-while the questions of usability and of security-related bugs
-remain largely open for future work.
-
-One early pragmatic experiment with matchertext, however,
+One early pragmatic experiment with matchertext
 is MinML~\anoncite{ford22minml},
 a concise but general-purpose alternative syntax
 for SGML-derived markup languages such as HTML and XML.
@@ -259,6 +233,27 @@ MinML uses matcher characters for structure
 instead of matching pairs of start and end tags:
 \eg \verb|em[emphasis]| rather than \verb|<em>emphasis</em>|.
 \Cref{sec:impl} describes MinML and its tools.
+
+This paper makes the following contributions:
+\begin{itemize}
+\item	the matchertext discipline, with Lean~4 proofs
+	that a matched delimiter pair around matchertext always yields matchertext
+	and that a host finds the end of an embedding by matcher balance alone
+	(\cref{sec:design});
+\item	backward-compatible extensions that let C-like and SGML-derived languages
+	host matchertext (\cref{sec:host})
+	and write embeddable matchertext conveniently (\cref{sec:embed}),
+	with URIs and regular expressions in the appendices;
+\item	two implementations, a CHICKEN Scheme reader extension and MinML
+	(\cref{sec:impl}); and
+\item	an evaluation on 469.6~million string literals from 79 organizations
+	(\cref{sec:eval}): 98.57\% are already matchertext,
+	and matchertext literals would remove 94.78\% of their backslash escapes.
+\end{itemize}
+\Cref{sec:bg} reviews current embedding practice,
+\cref{sec:rel} discusses related work, and \cref{sec:concl} concludes.
+How matchertext affects usability and the rate of security bugs
+remains open (\cref{sec:eval:open}).
 
 
 \xxx{
@@ -278,5 +273,4 @@ and hence decrease the frequency of such bugs.
 XXX to be tested empirically.
 }
 
-\xxx{ paper roadmap}
 

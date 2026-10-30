@@ -11,12 +11,12 @@ the backward compatibility that \cref{sec:host} identifies as essential to adopt
 The general technique is to guard each new form
 with a marker the old grammar could never accept,
 so the extension fires only on input the language previously rejected.
-We give grammar rules of this kind for the two directions in turn,
-first the embedded matchertext literal itself
-and then the accommodation a host language must make to admit it.
+We give grammar rules of this kind for the two hosting extensions
+of \cref{sec:host:c} in turn,
+first the matchertext literal and then, more briefly, the matchertext escape.
 
-\subsection{Embedded-matchertext grammar}
-\label{app:grammar:embed}
+\subsection{Matchertext-literal grammar}
+\label{app:grammar:literal}
 
 We now cast the matchertext literal of \cref{sec:host:c:literals}
 as concrete grammar rules that a C-like language could fold into its lexer.
@@ -139,12 +139,12 @@ matcher after the \verb|M|:
 \end{array}
 \]
 
-\subsection{Host-language grammar}
-\label{app:grammar:host}
+\subsection{Matchertext-escape grammar}
+\label{app:grammar:escape}
 
-Hosting embedded matchertext asks less of the grammar than embedding does,
+The matchertext escape asks less of the grammar than a new literal form,
 at least for C-like languages,
-because the property a host must enforce inside an embedding,
+because the property a host must enforce inside the escape,
 that matchers balance,
 is one these languages already enforce throughout their ordinary syntax.
 The expression, block, and argument-list grammars of

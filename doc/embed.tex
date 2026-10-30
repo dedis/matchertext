@@ -73,17 +73,10 @@ and oblivious to language-specific syntax such as that of string literals.
 So a backslash-escaped unmatched bracket \verb|\[|
 remains just as much a matchertext violation as the bracket alone.
 
-There is a solution that avoids the need for ASCII tables, however.
-Because literal matchers are a problem in matchertext only when unmatched,
-we can simply introduce escape sequences that incorporate
-\emph{both} matchers as a properly-matched pair,
-while ``selecting'' only the opener or closer of the pair.
-In C-like languages, for example,
-we suggest the sequence \verb|\o()| to escape an open parenthesis,
-\verb|\c()| to escape a close parenthesis.
-Similarly,
-\verb|\o[]| and \verb|\c[]| represent open/close square brackets,
-and \verb|\o{}| and \verb|\c{}| represent open/close curly braces.
+The escapes proposed in \cref{sec:intro} avoid ASCII tables:
+each contains \emph{both} matchers of a pair, properly matched,
+and selects only the opener or closer,
+as in \verb|\o()| or \verb|\c[]| (\cref{tab:unmatched-matchers}).
 
 The choice of the letters \verb|o| and \verb|c| to escape the matchers
 is consistent with their standardized character classes:
@@ -164,9 +157,8 @@ or numeric (\verb|&#x0028;|).
 For the same reasons as above,
 we may like to have extensions
 offering more visually-obvious alternatives for writing matchertext:
-\eg \verb|&o();| and \verb|&c();|
-for open and close parentheses,
-respectively.
+\eg \verb|&(<);| and \verb|&(>);|
+for open and close parentheses (\cref{tab:unmatched-matchers}).
 
 \Cref{app:uri:embed,app:regex:embed} discuss embedding
 uniform resource identifiers and regular expressions as matchertext.
