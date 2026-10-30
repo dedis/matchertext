@@ -55,14 +55,17 @@ when its ASCII matchers match (\cref{sec:design}),
 and the \emph{compliance rate} is the fraction of compliant samples;
 a \emph{strict} rule treats a wrong-kind closer (\eg \verb|)| closing \verb|[|)
 as a violation, while a \emph{relaxed} rule permits it.
+A \emph{violation} is one unmatched or wrong-kind matcher.
 A \emph{toothpick} is a single backslash character in a sample,
 following the ``leaning toothpick syndrome'' of \cref{sec:bg};
 to estimate the escaping that matchertext would remove,
 each compliant string literal is rewritten
 as the equivalent escapeless C++ raw string literal \verb|R"(|$\dots$\verb|)"|
+(same toothpicks as \verb|M"(|$\dots$\verb|)"|)
 and the surviving backslashes are counted,
 yielding a \emph{toothpick reduction}.
-Finally, \emph{nesting depth} is the deepest matcher nesting a sample reaches.
+Finally, \emph{nesting depth} is the deepest matcher nesting a sample reaches;
+\emph{raw} depth also counts unclosed openers.
 
 
 \subsection{Q1: Compliance of existing code}
@@ -103,7 +106,8 @@ Files		& 12.39\,M	& 86.77\%	& 86.91\%	\\
 \end{footnotesize}
 \end{center}
 \caption{Matchertext compliance rate and sample size by stream,
-	under the strict and relaxed rules~\anoncite{bastide26matchertext}.}
+	under the strict and relaxed rules;
+	the relaxed rule was measured only for comments and files~\anoncite{bastide26matchertext}.}
 \label{tab:eval:compliance}
 \end{table}
 
@@ -116,7 +120,7 @@ As \cref{tab:eval:categories} shows,
 regular expressions and shell fragments alone
 account for the largest violation counts
 (670,118 and 534,719 respectively),
-despite each making up only about 1.6\% of samples;
+despite each making up only about 1.6\% of classified samples;
 relative to their sample counts they are
 far more often non-compliant than prose or identifiers.
 CSS is similarly disproportionate,
@@ -153,12 +157,12 @@ are consistent across hosts.
 
 Most string literals are not cross-language embeddings at all:
 plain prose, identifier-like tokens, and file paths
-account for about 83\% of samples (\cref{tab:eval:categories}).
+account for about 83\% of classified samples (\cref{tab:eval:categories}).
 Among the languages that motivate our injection discussion,
-SQL accounts for 0.79\% of samples, CSS for 0.22\%,
+SQL accounts for 0.79\%, CSS for 0.22\%,
 JSON for 0.19\%, and XML for 0.06\%.
 Because the corpus is infrastructure-heavy (\cref{sec:eval:methodology}),
-these figures are a lower bound for web-facing combinations
+these figures likely understate web-facing combinations
 such as SQL in application code or HTML templating.
 The classification is content-based and best-effort,
 so its finer categories are approximate,
@@ -184,9 +188,10 @@ URL		& 1.3\%		& 983		& 3		\\
 \end{tabular}
 \end{footnotesize}
 \end{center}
-\caption{Largest embedded-string categories by share of string samples,
-	with their accumulated violations and toothpicks;
-	categories below 1\% of samples are omitted~\anoncite{bastide26matchertext}.}
+\caption{Largest embedded-string categories by share of the 127.1\,M classified string samples
+	(27\% of all), with their violations and toothpicks; categories below 1\% are omitted.
+	The 342.5\,M unclassified samples carry 6.24\,M of the 8.97\,M violations
+	and 74.0\,M of the 178.1\,M toothpicks~\anoncite{bastide26matchertext}.}
 \label{tab:eval:categories}
 \end{table}
 
@@ -200,13 +205,15 @@ as an equivalent C++ raw string literal
 eliminates 94.78\% of all toothpicks in the corpus,
 cutting the string-literal toothpick total
 from about 178.1~million to about 9.30~million.
+Escaped binary data alone (BinaryData and PseudoBinaryData)
+holds 84.0~million of these toothpicks.
 As a concrete case,
 the compliant C++ regular-expression literal
 \verb|"\\b,\"axis\":(\\d+)\\b"|
 carries eight toothpicks;
 rewritten verbatim as the matchertext literal
 \verb|M"(\b,"axis":(\d+)\b)"|,
-the four quote-escapes vanish
+the two quote escapes and three doubled backslashes vanish
 and only the three genuine backslash escapes remain --
 a 62.5\% reduction in that one literal.
 
@@ -276,9 +283,8 @@ OCaml		& 18	& 399\,k	& 96.65\%	& 19.86\%	& 87		\\
 \label{sec:eval:nesting}
 
 Most embedding is shallow.
-The overwhelming majority of samples
-reach a matcher nesting depth of only one,
-and depth falls off sharply beyond that:
+Most samples contain no matchers at all,
+and depth falls off sharply beyond one:
 the average per-sample maximum depth
 is only 0.102 for string literals
 and 0.275 for comments.
@@ -299,7 +305,7 @@ whereas string literals more often hold a single flat fragment.
 
 The results suggest that the adoption cost is small
 and the benefit large.
-Over 98\% of string literals and 97\% of comments need no change,
+Over 98\% of string literals and nearly 97\% of comments need no change,
 and rewriting the compliant majority as raw string literals
 removes 94.78\% of the toothpicks.
 The remaining violations fall where \cref{sec:embed} predicts,
