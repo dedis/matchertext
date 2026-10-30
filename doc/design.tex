@@ -115,8 +115,7 @@ included in the \texttt{lean} directory of the artifact.\footnote{%
 	The development relies only on the standard axioms
 	\texttt{propext} and \texttt{Quot.sound},
 	plus \texttt{Classical.choice} for \cref{thm:design:findend}.}
-\Cref{app:lean,app:boundary} reproduce the complete specifications
-the theorems are stated against.
+For reference, \cref{app:lean,app:boundary} list the Lean declarations.
 We summarize the result here;
 it concerns the abstract matchertext language $L$
 defined inductively in \cref{sec:design:abstract}.
@@ -132,7 +131,8 @@ If $a \in L$ and $b \in L$, then $a || b \in L$.
 If $m \in L$ and $(o,c) \in \Pi$, then $o||m||c \in L$.
 \end{lemma}
 
-\Cref{app:lean} gives proof sketches of both lemmas.
+Concatenation follows by induction on the derivation of $L$,
+and wrapping directly from the nesting rule (details in \cref{app:lean}).
 
 To capture the shape of the delimiter strings $s_o,s_c$
 that practical hosts use,
