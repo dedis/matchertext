@@ -115,8 +115,14 @@ interpolated into an SQL query between quotes
 might contain a quote mark that gets interpreted
 as an ``early'' close quote followed by arbitrary attack code
 that gets executed as SQL code on the server side.
+If the receiving language, here SQL,
+also delimits each hole with matchers,
+as in a matchertext literal \verb|M'(|$\dots$\verb|)'|,
+it ends the value by matcher balance rather than at a quote,
+so a quote in the value stays data.
 Using matchertext literals and interpolation
 instead of conventional literals
+in both languages
 could thus provide a layer of protection against such attacks
 below and independent of
 the complex language-dependent parsing and string-handling code.
