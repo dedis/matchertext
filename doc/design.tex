@@ -102,14 +102,16 @@ a host language \emph{must not} apply
 transformations (\eg escapes)
 or restrictions (\eg forbidden characters or sequences)
 within the embedded matchertext.
-Exceptions to this rule (\cref{app:concrete:variations})
-reduce verbatim embedding compatibility.
+Exceptions to this rule
+reduce verbatim embedding compatibility
+(\cref{app:concrete:variations}).
 
 
 \subsubsection{A formal guarantee of embeddability}
 \label{sec:design:abstract:formal}
 
-The reasoning above can be proven with the \href{https://lean-lang.org}{Lean~4} proof assistant
+The reasoning above is verified
+with the \href{https://lean-lang.org}{Lean~4} proof assistant
 using its \href{https://leanprover-community.github.io}{Mathlib} library,
 included in the \texttt{lean} directory of the artifact.\footnote{%
 	The development relies only on the standard axioms
@@ -285,7 +287,7 @@ and its matcher pairs $\Pi$ are
 the ASCII parentheses \verb|()|,
 square brackets \verb|[]|,
 and curly braces \verb|{}|.
-Matchertext operates on characters,
+The matchertext discipline operates on characters,
 so the encoding (usually UTF-8) does not matter.
 
 \subsubsection{Standardizing on matcher pairs}
@@ -311,15 +313,16 @@ is to serve as open and close punctuation in matched pairs.
 \paragraph{Why not the ``angle brackets'' \texttt{<>}?}
 Many languages use \verb|<| and \verb|>| in pairs,
 for generic types in C++ and Java or for markup in HTML and XML.
-UCS standardizes them, however,
-as the less-than and greater-than symbols,
+UCS standardizes them
+as the less-than and greater-than symbols, however,
 and programs use them unmatched far more often,
 as in \verb|if (a < b)|.
 Requiring them to match would make inequalities cumbersome
 in almost all languages.
 Omitting \verb|<>| from $\Pi$ does not prevent their paired use
-in specific languages (\cref{sec:host:ml,sec:embed:ml});
-it only avoids a universal rule that they must always match.
+in languages that wish to do so (\cref{sec:host:ml,sec:embed:ml});
+omitting them from $\Pi$ merely declines to establish a universal rule
+that they must \emph{always} match.
 
 \paragraph{Why only the ASCII open/close punctuation?}
 UCS has much more open and close punctuation,
@@ -334,12 +337,13 @@ can match the right double quote U+201D,
 depending on culture and typographic style.
 Languages may use any UCS punctuation for their own purposes,
 but restricting the strictly-matching set $\Pi$
-to the ASCII matchers is simplest and safest.
+to the ASCII matchers is simple, safe,
+consistent with language-design tradition.
 
 \paragraph{Why all three ASCII matcher pairs?}
 All three pairs are used pervasively in different structural roles,
-and no principle selects one of them for a global matching role.
-Mixing distinct pairs also gives redundancy that localizes errors:
+and no obvious principle selects one of them for a global matching role.
+Mixing distinct pairs also offers redundancy that helps localize errors:
 the missing close bracket is easier to find in \verb|[{}([){}]|
 than in \verb|[[][[][]]|.
 Finally, every host must use some matcher pair
