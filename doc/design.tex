@@ -208,7 +208,7 @@ each closer must pop the opener of its own pair,
 and the string is matchertext exactly when
 the scan finishes with an empty stack.
 
-\begin{algorithm}[!b]
+\begin{algorithm}[!t]
 \caption{Deciding whether a string $s$ is matchertext.}
 \label{alg:design:verify}
 \begin{algorithmic}[1]
@@ -246,10 +246,7 @@ admitting untrusted embedded content requires only this passive linear check,
 rather than a content-modifying transformation
 that must anticipate every sequence sensitive to the host language.
 It is also exactly the check that our empirical analysis (\cref{sec:eval})
-applies to every string literal and comment in the corpus;
-dropping the pair-kind test $(\textsc{Top}(st), x) \notin \Pi$
-yields the \emph{relaxed} variant reported there,
-which tolerates a wrong-kind closer.
+applies to every string literal and comment in the corpus.
 
 
 \subsubsection{Locating the end of an embedding}
