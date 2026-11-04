@@ -78,7 +78,8 @@ os.makedirs(OUTDIR, exist_ok=True)
 # =========================================================================
 S_SUM = {"Sample Size", "With Toothpicks", "Total Toothpicks", "With Non-Compliance",
          "Non-Compliance Count", "Compliant Samples", "With Toothpicks (Converted)",
-         "Total Toothpicks (Converted)", "With Raw Nested Embedding",
+         "Total Toothpicks (Converted)", "Raw-Form Holdable", "Matchertext-Only",
+         "With Raw Nested Embedding",
          "Sum Of Per-Sample Raw Max Depth", "With Valid Nested Embedding",
          "Sum Of Per-Sample Valid Max Depth", "Raw Character Count"}
 S_MAX = {"Maximum Toothpicks", "Non-Compliance Max", "Maximum Toothpicks (Converted)",

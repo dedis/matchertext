@@ -205,8 +205,9 @@ bool TestStringBucketMix() {
 
   bool ok = true;
   ok &= CheckEq("bucket_mix.strings.count", strings.count, 7.0);
-  ok &= CheckEq("bucket_mix.strings.with_toothpicks", strings.withToothpicks, 1.0);
-  ok &= CheckEq("bucket_mix.strings.toothpicks", strings.toothpicks, 9.0);
+  // kBinary's nine backslashes all belong to hex escapes, which are not toothpicks.
+  ok &= CheckEq("bucket_mix.strings.with_toothpicks", strings.withToothpicks, 0.0);
+  ok &= CheckEq("bucket_mix.strings.toothpicks", strings.toothpicks, 0.0);
   ok &= CheckEq("bucket_mix.strings.raw_chars", strings.rawChars, 297.0);
   ok &= CheckEq("bucket_mix.docs.count", docs.count, 0.0);
   ok &= CheckEq("bucket_mix.docs_relaxed.count", docsRelaxed.count, 0.0);
@@ -230,7 +231,7 @@ bool RunFixture(const std::string &fixturePath) {
   const fs::path path(fixturePath);
   const std::string name = path.filename().string();
 
-  if (Serde::JSON result; Parser::ParseC_CPP(path.string(), result))
+  if (Serde::JSON result; Parser::ParseC_CPP(path.string(), LanguageEnum::CPP, result))
     Parser::GatherStatistics(std::move(result), path.string(), path.string());
 
   if (name == "basic_literals.cpp")
