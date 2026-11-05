@@ -81,7 +81,8 @@ Further, $s_o$ must contain one or more open matchers in $O$
 that would be unmatched in $s_o$ alone --
 that is, $s_o$ alone \emph{cannot} be valid matchertext --
 and $s_c$ must contain one or more corresponding close matchers in $C$
-that would be unmatched in $s_c$ alone.
+that would be unmatched in $s_c$ alone,
+and $s_c$ must begin with one of them.
 
 This embedding rule permits escapeless embedding
 because no fixed characters or strings, including $s_o$ and $s_c$,
@@ -144,7 +145,7 @@ we define a \emph{matched delimiter pair} inductively:
 \label{def:design:delim}
 The pair $(s_o,s_c)$ is \emph{matched} if it can be formed by these rules:
 \begin{itemize}
-\item	$(\epsilon,\epsilon)$ is matched;
+\item	$(o,c)$ is matched for every $(o,c) \in \Pi$;
 \item	if $(s_o,s_c)$ is matched and $(o,c) \in \Pi$,
 	then $(o||s_o,\; s_c||c)$ is matched; and
 \item	if $(s_o,s_c)$ is matched and $x \in N$ is a nonmatcher,
@@ -152,9 +153,9 @@ The pair $(s_o,s_c)$ is \emph{matched} if it can be formed by these rules:
 \end{itemize}
 \end{definition}
 
-Intuitively, $s_o$ supplies a sequence of open matchers
+Intuitively, $s_o$ supplies one or more open matchers
 and $s_c$ the corresponding close matchers in properly-nested order,
-with nonmatcher characters interspersed freely,
+with nonmatcher characters interspersed freely except next to $m$,
 exactly the shape of practical delimiters such as
 the \texttt{M} and \texttt{"} surrounding the parenthesis
 in \verb|M"(|$\dots$\verb|)"|.
@@ -168,9 +169,8 @@ then $s_o||m||s_c \in L$.
 \begin{proof}[Proof sketch]
 By induction on the derivation that $(s_o,s_c)$ is matched
 (\cref{def:design:delim}).
-The base case is $m$ itself.
-A matcher step wraps the induction hypothesis
-using \cref{lem:design:wrap};
+The base case wraps $m$ using \cref{lem:design:wrap},
+and a matcher step likewise wraps the induction hypothesis;
 a nonmatcher step prepends or appends a single-character
 nonmatcher string (which is in $L$ by the flat rule)
 using \cref{lem:design:concat}.
@@ -267,8 +267,8 @@ $m$ has depth $0$, and $m||c$ has depth $-1$.
 A host therefore scans the text after $s_o$ with a depth counter
 starting at $0$, or equivalently with the stack of \cref{alg:design:verify},
 and stops at the first closer that makes the depth negative:
-by \cref{thm:design:findend} this is the first closer of $s_c$,
-since any nonmatchers of $s_c$ before it have depth $0$.
+by \cref{thm:design:findend} this is the first character of $s_c$,
+which \cref{def:design:delim} makes a closer.
 
 
 \subsection{Concrete matchertext in practice}

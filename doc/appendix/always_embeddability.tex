@@ -53,7 +53,7 @@ theorem mt_wrap {m : List α} (hm : MT Pi m) {o c : α} (hp : (o, c) ∈ Pi) :
 -- with nonmatchers interspersed freely on either side.
 inductive AllMatch (Pi : Set (α × α)) :
     List α → List α → Prop where
-  | nil : AllMatch Pi [] []
+  | pair (o c : α) (hp : (o, c) ∈ Pi) : AllMatch Pi [o] [c]
   | cons (o c : α) (s_o' s_c' : List α) (hp : (o, c) ∈ Pi)
          (rest : AllMatch Pi s_o' s_c') :
       AllMatch Pi (o :: s_o') (s_c' ++ [c])

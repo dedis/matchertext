@@ -13,7 +13,9 @@ The Dyck language~\cite{chomsky63algebraic} already covers much of the disciplin
 matchertext is a Dyck language with neutral symbols (\cref{sec:design:abstract}). In addition,
 every context-free language is a homomorphic image
 of a Dyck language filtered by a regular one~\cite{chomsky63algebraic}.
-Matchertext keeps the brackets visible
+Matchertext keeps the brackets visible,
+making it a visibly pushdown
+language~\cite{alur04visibly,mehlhorn80pebbling},
 so a host can find where embedded text ends without parsing it.
 
 However, surprisingly little prior work has focused on
@@ -61,11 +63,10 @@ the syntax, semantics, and tooling of the host language.
 DSELs are thus unsuitable for embedded languages
 that wish to remain agnostic to, or usable across a variety of,
 host languages.
-Asking an embedded language to conform only to the matchertext discipline --
-that ASCII matchers must match --
+Asking an embedded language to conform only to the matchertext discipline
 is a much more lightweight proposition than
 asking the embedded language to adopt, and become usable \emph{only} with,
-the entirety of Haskell or another general-purpose programming language.
+the entirety of Haskell or another general-purpose language.
 
 Pragmatically,
 some existing languages come close to the matchertext approach to embedding.
