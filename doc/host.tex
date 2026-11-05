@@ -1,11 +1,12 @@
 \section{Host language considerations}
 \label{sec:host}
 
-This section proposes extensions that let languages \emph{host}
+This section proposes potential extensions that let languages \emph{host}
 embedded matchertext;
 \cref{sec:embed} covers languages that wish to \emph{be embedded}.
-The two are orthogonal:
-a language can adopt either set of extensions without the other.
+The two classes of extensions are orthogonal:
+a language can meaningfully and justifiably adopt
+either set of extensions without the other.
 
 
 \subsection{General hosting considerations}
@@ -15,11 +16,11 @@ from an arbitrary language $L_e$
 follows the embedding rule of \cref{sec:design:abstract:embed}:
 it imposes no constraint on $m$ other than that matchers match,
 and disables its own escapes and other transformations inside $m$.
-Any escaping active within $m$ belongs to $L_e$, not $L_h$.
+Any escaping that might be active within $m$ belongs to $L_e$, not to $L_h$.
 
 A host need not \emph{be} matchertext-compliant in its own syntax.
 Existing languages can keep full compatibility with existing code,
-including unmatched matchers in ordinary string literals,
+including allowing unmatched matchers in ordinary string literals for example,
 while they add extensions that host matchertext verbatim.
 This backward compatibility is likely essential to incremental adoption.
 
@@ -63,8 +64,8 @@ C-like	& Literal
 
 \Cref{tab:host:summary} summarizes the extensions we propose
 for C-like languages (\cref{sec:host:c})
-and SGML-derived languages (\cref{sec:host:ml});
-the same approach also applies to URIs and regular expressions
+and SGML-derived languages (\cref{sec:host:ml}).
+The same general approach also applies to URIs and regular expressions
 (see supplementary \cref{app:uri,app:regex}).
 These are proposals for discussion:
 languages need not agree on extension syntax,
