@@ -39,6 +39,8 @@
   X(toothpicksReductionTotal, "Toothpick Reduction Total (%)", "Percentage reduction in total toothpicks after rewriting matchertext-compliant string literals as C++ raw string literals.") \
   X(toothpicksReductionAvg, "Toothpick Reduction Average (%)", "Mean of each sample's own percentage reduction in toothpicks after rewriting matchertext-compliant string literals as C++ raw string literals (samples without toothpicks count as 0%).") \
   X(toothpicksReductionMax, "Toothpick Reduction Maximum (%)", "Percentage reduction in the maximum per-sample toothpick count after rewriting matchertext-compliant string literals as C++ raw string literals.") \
+  X(rawHoldable, "Raw-Form Holdable", "Number of matchertext-compliant string literals whose content the language's default raw string form holds verbatim.") \
+  X(matchertextOnly, "Matchertext-Only", "Number of matchertext-compliant string literals whose content a matchertext literal M\"(...)\" holds verbatim but the language's default raw string form does not.") \
   \
   X(withNesting, "With Raw Nested Embedding", "Number of samples whose raw nesting depth exceeds 1, even if the nesting is never closed.") \
   X(nestingDepthTotal, "Sum Of Per-Sample Raw Max Depth", "Sum of each sample's maximum raw nesting depth, counting unmatched openers such as '((('.") \

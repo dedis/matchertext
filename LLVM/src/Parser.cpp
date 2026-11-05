@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -27,6 +28,7 @@
 #include "../include/Parser.hpp"
 #include "../include/LanguageClassifier.hpp"
 #include "../include/MatcherText.hpp"
+#include "../include/RawRewrite.hpp"
 
 namespace Serde {
   class JSON;
@@ -271,166 +273,73 @@ static std::string ExtractLiteralBody(std::string_view spelling, bool &isRaw) {
   return std::string(spelling.substr(open + 1, close - open - 1));
 }
 
-// Counts the backslash bytes that would remain if a C/C++ string literal body were
-// rewritten verbatim inside a raw string literal R"(...)" — i.e. the number of '\'
-// characters in the *decoded* content. Escape sequences are decoded semantically:
-// only sequences that actually produce a 0x5C code unit are counted (\\, octal \ooo,
-// hex \xH..., the \uXXXX / \UXXXXXXXX universal-character-name forms, and the C++23
-// delimited forms \x{...} / \o{...} / \u{...} / \N{REVERSE SOLIDUS}). `body` is
-// expected to already have line splices removed
-// (clang::Lexer::getSpelling does this); bodies taken from raw literals — or from
-// normal+raw adjacent-literal concatenations — are decoded as if normal and may be
-// over-collapsed, which is an accepted approximation here.
-uint64_t Parser::CountRawStringToothpicks(std::string_view body) {
-  const auto hexDigit = [](const unsigned char c) -> int {
-    if (c >= '0' && c <= '9')
-      return c - '0';
-    if (c >= 'a' && c <= 'f')
-      return c - 'a' + 10;
-    if (c >= 'A' && c <= 'F')
-      return c - 'A' + 10;
-    return -1;
-  };
-  const auto octDigit = [](const unsigned char c) -> int {
-    return c >= '0' && c <= '7' ? c - '0' : -1;
-  };
-
+// End of the C/C++ escape sequence that starts with the backslash at `i`.
+static size_t EscapeEnd(const std::string_view body, const size_t i) {
   const size_t n = body.size();
+  size_t j = i + 1;
+  if (j >= n)
+    return n; // dangling backslash
+  const char e = body[j++];
+  const auto isHex = [](const char c) { return std::isxdigit(static_cast<unsigned char>(c)) != 0; };
 
-  // Reads exactly `digits` hex digits starting at body[i]; advances i past them on success.
-  const auto parseFixedHex = [&](size_t &i, const int digits, uint32_t &value) -> bool {
-    value = 0;
-    for (int k = 0; k < digits; ++k) {
-      if (i >= n)
-        return false;
-      const int d = hexDigit(static_cast<unsigned char>(body[i]));
-      if (d < 0)
-        return false;
-      value = value * 16u + static_cast<uint32_t>(d);
-      ++i;
-    }
-    return true;
-  };
+  // C++23 delimited forms \x{...}, \o{...}, \u{...}, \N{...}.
+  if ((e == 'x' || e == 'o' || e == 'u' || e == 'N') && j < n && body[j] == '{') {
+    const size_t close = body.find('}', j);
+    return close == std::string_view::npos ? j : close + 1;
+  }
+  if (e == 'x') {
+    while (j < n && isHex(body[j]))
+      ++j;
+    return j;
+  }
+  if (e == 'u' || e == 'U') {
+    const size_t digits = e == 'u' ? 4 : 8;
+    size_t k = j;
+    while (k < n && k - j < digits && isHex(body[k]))
+      ++k;
+    return k - j == digits ? k : j;
+  }
+  if (e >= '0' && e <= '7') {
+    while (j < n && j - i < 4 && body[j] >= '0' && body[j] <= '7')
+      ++j;
+    return j;
+  }
+  return j;
+}
 
-  // Reads a "{ digits }" run in the given base starting at body[i]; advances i past the
-  // closing brace on success. Requires at least one digit.
-  const auto parseBracedNumber = [&](size_t &i, const int base, uint32_t &value) -> bool {
-    if (i >= n || body[i] != '{')
-      return false;
-    ++i;
+// Counts the toothpicks left if a C/C++ string literal body were rewritten verbatim
+// inside a raw string literal R"(...)" (see RawRewrite.hpp). `body` is expected to
+// already have line splices removed (clang::Lexer::getSpelling does this); bodies
+// taken from raw literals are treated as if normal and may be over-collapsed, which
+// is an accepted approximation here.
+uint64_t Parser::CountRawStringToothpicks(const std::string_view body, RawLiteral *literal) {
+  constexpr RawRewrite::Dialect dialect{.controls = "abefnrtv"};
+  thread_local RawRewrite::Counter counter;
+  counter.Reset(dialect);
 
-    value = 0;
-    bool any = false;
-    while (i < n && body[i] != '}') {
-      const int d = base == 16
-                      ? hexDigit(static_cast<unsigned char>(body[i]))
-                      : octDigit(static_cast<unsigned char>(body[i]));
-      if (d < 0)
-        return false;
-      value = value * static_cast<uint32_t>(base) + static_cast<uint32_t>(d);
-      any = true;
-      ++i;
-    }
-    if (i >= n || body[i] != '}')
-      return false;
-    ++i;
-    return any;
-  };
-
-  uint64_t count = 0;
-  for (size_t i = 0; i < n;) {
+  size_t literalStart = 0;
+  for (size_t i = 0; i < body.size();) {
     if (body[i] != '\\') {
       ++i;
       continue;
     }
-
-    // Start of an escape sequence; the leading backslash itself does not survive.
-    if (++i >= n)
-      break; // dangling backslash — not valid source, ignore.
-
-    const auto e = static_cast<unsigned char>(body[i]);
-
-    if (e == '\\') { // \\ -> one literal backslash survives
-      ++count;
-      ++i;
-      continue;
-    }
-
-    if (e == 'x') { // \xH... or (C++23) \x{ H... }
-      ++i;
-      uint32_t value = 0;
-      if (i < n && body[i] == '{') {
-        if (parseBracedNumber(i, 16, value) && value == 0x5Cu)
-          ++count;
-        continue;
-      }
-      bool any = false;
-      while (i < n) {
-        const int d = hexDigit(static_cast<unsigned char>(body[i]));
-        if (d < 0)
-          break;
-        value = value * 16u + static_cast<uint32_t>(d);
-        any = true;
-        ++i;
-      }
-      if (any && value == 0x5Cu)
-        ++count;
-      continue;
-    }
-
-    if (e == 'o') { // (C++23) \o{ O... }
-      ++i;
-      uint32_t value = 0;
-      if (i < n && body[i] == '{' && parseBracedNumber(i, 8, value) && value == 0x5Cu)
-        ++count;
-      continue;
-    }
-
-    if (e == 'u' || e == 'U') { // \uHHHH, \UHHHHHHHH, or (C++23) \u{ H... }
-      ++i;
-      uint32_t value = 0;
-      if (i < n && body[i] == '{') {
-        if (parseBracedNumber(i, 16, value) && value == 0x5Cu)
-          ++count;
-        continue;
-      }
-      if (parseFixedHex(i, e == 'u' ? 4 : 8, value) && value == 0x5Cu)
-        ++count;
-      continue;
-    }
-
-    if (e == 'N') { // (C++23) named universal character escape \N{ NAME }
-      ++i;
-      constexpr std::string_view reverseSolidus = "{REVERSE SOLIDUS}";
-      if (body.substr(i, reverseSolidus.size()) == reverseSolidus) {
-        ++count;
-        i += reverseSolidus.size();
-      }
-      continue;
-    }
-
-    if (e >= '0' && e <= '7') { // \ooo octal escape, up to 3 digits
-      uint32_t value = 0;
-      for (int d = 0; d < 3 && i < n; ++d) {
-        const int od = octDigit(static_cast<unsigned char>(body[i]));
-        if (od < 0)
-          break;
-        value = value * 8u + static_cast<uint32_t>(od);
-        ++i;
-      }
-      if (value == 0x5Cu)
-        ++count;
-      continue;
-    }
-
-    // Simple escapes (\n \t \r \v \f \a \b \" \' \? ...): none decodes to a backslash.
-    ++i;
+    counter.Literal(body.substr(literalStart, i - literalStart));
+    const size_t end = EscapeEnd(body, i);
+    counter.Escape(body.substr(i, end - i));
+    i = literalStart = end;
+  }
+  counter.Literal(body.substr(literalStart));
+  const uint64_t count = counter.Count();
+  if (literal) {
+    literal->content.append(counter.Content());
+    literal->holdable = literal->holdable && counter.Holdable();
+    literal->encodingBackslashes += counter.EncodingBackslashes();
   }
   return count;
 }
 
 void Parser::ParseFile(const std::string &filePath, const std::string &inputPath) {
-  if (Serde::JSON result; ParseC_CPP(filePath, result) && result.IsArray())
+  if (Serde::JSON result; ParseC_CPP(filePath, LanguageEnum::CPP, result) && result.IsArray())
     GatherStatistics(std::move(result), filePath, inputPath);
 }
 
@@ -444,7 +353,7 @@ void Parser::FlushDebugLanguageLogs() {
   GetDebugLanguageLogger().Flush();
 }
 
-bool Parser::ParseC_CPP(const std::string &path, Serde::JSON &result) {
+bool Parser::ParseC_CPP(const std::string &path, const LanguageEnum language, Serde::JSON &result) {
   /// Read-only after construction — safe to share across threads.
   static clang::DiagnosticOptions diagOpts;
   static auto diagIDs = llvm::makeIntrusiveRefCnt<clang::DiagnosticIDs>();
@@ -497,6 +406,7 @@ bool Parser::ParseC_CPP(const std::string &path, Serde::JSON &result) {
     if (IsStringToken(tok)) {
       std::string value;
       uint64_t convertedToothpicks = 0;
+      RawLiteral literal; // the raw rewrite of the concatenated segments
       clang::Token current = tok;
 
       /// Concatenate adjacent string literals ("a" "b").
@@ -512,7 +422,9 @@ bool Parser::ParseC_CPP(const std::string &path, Serde::JSON &result) {
         /// backslashes their content actually holds.
         convertedToothpicks += isRaw
           ? static_cast<uint64_t>(std::count(body.begin(), body.end(), '\\'))
-          : CountRawStringToothpicks(body);
+          : CountRawStringToothpicks(body, &literal);
+        if (isRaw)
+          literal.content += body;
 
         value += body;
         lexer.LexFromRawLexer(current);
@@ -522,7 +434,10 @@ bool Parser::ParseC_CPP(const std::string &path, Serde::JSON &result) {
       result.PushBack(Serde::JSON::Object({
         {"kind", Serde::JSON("string")},
         {"value", Serde::JSON(value)},
-        {"convertedToothpicks", Serde::JSON(static_cast<double>(convertedToothpicks))}
+        {"convertedToothpicks", Serde::JSON(static_cast<double>(convertedToothpicks))},
+        {"encodingBackslashes", Serde::JSON(static_cast<double>(literal.encodingBackslashes))},
+        {"rawHolds", Serde::JSON(literal.holdable && RawRewrite::DefaultRawHolds(language, literal.content, {}) ? 1.0 : 0.0)},
+        {"mHolds", Serde::JSON(literal.holdable && RawRewrite::MatchertextHolds(literal.content) ? 1.0 : 0.0)}
       }));
       continue;
     }
@@ -546,16 +461,18 @@ void Parser::GatherStatistics(
   for (auto e: json.GetArray()) {
     std::string value = e["value"].GetString();
     if (e["kind"].GetString() == "string") {
-      const uint64_t convertedToothpicks = e.Contains("convertedToothpicks")
-        ? static_cast<uint64_t>(e["convertedToothpicks"].GetNumber())
-        : 0;
+      // Both producers (ParseC_CPP, TreeSitter::Parse) emit the converted count.
+      const auto convertedToothpicks = static_cast<uint64_t>(e["convertedToothpicks"].GetNumber());
+      const bool rawHolds = e["rawHolds"].GetNumber() != 0.0;
+      const bool mHolds = e["mHolds"].GetNumber() != 0.0;
+      const auto encodingBackslashes = static_cast<uint64_t>(e["encodingBackslashes"].GetNumber());
       const uint64_t violations = process(
         std::move(value), STRING_STATS, STRING_NESTED_STATS, &STRING_LANG_STATS, false, path,
         inputPath.empty() ? std::string_view(path) : inputPath,
         perLang ? &perLang->stringStats : nullptr,
         perLang ? &perLang->stringNestedStats : nullptr,
         perLang ? &perLang->langStats : nullptr,
-        convertedToothpicks
+        convertedToothpicks, rawHolds, mHolds, encodingBackslashes
       );
       fileViolations += violations;
       fileViolationsRelaxed += violations;
@@ -595,13 +512,17 @@ uint64_t Parser::process(
   LanguageStats *langStats, const bool relaxed,
   const std::string_view sourcePath, const std::string_view inputPath,
   EmbeddedStats *extraEmbedded, NestedStats *extraNested, LanguageStats *extraLangStats,
-  const uint64_t convertedToothpicksHint
+  const uint64_t convertedToothpicksHint, const bool rawHoldsHint, const bool mHoldsHint,
+  const uint64_t encodingBackslashes
 ) {
+  /// Backslashes of encoding escapes (\x41, \u00e9, ...) stay as written in a raw
+  /// rewrite and are not toothpicks.
   uint64_t toothpicks = 0;
   for (const unsigned char c: string) {
     if (c == '\\')
       ++toothpicks;
   }
+  toothpicks -= encodingBackslashes;
 
   const auto [unmatched, maxDepth, maxValidDepth, rawChars] = AnalyzeMatcherText(string, relaxed);
 
@@ -656,6 +577,12 @@ uint64_t Parser::process(
         s.toothpicksReductionSum,
         100.0 * static_cast<double>(toothpicks - convertedToothpicks) / static_cast<double>(toothpicks)
       );
+
+    /// Which literal form holds the rewritten content verbatim (compliant literals only).
+    if (compliantStringLiteral && rawHoldsHint)
+      AtomicAdd(s.rawHoldable, 1.0);
+    if (compliantStringLiteral && mHoldsHint && !rawHoldsHint)
+      AtomicAdd(s.matchertextOnly, 1.0);
 
     if (unmatched > 0)
       AtomicAdd(s.withNonCompliance, 1.0);

@@ -6,8 +6,10 @@
 
 #ifndef MATCHER_TEXT_HPP
 #define MATCHER_TEXT_HPP
+#include <algorithm>
 #include <cstdint>
 #include <string_view>
+#include <vector>
 
 [[nodiscard]] inline bool IsOpener(const char c) {
   return c == '(' || c == '[' || c == '{';
