@@ -112,9 +112,10 @@ reduce verbatim embedding compatibility
 \label{sec:design:abstract:formal}
 
 The reasoning above is verified
-with the \href{https://lean-lang.org}{Lean~4} proof assistant
-using its \href{https://leanprover-community.github.io}{Mathlib} library,
-included in the \texttt{lean} directory of the artifact.\footnote{%
+with the Lean~4 proof assistant
+using its Mathlib library,
+included in the \texttt{lean} directory of the artifact
+(\href{https://lean-lang.org}{Lean}, \href{https://leanprover-community.github.io}{Mathlib}).\footnote{%
 	The development relies only on the standard axioms
 	\texttt{propext} and \texttt{Quot.sound},
 	plus \texttt{Classical.choice} for \cref{thm:design:findend}.}
@@ -297,12 +298,13 @@ namely the authority embodied in
 the UCS character set we already chose.
 The parentheses, square brackets, and curly braces
 are the only characters in the ASCII --
-or ``\href{https://www.compart.com/en/unicode/block/U+0000}{Basic Latin}'' -- 
+or ``Basic Latin'' --
 code block that are standardized as members of the
-\href{https://www.compart.com/en/unicode/category/Ps}{Open Punctuation (Ps)}
-and 
-\href{https://www.compart.com/en/unicode/category/Pe}{Close Punctuation (Pe)}
-character classes.
+Open Punctuation (Ps) and Close Punctuation (Pe)
+character classes
+(\href{https://www.compart.com/en/unicode/block/U+0000}{Basic Latin},
+\href{https://www.compart.com/en/unicode/category/Ps}{Ps},
+\href{https://www.compart.com/en/unicode/category/Pe}{Pe}).
 Exactly as their official names indicate,
 these character classes denote characters whose standard purpose
 is to serve as open and close punctuation in matched pairs.
@@ -323,9 +325,11 @@ that they must \emph{always} match.
 
 \paragraph{Why only the ASCII open/close punctuation?}
 UCS has much more open and close punctuation,
-and \href{https://www.compart.com/en/unicode/category/Pi}{Initial Punctuation (Pi)}
-and \href{https://www.compart.com/en/unicode/category/Pf}{Final Punctuation (Pf)}
-classes for paired quotation marks (\eg «quote» or “quote”).
+and Initial Punctuation (Pi)
+and Final Punctuation (Pf)
+classes for paired quotation marks (\eg «quote» or “quote”;
+\href{https://www.compart.com/en/unicode/category/Pi}{Pi},
+\href{https://www.compart.com/en/unicode/category/Pf}{Pf}).
 Machine-readable syntaxes rarely use them,
 partly because most keyboards cannot type them directly.
 They also do not occur strictly in pairs:

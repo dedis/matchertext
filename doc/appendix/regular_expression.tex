@@ -8,11 +8,12 @@ that multiple entire books have been written
 about them~\cite{fitzgerald12introducing,friedl06mastering,goyvaerts12regular}.
 Two regular expression syntaxes were standardized
 by POSIX~\cite{ieee17posix},
-while the \href{https://www.perl.org}{Perl language} and the
-\href{https://www.pcre.org}{Perl Compatible Regular Expressions (PCRE) library}
+while the Perl language and the
+Perl Compatible Regular Expressions (PCRE) library
 it inspired
 define advanced syntax that has become popular
-in numerous other languages and applications.
+in numerous other languages and applications
+(\href{https://www.perl.org}{Perl}, \href{https://www.pcre.org}{PCRE}).
 
 In filling their basic role of matching patterns in text,
 REs must inherently embed strings
@@ -29,10 +30,11 @@ such as \verb|\[|$m$\verb|]|, could work for REs.
 Because of the large number of punctuation characters
 that are sensitive in REs, however,
 some popular RE syntaxes such as
-\href{https://www.pcre.org/original/doc/html/pcrepattern.html}{PCRE}
+PCRE
 guarantee the rule that if a backslash
 ``is followed by a character that is not a number or a letter,
-it takes away any special meaning that character may have.''
+it takes away any special meaning that character may have''
+(\href{https://www.pcre.org/original/doc/html/pcrepattern.html}{PCRE}).
 This way, a user can just conservatively
 escape \emph{all} literal punctuation appearing in an RE,
 instead of remembering which punctuation \emph{must} be escaped.
@@ -48,9 +50,10 @@ for repetition quantifiers like $c$\verb|{1,3}|,
 but in a syntactically non-conflicting fashion
 since the inner braces cannot be mistaken for repetition quantifiers.
 With this alternative syntax,
-the pathological ``\href{https://en.wikipedia.org/wiki/Leaning_toothpick_syndrome}{leaning toothpick syndrome}'' example RE,
+the pathological ``leaning toothpick syndrome'' example RE,
 matching the double-backslash \verb|\\| in a UNC name (see \cref{sec:bg}),
-becomes the more readable RE \verb|{{\\}}|.
+becomes the more readable RE \verb|{{\\}}|
+(\href{https://en.wikipedia.org/wiki/Leaning_toothpick_syndrome}{leaning toothpicks}).
 Embedding this RE in a C-like string literal with matchertext extensions
 in turn becomes \verb|M"({{\\}})"| or \verb|"\[{{\\}}]"|,
 for a more manageable two or three leaning toothpicks,
@@ -66,9 +69,10 @@ Similar escape sequences like \verb|\o| and \verb|\c| for unmatched matchers
 could therefore be introduced as \cref{sec:embed:c} discusses.
 
 One complication is that the popular
-\href{https://www.pcre.org/original/doc/html/pcrepattern.html}{PCRE syntax}
+PCRE syntax
 already uses \verb|\o{|$n$\verb|}|
-for character escapes with octal numeric value $n$.
+for character escapes with octal numeric value $n$
+(\href{https://www.pcre.org/original/doc/html/pcrepattern.html}{PCRE}).
 This octal-escape usage of \verb|\o|
 technically does not conflict syntactically
 with \verb|\o{}|, however,

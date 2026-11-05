@@ -76,16 +76,16 @@ and may contain unescaped literal parentheses provided they are balanced.
 The \verb|dc| calculator~\cite{howard21dc}
 similarly delimits strings with brackets,
 and allows balanced nested brackets.
-\href{https://spec.commonmark.org/0.30/#links}{Link syntax}
-in Markdown~\cite{macfarlane19commonmark},
+Link syntax
+in Markdown,
 like \verb|[|\emph{text}\verb|](|\emph{url}\verb|)|,
 allows brackets within \emph{text}
-and parentheses within \emph{url} provided they are balanced.
+and parentheses within \emph{url} provided they are balanced~\cite{macfarlane19commonmark}.
+Balanced delimiters also nest within
 \href{https://www.tcl-lang.org/man/tcl8.6/TclCmd/Tcl.htm}{Tcl} braces,
 \href{https://perldoc.perl.org/perlop#Quote-and-Quote-like-Operators}{Perl}'s \verb|q{|$\dots$\verb|}|,
 \href{https://docs.ruby-lang.org/en/master/syntax/literals_rdoc.html}{Ruby}'s \verb|%q(|$\dots$\verb|)|,
-and \href{https://www.gnu.org/software/m4/manual/html_node/Quoted-strings.html}{m4} quotes
-also nest balanced delimiters.
+and \href{https://www.gnu.org/software/m4/manual/html_node/Quoted-strings.html}{m4} quotes.
 These languages balance only their own delimiter, however,
 and do not support general cross-language embedding.
 
