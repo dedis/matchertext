@@ -110,6 +110,8 @@ The content $m$ of such a matchertext literal
 otherwise the language processor reports a syntax error.
 Any matchertext string may be embedded verbatim in such a literal
 without exceptions or escaping.
+Like C++ raw strings, it reverts trigraphs, line splices,
+and Java's \verb|\u| escapes within $m$.
 
 We could prescribe the use in this syntax
 of one particular matcher pair of the three,
@@ -175,7 +177,9 @@ Any choice may conflict with existing syntax in \emph{some} language:
 \verb|\(|$m$\verb|)| conflicts with
 \href{https://docs.swift.org/swift-book/LanguageGuide/StringsAndCharacters.html#ID292}{string interpolation in Swift},
 \verb|\[|$m$\verb|]| conflicts with
-\href{https://docs.python.org/3/reference/lexical_analysis.html#escape-sequences}{unrecognized escapes in Python},
+unrecognized escapes in
+\href{https://docs.python.org/3/reference/lexical_analysis.html#escape-sequences}{Python},
+JavaScript, and C (GCC, Clang),
 and
 \verb|\{|$m$\verb|}| conflicts with
 \href{https://ceylon-lang.org/documentation/1.3/reference/literal/string/}{Unicode escapes in Ceylon}.

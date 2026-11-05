@@ -151,8 +151,15 @@ The expression, block, and argument-list grammars of
 C, C++, Rust, Java, Python, and their relatives
 all require every \verb|(|, \verb|[|, and \verb|{| to be matched
 for a program to compile at all,
-so at the structural level their code is already matchertext.
-The only contexts in which they admit unmatched matchers today
+so at the structural level their code is mostly matchertext already.
+C and C++ have two exceptions outside literals and comments.
+The preprocessor runs before the parser,
+so \verb|#define BEGIN {| or two \verb|#if| branches that each open a \verb|{|
+leave matchers unmatched in the source text.
+Digraphs spell brackets with other characters,
+so \verb|a<:0]| compiles but is not matchertext.
+Code that uses either cannot be embedded verbatim as matchertext.
+Apart from these, the only contexts in which these languages admit unmatched matchers
 are the opaque ones, string and character literals and comments,
 whose contents the compiler does not otherwise interpret.
 
