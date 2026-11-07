@@ -12,19 +12,10 @@ and explore potential backward-compatible extensions
 to existing classes of languages
 both to host embedded matchertext strings,
 and to write embeddable matchertext conveniently.
-Further experience is needed implementing and using matchertext
-in order to evaluate its benefits and costs empirically.
-
-\subsection*{Acknowledgments}
-
-I wish to thank
-Henry Corrigan-Gibbs,
-Russ Cox,
-Philip Hamelink,
-Hernán Ibarra Mejia,
-and
-Terence Parr
-for valuable feedback on earlier drafts of this paper.
-
-\xxx{samller contributions and funding acknowledgments here}
-
+Lean~4 proofs establish that embedding preserves matchertext
+and that a host finds the end of an embedding by matcher balance alone.
+In 469.6~million string literals, 98.57\% are already matchertext,
+and matchertext literals would remove 94.78\% of the backslash escapes.
+MinML shows that a full markup syntax can rest on the discipline.
+Its effect on usability and on the rate of injection bugs
+remains open for future work.

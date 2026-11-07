@@ -62,7 +62,7 @@ class Parser final {
      * @param path Absolute or relative path to the source file to scan.
      * @param result
      */
-    static bool ParseC_CPP(const std::string &path, Serde::JSON &result);
+    static bool ParseC_CPP(const std::string &path, LanguageEnum language, Serde::JSON &result);
 
     static void GatherStatistics(
       Serde::JSON &&json, const std::string &path, std::string_view inputPath = {}, PerLanguageStats *perLang = nullptr
@@ -92,7 +92,16 @@ class Parser final {
     /// Per-language classification statistics for strings
     inline static LanguageStats STRING_LANG_STATS{};
 
-    static uint64_t CountRawStringToothpicks(std::string_view body);
+    /// What adjacent C/C++ literal segments add up to in a raw rewrite.
+    struct RawLiteral {
+      std::string content;  // the raw literal's content
+      bool holdable = true; // no simple escape needs a character a raw literal cannot hold
+      uint64_t encodingBackslashes = 0; // backslashes of encoding escapes, not toothpicks
+    };
+
+    /// Toothpicks left after rewriting a C/C++ literal body as a raw literal. If given,
+    /// `literal` accumulates the segment's content and counts.
+    static uint64_t CountRawStringToothpicks(std::string_view body, RawLiteral *literal = nullptr);
   private:
     /// Processes a string/doc and updates the given stat
     /// @returns the number of MatcherText violations found
@@ -101,7 +110,8 @@ class Parser final {
       LanguageStats *langStats = nullptr, bool relaxed = false,
       std::string_view sourcePath = {}, std::string_view inputPath = {},
       EmbeddedStats *extraEmbedded = nullptr, NestedStats *extraNested = nullptr,
-      LanguageStats *extraLangStats = nullptr, uint64_t convertedToothpicksHint = 0
+      LanguageStats *extraLangStats = nullptr, uint64_t convertedToothpicksHint = 0,
+      bool rawHoldsHint = false, bool mHoldsHint = false, uint64_t encodingBackslashes = 0
     );
 };
 

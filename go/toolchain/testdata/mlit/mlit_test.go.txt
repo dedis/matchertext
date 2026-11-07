@@ -1,0 +1,42 @@
+// Acceptance tests for matchertext literals. They build only with the patched
+// toolchain (see ../../build.sh); experiment.sh copies this file to mlit_test.go.
+package mlit
+
+import (
+	M"fmt"
+	"testing"
+)
+
+// The import alias M directly before a quote keeps its meaning.
+var sprint = M.Sprint
+
+const regex = M"(\b,"axis":(\d+)\b)"
+
+func TestValues(t *testing.T) {
+	cases := []struct{ got, want string }{
+		{M"()", ""},
+		{M"(a"b)", "a\"b"},
+		{M"(\d+)", `\d+`},
+		{M"[x(y)z]", "x(y)z"},
+		{M"{a{b}c}", "a{b}c"},
+		{M"("quoted" (nested [ok] {yes}))", "\"quoted\" (nested [ok] {yes})"},
+		{M"(`backtick`)", "`backtick`"},
+		{M"(two
+lines)", "two\nlines"},
+		{regex, "\\b,\"axis\":(\\d+)\\b"},
+		{sprint(M"(x)"), "x"},
+	}
+	for i, c := range cases {
+		if c.got != c.want {
+			t.Errorf("case %d: got %q, want %q", i, c.got, c.want)
+		}
+	}
+}
+
+func TestSwitch(t *testing.T) {
+	switch "(a)" {
+	case M"[(a)]":
+	default:
+		t.Error("switch on a matchertext literal did not match")
+	}
+}
