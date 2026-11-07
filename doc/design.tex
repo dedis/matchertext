@@ -81,7 +81,8 @@ Further, $s_o$ must contain one or more open matchers in $O$
 that would be unmatched in $s_o$ alone --
 that is, $s_o$ alone \emph{cannot} be valid matchertext --
 and $s_c$ must contain one or more corresponding close matchers in $C$
-that would be unmatched in $s_c$ alone.
+that would be unmatched in $s_c$ alone,
+and $s_c$ must begin with one of them.
 
 This embedding rule permits escapeless embedding
 because no fixed characters or strings, including $s_o$ and $s_c$,
@@ -111,9 +112,10 @@ reduce verbatim embedding compatibility
 \label{sec:design:abstract:formal}
 
 The reasoning above is verified
-with the \href{https://lean-lang.org}{Lean~4} proof assistant
-using its \href{https://leanprover-community.github.io}{Mathlib} library,
-included in the \texttt{lean} directory of the artifact.\footnote{%
+with the Lean~4 proof assistant
+using its Mathlib library,
+included in the \texttt{lean} directory of the artifact
+(\href{https://lean-lang.org}{Lean}, \href{https://leanprover-community.github.io}{Mathlib}).\footnote{%
 	The development relies only on the standard axioms
 	\texttt{propext} and \texttt{Quot.sound},
 	plus \texttt{Classical.choice} for \cref{thm:design:findend}.}
@@ -144,7 +146,7 @@ we define a \emph{matched delimiter pair} inductively:
 \label{def:design:delim}
 The pair $(s_o,s_c)$ is \emph{matched} if it can be formed by these rules:
 \begin{itemize}
-\item	$(\epsilon,\epsilon)$ is matched;
+\item	$(o,c)$ is matched for every $(o,c) \in \Pi$;
 \item	if $(s_o,s_c)$ is matched and $(o,c) \in \Pi$,
 	then $(o||s_o,\; s_c||c)$ is matched; and
 \item	if $(s_o,s_c)$ is matched and $x \in N$ is a nonmatcher,
@@ -152,9 +154,9 @@ The pair $(s_o,s_c)$ is \emph{matched} if it can be formed by these rules:
 \end{itemize}
 \end{definition}
 
-Intuitively, $s_o$ supplies a sequence of open matchers
+Intuitively, $s_o$ supplies one or more open matchers
 and $s_c$ the corresponding close matchers in properly-nested order,
-with nonmatcher characters interspersed freely,
+with nonmatcher characters interspersed freely except next to $m$,
 exactly the shape of practical delimiters such as
 the \texttt{M} and \texttt{"} surrounding the parenthesis
 in \verb|M"(|$\dots$\verb|)"|.
@@ -168,9 +170,8 @@ then $s_o||m||s_c \in L$.
 \begin{proof}[Proof sketch]
 By induction on the derivation that $(s_o,s_c)$ is matched
 (\cref{def:design:delim}).
-The base case is $m$ itself.
-A matcher step wraps the induction hypothesis
-using \cref{lem:design:wrap};
+The base case wraps $m$ using \cref{lem:design:wrap},
+and a matcher step likewise wraps the induction hypothesis;
 a nonmatcher step prepends or appends a single-character
 nonmatcher string (which is in $L$ by the flat rule)
 using \cref{lem:design:concat}.
@@ -267,8 +268,8 @@ $m$ has depth $0$, and $m||c$ has depth $-1$.
 A host therefore scans the text after $s_o$ with a depth counter
 starting at $0$, or equivalently with the stack of \cref{alg:design:verify},
 and stops at the first closer that makes the depth negative:
-by \cref{thm:design:findend} this is the first closer of $s_c$,
-since any nonmatchers of $s_c$ before it have depth $0$.
+by \cref{thm:design:findend} this is the first character of $s_c$,
+which \cref{def:design:delim} makes a closer.
 
 
 \subsection{Concrete matchertext in practice}
@@ -297,12 +298,13 @@ namely the authority embodied in
 the UCS character set we already chose.
 The parentheses, square brackets, and curly braces
 are the only characters in the ASCII --
-or ``\href{https://www.compart.com/en/unicode/block/U+0000}{Basic Latin}'' -- 
+or ``Basic Latin'' --
 code block that are standardized as members of the
-\href{https://www.compart.com/en/unicode/category/Ps}{Open Punctuation (Ps)}
-and 
-\href{https://www.compart.com/en/unicode/category/Pe}{Close Punctuation (Pe)}
-character classes.
+Open Punctuation (Ps) and Close Punctuation (Pe)
+character classes
+(\href{https://www.compart.com/en/unicode/block/U+0000}{Basic Latin},
+\href{https://www.compart.com/en/unicode/category/Ps}{Ps},
+\href{https://www.compart.com/en/unicode/category/Pe}{Pe}).
 Exactly as their official names indicate,
 these character classes denote characters whose standard purpose
 is to serve as open and close punctuation in matched pairs.
@@ -323,9 +325,11 @@ that they must \emph{always} match.
 
 \paragraph{Why only the ASCII open/close punctuation?}
 UCS has much more open and close punctuation,
-and \href{https://www.compart.com/en/unicode/category/Pi}{Initial Punctuation (Pi)}
-and \href{https://www.compart.com/en/unicode/category/Pf}{Final Punctuation (Pf)}
-classes for paired quotation marks (\eg «quote» or “quote”).
+and Initial Punctuation (Pi)
+and Final Punctuation (Pf)
+classes for paired quotation marks (\eg «quote» or “quote”;
+\href{https://www.compart.com/en/unicode/category/Pi}{Pi},
+\href{https://www.compart.com/en/unicode/category/Pf}{Pf}).
 Machine-readable syntaxes rarely use them,
 partly because most keyboards cannot type them directly.
 They also do not occur strictly in pairs:

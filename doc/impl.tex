@@ -7,10 +7,11 @@ and MinML, a matchertext-based markup syntax.
 
 \subsection{Matchertext for CHICKEN Scheme}
 
-The \href{https://wiki.call-cc.org/eggref/6/matchertext}{\texttt{matchertext} egg}
+The \texttt{matchertext} egg
 for CHICKEN Scheme, by Hernán Ibarra Mejia,
 adds the matchertext literals of \cref{sec:host:c:literals}
-as a reader extension (\cref{app:grammar} gives a grammar), enabled by \verb|(import matchertext)|.
+as a reader extension (\cref{app:grammar} gives a grammar), enabled by \verb|(import matchertext)|
+(\href{https://wiki.call-cc.org/eggref/6/matchertext}{egg}).
 Since CHICKEN Scheme is not a C-style language, the \verb|M| prefix
 is rewritten as \verb|#M| to use the language's
 \href{https://wiki.call-cc.org/man/5/Module%20(chicken%20read-syntax)}{reader's dispatch character}.
@@ -75,7 +76,7 @@ MinML tools include
 a Go library and command-line tool that convert MinML to HTML or XML
 (\anon[\url{https://anonymous.4open.science/r/matchertext-D61C/go/matchertext}]{\url{https://github.com/dedis/matchertext/tree/main/go/matchertext}}),
 an \anon[extension]{\href{https://github.com/bford/hugo}{extension}}
-to the \href{https://gohugo.io}{Hugo} static website generator,
+to the Hugo static website generator,
 a Language Server Protocol server with diagnostics, hover, and completion
 for Visual Studio Code, JetBrains IDEs, and five other editors
 (\anon[\url{https://anonymous.4open.science/r/matchertext-D61C/dev/vscode/minml-preview}]{\url{https://github.com/dedis/matchertext/tree/main/dev/vscode/minml-preview}}),

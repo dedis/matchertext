@@ -236,18 +236,17 @@ instead of matching pairs of start and end tags:
 
 This paper makes the following contributions:
 \begin{itemize}
-\item	the matchertext discipline, with Lean~4 proofs
-	that a matched delimiter pair around matchertext always yields matchertext
-	and that a host finds the end of an embedding by matcher balance alone
-	(\cref{sec:design});
+\item	the matchertext discipline (\cref{sec:design});
 \item	backward-compatible extensions that let C-like and SGML-derived languages
 	host matchertext (\cref{sec:host})
 	and write embeddable matchertext conveniently (\cref{sec:embed});
 \item	two implementations, a CHICKEN Scheme reader extension and MinML
-	(\cref{sec:impl}); and
+	(\cref{sec:impl});
 \item	an evaluation on 469.6~million string literals from 79 organizations
 	(\cref{sec:eval}): 98.57\% are already matchertext,
-	and matchertext literals would remove 94.78\% of their backslash escapes.
+	and matchertext literals would remove 94.78\% of their backslash escapes; and
+\item	Lean~4 proofs of embeddability and of the embedding boundary
+	(\cref{sec:design:abstract:formal}).
 \end{itemize}
 \Cref{sec:bg} reviews current embedding practice,
 \cref{sec:rel} discusses related work, and \cref{sec:concl} concludes.
