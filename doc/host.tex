@@ -18,7 +18,7 @@ it imposes no constraint on $m$ other than that matchers match,
 and disables its own escapes and other transformations inside $m$.
 Any escaping that might be active within $m$ belongs to $L_e$, not to $L_h$.
 
-A host need not \emph{be} matchertext-compliant in its own syntax.
+A host language need not \emph{be} matchertext-compliant in its own syntax.
 Existing languages can keep full compatibility with existing code,
 including allowing unmatched matchers in ordinary string literals for example,
 while they add extensions that host matchertext verbatim.
@@ -39,7 +39,7 @@ C-like	& Literal
 	& \ref{sec:host:c:literals} \\
 	& String escape
 	& \verb|"|$\dots$\verb|\[|$m$\verb|]|$\dots$\verb|"|
-	& \verb|"now \[quoting's "easy" in matchertext]"|
+	& \verb|"now \[quoting's "easy"] in matchertext"|
 	& \ref{sec:host:c} \\
 	& & & & \\
 \ml	& Element
@@ -67,7 +67,7 @@ for C-like languages (\cref{sec:host:c})
 and SGML-derived languages (\cref{sec:host:ml}).
 The same general approach also applies to URIs and regular expressions
 (see supplementary \cref{app:uri,app:regex}).
-These are proposals for discussion:
+These are proposals for consideration:
 languages need not agree on extension syntax,
 only on the rule that matchers match.
 
@@ -100,7 +100,7 @@ either or both of these extensions independently.
 
 A \emph{matchertext literal} is a string literal
 whose content is entirely matchertext.
-We suggest that languages allow matchertext literals of the form
+We suggest allowing matchertext literals of the form
 \verb|M"(|$m$\verb|)"|,
 \verb|M"[|$m$\verb|]"|, and
 \verb|M"{|$m$\verb|}"|,
@@ -255,17 +255,17 @@ that these embedding contexts can create.
 \begin{footnotesize}
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{lrl}
-\multicolumn{3}{@{}p{\linewidth}@{}}{\textbf{(a) Embedding strings in other languages as element content, in standard HTML or with matchertext hosting extensions (+M):}} \\
+\multicolumn{3}{@{}p{\linewidth}@{}}{\textbf{(a) Embedding strings in other languages as element content in HTML}} \\
 & HTML	& \verb|<code>printf("Example &lt;b&gt;bold&lt;/b&gt; and &amp;bigstar; reference in HTML");</code>| \\
 & +M	& \verb|<code [printf("Example <b>bold</b> and &bigstar; reference in HTML");]>| \\
 & HTML	& \verb|<script>document.getElementById("demo").innerHTML = "a <" + "/script> end tag";</script>| \\
 & +M	& \verb|<script [document.getElementById("demo").innerHTML = "a </script> end tag";]>| \\
 \\
-\multicolumn{3}{@{}p{\linewidth}@{}}{\textbf{(b) Embedding strings in other languages within element attributes, in standard HTML or with matchertext extensions (+M):}} \\
+\multicolumn{3}{@{}p{\linewidth}@{}}{\textbf{(b) Embedding strings in other languages within element attributes in HTML}} \\
 & HTML	& \verb|<button onclick="emitCharacter('\'')">Emit Apostrophe</button>| \\
 & +M	& \verb|<button onclick=[emitCharacter("'")]>Emit Apostrophe</button>| \\
 \\
-\multicolumn{3}{@{}p{\linewidth}@{}}{\textbf{(c) Embedding strings within CDATA (character data) sections, in standard XHTML or with matchertext extensions (+M):}} \\
+\multicolumn{3}{@{}p{\linewidth}@{}}{\textbf{(c) Embedding strings within CDATA (character data) sections in XHTML}} \\
 & XHTML	& \verb|<code>example <![CDATA[<![CDATA[character data]]]]><![CDATA[>]]> markup</code>| \\
 & +M	& \verb|<code>example <![MDATA[<![CDATA[character data]]>]]> markup</code>| \\
 & XHTML	& \verb|<code>example <![CDATA[<![CDATA[<![CDATA[double embedded]]]]]]>| \\
@@ -274,8 +274,8 @@ that these embedding contexts can create.
 \end{tabular}
 \end{footnotesize}
 \end{center}
-\caption{Examples of embedded strings in standard \ml languages,
-	and with proposed matchertext extensions (+M).}
+\caption{Example embedded strings in \ml languages,
+	standard versus proposed matchertext extensions (+M).}
 \label{fig:ml-emb}
 \end{figure*}
 
