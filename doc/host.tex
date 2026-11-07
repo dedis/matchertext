@@ -134,12 +134,33 @@ would not be fully robust or general
 because ASCII double quotes do not come in matched pairs,
 as further discussed below in \cref{sec:host:c:other}.
 
-The upper-case \verb|M| leaves the lower-case \verb|m"|$m$\verb|"|
-free for language-specific variants (\cref{app:interp:lower}).
+An optional extension to this syntax
+could allow string interpolation
+within matchertext literals used as templates,
+like \verb|M{}"(Hi {name})"| or \verb|M[]"{Hi [name]}"|.
+This example would insert the content of string-variable \verb|name|
+after the prefix ``\verb|Hi |'';
+see \cref{app:interp} for details.
 
-As an optional extension, \cref{app:interp} sketches
-string interpolation in matchertext literals
-that preserves the hierarchical structure of the template.
+Using the upper-case \verb|M| in this syntax
+leaves the lower-case \verb|m"|$m$\verb|"|
+free for language-specific definition,
+such as a hybrid variant that allows host-language escapes
+within the literal
+while also enforcing the matchertext discipline,
+\eg for security hardening (see \cref{app:interp:lower}).
+
+A few languages currently prohibit certain characters appearing anywhere:
+\eg Python prohibits NUL (0) characters.
+NUL handling is implementation-dependent in Go and C\#.
+Full matchertext compliance requires suspending any such character prohibition
+within a matchertext literal.
+This change would not affect backward compatibility,
+since legacy source files contain no matchertext literals anyway.
+Most modern languages
+like C++, Rust, Java, JavaScript, Swift, and Kotlin
+already have no blanket prohibitions,
+as long as the source text is properly encoded (usually UTF-8).
 
 
 \subsubsection{Matchertext escapes in ordinary string literals}
