@@ -23,7 +23,8 @@ own lexical structure rather than from ad-hoc pattern matching.
 For C and C++ it uses the Clang lexer,
 recognizing all string-literal forms (including the wide, UTF-8,
 UTF-16, UTF-32, and raw variants) and both comment styles;
-for the remaining languages it uses in-process tree-sitter grammars.
+for the remaining languages it uses in-process tree-sitter grammars\cite{XXX}.
+\xxx{tree-sitter needs a citation}
 Both paths emit string-literal and comment samples
 that feed the same metric computation.
 Each candidate string is further classified by content --
@@ -56,11 +57,14 @@ a \emph{strict} rule treats a wrong-kind closer (\eg \verb|)| closing \verb|[|)
 as a violation, while a \emph{relaxed} rule permits it.
 A \emph{violation} is one unmatched or wrong-kind matcher.
 A \emph{toothpick} is a single backslash character in a sample,
-following the ``leaning toothpick syndrome'' of \cref{sec:bg};
-to estimate the escaping that matchertext would remove,
+following the term ``leaning toothpick syndrome'' of \cref{sec:bg}.
+To estimate the escaping that matchertext would remove,
 each compliant string literal is rewritten
 as the equivalent escapeless C++ raw string literal \verb|R"(|$\dots$\verb|)"|
 (same toothpicks as \verb|M"(|$\dots$\verb|)"|)
+\xxx{not quite exactly the same toothpicks!
+	there will be a difference for unmatched matchers
+	and for the raw-string closer sequence.}
 and the surviving backslashes are counted,
 yielding a \emph{toothpick reduction}.
 Finally, \emph{nesting depth} is the deepest matcher nesting a sample reaches;
@@ -172,6 +176,13 @@ and it shows what is embedded, not why.
 \begin{footnotesize}
 \begin{tabular}{lrrr}
 \hline
+\xxx{This table is missing a "Samples" column (per category),
+	which should probably be just after the "Share" column
+	so that the reader has something to compare the
+	"Violations" and "Toothpicks" column numbers with.
+	Also, I think a graph form would be more visually clear and useful.
+	We could even perhaps include both side-by-side
+	without taking up any more vertical space.}
 Category	& Share		& Violations	& Toothpicks	\\
 \hline
 PlainText	& 40.6\%	& 557,736	& 8,380,105	\\
@@ -303,10 +314,11 @@ For reference, \cref{app:nesting} plots the full depth distribution.
 \label{sec:eval:open}
 
 The results suggest that the adoption cost is small
-and the benefit large.
+and the benefit could be large.
 Over 98\% of string literals and nearly 97\% of comments need no change,
-and rewriting the compliant majority as raw string literals
-removes 94.78\% of the toothpicks.
+and rewriting the compliant majority
+as raw string literals or matchertext literals
+would remove 94.78\% of the toothpicks.
 The remaining violations fall where \cref{sec:embed} predicts,
 in syntaxes that use brackets singly,
 and the near-identical strict and relaxed rates show that
