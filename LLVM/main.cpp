@@ -273,6 +273,9 @@ int main(const int argc, char *argv[]) {
   // task. is_directory/is_regular_file consume the file type cached by readdir
   // where the platform provides it, avoiding extra stat calls. Errors (e.g.
   // permission denied) skip the offending entry rather than aborting the walk.
+  // Symlinks are skipped: a directory link can form a cycle (apple/SwiftUsd
+  // links to its own root), and a file link duplicates a file counted at its
+  // real path.
   std::function<void(const fs::path &, const std::string &)> walk =
       [&](const fs::path &dir, const std::string &inputPath) {
     std::vector<fs::path> subdirs;
@@ -280,6 +283,8 @@ int main(const int argc, char *argv[]) {
     for (fs::directory_iterator it(dir, fs::directory_options::skip_permission_denied, wec), end;
          !wec && it != end; it.increment(wec)) {
       std::error_code tec;
+      if (it->is_symlink(tec))
+        continue;
       if (it->is_directory(tec))
         subdirs.push_back(it->path());
       else if (it->is_regular_file(tec))

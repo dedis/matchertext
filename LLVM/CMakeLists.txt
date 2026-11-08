@@ -73,6 +73,13 @@ add_executable(LanguageClassifierTests
 target_include_directories(LanguageClassifierTests PRIVATE include)
 add_test(NAME language_detection COMMAND LanguageClassifierTests)
 
+add_executable(MatcherTextTests
+    tests/matcher_text_test.cpp
+    include/MatcherText.hpp
+)
+target_include_directories(MatcherTextTests PRIVATE include)
+add_test(NAME matcher_text COMMAND MatcherTextTests)
+
 add_executable(ParserFixtureTests
     tests/parser_fixture_test.cpp
     src/Parser.cpp

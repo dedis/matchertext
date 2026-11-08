@@ -11,7 +11,9 @@ Steps:
   1. Build the parser (`make train build`) if it is missing or --build is set.
   2. With --fresh, move result/repos/ to result/repos.<timestamp>/ so that no
      old per-language files stay in the new results.
-  3. Run clone-orgs.sh once per organisation. If an organisation fails, run
+  3. Skip each organisation whose result/repos/<org>/@org/strings.md exists.
+     Run clone-orgs.sh once per other organisation. clone-orgs.sh does not
+     parse again a repository whose strings.md exists. If an organisation fails, run
      clone-orgs.sh for it again, up to --attempts times. If a failed attempt
      stopped before clone-orgs.sh deleted the clone tree, repositories already
      on disk are not downloaded again.
@@ -33,10 +35,10 @@ ORGS = [
     "JetBrains", "JuliaLang", "NixOS", "Shopify", "WebAssembly", "WordPress",
     "airbnb", "angular", "apache", "apple", "archlinux", "aws", "chromium",
     "clojure", "cockroachdb", "coreutils", "curl", "dart-lang", "dask",
-    "discourse", "docker", "dotnet", "elastic", "elixir-lang", "facebook",
+    "discourse", "docker", "dotnet", "elastic", "elixir-lang",
     "flutter", "freebsd", "gentoo", "godotengine", "golang", "gradle", "grpc",
     "haskell", "huggingface", "jupyter", "keras-team", "kubernetes", "laravel",
-    "llvm", "matplotlib", "mongodb", "mozilla", "nodejs", "numpy", "ocaml",
+    "llvm", "matplotlib", "meta", "mongodb", "mozilla", "nodejs", "numpy", "ocaml",
     "openjdk", "openssl", "pandas-dev", "php", "pointfreeco", "postgres",
     "prometheus", "purescript", "python", "pytorch", "rails", "redis",
     "rstudio", "rust-lang", "scikit-learn", "scipy", "square", "sveltejs",
@@ -50,7 +52,7 @@ def log(msg):
 
 
 def aggregate(org):
-    return os.path.join(REPOS, org, org, "strings.md")
+    return os.path.join(REPOS, org, "@org", "strings.md")
 
 
 def run_org(org, attempts, env):
@@ -58,7 +60,7 @@ def run_org(org, attempts, env):
 
     Returns True when the org was parsed. clone-orgs.sh exits non-zero when
     some repositories fail to clone, even if the org was parsed, so success
-    is a new result/repos/<org>/<org>/strings.md, not the exit code.
+    is a new result/repos/<org>/@org/strings.md, not the exit code.
     """
     for attempt in range(1, attempts + 1):
         start = time.time()
@@ -101,7 +103,9 @@ def main():
     failed = []
     for i, org in enumerate(orgs, 1):
         log("\n[%d/%d] %s" % (i, len(orgs), org))
-        if not run_org(org, max(1, args.attempts), env):
+        if os.path.isfile(aggregate(org)):
+            log("%s: skipped, %s exists" % (org, aggregate(org)))
+        elif not run_org(org, max(1, args.attempts), env):
             failed.append(org)
 
     log("\nbuilding the global aggregate: build_global.py")

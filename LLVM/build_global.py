@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aggregate the per-organisation accumulated stats (result/repos/$ORG/$ORG/*.md)
+"""Aggregate the per-organisation accumulated stats (result/repos/$ORG/@org/*.md)
 into a single global version of each of the 4 md files.
 
 Rules:
@@ -14,9 +14,9 @@ import os, sys
 ROOT = "."
 REPOS = os.path.join(ROOT, "result", "repos")
 OUTDIR = os.path.join(ROOT, "result", "global")
-SKIP = {""}  # no accumulated $ORG/$ORG folder yet; parsed separately later
+SKIP = {""}  # no accumulated $ORG/@org folder yet; parsed separately later
 
-NOTE = ("<!-- GLOBAL AGGREGATE: built from result/repos/$ORG/$ORG/*.md across {n} "
+NOTE = ("<!-- GLOBAL AGGREGATE: built from result/repos/$ORG/@org/*.md across {n} "
         "organisations ({orgs}). Sums and maxima accumulated directly; averages, "
         "rates and reduction percentages recomputed from aggregated totals. -->")
 
@@ -58,16 +58,16 @@ def find_table(text, after=None):
         i += 1
     return lines, start, rows
 
+def path(org, f):
+    return os.path.join(REPOS, org, "@org", f)
+
 # ---------- discover orgs ----------
 orgs = []
 for name in sorted(os.listdir(REPOS)):
     if name in SKIP:
         continue
-    if os.path.isfile(os.path.join(REPOS, name, name, "strings.md")):
+    if os.path.isfile(path(name, "strings.md")):
         orgs.append(name)
-
-def path(org, f):
-    return os.path.join(REPOS, org, org, f)
 
 print("Aggregating %d orgs (skipping %s)." % (len(orgs), ", ".join(sorted(SKIP))))
 note = NOTE.format(n=len(orgs), orgs=", ".join(orgs))

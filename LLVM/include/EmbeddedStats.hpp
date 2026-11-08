@@ -47,8 +47,8 @@
   X(nestingDepthMax, "Highest Per-Sample Raw Max Depth", "Greatest raw nesting depth observed in any single sample, even if the nesting is left open.") \
   X(nestingDepthAvg, "Avg Per-Sample Raw Max Depth", "Average of the maximum raw nesting depth measured per sample.") \
   X(withValidNesting, "With Valid Nested Embedding", "Number of samples whose nesting depth exceeds 1 and is confirmed by matching closers, such as '((()))'.") \
-  X(validNestingDepthTotal, "Sum Of Per-Sample Valid Max Depth", "Sum of each sample's maximum valid nesting depth, counting only depths closed by matching closers.") \
-  X(validNestingDepthMax, "Highest Per-Sample Valid Max Depth", "Greatest valid nesting depth observed in any single sample, confirmed by matching closers.") \
+  X(validNestingDepthTotal, "Sum Of Per-Sample Valid Max Depth", "Sum of each sample's maximum valid nesting depth: the matched pairs around a matched pair, itself included. Unmatched openers add no level.") \
+  X(validNestingDepthMax, "Highest Per-Sample Valid Max Depth", "Greatest valid nesting depth observed in any single sample. Unmatched openers add no level.") \
   X(validNestingDepthAvg, "Avg Per-Sample Valid Max Depth", "Average of the maximum valid nesting depth measured per sample.") \
   \
   X(rawChars, "Raw Character Count", "Total number of raw input characters processed.")
