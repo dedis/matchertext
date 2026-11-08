@@ -95,13 +95,13 @@ class Parser final {
     /// What adjacent C/C++ literal segments add up to in a raw rewrite.
     struct RawLiteral {
       std::string content;  // the raw literal's content
-      bool holdable = true; // no simple escape needs a character a raw literal cannot hold
-      uint64_t encodingBackslashes = 0; // backslashes of encoding escapes, not toothpicks
+      bool holdable = true; // every escape decodes to characters a raw literal can hold
     };
 
     /// Toothpicks left after rewriting a C/C++ literal body as a raw literal. If given,
-    /// `literal` accumulates the segment's content and counts.
-    static uint64_t CountRawStringToothpicks(std::string_view body, RawLiteral *literal = nullptr);
+    /// `literal` accumulates the segment's content and counts. `wide` is set for L, u,
+    /// and U literals, whose \x and octal escapes are code units rather than bytes.
+    static uint64_t CountRawStringToothpicks(std::string_view body, RawLiteral *literal = nullptr, bool wide = false);
   private:
     /// Processes a string/doc and updates the given stat
     /// @returns the number of MatcherText violations found
@@ -111,7 +111,7 @@ class Parser final {
       std::string_view sourcePath = {}, std::string_view inputPath = {},
       EmbeddedStats *extraEmbedded = nullptr, NestedStats *extraNested = nullptr,
       LanguageStats *extraLangStats = nullptr, uint64_t convertedToothpicksHint = 0,
-      bool rawHoldsHint = false, bool mHoldsHint = false, uint64_t encodingBackslashes = 0
+      bool rawHoldsHint = false, bool mHoldsHint = false
     );
 };
 

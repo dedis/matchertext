@@ -1,5 +1,6 @@
 #include "../include/TreeSitterParser.hpp"
 
+#include <algorithm>
 #include <cctype>
 #include <chrono>
 #include <cstring>
@@ -131,29 +132,29 @@ namespace {
     static const std::unordered_map<LanguageEnum, EscapeRules> table = [] {
       std::unordered_map<LanguageEnum, EscapeRules> m;
       using enum RawRewrite::Dialect::Digits;
-      const RawRewrite::Dialect c{.controls = "abefnrtv"};
+      const RawRewrite::Dialect c{.controls = "abefnrtv", .byteEscapes = true};
       m[LanguageEnum::JavaScript] = {{.controls = "bfnrtv"}};
       m[LanguageEnum::TypeScript] = {{.controls = "bfnrtv"}};
       m[LanguageEnum::Java] = {{.controls = "bfnrt"}};
       m[LanguageEnum::CSharp] = {{.controls = "abefnrtv"}};
       m[LanguageEnum::Rust] = {{.controls = "nrt"}};
-      m[LanguageEnum::Ruby] = {{.controls = "abefnrtv", .controlLetters = true}, EscapeSource::Ruby};
-      m[LanguageEnum::PHP] = {{.controls = "efnrtv", .unknownKeepsBackslash = true}};
-      m[LanguageEnum::Perl] = {{.controls = "abefnrt", .controlLetters = true}, EscapeSource::Perl};
-      m[LanguageEnum::Lua] = {{.controls = "abfnrtv", .empty = "z", .digits = Decimal}};
+      m[LanguageEnum::Ruby] = {{.controls = "abefnrtv", .controlLetters = true, .byteEscapes = true}, EscapeSource::Ruby};
+      m[LanguageEnum::PHP] = {{.controls = "efnrtv", .unknownKeepsBackslash = true, .byteEscapes = true}};
+      m[LanguageEnum::Perl] = {{.controls = "abefnrt", .controlLetters = true, .byteEscapes = true}, EscapeSource::Perl};
+      m[LanguageEnum::Lua] = {{.controls = "abfnrtv", .empty = "z", .digits = Decimal, .byteEscapes = true}};
       m[LanguageEnum::Swift] = {{.controls = "nrt"}, EscapeSource::Swift};
       m[LanguageEnum::Kotlin] = {{.controls = "bnrt"}, EscapeSource::Kotlin};
-      m[LanguageEnum::R] = {{.controls = "abfnrtv"}};
+      m[LanguageEnum::R] = {{.controls = "abfnrtv", .byteEscapes = true}};
       m[LanguageEnum::Scala] = {{.controls = "bfnrt"}};
       m[LanguageEnum::Haskell] = {{.controls = "abfnrtv", .empty = "&", .digits = Decimal}, EscapeSource::Haskell};
-      m[LanguageEnum::OCaml] = {{.controls = "bnrt", .digits = Decimal, .unknownKeepsBackslash = true}};
+      m[LanguageEnum::OCaml] = {{.controls = "bnrt", .digits = Decimal, .unknownKeepsBackslash = true, .byteEscapes = true}};
       m[LanguageEnum::Erlang] = {{.controls = "bdefnrtv"}, EscapeSource::Erlang};
-      m[LanguageEnum::Elixir] = {{.controls = "abdefnrtv"}};
+      m[LanguageEnum::Elixir] = {{.controls = "abdefnrtv", .byteEscapes = true}};
       m[LanguageEnum::Dart] = {{.controls = "bfnrtv", .digits = None}};
       m[LanguageEnum::Objective_C] = {c};
       m[LanguageEnum::GLSL] = {c};
       m[LanguageEnum::HLSL] = {c};
-      m[LanguageEnum::Go] = {{.controls = "abfnrtv"}};
+      m[LanguageEnum::Go] = {{.controls = "abfnrtv", .byteEscapes = true}};
       m[LanguageEnum::Python] = {{.controls = "abfnrtv"}};
       return m;
     }();
@@ -416,8 +417,6 @@ namespace {
   // Outcome of rewriting one string as a raw literal (see RawRewrite.hpp).
   struct Rewrite {
     uint64_t converted = 0;
-    /// Backslashes of encoding escapes, which are not toothpicks.
-    uint64_t encodingBackslashes = 0;
     /// The language's default raw form holds the rewritten content verbatim.
     bool rawHolds = false;
     /// A matchertext literal M"(...)" holds the rewritten content verbatim.
@@ -432,7 +431,7 @@ namespace {
     if (quote != std::string_view::npos)
       quoteRun = text.substr(quote, text.substr(quote, 3) == std::string(3, text[quote]) ? 3 : 1);
     if (body.find('\\') == std::string_view::npos)
-      return {0, 0, RawRewrite::DefaultRawHolds(language, body, quoteRun), RawRewrite::MatchertextHolds(body)};
+      return {0, RawRewrite::DefaultRawHolds(language, body, quoteRun), RawRewrite::MatchertextHolds(body)};
 
     RawRewrite::Counter &counter = scratch.counter;
     counter.Reset(rules.dialect);
@@ -481,12 +480,15 @@ namespace {
     else
       for (const auto [start, end]: scratch.spans)
         lexEscapes(source, src.substr(start, end - start), context, counter, scratch.escape);
-    const uint64_t converted = counter.Count();
-    const uint64_t encodings = counter.EncodingBackslashes();
+    uint64_t converted = counter.Count();
+    // Decoding can create matchers (\x5B is '['). A literal whose decoded content
+    // is not matchertext cannot be rewritten and keeps all its toothpicks.
+    const bool matchertext = RawRewrite::MatchertextHolds(counter.Content());
+    if (!matchertext)
+      converted = static_cast<uint64_t>(std::ranges::count(body, '\\'));
     if (!counter.Holdable())
-      return {converted, encodings, false, false};
-    return {converted, encodings, RawRewrite::DefaultRawHolds(language, counter.Content(), quoteRun),
-            RawRewrite::MatchertextHolds(counter.Content())};
+      return {converted, false, false};
+    return {converted, RawRewrite::DefaultRawHolds(language, counter.Content(), quoteRun), matchertext};
   }
 
   // Body text of the spans: a view into `src` for one span, else concatenated.
@@ -523,12 +525,11 @@ namespace {
         case Kind::String: {
           bodySpans(node, src, scratch.spans);
           const std::string_view body = bodyText(src, scratch.spans, scratch.body);
-          const auto [converted, encodings, rawHolds, mHolds] = rewrite(language, node, src, body, rules, scratch);
+          const auto [converted, rawHolds, mHolds] = rewrite(language, node, src, body, rules, scratch);
           out.PushBack(Serde::JSON::Object({
             {"kind", Serde::JSON("string")},
             {"value", Serde::JSON(body)},
             {"convertedToothpicks", Serde::JSON(static_cast<double>(converted))},
-            {"encodingBackslashes", Serde::JSON(static_cast<double>(encodings))},
             {"rawHolds", Serde::JSON(rawHolds ? 1.0 : 0.0)},
             {"mHolds", Serde::JSON(mHolds ? 1.0 : 0.0)}
           }));

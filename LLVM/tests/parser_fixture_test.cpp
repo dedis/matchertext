@@ -205,9 +205,12 @@ bool TestStringBucketMix() {
 
   bool ok = true;
   ok &= CheckEq("bucket_mix.strings.count", strings.count, 7.0);
-  // kBinary's nine backslashes all belong to hex escapes, which are not toothpicks.
-  ok &= CheckEq("bucket_mix.strings.with_toothpicks", strings.withToothpicks, 0.0);
-  ok &= CheckEq("bucket_mix.strings.toothpicks", strings.toothpicks, 0.0);
+  // kBinary's nine backslashes all belong to hex escapes. The rewrite decodes them:
+  // CR and LF become line feeds, other controls are dropped, and only \x89, which
+  // alone is not valid UTF-8, keeps its toothpick.
+  ok &= CheckEq("bucket_mix.strings.with_toothpicks", strings.withToothpicks, 1.0);
+  ok &= CheckEq("bucket_mix.strings.toothpicks", strings.toothpicks, 9.0);
+  ok &= CheckEq("bucket_mix.strings.toothpicks_converted", strings.toothpicksConverted, 1.0);
   ok &= CheckEq("bucket_mix.strings.raw_chars", strings.rawChars, 297.0);
   ok &= CheckEq("bucket_mix.docs.count", docs.count, 0.0);
   ok &= CheckEq("bucket_mix.docs_relaxed.count", docsRelaxed.count, 0.0);

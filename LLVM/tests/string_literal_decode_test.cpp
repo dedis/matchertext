@@ -5,10 +5,11 @@
 //
 // Unit tests for Parser::CountRawStringToothpicks — given the *body* of a C/C++
 // string literal (the text between the quotes, line splices already removed), it
-// returns how many toothpicks survive a rewrite to a raw string literal: \\
-// leaves one backslash, \n, \t, and quote escapes are removed, simple escapes for
-// control characters (\r, \a, ...) keep a toothpick, and encoding escapes (\x41,
-// \101, \u0041, \N{...}) stay as written and are not counted, before or after.
+// returns how many toothpicks survive a rewrite to a raw string literal. Every
+// escape is decoded and loses its backslash, encoding escapes (\x41, \101,
+// \u0041, \N{...}) included; \\ and any escape that decodes to a backslash leave
+// one. \r\n and \r become a line feed, \f and \v a space, and other control
+// characters are dropped. A byte that is not valid UTF-8 keeps its toothpick.
 //
 // Test inputs are written as raw string literals R"(...)" so the test's own
 // compiler does not pre-decode the escape sequences being exercised. The bare
@@ -27,24 +28,23 @@ namespace {
 int failures = 0;
 int checks = 0;
 
-// Expects `converted` toothpicks after the rewrite and `encodings` backslashes of
-// encoding escapes, which are excluded from the toothpick totals.
+// Expects `converted` toothpicks after the rewrite of a narrow literal, or of a
+// wide one (L, u, U) if `wide` is set.
 void Expect(const std::string_view label, const std::string_view body, const uint64_t converted,
-            const uint64_t encodings = 0) {
+            const bool wide = false) {
   ++checks;
   Parser::RawLiteral literal;
-  const uint64_t actual = Parser::CountRawStringToothpicks(body, &literal);
-  if (actual == converted && literal.encodingBackslashes == encodings)
+  const uint64_t actual = Parser::CountRawStringToothpicks(body, &literal, wide);
+  if (actual == converted)
     return;
   ++failures;
   std::cerr << "string_literal_decode_test FAILED: " << label
-            << " | body=<" << body << "> expected=" << converted << "/" << encodings
-            << " actual=" << actual << "/" << literal.encodingBackslashes << '\n';
+            << " | body=<" << body << "> expected=" << converted << " actual=" << actual << '\n';
 }
 
 const std::string kBackslash = "\\"; // a single backslash, used to build universal-character-name inputs
 
-// Expects the raw literal's content: decoded simple escapes, encoding escapes as written.
+// Expects the raw literal's content: every escape decoded and normalized.
 void ExpectContent(const std::string_view label, const std::string_view body, const std::string_view content) {
   ++checks;
   Parser::RawLiteral literal;
@@ -73,35 +73,43 @@ int main() {
   Expect("backslash buried in plain text", R"(prefix \\ suffix)", 1);
   Expect("escaped backslash then literal '134' (not an octal escape)", R"(\\134)", 1);
 
-  // --- Simple escapes for characters a raw literal cannot hold keep a toothpick ---
-  Expect("control letters CR, VT, FF, BEL, BS", R"(\r\v\f\a\b)", 5);
+  // --- Control characters are normalized or dropped, so their backslash goes ---
+  Expect("control letters CR, VT, FF, BEL, BS", R"(\r\v\f\a\b)", 0);
+  Expect("CR LF", R"(\r\n)", 0);
 
-  // --- Encoding escapes stay as written and are not counted ---
-  Expect("hex escape", R"(\x41)", 0, 1);
-  Expect("hex escape of a backslash", R"(\x5c)", 0, 1);
-  Expect("hex escape eats all hex digits", R"(\x5cc)", 0, 1);
-  Expect("two hex escapes of a UTF-8 character", R"(\xc3\xa9)", 0, 2);
-  Expect("NUL as hex", R"(\x00)", 0, 1);
-  Expect("octal escape", R"(\134)", 0, 1);
-  Expect("octal limited to 3 digits: 01340 is one escape then '40'", R"(\01340)", 0, 1);
-  Expect("octal 0 then literal '8'", R"(\08)", 0, 1);
-  Expect("UCN backslash-u", kBackslash + "u0041", 0, 1);
-  Expect("UCN backslash-U", R"(\U0000005c)", 0, 1);
-  Expect("C++23 delimited hex", R"(\x{5c})", 0, 1);
-  Expect("C++23 delimited octal", R"(\o{134})", 0, 1);
-  Expect("C++23 delimited UCN", R"(\u{5c})", 0, 1);
-  Expect("C++23 named UCN", R"(\N{REVERSE SOLIDUS})", 0, 1);
-  Expect("C++23 named UCN, other name", R"(\N{LATIN SMALL LETTER A})", 0, 1);
+  // --- Encoding escapes are decoded ---
+  Expect("hex escape", R"(\x41)", 0);
+  Expect("hex escape of a backslash", R"(\x5c)", 1);
+  Expect("hex escape eats all hex digits: x5cc is U+05CC", R"(\x5cc)", 0);
+  Expect("two hex escapes of a UTF-8 character", R"(\xc3\xa9)", 0);
+  Expect("lone byte that is not UTF-8 keeps its toothpick", R"(\xe9)", 1);
+  Expect("wide literal: xe9 is U+00E9", R"(\xe9)", 0, true);
+  Expect("NUL as hex", R"(\x00)", 0);
+  Expect("octal escape of a backslash", R"(\134)", 1);
+  Expect("octal limited to 3 digits: 01340 is one escape then '40'", R"(\01340)", 0);
+  Expect("octal 0 then literal '8'", R"(\08)", 0);
+  Expect("UCN backslash-u", kBackslash + "u0041", 0);
+  Expect("UCN backslash-U of a backslash", R"(\U0000005c)", 1);
+  Expect("UCN of a lone surrogate keeps its toothpick", kBackslash + "uD800", 1);
+  Expect("C++23 delimited hex", R"(\x{5c})", 1);
+  Expect("C++23 delimited octal", R"(\o{134})", 1);
+  Expect("C++23 delimited UCN", R"(\u{5c})", 1);
+  Expect("C++23 named UCN", R"(\N{REVERSE SOLIDUS})", 1);
+  Expect("C++23 named UCN, other name", R"(\N{LATIN SMALL LETTER A})", 0);
 
   // --- Content of the rewrite ---
   ExpectContent("quote, tab, backslash, line feed", R"(q\"\t\\\n)", "q\"\t\\\n");
-  ExpectContent("encoding escapes stay as written", R"(caf\xe9 \101)", R"(caf\xe9 \101)");
-  ExpectContent("control letter decodes", R"(\r)", "\r");
+  ExpectContent("encoding escapes decode", R"(caf\xc3\xa9 \101)", "café A");
+  ExpectContent("encoded matcher decodes", R"(\x5B\135)", "[]");
+  ExpectContent("CR LF and lone CR become line feeds", R"(a\r\nb\rc)", "a\nb\nc");
+  ExpectContent("encoded CR LF becomes one line feed", R"(\x0d\x0a)", "\n");
+  ExpectContent("FF and VT become spaces", R"(a\fb\vc)", "a b c");
+  ExpectContent("other control characters are dropped", R"(a\a\b\x00\x1b\177b)", "ab");
 
   // --- Mixed ---
-  Expect("escaped backslash, line feed, octal, hex", R"(a\\b\nc\134d\x5c)", 1, 2);
+  Expect("escaped backslash, line feed, octal, hex", R"(a\\b\nc\134d\x5c)", 3);
   Expect("one of each encoding form",
-         R"(\134\x5c\U0000005c\x{5c}\o{134}\u{5c}\N{REVERSE SOLIDUS})", 0, 7);
+         R"(\134\x5c\U0000005c\x{5c}\o{134}\u{5c}\N{REVERSE SOLIDUS})", 7);
   Expect("escapes mixed with braces", R"(\n {5c} \t)", 0);
 
   // --- Malformed inputs: best effort, must never crash ---

@@ -43,9 +43,9 @@ namespace {
            parseDigits(text, i + 1, base, value) == text.size() - i - 2;
   }
 
-  /// Characters that a raw literal cannot hold literally.
-  bool nonHoldable(const uint32_t cp) {
-    return (cp < 0x20 && cp != '\t' && cp != '\n') || (cp >= 0x7F && cp <= 0x9F);
+  /// C0 and C1 control characters, which a raw literal cannot hold.
+  bool isControl(const uint32_t cp) {
+    return cp < 0x20 || (cp >= 0x7F && cp <= 0x9F);
   }
 
   uint32_t controlCode(const char c) {
@@ -69,8 +69,33 @@ namespace {
     "CAN", "EM", "SUB", "ESC", "FS", "GS", "RS", "US", "SP", "DEL"
   };
 
-  bool asciiName(const std::string_view name) {
-    return std::ranges::find(kAsciiNames, name) != kAsciiNames.end();
+  /// Code point of a Haskell ASCII control name, or kInvalid.
+  uint32_t asciiCode(const std::string_view name) {
+    const auto it = std::ranges::find(kAsciiNames, name);
+    if (it == kAsciiNames.end())
+      return kInvalid;
+    const auto index = static_cast<uint32_t>(it - kAsciiNames.begin());
+    return index == 33 ? 0x7F : index; // DEL; SP is 0x20 at index 32
+  }
+
+  /// Code point of a \N{NAME} escape. Only the names that matter to the rewrite
+  /// (backslash, matchers, line breaks, controls) are known; any other name is a
+  /// printable character, stood in for by U+FFFD.
+  uint32_t namedCode(const std::string_view name) {
+    struct Named { std::string_view name; uint32_t cp; };
+    static constexpr std::array<Named, 13> kNames = {{
+      {"REVERSE SOLIDUS", 0x5C}, {"LEFT PARENTHESIS", 0x28}, {"RIGHT PARENTHESIS", 0x29},
+      {"LEFT SQUARE BRACKET", 0x5B}, {"RIGHT SQUARE BRACKET", 0x5D}, {"LEFT CURLY BRACKET", 0x7B},
+      {"RIGHT CURLY BRACKET", 0x7D}, {"NULL", 0x00}, {"CHARACTER TABULATION", 0x09},
+      {"LINE FEED", 0x0A}, {"CARRIAGE RETURN", 0x0D}, {"SPACE", 0x20}, {"DELETE", 0x7F},
+    }};
+    std::string upper(name);
+    for (char &c: upper)
+      c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    for (const auto &[n, cp]: kNames)
+      if (n == upper)
+        return cp;
+    return 0xFFFD;
   }
 
   /// Decodes one strict UTF-8 sequence at `i`; returns its length, or 0 if invalid.
@@ -115,7 +140,8 @@ namespace RawRewrite {
     bytes.clear();
     owner.clear();
     survives.clear();
-    encodingBackslashes = 0;
+    content.clear();
+    pendingHigh = -1;
   }
 
   void Counter::push(const uint8_t byte, const int32_t id) {
@@ -123,98 +149,190 @@ namespace RawRewrite {
     owner.push_back(id);
   }
 
+  /// Pushes the UTF-8 encoding of `cp`. A surrogate or an out-of-range value
+  /// cannot be written, so its escape keeps its toothpick.
+  void Counter::pushCodePoint(const uint32_t cp, const int32_t id) {
+    if (cp >= kInvalid || (cp >= 0xD800 && cp <= 0xDFFF)) {
+      survives[static_cast<size_t>(id)] = 1;
+      return;
+    }
+    if (cp < 0x80)
+      push(static_cast<uint8_t>(cp), id);
+    else if (cp < 0x800) {
+      push(static_cast<uint8_t>(0xC0 | cp >> 6), id);
+      push(static_cast<uint8_t>(0x80 | (cp & 0x3F)), id);
+    } else if (cp < 0x10000) {
+      push(static_cast<uint8_t>(0xE0 | cp >> 12), id);
+      push(static_cast<uint8_t>(0x80 | (cp >> 6 & 0x3F)), id);
+      push(static_cast<uint8_t>(0x80 | (cp & 0x3F)), id);
+    } else {
+      push(static_cast<uint8_t>(0xF0 | cp >> 18), id);
+      push(static_cast<uint8_t>(0x80 | (cp >> 12 & 0x3F)), id);
+      push(static_cast<uint8_t>(0x80 | (cp >> 6 & 0x3F)), id);
+      push(static_cast<uint8_t>(0x80 | (cp & 0x3F)), id);
+    }
+  }
+
+  /// A high surrogate with no low half after it cannot be written.
+  void Counter::flushPending() {
+    if (pendingHigh >= 0)
+      survives[static_cast<size_t>(pendingHigh)] = 1;
+    pendingHigh = -1;
+  }
+
   void Counter::Literal(const std::string_view text) {
+    if (text.empty())
+      return; // callers pass the empty run between adjacent escapes
+    flushPending();
     for (const char c: text)
       push(static_cast<uint8_t>(c), kLiteral);
   }
 
-  /// An escape that encodes a character by number or name stays as written in the
-  /// raw literal, and its backslashes are not toothpicks.
-  void Counter::encoding(const std::string_view text) {
-    for (const char c: text)
-      push(static_cast<uint8_t>(c), kEncoding);
-    encodingBackslashes += static_cast<uint64_t>(std::ranges::count(text, '\\'));
-  }
-
-  bool Counter::isEncoding(const std::string_view rest) const {
+  bool Counter::decodeEncoding(const std::string_view rest, const int32_t id, const int32_t high, bool &paired) {
     uint32_t value = 0;
-    if (rest.size() >= 2 && asciiName(rest))
-      return true; // Haskell \NUL, \SOH, ...
+    // A byte in byte-string languages, else a code point.
+    const auto unit = [&](const uint32_t v) {
+      if (dialect.byteEscapes && v <= 0xFF)
+        push(static_cast<uint8_t>(v), id);
+      else
+        pushCodePoint(v, id);
+    };
+    if (rest.size() >= 2) // Haskell \NUL, \SOH, ...
+      if (const uint32_t cp = asciiCode(rest); cp != kInvalid) {
+        pushCodePoint(cp, id);
+        return true;
+      }
     const char c = rest[0];
     switch (c) {
       case 'x':
-        return parseBraced(rest, 1, 16, value) || (rest.size() > 1 && parseDigits(rest, 1, 16, value) == rest.size() - 1);
-      case 'o':
-        return parseBraced(rest, 1, 8, value) || (rest.size() > 1 && parseDigits(rest, 1, 8, value) == rest.size() - 1);
+      case 'o': {
+        const uint32_t base = c == 'x' ? 16 : 8;
+        if (parseBraced(rest, 1, base, value))
+          pushCodePoint(value, id); // Perl \x{263A}, C++23 \x{...} and \o{...}
+        else if (rest.size() > 1 && parseDigits(rest, 1, base, value) == rest.size() - 1)
+          unit(value);
+        else
+          return false;
+        return true;
+      }
       case 'u': {
-        if (rest.size() == 5 && parseDigits(rest, 1, 16, value) == 4)
+        if (rest.size() == 5 && parseDigits(rest, 1, 16, value) == 4) {
+          // A UTF-16 code unit: a high surrogate waits for its low half.
+          if (value >= 0xD800 && value <= 0xDBFF) {
+            pendingHigh = id;
+            pendingValue = value;
+          } else if (value >= 0xDC00 && value <= 0xDFFF && high >= 0) {
+            paired = true;
+            pushCodePoint(0x10000 + ((pendingValue - 0xD800) << 10) + (value - 0xDC00), high);
+          } else
+            pushCodePoint(value, id);
           return true;
+        }
         // \u{...}, with several space-separated code points in Ruby.
         if (rest.size() < 4 || rest[1] != '{' || rest.back() != '}')
           return false;
         const std::string_view list = rest.substr(2, rest.size() - 3);
-        return list.find_first_not_of("0123456789abcdefABCDEF ") == std::string_view::npos &&
-               list.find_first_not_of(' ') != std::string_view::npos;
+        if (list.find_first_not_of("0123456789abcdefABCDEF ") != std::string_view::npos ||
+            list.find_first_not_of(' ') == std::string_view::npos)
+          return false;
+        for (size_t i = 0; i < list.size();) {
+          const size_t digits = parseDigits(list, i, 16, value);
+          if (digits > 0)
+            pushCodePoint(value, id);
+          i += std::max<size_t>(digits, 1);
+        }
+        return true;
       }
       case 'U':
-        return rest.size() == 9 && parseDigits(rest, 1, 16, value) == 8;
+        if (rest.size() != 9 || parseDigits(rest, 1, 16, value) != 8)
+          return false;
+        pushCodePoint(value, id);
+        return true;
       case 'N':
-        return rest.size() > 3 && rest[1] == '{' && rest.back() == '}';
-      case '^':
-        return rest.size() == 2; // Haskell and Erlang control characters
+        if (rest.size() <= 3 || rest[1] != '{' || rest.back() != '}')
+          return false;
+        pushCodePoint(namedCode(rest.substr(2, rest.size() - 3)), id);
+        return true;
+      case '^': // Haskell and Erlang control characters, \^A is 0x01
+        if (rest.size() != 2)
+          return false;
+        pushCodePoint(rest[1] == '?' ? 0x7F : static_cast<uint32_t>(rest[1]) & 0x1F, id);
+        return true;
       default:
-        if (c >= '0' && c <= '9' && dialect.digits != Dialect::Digits::None)
-          return parseDigits(rest, 0, dialect.digits == Dialect::Digits::Octal ? 8 : 10, value) == rest.size();
+        if (c >= '0' && c <= '9' && dialect.digits != Dialect::Digits::None) {
+          const uint32_t base = dialect.digits == Dialect::Digits::Octal ? 8 : 10;
+          if (parseDigits(rest, 0, base, value) != rest.size())
+            return false;
+          unit(value);
+          return true;
+        }
         // Ruby and Perl \cX, \C-x, \M-x. The Ruby grammar marks only \c, \C, or \M
-        // and leaves the rest as content.
-        return dialect.controlLetters && (c == 'c' || ((c == 'C' || c == 'M') && (rest.size() == 1 || rest[1] == '-')));
+        // and leaves the rest as content. A control character is dropped, and a
+        // meta character is a byte above 0x7F, which alone is not valid UTF-8.
+        if (!dialect.controlLetters || !(c == 'c' || ((c == 'C' || c == 'M') && (rest.size() == 1 || rest[1] == '-'))))
+          return false;
+        if (c == 'M' && rest.size() > 2)
+          push(static_cast<uint8_t>(0x80 | (static_cast<uint8_t>(rest[2]) & 0x7F)), id);
+        return true;
     }
   }
 
   void Counter::Escape(const std::string_view text) {
     const auto id = static_cast<int32_t>(survives.size());
     survives.push_back(0);
+    const int32_t high = pendingHigh;
+    pendingHigh = -1;
+    bool paired = false;
 
     const std::string_view rest = text.substr(1);
-    // A dangling backslash, a line continuation, or a Haskell string gap.
-    if (rest.empty() || rest[0] == ' ' || rest[0] == '\t' || rest[0] == '\n' || rest[0] == '\r' ||
-        dialect.empty.find(rest[0]) != std::string_view::npos)
-      return;
-    if (isEncoding(rest))
-      return encoding(text);
+    // A dangling backslash, a line continuation, or a Haskell string gap decodes to nothing.
+    const bool nothing = rest.empty() || rest[0] == ' ' || rest[0] == '\t' || rest[0] == '\n' ||
+                         rest[0] == '\r' || dialect.empty.find(rest[0]) != std::string_view::npos;
+    if (!nothing && !decodeEncoding(rest, id, high, paired)) {
+      const char c = rest[0];
+      if (dialect.controls.find(c) != std::string_view::npos)
+        push(static_cast<uint8_t>(controlCode(c)), id);
+      else if (dialect.unknownKeepsBackslash && c != '\\' && c != '"' && c != '\'' && c != '$')
+        for (const char r: text) // an unknown escape is kept as written, backslash included
+          push(static_cast<uint8_t>(r), kLiteral);
+      else
+        for (const char r: rest) // identity escape: decodes to the escaped character itself
+          push(static_cast<uint8_t>(r), id);
+    }
 
-    const char c = rest[0];
-    if (dialect.controls.find(c) != std::string_view::npos)
-      return push(static_cast<uint8_t>(controlCode(c)), id);
-    // Identity escape: decodes to the escaped character itself.
-    if (dialect.unknownKeepsBackslash && c != '\\' && c != '"' && c != '\'' && c != '$')
-      return Literal(text);
-    for (const char r: rest)
-      push(static_cast<uint8_t>(r), id);
+    if (high >= 0 && !paired)
+      survives[static_cast<size_t>(high)] = 1;
   }
 
   uint64_t Counter::Count() {
+    flushPending();
+    content.clear();
     uint64_t literalBackslashes = 0;
     for (size_t i = 0; i < bytes.size();) {
       uint32_t cp = 0;
       const size_t len = decodeUtf8(bytes, i, cp);
+      const int32_t id = owner[i];
       if (len == 0) {
-        if (owner[i] >= 0)
-          survives[static_cast<size_t>(owner[i])] = 1;
-        ++i;
+        if (id >= 0)
+          survives[static_cast<size_t>(id)] = 1; // not valid UTF-8, so it cannot be written
+        content.push_back(bytes[i++]);
         continue;
       }
-      if (cp == kBackslash) {
-        if (owner[i] == kLiteral)
-          ++literalBackslashes;
-        else if (owner[i] >= 0 && survives[static_cast<size_t>(owner[i])] == 0)
-          survives[static_cast<size_t>(owner[i])] = 2;
-      } else if (nonHoldable(cp)) {
-        for (size_t k = i; k < i + len; ++k)
-          if (owner[k] >= 0)
-            survives[static_cast<size_t>(owner[k])] = 1;
-      }
-      i += len;
+      if (id == kLiteral) {
+        literalBackslashes += cp == kBackslash;
+        content.append(bytes, i, len);
+      } else if (cp == kBackslash) {
+        if (survives[static_cast<size_t>(id)] == 0)
+          survives[static_cast<size_t>(id)] = 2;
+        content.push_back('\\');
+      } else if (cp == '\r') {
+        if (i + 1 >= bytes.size() || bytes[i + 1] != '\n')
+          content.push_back('\n'); // a lone CR is a line feed; CR LF keeps only the LF
+      } else if (cp == '\f' || cp == '\v')
+        content.push_back(' ');
+      else if (cp == '\t' || cp == '\n' || !isControl(cp))
+        content.append(bytes, i, len);
+      i += len; // any other control character is dropped
     }
     return literalBackslashes + static_cast<uint64_t>(survives.size() - static_cast<size_t>(std::ranges::count(survives, 0)));
   }
