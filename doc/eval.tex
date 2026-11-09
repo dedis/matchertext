@@ -39,14 +39,14 @@ which affects only the per-category attribution of results.
 
 The corpus is drawn from GitHub
 and is intended to represent mature, widely-deployed production code:
-the main repositories of 79 organizations
+the main repositories of \dataOrgs organizations
 behind operating-system kernels, databases, browsers,
 language toolchains, and similar infrastructure.
-It comprises 14,293 repositories and roughly 12.39~million source files
+It comprises \dataRepos repositories and roughly \dataFiles source files
 (on the order of 1.5~TiB of code),
-yielding approximately 469.6~million string-literal samples
-and 304.1~million comment samples.
-JavaScript alone contributes about 207~million string samples,
+yielding approximately \dataStrSamples string-literal samples
+and \dataDocSamples comment samples.
+JavaScript alone contributes about \dataJsStrSamples string samples,
 reflecting both its prevalence and its string-heavy style.
 
 The key metrics are as follows.
@@ -67,6 +67,13 @@ as the equivalent escapeless C++ raw string literal \verb|R"(|$\dots$\verb|)"|
 	and for the raw-string closer sequence.}
 and the surviving backslashes are counted,
 yielding a \emph{toothpick reduction}.
+The rewrite decodes every escape, numeric and named ones like \verb|\x5B| included,
+and drops its backslash unless it decodes to a backslash.
+Raw literals hold no control characters,
+so \verb|\r\n| and \verb|\r| become line feeds, \verb|\f| and \verb|\v| spaces,
+and other controls are dropped.
+An escape that cannot be written raw, such as a byte that is not valid UTF-8, keeps its backslash,
+and a literal whose decoded content is not matchertext keeps all of them.
 Finally, \emph{nesting depth} is the deepest matcher nesting a sample reaches;
 \emph{raw} depth also counts unclosed openers.
 
@@ -77,20 +84,20 @@ Finally, \emph{nesting depth} is the deepest matcher nesting a sample reaches;
 Existing code is already highly matchertext-compliant
 at the level of individual embedded fragments.
 As \cref{tab:eval:compliance} shows,
-98.57\% of string-literal samples
-and 96.75\% of comment samples are compliant as written.
-At the file level compliance is lower, 86.77\%,
+\dataStrCompliance of string-literal samples
+and \dataDocCompliance of comment samples are compliant as written.
+At the file level compliance is lower, \dataFileCompliance,
 because a single unmatched matcher anywhere in a file
 makes the whole file non-compliant,
 so per-sample-rare violations still touch a noticeable fraction of files.
 The relaxed rule barely changes any of these figures
-(file compliance rises only to 86.91\%,
-comments to 96.78\%),
+(file compliance rises only to \dataFileComplianceRelaxed,
+comments to \dataDocComplianceRelaxed),
 which means almost all violations are genuinely unmatched matchers
 rather than correctly-paired-but-wrong-kind nesting.
 Compliance is also high across every host language,
 with string-literal compliance staying within a narrow band
-from 95.20\% for the least-compliant language up to 99.92\%,
+from \dataHostComplianceMin for the least-compliant language up to \dataHostComplianceMax,
 so no language in the corpus is broadly non-compliant.
 
 \begin{table}[t]
@@ -101,9 +108,9 @@ so no language in the corpus is broadly non-compliant.
 Stream		& Samples	& Compliant	& Compliant	\\
 		&		& (strict)	& (relaxed)	\\
 \hline
-String literals	& 469.6\,M	& 98.57\%	& ---		\\
-Comments	& 304.1\,M	& 96.75\%	& 96.78\%	\\
-Files		& 12.39\,M	& 86.77\%	& 86.91\%	\\
+String literals	& \dataStrSamplesShort	& \dataStrCompliance	& ---		\\
+Comments	& \dataDocSamplesShort	& \dataDocCompliance	& \dataDocComplianceRelaxed	\\
+Files		& \dataFilesShort	& \dataFileCompliance	& \dataFileComplianceRelaxed	\\
 \hline
 \end{tabular}
 \end{footnotesize}
@@ -120,14 +127,13 @@ Files		& 12.39\,M	& 86.77\%	& 86.91\%	\\
 
 Violations are far from evenly spread across embedded-language categories.
 As \cref{tab:eval:categories} shows,
-regular expressions and shell fragments alone
-account for the largest violation counts
-(670,118 and 534,719 respectively),
-despite each making up only about 1.6\% of classified samples;
+regular expressions and shell fragments
+carry \dataRegexViolations and \dataShellViolations violations respectively,
+despite making up only \dataRegexShare and \dataShellShare of classified samples;
 relative to their sample counts they are
 far more often non-compliant than prose or identifiers.
 CSS is similarly disproportionate,
-contributing 98,186 violations from only 275,165 samples.
+contributing \dataCssViolations violations from only \dataCssSamples samples.
 By contrast, identifier-like tokens and URLs
 are essentially violation-free.
 The pattern is that unmatched matchers cluster
@@ -145,14 +151,14 @@ is where the matchertext discipline bites.
 Resolving the data by host language separates two effects.
 The first is the per-sample violation \emph{rate}:
 the bracket-single-use categories are most violation-prone
-wherever they appear, and most acutely in JavaScript,
-where regular expressions average 0.70 violations per sample,
-shell fragments 0.41, and CSS 0.38.
+wherever they appear, and acutely in JavaScript,
+where regular expressions average \dataJsRegexRate violations per sample,
+shell fragments \dataJsShellRate, and CSS \dataJsCssRate.
 The second is absolute \emph{contribution}, which is partly volume-driven:
 in C++ and Java the single largest source of violations
-is ordinary prose (46.3\% and 74.9\% of each language's violations),
+is ordinary prose (\dataCppProseViolationShare and \dataJavaProseViolationShare of each language's violations),
 not because prose is error-prone --
-its rate is only about 0.02 --
+its rate is only about \dataProseRate{} --
 but because prose strings are so numerous.
 The category leading a host's violations thus differs by host,
 but the categories intrinsically most likely to violate
@@ -160,10 +166,10 @@ are consistent across hosts.
 
 Most string literals are not cross-language embeddings at all:
 plain prose, identifier-like tokens, and file paths
-account for about 83\% of classified samples (\cref{tab:eval:categories}).
+account for about \dataBulkShare of classified samples (\cref{tab:eval:categories}).
 Among the languages that motivate our injection discussion,
-SQL accounts for 0.79\%, CSS for 0.22\%,
-JSON for 0.19\%, and XML for 0.06\%.
+SQL accounts for \dataSqlShare, JSON for \dataJsonShare,
+CSS for \dataCssShare, and XML for \dataXmlShare.
 Because the corpus is infrastructure-heavy (\cref{sec:eval:methodology}),
 these figures likely understate web-facing combinations
 such as SQL in application code or HTML templating.
@@ -185,23 +191,15 @@ and it shows what is embedded, not why.
 	without taking up any more vertical space.}
 Category	& Share		& Violations	& Toothpicks	\\
 \hline
-PlainText	& 40.6\%	& 557,736	& 8,380,105	\\
-IdentifierLike	& 31.1\%	& 0		& 20,585	\\
-FilePath	& 11.2\%	& 12,932	& 455,055	\\
-FormatString	& 5.8\%		& 204,505	& 3,119,607	\\
-HTML		& 1.8\%		& 81,491	& 203,111	\\
-Regex		& 1.6\%		& 670,118	& 3,065,895	\\
-Shell		& 1.6\%		& 534,719	& 424,046	\\
-HexData		& 1.4\%		& 0		& 1,835		\\
-URL		& 1.3\%		& 983		& 3		\\
+\dataTblCategoryRows
 \hline
 \end{tabular}
 \end{footnotesize}
 \end{center}
-\caption{Largest embedded-string categories by share of the 127.1\,M classified string samples
-	(27\% of all), with their violations and toothpicks; categories below 1\% are omitted.
-	The 342.5\,M unclassified samples carry 6.24\,M of the 8.97\,M violations
-	and 74.0\,M of the 178.1\,M toothpicks.}
+\caption{Largest embedded-string categories by share of the \dataClassified classified string samples
+	(\dataClassifiedShare of all), with their violations and toothpicks; categories below 1\% are omitted.
+	The \dataUnclassified unclassified samples carry \dataUnclassifiedViolations of the \dataStrViolations violations
+	and \dataUnclassifiedToothpicks of the \dataToothpicksShort toothpicks.}
 \label{tab:eval:categories}
 \end{table}
 
@@ -212,11 +210,11 @@ URL		& 1.3\%		& 983		& 3		\\
 The central benefit of matchertext is the escaping it removes.
 Rewriting each compliant string literal
 as an equivalent C++ raw string literal
-eliminates 94.78\% of all toothpicks in the corpus,
+eliminates \dataReduction of all toothpicks in the corpus,
 cutting the string-literal toothpick total
-from about 178.1~million to about 9.30~million.
+from about \dataToothpicks to about \dataToothpicksConverted.
 Escaped binary data alone (BinaryData and PseudoBinaryData)
-holds 84.0~million of these toothpicks.
+holds \dataBinaryToothpicks of these toothpicks.
 As a concrete case,
 the compliant C++ regular-expression literal
 \verb|"\\b,\"axis\":(\\d+)\\b"|
@@ -228,32 +226,29 @@ and only the three genuine backslash escapes remain --
 a 62.5\% reduction in that one literal.
 
 The reduction is large but content-dependent.
-Across the 79 organizations it ranges
-from 23.6\% to 100\%,
-but once a handful of low outliers are set aside
-the bulk of organizations fall in an 85--100\% band.
+Across the \dataOrgs organizations it ranges
+from \dataOrgReductionMin to \dataOrgReductionMax,
+with half of them between \dataOrgReductionQOne and \dataOrgReductionQThree.
 As \cref{tab:eval:hostlang} shows, it also varies by host language:
-mainstream C-family and JVM languages
-see almost all of their compliant-literal toothpicks eliminated
-(Java 99.93\%, JavaScript 99.82\%, Go 99.66\%),
-while a few reduce much less,
-most strikingly OCaml (19.86\%) and Python (42.89\%).
+C-family languages and Java
+see most of their toothpicks eliminated
+(C \dataHostCReduction, C++ \dataHostCppReduction, Java \dataHostJavaReduction),
+while others reduce much less,
+most strikingly Go (\dataHostGoReduction), Python (\dataHostPythonReduction),
+and TypeScript (\dataHostTypeScriptReduction).
 
 A notable finding is that compliance and escape relief
 are largely \emph{independent},
 turning on where a language's escaping actually lives.
-Python is the clearest case:
-its string literals are 99.54\% compliant,
+TypeScript is the clearest case:
+its string literals are \dataHostTypeScriptCompliance compliant,
 among the highest in the corpus,
-yet rewriting them removes only 42.89\% of their toothpicks,
+yet rewriting them removes only \dataHostTypeScriptReduction of their toothpicks,
 among the lowest.
-The reason is that most of Python's backslashes
-sit in escaped binary-like strings
-that are themselves non-compliant,
-so the conversion never reaches them;
-in JavaScript, by contrast,
-almost all backslashes sit in compliant binary data
-that the conversion does relieve.
+The reason is that most of its backslashes (\dataTsRegexToothpickShare)
+sit in regular expressions,
+whose own escapes, like the three in the example above,
+survive the rewriting.
 A language can therefore satisfy the matchertext rule almost everywhere
 and still gain little from raw-string rewriting:
 the cost of becoming compliant
@@ -266,16 +261,7 @@ and the benefit of doing so are distinct quantities.
 \hline
 Host language	& Orgs	& String samples	& Compliance	& Reduction	& Max depth	\\
 \hline
-JavaScript	& 77	& 206.8\,M	& 98.52\%	& 99.82\%	& 11,777	\\
-Java		& 49	& 66.9\,M	& 97.24\%	& 99.93\%	& 50		\\
-Python		& 72	& 34.0\,M	& 99.54\%	& 42.89\%	& 8,394		\\
-Go		& 43	& 30.9\,M	& 99.20\%	& 99.66\%	& 652		\\
-C++		& 61	& 27.2\,M	& 97.67\%	& 93.45\%	& 41,066	\\
-TypeScript	& 62	& 20.0\,M	& 99.75\%	& 98.66\%	& 333		\\
-C		& 70	& 18.6\,M	& 99.00\%	& 91.55\%	& 305		\\
-C\#		& 37	& 18.3\,M	& 98.76\%	& 99.01\%	& 3,757		\\
-Rust		& 49	& 7.1\,M	& 99.20\%	& 98.44\%	& 148		\\
-OCaml		& 18	& 399\,k	& 96.65\%	& 19.86\%	& 87		\\
+\dataTblHostRows
 \hline
 \end{tabular}
 \end{footnotesize}
@@ -284,7 +270,7 @@ OCaml		& 18	& 399\,k	& 96.65\%	& 19.86\%	& 87		\\
 	contributing organizations, string-sample count,
 	string-literal compliance rate, toothpick reduction,
 	and the deepest raw matcher nesting observed in any single sample.
-	OCaml is shown as the lowest-reduction language in the corpus.}
+	\dataHostLeastCompliant is shown as the least-compliant host language in the corpus.}
 \label{tab:eval:hostlang}
 \end{table*}
 
@@ -296,13 +282,13 @@ Most embedding is shallow.
 Most samples contain no matchers at all,
 and depth falls off sharply beyond one:
 the average per-sample maximum depth
-is only 0.102 for string literals
-and 0.275 for comments.
+is only \dataStrAvgDepth for string literals
+and \dataDocAvgDepth for comments.
 Deep nesting does occur in a heavy tail --
-the single deepest string sample reaches a raw depth of 41,066,
-in C++ (though that literal's deepest \emph{matched} nesting is only 500),
-followed by maxima in JavaScript (11,777), Python (8,394),
-and C\# (3,757) --
+the single deepest string sample reaches a raw depth of \dataStrMaxDepth,
+in \dataStrMaxDepthHost (though that literal's deepest \emph{matched} nesting is at most \dataStrMaxDepthValidBound),
+followed by maxima in JavaScript (\dataHostJavaScriptMaxDepth), C\# (\dataHostCSharpMaxDepth),
+and Python (\dataHostPythonMaxDepth) --
 but such cases are vanishingly rare.
 Comments nest more on average than string literals,
 consistent with comments containing structured examples and prose,
@@ -315,10 +301,10 @@ For reference, \cref{app:nesting} plots the full depth distribution.
 
 The results suggest that the adoption cost is small
 and the benefit could be large.
-Over 98\% of string literals and nearly 97\% of comments need no change,
+Over \dataStrComplianceFloor of string literals and over \dataDocComplianceFloor of comments need no change,
 and rewriting the compliant majority
 as raw string literals or matchertext literals
-would remove 94.78\% of the toothpicks.
+would remove \dataReduction of the toothpicks.
 The remaining violations fall where \cref{sec:embed} predicts,
 in syntaxes that use brackets singly,
 and the near-identical strict and relaxed rates show that
