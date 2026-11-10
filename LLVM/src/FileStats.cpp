@@ -31,4 +31,8 @@ void FileStats::DeriveStats() {
   complianceRate.store(100.0 * (n > 0.0 ? (n - wv) / n : 0.0), std::memory_order_relaxed);
   violationAvgRelaxed.store(n > 0.0 ? vr / n : 0.0, std::memory_order_relaxed);
   complianceRateRelaxed.store(100.0 * (n > 0.0 ? (n - wvr) / n : 0.0), std::memory_order_relaxed);
+  wholeComplianceRate.store(
+    100.0 * (n > 0.0 ? wholeCompliant.load(std::memory_order_relaxed) / n : 0.0), std::memory_order_relaxed);
+  wholeComplianceRateRelaxed.store(
+    100.0 * (n > 0.0 ? wholeCompliantRelaxed.load(std::memory_order_relaxed) / n : 0.0), std::memory_order_relaxed);
 }

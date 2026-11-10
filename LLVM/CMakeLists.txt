@@ -129,6 +129,10 @@ add_test(NAME parser_fixture_string_bucket_mix
     COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/string_bucket_mix.cpp)
 add_test(NAME parser_fixture_comment_after_string
     COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/comment_after_string.cpp)
+add_test(NAME parser_fixture_whole_file_fragments_only
+    COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/whole_file_fragments_only.cpp)
+add_test(NAME parser_fixture_whole_file_whole_only
+    COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/whole_file_whole_only.cpp)
 
 add_executable(DebugLanguageOutputTests
     tests/debug_language_output_test.cpp

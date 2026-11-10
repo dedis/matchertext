@@ -7,8 +7,11 @@
 #ifndef PARSER_HPP
 #define PARSER_HPP
 
+#include <cstdint>
+#include <mutex>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "FileStats.hpp"
@@ -27,6 +30,12 @@ struct PerLanguageStats {
   FileStats fileStats;
   LanguageStats langStats;
   RawFormStats rawForms;
+  /// Example files (paths relative to the input) for the off-diagonal cells of
+  /// fragments compliant x whole file compliant (strict), at most kMaxExamples each.
+  static constexpr size_t kMaxExamples = 5;
+  std::mutex examplesMutex;
+  std::vector<std::string> fragmentsOnlyExamples;
+  std::vector<std::string> wholeOnlyExamples;
 };
 
 /**
@@ -92,6 +101,15 @@ class Parser final {
     inline static FileStats FILE_STATS{};
     /// Per-language classification statistics for strings
     inline static LanguageStats STRING_LANG_STATS{};
+
+    /// One distinct file content (keyed by its 64-bit FNV-1a hash): how many parsed
+    /// files have it, and their string samples. Used to measure exact duplicates.
+    struct FileContent {
+      uint64_t files = 0;
+      uint64_t strings = 0;
+    };
+    inline static std::unordered_map<uint64_t, FileContent> FILE_CONTENTS{};
+    inline static std::mutex FILE_CONTENTS_MUTEX;
 
     /// What adjacent C/C++ literal segments add up to in a raw rewrite.
     struct RawLiteral {

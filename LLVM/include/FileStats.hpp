@@ -26,7 +26,15 @@
   X(complianceRateRelaxed, "Compliance Rate Relaxed", "Percentage of files without relaxed non-compliance.") \
   X(skippedOversized, "Skipped Oversized", "Files not parsed because they exceed 16 MiB; not in Sample Size.") \
   X(skippedBinary, "Skipped Binary", "Files not parsed because they contain a NUL byte; not in Sample Size.") \
-  X(skippedTimeout, "Skipped Timeout", "Files whose parse did not finish within 5 seconds; not in Sample Size.")
+  X(skippedTimeout, "Skipped Timeout", "Files whose parse did not finish within 5 seconds; not in Sample Size.") \
+  X(wholeCompliant, "Whole-File Compliant", "Number of files whose entire source text is matchertext under the strict rule.") \
+  X(wholeComplianceRate, "Whole-File Compliance Rate", "Percentage of files whose entire source text is matchertext under the strict rule.") \
+  X(wholeCompliantRelaxed, "Whole-File Compliant Relaxed", "Number of files whose entire source text is matchertext under the relaxed rule.") \
+  X(wholeComplianceRateRelaxed, "Whole-File Compliance Rate Relaxed", "Percentage of files whose entire source text is matchertext under the relaxed rule.") \
+  X(bothCompliant, "Fragments And Whole File Compliant", "Number of files whose literals and comments are all compliant and whose entire source text is matchertext (strict).") \
+  X(fragmentsOnlyCompliant, "Fragments Compliant Only", "Number of files whose literals and comments are all compliant but whose entire source text is not matchertext (strict).") \
+  X(wholeOnlyCompliant, "Whole File Compliant Only", "Number of files whose entire source text is matchertext although some literal or comment is not (strict).") \
+  X(neitherCompliant, "Neither Compliant", "Number of files with a non-compliant literal or comment whose entire source text is not matchertext either (strict).")
 CREATE_STATS_HPP_NO_EXTRA(FileStats, FILE_STATS_FIELDS)
 
 /// Why a file yielded no samples without being parsed.

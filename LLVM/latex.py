@@ -8,7 +8,8 @@ doc/main.tex pulls in.
 
 Scalar macros end in \\xspace so they can be written inline without a
 trailing {}. Counts are formatted 13{,}691 and percentages 98.69\\%,
-matching the prose style. The table bodies \\dataTblCategoryRows and
+matching the prose style. The table bodies \\dataTblCategoryRows,
+\\dataTblCategoryToothpickRows and
 \\dataTblHostRows expand to complete tabular rows.
 
 Usage: python3 latex.py   (from any directory)
@@ -60,6 +61,10 @@ def macro_name(lang):
     return special.get(lang, "".join(c for c in lang if c.isalnum()))
 
 
+# Shown for figures the current results do not have yet.
+PENDING = "\\textbf{??}"
+
+
 def macro(name, value):
     return f"\\newcommand{{\\data{name}}}{{{value}\\xspace}}\n"
 
@@ -106,6 +111,8 @@ def main():
     g = metrics(os.path.join(GLOBAL, "strings.md"))
     f = metrics(os.path.join(GLOBAL, "files.md"))
     cats = categories(os.path.join(GLOBAL, "language_stats.md"))
+    # Unclassified strings: a row of their own, kept out of the classified shares.
+    unknown = cats.pop("Unknown", None)
 
     str_n, doc_n = g["Sample Size"][0], g["Sample Size"][1]
     toothpicks = g["Total Toothpicks"][0]
@@ -117,6 +124,16 @@ def main():
     reduction = g["Toothpick Reduction Total (%)"][0]
 
     classified = sum(c["count"] for c in cats.values())
+    whole_file = "Whole-File Compliance Rate" in f
+    dup_path = os.path.join(GLOBAL, "duplicates.md")
+    dup = ({k: float(v[0]) for k, v in table(dup_path, after=None).items()}
+           if os.path.isfile(dup_path) else {})
+    if not dup.get("Parsed Files"):
+        dup = {}                    # results from before the duplicate check
+    if unknown is None:             # results from before the Unknown row
+        unknown = dict(count=str_n - classified,
+                       viol=violations - sum(c["viol"] for c in cats.values()),
+                       tp=toothpicks - sum(c["tp"] for c in cats.values()))
     share = {k: 100 * c["count"] / classified for k, c in cats.items()}
 
     # per organisation and per host language
@@ -152,6 +169,8 @@ def main():
             cp = os.path.join(base, lang, "language_stats.md")
             if os.path.isfile(cp):
                 for k, v in categories(cp).items():
+                    if k == "Unknown":
+                        continue
                     c = h["cats"].setdefault(k, dict(count=0, viol=0, tp=0))
                     for field in c:
                         c[field] += v[field]
@@ -195,15 +214,24 @@ def main():
         ("DocComplianceRelaxed", pct(g["Compliance Rate"][2])),
         ("FileCompliance", pct(f["Compliance Rate"][0])),
         ("FileComplianceRelaxed", pct(f["Compliance Rate Relaxed"][0])),
+        # whole-file check: the file's entire source text is matchertext (strict)
+        ("WholeFileCompliance", pct(f["Whole-File Compliance Rate"][0]) if whole_file else PENDING),
+        ("WholeFileComplianceRelaxed",
+         pct(f["Whole-File Compliance Rate Relaxed"][0]) if whole_file else PENDING),
+        ("FilesFragmentsOnly", num(f["Fragments Compliant Only"][0]) if whole_file else PENDING),
+        ("FilesWholeOnly", num(f["Whole File Compliant Only"][0]) if whole_file else PENDING),
+        # exact content duplicates across the corpus
+        ("DupFileShare", pct(dup["Duplicate File Share (%)"], 1) if dup else PENDING),
+        ("DupStringShare", pct(dup["Duplicate String Sample Share (%)"], 1) if dup else PENDING),
         ("HostComplianceMin", pct(hosts[least_compliant]["compliance"])),
         ("HostComplianceMax", pct(max(h["compliance"] for h in hosts.values()))),
         ("HostLeastCompliant", tex_name(least_compliant)),
         # Q2: categories
         ("Classified", short(classified)),
         ("ClassifiedShare", pct(100 * classified / str_n, 0)),
-        ("Unclassified", short(str_n - classified)),
-        ("UnclassifiedViolations", short(violations - sum(c["viol"] for c in cats.values()), 2)),
-        ("UnclassifiedToothpicks", short(toothpicks - sum(c["tp"] for c in cats.values()))),
+        ("Unclassified", short(unknown["count"])),
+        ("UnclassifiedViolations", short(unknown["viol"], 2)),
+        ("UnclassifiedToothpicks", short(unknown["tp"])),
         ("StrViolations", short(violations, 2)),
         ("ToothpicksShort", short(toothpicks)),
         ("RegexViolations", num(cats["Regex"]["viol"])),
@@ -256,9 +284,18 @@ def main():
                  (m + "MaxDepth", num(h["maxdepth"]))]
 
     category_rows = "".join(
-        f"{k}\t& {pct(share[k], 1)}\t& {num(c['viol'])}\t& {num(c['tp'])}\t\\\\\n"
+        f"{k}\t& {pct(share[k], 1)}\t& {short(c['count'])}\t& {num(c['viol'])}\t& {num(c['tp'])}\t\\\\\n"
         for k, c in sorted(cats.items(), key=lambda kv: -kv[1]["count"])
         if share[k] >= CATEGORY_MIN_SHARE)
+    category_rows += (f"\\hline\nUnknown\t& ---\t& {short(unknown['count'])}\t& {num(unknown['viol'])}"
+                      f"\t& {num(unknown['tp'])}\t\\\\\n")
+    # The same number of categories, ranked by toothpicks (share of all string toothpicks).
+    shown = sum(1 for k in cats if share[k] >= CATEGORY_MIN_SHARE)
+    toothpick_rows = "".join(
+        f"{k}\t& {num(c['tp'])}\t& {pct(100 * c['tp'] / toothpicks, 1)}\t\\\\\n"
+        for k, c in sorted(cats.items(), key=lambda kv: -kv[1]["tp"])[:shown])
+    toothpick_rows += (f"\\hline\nUnknown\t& {num(unknown['tp'])}\t& {pct(100 * unknown['tp'] / toothpicks, 1)}"
+                       f"\t\\\\\n")
     table_hosts = sorted(set(TABLE_HOSTS) | {least_compliant}, key=lambda h: -hosts[h]["n"])
     host_rows = "".join(
         f"{tex_name(lang)}\t& {h['orgs']}\t& {short(h['n'])}\t& {pct(h['compliance'])}"
@@ -271,9 +308,11 @@ def main():
         out.write("".join(macro(k, v) for k, v in vals))
         out.write("%% Rows of tab:eval:categories\n")
         out.write(f"\\newcommand{{\\dataTblCategoryRows}}{{%\n{category_rows}}}\n")
+        out.write("%% Rows of tab:eval:categories:toothpicks\n")
+        out.write(f"\\newcommand{{\\dataTblCategoryToothpickRows}}{{%\n{toothpick_rows}}}\n")
         out.write("%% Rows of tab:eval:hostlang\n")
         out.write(f"\\newcommand{{\\dataTblHostRows}}{{%\n{host_rows}}}\n")
-    print(f"wrote {len(vals)} macros and 2 table bodies to {os.path.relpath(OUT)}")
+    print(f"wrote {len(vals)} macros and 3 table bodies to {os.path.relpath(OUT)}")
 
 
 if __name__ == "__main__":

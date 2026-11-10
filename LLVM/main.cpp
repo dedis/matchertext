@@ -446,6 +446,12 @@ int main(const int argc, char *argv[]) {
       auto f = open_stat_file("language_stats.md");
       f << "# String Language Distribution\n\n";
       PrintLanguageStatsTable({{"String", Parser::STRING_LANG_STATS.Snapshot()}}, f);
+    } {
+      // One line per distinct file content: hash, files, string samples. build_global.py
+      // merges them across organizations to count exact duplicates.
+      auto f = open_stat_file("file_contents.tsv");
+      for (const auto &[hash, content]: Parser::FILE_CONTENTS)
+        f << std::hex << hash << std::dec << '\t' << content.files << '\t' << content.strings << '\n';
     }
 
     for (const auto &[lang, pls]: perLangStats) {
@@ -495,6 +501,15 @@ int main(const int argc, char *argv[]) {
         auto f = open_lang_file("raw_forms.md");
         f << "# Native Raw String Forms\n\n";
         PrintRawFormStatsTable(pls->rawForms, f);
+      } {
+        auto f = open_lang_file("file_examples.md");
+        f << "# Whole-File Compliance Examples\n\n";
+        f << "## Fragments Compliant Only\n\n";
+        for (const auto &example: pls->fragmentsOnlyExamples)
+          f << "- " << example << '\n';
+        f << "\n## Whole File Compliant Only\n\n";
+        for (const auto &example: pls->wholeOnlyExamples)
+          f << "- " << example << '\n';
       }
     }
 

@@ -10,7 +10,9 @@ Rules:
 Output: result/global/{strings,nesting,files,language_stats}.md, plus
   language_stats_by_toothpicks.md (string languages sorted by toothpicks) and
   host_languages_by_characters.md (host languages sorted by raw characters), and
-  raw_forms.md (how each host's native raw string forms hold its strings).
+  raw_forms.md (how each host's native raw string forms hold its strings),
+  whole_file.md (files compliant fragment by fragment vs. as a whole), and
+  duplicates.md (exact content duplicates across the corpus).
 """
 import os, re, sys
 
@@ -180,10 +182,14 @@ s_agg, s_ncols = build_simple("strings.md", S_SUM, S_MAX, s_derived, S_DERIVED)
 # =========================================================================
 F_SUM = {"Sample Size", "With Violation", "Total Violations",
          "With Violation Relaxed", "Total Relaxed Violations",
-         "Skipped Oversized", "Skipped Binary", "Skipped Timeout"}
+         "Skipped Oversized", "Skipped Binary", "Skipped Timeout",
+         "Whole-File Compliant", "Whole-File Compliant Relaxed",
+         "Fragments And Whole File Compliant", "Fragments Compliant Only",
+         "Whole File Compliant Only", "Neither Compliant"}
 F_MAX = {"Maximum Violations", "Maximum Relaxed Violations"}
 F_DERIVED = {"Average Violations", "Compliance Rate",
-             "Average Relaxed Violations", "Compliance Rate Relaxed"}
+             "Average Relaxed Violations", "Compliance Rate Relaxed",
+             "Whole-File Compliance Rate", "Whole-File Compliance Rate Relaxed"}
 
 def f_derived(m, c, a):
     g = lambda k: a[k][c] if k in a else 0.0
@@ -191,6 +197,9 @@ def f_derived(m, c, a):
     if m == "Compliance Rate":            return div(g("Sample Size") - g("With Violation"), g("Sample Size")) * 100
     if m == "Average Relaxed Violations": return div(g("Total Relaxed Violations"), g("Sample Size"))
     if m == "Compliance Rate Relaxed":    return div(g("Sample Size") - g("With Violation Relaxed"), g("Sample Size")) * 100
+    if m == "Whole-File Compliance Rate": return div(g("Whole-File Compliant"), g("Sample Size")) * 100
+    if m == "Whole-File Compliance Rate Relaxed":
+        return div(g("Whole-File Compliant Relaxed"), g("Sample Size")) * 100
     return 0.0
 
 f_agg, _ = build_simple("files.md", F_SUM, F_MAX, f_derived, F_DERIVED)
@@ -377,7 +386,102 @@ for h in hosts_order:
         "%.1f%% / %.1f%%" % (pct_of(raw[h], k, 1), pct_of(raw[h], k, 2)) for k in holds) + " |")
 open(os.path.join(OUTDIR, "raw_forms.md"), "w").write("\n".join(out) + "\n")
 
-print("\nWrote 7 files to %s\n" % OUTDIR)
+# =========================================================================
+# whole_file.md  (per host language: files compliant fragment by fragment vs.
+# as a whole, from @org/language_stats/<Language>/{files,file_examples}.md)
+# =========================================================================
+CELLS = ("Fragments And Whole File Compliant", "Fragments Compliant Only",
+         "Whole File Compliant Only", "Neither Compliant")
+EXAMPLES_PER_CELL = 10
+whole = {}                          # host -> {metric: sum}
+examples = {}                       # host -> (fragments only, whole only) example paths
+for org in orgs:
+    base = path(org, "language_stats")
+    if not os.path.isdir(base):
+        continue
+    for lang in os.listdir(base):
+        p = os.path.join(base, lang, "files.md")
+        if not os.path.isfile(p):
+            continue
+        _, _, r = find_table(open(p).read(), after="## Data")
+        row = {split_row(x)[0]: parse_num(split_row(x)[1]) or 0.0 for x in r[2:]}
+        if "Whole-File Compliant" not in row:
+            continue                # results from before the whole-file check
+        acc = whole.setdefault(lang, {})
+        for metric in ("Sample Size", "Whole-File Compliant", "Whole-File Compliant Relaxed") + CELLS:
+            acc[metric] = acc.get(metric, 0.0) + row.get(metric, 0.0)
+        ex = examples.setdefault(lang, ([], []))
+        ep = os.path.join(base, lang, "file_examples.md")
+        if os.path.isfile(ep):
+            cell = None
+            for line in open(ep):
+                if line.startswith("## "):
+                    cell = 0 if "Fragments" in line else 1
+                elif line.startswith("- ") and cell is not None and len(ex[cell]) < EXAMPLES_PER_CELL:
+                    ex[cell].append("%s/%s" % (org, line[2:].strip()))
+whole = {h: v for h, v in whole.items() if v["Sample Size"]}
+whole_total = {m: sum(v[m] for v in whole.values()) for m in next(iter(whole.values()), {})}
+out = ["# Whole-File Compliance", note,
+       "<!-- Fragments: all string literals and comments of the file are compliant (strict); "
+       "this is the file compliance of files.md. Whole file: the file's entire source text is "
+       "matchertext (strict). Character literals are not fragments, so they count only in the "
+       "whole-file check. -->", "",
+       "| Host Language | Files | Both | Fragments Only | Whole File Only | Neither "
+       "| Whole-File Compliance | Whole-File Compliance (Relaxed) |",
+       "|---|---|---|---|---|---|---|---|"]
+def whole_row(name, v):
+    n = v["Sample Size"]
+    return "| %s | %s | %s | %s | %s | %s | %.2f%% | %.2f%% |" % (
+        (name, fmt_int(n)) + tuple(fmt_int(v[c]) for c in CELLS) +
+        (div(v["Whole-File Compliant"], n) * 100, div(v["Whole-File Compliant Relaxed"], n) * 100))
+for h in sorted(whole, key=lambda k: (-whole[k]["Sample Size"], k)):
+    out.append(whole_row(h, whole[h]))
+if whole:
+    out.append(whole_row("**Total**", whole_total))
+for title, cell in (("Fragments Compliant, Whole File Not", 0), ("Whole File Compliant, Fragments Not", 1)):
+    out += ["", "## Examples: %s" % title, ""]
+    for h in sorted(examples):
+        for e in examples[h][cell]:
+            out.append("- %s: %s" % (h, e))
+open(os.path.join(OUTDIR, "whole_file.md"), "w").write("\n".join(out) + "\n")
+
+# =========================================================================
+# duplicates.md  (merge result/repos/$ORG/@org/file_contents.tsv: one line per
+# distinct file content, hash<TAB>files<TAB>string samples)
+# =========================================================================
+contents = {}                       # hash -> files * 2**32 + string samples
+for org in orgs:
+    p = path(org, "file_contents.tsv")
+    if not os.path.isfile(p):
+        continue
+    with open(p) as f:
+        for line in f:
+            h, files, strings = line.split("\t")
+            key = int(h, 16)
+            contents[key] = contents.get(key, 0) + (int(files) << 32) + int(strings)
+files_total = strings_total = dup_files = dup_strings = 0
+for packed in contents.values():
+    files, strings = packed >> 32, packed & 0xFFFFFFFF
+    files_total += files
+    strings_total += strings
+    if files > 1:                   # every copy but one is a duplicate
+        dup_files += files - 1
+        dup_strings += strings - strings // files
+out = ["# Exact Content Duplicates", note,
+       "<!-- Parsed files grouped by a 64-bit FNV-1a hash of their content across all "
+       "organizations. Every copy of a content but one counts as a duplicate. -->", "",
+       "| Metric | Value |", "|---|---|",
+       "| Parsed Files | %s |" % fmt_int(files_total),
+       "| Distinct Contents | %s |" % fmt_int(len(contents)),
+       "| Duplicate Files | %s |" % fmt_int(dup_files),
+       "| Duplicate File Share (%%) | %.2f |" % (div(dup_files, files_total) * 100),
+       "| String Samples | %s |" % fmt_int(strings_total),
+       "| String Samples in Duplicate Files | %s |" % fmt_int(dup_strings),
+       "| Duplicate String Sample Share (%%) | %.2f |" % (div(dup_strings, strings_total) * 100)]
+open(os.path.join(OUTDIR, "duplicates.md"), "w").write("\n".join(out) + "\n")
+del contents
+
+print("\nWrote 9 files to %s\n" % OUTDIR)
 print("Key global figures (Strings column):")
 def gv(a, m): return a[m][0]
 print("  Sample Size            : %s" % fmt_g(gv(s_agg, "Sample Size")))

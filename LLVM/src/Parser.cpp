@@ -473,15 +473,27 @@ bool Parser::ParseC_CPP(const std::string &path, const LanguageEnum language, Se
   return true;
 }
 
+namespace {
+  /// 64-bit FNV-1a hash of a file's content, to find exact duplicates across the corpus.
+  uint64_t ContentHash(const std::string_view text) {
+    uint64_t hash = 0xcbf29ce484222325;
+    for (const unsigned char c: text)
+      hash = (hash ^ c) * 0x100000001b3;
+    return hash;
+  }
+}
+
 void Parser::GatherStatistics(
   Serde::JSON &&json, const std::string &path, const std::string_view inputPath, PerLanguageStats *perLang
 ) {
   uint64_t fileViolations = 0;
   uint64_t fileViolationsRelaxed = 0;
+  uint64_t fileStrings = 0;
 
   for (auto e: json.GetArray()) {
     std::string value = e["value"].GetString();
     if (e["kind"].GetString() == "string") {
+      ++fileStrings;
       // Both producers (ParseC_CPP, TreeSitter::Parse) emit the converted count.
       const auto convertedToothpicks = static_cast<uint64_t>(e["convertedToothpicks"].GetNumber());
       const bool rawHolds = e["rawHolds"].GetNumber() != 0.0;
@@ -531,6 +543,43 @@ void Parser::GatherStatistics(
   updateFileStats(FILE_STATS, fileViolations, fileViolationsRelaxed);
   if (perLang)
     updateFileStats(perLang->fileStats, fileViolations, fileViolationsRelaxed);
+
+  /// The whole source text: is it matchertext as a whole, and is it an exact
+  /// duplicate of another file in the corpus?
+  std::ifstream in(path, std::ios::binary);
+  if (!in)
+    return;
+  const std::string text{std::istreambuf_iterator(in), std::istreambuf_iterator<char>()};
+  const bool whole = AnalyzeMatcherText(text, false).unmatched == 0;
+  const bool wholeRelaxed = AnalyzeMatcherText(text, true).unmatched == 0;
+  const bool fragments = fileViolations == 0;
+  const auto updateWholeFile = [&](FileStats &fs) {
+    if (whole)
+      AtomicAdd(fs.wholeCompliant, 1.0);
+    if (wholeRelaxed)
+      AtomicAdd(fs.wholeCompliantRelaxed, 1.0);
+    AtomicAdd(fragments ? (whole ? fs.bothCompliant : fs.fragmentsOnlyCompliant)
+                        : (whole ? fs.wholeOnlyCompliant : fs.neitherCompliant), 1.0);
+  };
+  updateWholeFile(FILE_STATS);
+  if (perLang) {
+    updateWholeFile(perLang->fileStats);
+    if (fragments != whole) {
+      std::string relative = path;
+      if (!inputPath.empty() && relative.starts_with(inputPath))
+        relative.erase(0, inputPath.size() + (relative.size() > inputPath.size() && relative[inputPath.size()] == '/'));
+      std::lock_guard lock(perLang->examplesMutex);
+      if (auto &examples = fragments ? perLang->fragmentsOnlyExamples : perLang->wholeOnlyExamples;
+          examples.size() < PerLanguageStats::kMaxExamples)
+        examples.push_back(std::move(relative));
+    }
+  }
+
+  const uint64_t hash = ContentHash(text);
+  std::lock_guard lock(FILE_CONTENTS_MUTEX);
+  auto &[files, strings] = FILE_CONTENTS[hash];
+  ++files;
+  strings += fileStrings;
 }
 
 uint64_t Parser::process(
@@ -565,17 +614,17 @@ uint64_t Parser::process(
   /// toward the sample, character, toothpick and language stats only.
   bool inScope = true;
   if (langStats != nullptr) {
-    /// Classify the embedded language and record per-language stats only for strings.
-    if (const auto [lang, confidence] = ClassifyString(string); lang != LanguageEnum::Unknown) {
-      inScope = InMatchertextScope(lang);
-      langStats->Record(lang, unmatched, toothpicks);
-      if (extraLangStats)
-        extraLangStats->Record(lang, unmatched, toothpicks);
-      GetDebugLanguageLogger().Record(
-        inputPath, lang, sourcePath, string,
-        confidence, unmatched, toothpicks
-      );
-    }
+    /// Classify the embedded language and record per-language stats only for
+    /// strings; unclassified strings are recorded as Unknown.
+    const auto [lang, confidence] = ClassifyString(string);
+    inScope = InMatchertextScope(lang);
+    langStats->Record(lang, unmatched, toothpicks);
+    if (extraLangStats)
+      extraLangStats->Record(lang, unmatched, toothpicks);
+    GetDebugLanguageLogger().Record(
+      inputPath, lang, sourcePath, string,
+      confidence, unmatched, toothpicks
+    );
   }
 
   if (rawForms)

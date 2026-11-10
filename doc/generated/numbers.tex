@@ -17,6 +17,12 @@
 \newcommand{\dataDocComplianceRelaxed}{96.57\%\xspace}
 \newcommand{\dataFileCompliance}{86.55\%\xspace}
 \newcommand{\dataFileComplianceRelaxed}{86.68\%\xspace}
+\newcommand{\dataWholeFileCompliance}{\textbf{??}\xspace}
+\newcommand{\dataWholeFileComplianceRelaxed}{\textbf{??}\xspace}
+\newcommand{\dataFilesFragmentsOnly}{\textbf{??}\xspace}
+\newcommand{\dataFilesWholeOnly}{\textbf{??}\xspace}
+\newcommand{\dataDupFileShare}{\textbf{??}\xspace}
+\newcommand{\dataDupStringShare}{\textbf{??}\xspace}
 \newcommand{\dataHostComplianceMin}{96.61\%\xspace}
 \newcommand{\dataHostComplianceMax}{99.93\%\xspace}
 \newcommand{\dataHostLeastCompliant}{OCaml\xspace}
@@ -191,15 +197,31 @@
 \newcommand{\dataHostTypeScriptMaxDepth}{333\xspace}
 %% Rows of tab:eval:categories
 \newcommand{\dataTblCategoryRows}{%
-PlainText	& 40.3\%	& 585{,}971	& 18{,}842{,}249	\\
-IdentifierLike	& 31.6\%	& 0	& 152{,}822	\\
-FilePath	& 11.4\%	& 15{,}855	& 865{,}647	\\
-FormatString	& 5.6\%	& 199{,}869	& 4{,}009{,}956	\\
-Regex	& 1.6\%	& 642{,}457	& 10{,}972{,}811	\\
-HTML	& 1.6\%	& 78{,}227	& 4{,}795{,}302	\\
-URL	& 1.4\%	& 1{,}220	& 46	\\
-Shell	& 1.3\%	& 337{,}588	& 2{,}333{,}691	\\
-HexData	& 1.3\%	& 0	& 2{,}032	\\
+PlainText	& 40.3\%	& 54.5\,M	& 585{,}971	& 18{,}842{,}249	\\
+IdentifierLike	& 31.6\%	& 42.8\,M	& 0	& 152{,}822	\\
+FilePath	& 11.4\%	& 15.4\,M	& 15{,}855	& 865{,}647	\\
+FormatString	& 5.6\%	& 7.6\,M	& 199{,}869	& 4{,}009{,}956	\\
+Regex	& 1.6\%	& 2.2\,M	& 642{,}457	& 10{,}972{,}811	\\
+HTML	& 1.6\%	& 2.2\,M	& 78{,}227	& 4{,}795{,}302	\\
+URL	& 1.4\%	& 1.9\,M	& 1{,}220	& 46	\\
+Shell	& 1.3\%	& 1.8\,M	& 337{,}588	& 2{,}333{,}691	\\
+HexData	& 1.3\%	& 1.7\,M	& 0	& 2{,}032	\\
+\hline
+Unknown	& ---	& 340.7\,M	& 5{,}642{,}782	& 105{,}638{,}944	\\
+}
+%% Rows of tab:eval:categories:toothpicks
+\newcommand{\dataTblCategoryToothpickRows}{%
+BinaryData	& 57{,}491{,}530	& 21.8\%	\\
+PseudoBinaryData	& 35{,}486{,}064	& 13.4\%	\\
+PlainText	& 18{,}842{,}249	& 7.1\%	\\
+PseudoURL	& 11{,}687{,}370	& 4.4\%	\\
+Regex	& 10{,}972{,}811	& 4.2\%	\\
+JSON	& 6{,}947{,}694	& 2.6\%	\\
+HTML	& 4{,}795{,}302	& 1.8\%	\\
+FormatString	& 4{,}009{,}956	& 1.5\%	\\
+Shell	& 2{,}333{,}691	& 0.9\%	\\
+\hline
+Unknown	& 105{,}638{,}944	& 40.0\%	\\
 }
 %% Rows of tab:eval:hostlang
 \newcommand{\dataTblHostRows}{%

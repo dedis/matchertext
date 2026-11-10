@@ -47,6 +47,7 @@ It comprises \dataRepos repositories and roughly \dataFiles source files
 (on the order of 1.5~TiB of code),
 yielding approximately \dataStrSamples string-literal samples
 and \dataDocSamples comment samples.
+Exact duplicates (forks, vendored copies) are \dataDupFileShare of files, with \dataDupStringShare of string samples.
 JavaScript alone contributes about \dataJsStrSamples string samples,
 reflecting both its prevalence and its string-heavy style.
 
@@ -93,6 +94,9 @@ and \dataDocCompliance of comment samples are compliant as written.
 Per file, counting all its literals and comments, compliance is lower, \dataFileCompliance,
 because one violating fragment makes the whole file non-compliant,
 so per-sample-rare violations still touch a noticeable fraction of files.
+As whole source texts, \dataWholeFileCompliance of files are matchertext;
+\dataFilesFragmentsOnly files comply fragment by fragment but not as a whole (\eg \verb|'['|),
+and \dataFilesWholeOnly the reverse (\eg \verb|"["| \dots\ \verb|"]"|).
 The relaxed rule barely changes any of these figures
 (file compliance rises only to \dataFileComplianceRelaxed,
 comments to \dataDocComplianceRelaxed),
@@ -181,9 +185,10 @@ so its finer categories are approximate,
 and it shows what is embedded, not why.
 
 \begin{table}[t]
-\begin{center}
 \begin{footnotesize}
-\begin{tabular}{lrrr}
+\begin{subtable}[t]{0.6\textwidth}
+\centering
+\begin{tabular}{lrrrr}
 \hline
 \xxx{This table is missing a "Samples" column (per category),
 	which should probably be just after the "Share" column
@@ -192,17 +197,31 @@ and it shows what is embedded, not why.
 	Also, I think a graph form would be more visually clear and useful.
 	We could even perhaps include both side-by-side
 	without taking up any more vertical space.}
-Category	& Share		& Violations	& Toothpicks	\\
+Category	& Share		& Samples	& Violations	& Toothpicks	\\
 \hline
 \dataTblCategoryRows
 \hline
 \end{tabular}
+\caption{By share of samples.}
+\label{tab:eval:categories:samples}
+\end{subtable}\hfill
+\begin{subtable}[t]{0.38\textwidth}
+\centering
+\begin{tabular}{lrr}
+\hline
+Category	& Toothpicks	& Share	\\
+\hline
+\dataTblCategoryToothpickRows
+\hline
+\end{tabular}
+\caption{By toothpicks.}
+\label{tab:eval:categories:toothpicks}
+\end{subtable}
 \end{footnotesize}
-\end{center}
 \caption{Largest embedded-string categories by share of the \dataClassified classified string samples
-	(\dataClassifiedShare of all), with their violations and toothpicks; categories below 1\% are omitted.
-	The \dataUnclassified unclassified samples carry \dataUnclassifiedViolations of the \dataStrViolations violations
-	and \dataUnclassifiedToothpicks of the \dataToothpicksShort toothpicks.}
+	(\dataClassifiedShare of all), with their samples, violations and toothpicks; categories below 1\% are omitted.
+	Unknown holds the \dataUnclassified unclassified samples.
+	(b) ranks as many categories by toothpicks, as a share of all string-literal toothpicks.}
 \label{tab:eval:categories}
 \end{table}
 

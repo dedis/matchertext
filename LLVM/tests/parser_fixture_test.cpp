@@ -62,7 +62,9 @@ bool TestBasicLiterals() {
   ok &= CheckEq("basic.strings.raw_chars", strings.rawChars, 73.0);
   ok &= CheckEq("basic.docs.count", docs.count, 1.0);
   ok &= CheckEq("basic.docs_relaxed.count", docsRelaxed.count, 1.0);
-  ok &= CheckEq("basic.lang.total", static_cast<double>(lang.total), 2.0);
+  // Unclassified strings count as Unknown, so every string is in the total.
+  ok &= CheckEq("basic.lang.total", static_cast<double>(lang.total), 6.0);
+  ok &= CheckLanguageCount(lang, LanguageEnum::Unknown, 4);
 
   const uint64_t rawLevel1 =
       stringNested.rawLevels.size() > 1 ? stringNested.rawLevels[1] : 0;
@@ -145,7 +147,8 @@ bool TestCommentsAndRelaxed() {
   ok &= CheckEq("comments.file.violation_count", file.violationCount, 4.0);
   ok &= CheckEq("comments.file.with_violation_relaxed", file.withViolationRelaxed, 0.0);
   ok &= CheckEq("comments.file.violation_count_relaxed", file.violationCountRelaxed, 0.0);
-  ok &= CheckEq("comments.lang.total", static_cast<double>(lang.total), 0.0);
+  ok &= CheckEq("comments.lang.total", static_cast<double>(lang.total), 1.0);
+  ok &= CheckLanguageCount(lang, LanguageEnum::Unknown, 1);
 
   const uint64_t docsRawLevel2 =
       docsNested.rawLevels.size() > 2 ? docsNested.rawLevels[2] : 0;
@@ -180,7 +183,8 @@ bool TestPrefixedLiterals() {
   ok &= CheckEq("prefixed.strings.raw_chars", strings.rawChars, 175.0);
   ok &= CheckEq("prefixed.docs.count", docs.count, 0.0);
   ok &= CheckEq("prefixed.docs_relaxed.count", docsRelaxed.count, 0.0);
-  ok &= CheckEq("prefixed.lang.total", static_cast<double>(lang.total), 4.0);
+  ok &= CheckEq("prefixed.lang.total", static_cast<double>(lang.total), 5.0);
+  ok &= CheckLanguageCount(lang, LanguageEnum::Unknown, 1);
 
   const uint64_t rawLevel1 =
       stringNested.rawLevels.size() > 1 ? stringNested.rawLevels[1] : 0;
@@ -246,6 +250,25 @@ bool TestCommentAfterString() {
   return ok;
 }
 
+/// The file's cell of fragments compliant x whole file compliant (strict), and
+/// its single entry in the corpus-wide content registry.
+bool CheckWholeFile(const std::string_view label, const bool fragments, const bool whole, const double strings) {
+  const auto file = Parser::FILE_STATS.Snapshot();
+  const std::string l(label);
+  bool ok = true;
+  ok &= CheckEq(l + ".file.whole_compliant", file.wholeCompliant, whole ? 1.0 : 0.0);
+  ok &= CheckEq(l + ".file.both", file.bothCompliant, fragments && whole ? 1.0 : 0.0);
+  ok &= CheckEq(l + ".file.fragments_only", file.fragmentsOnlyCompliant, fragments && !whole ? 1.0 : 0.0);
+  ok &= CheckEq(l + ".file.whole_only", file.wholeOnlyCompliant, !fragments && whole ? 1.0 : 0.0);
+  ok &= CheckEq(l + ".file.neither", file.neitherCompliant, !fragments && !whole ? 1.0 : 0.0);
+  ok &= CheckEq(l + ".contents.distinct", static_cast<double>(Parser::FILE_CONTENTS.size()), 1.0);
+  for (const auto &[hash, content]: Parser::FILE_CONTENTS) {
+    ok &= CheckEq(l + ".contents.files", static_cast<double>(content.files), 1.0);
+    ok &= CheckEq(l + ".contents.strings", static_cast<double>(content.strings), strings);
+  }
+  return ok;
+}
+
 bool RunFixture(const std::string &fixturePath) {
   const fs::path path(fixturePath);
   const std::string name = path.filename().string();
@@ -265,6 +288,10 @@ bool RunFixture(const std::string &fixturePath) {
     return TestStringBucketMix();
   if (name == "comment_after_string.cpp")
     return TestCommentAfterString();
+  if (name == "whole_file_fragments_only.cpp")
+    return CheckWholeFile("whole_file_fragments_only", true, false, 1.0);
+  if (name == "whole_file_whole_only.cpp")
+    return CheckWholeFile("whole_file_whole_only", false, true, 2.0);
 
   std::cerr << "parser_fixture_test failed: unknown fixture " << fixturePath << '\n';
   return false;
