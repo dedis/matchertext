@@ -155,7 +155,7 @@ On reading the opener \verb|M"(|, the host scans the payload
 counting matcher depth and ignoring other characters,
 quotes and backslashes included.
 The sequence \verb|)"| inside the payload looks like the literal's terminator,
-but it occurs at depth one, closing the parenthesis opened before \verb|x|.
+but it occurs at depth two, closing the parenthesis opened before \verb|x|.
 Only the first closer that would take the depth below zero,
 namely the final \verb|)|, ends the literal.
 The literal's value is the payload exactly as written,
@@ -263,6 +263,62 @@ MinML uses matcher characters for structure
 instead of matching pairs of start and end tags:
 \eg \verb|em[emphasis]| rather than \verb|<em>emphasis</em>|.
 \Cref{sec:impl} describes MinML and its tools.
+
+\begin{figure}[t]
+\begin{center}
+\begin{footnotesize}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lllll}
+\hline
+Receiving syntax & Attack value \verb|v| & Matchertext check & Query text received by SQL & Result \\
+\hline
+\verb|name = '|\verb|v|\verb|'|
+	& \verb|x' OR '1'='1| & none
+	& \verb|name = 'x' OR '1'='1'| & bad: injected \\
+\verb|name = '|\verb|v|\verb|'|
+	& \verb|x' OR '1'='1| & yes, passes
+	& \verb|name = 'x' OR '1'='1'| & bad: still injected \\
+\verb|name = M'(|\verb|v|\verb|)'|
+	& \verb|x' OR '1'='1| & yes, passes
+	& \verb|name = M'(x' OR '1'='1)'| & good: one value \\
+\verb|name = M'(|\verb|v|\verb|)'|
+	& \verb|x)' OR '1'='1| & yes, fails
+	& none: rejected before splicing & good: rejected \\
+\hline
+\end{tabular}
+\end{footnotesize}
+\end{center}
+\caption{A matchertext check protects a value's boundary
+	only when the receiving syntax is matchertext-aware.
+	\texttt{M'(}\dots\texttt{)'} is a matchertext literal
+	in a hypothetical matchertext extension to SQL.}
+\label{fig:intro:sql}
+\end{figure}
+
+Matchertext is a contract between
+text being embedded and the language receiving it.
+The embedded string must be matchertext
+in the form actually inserted.
+The receiving language must delimit it with a matchertext region,
+find the region's end by matcher balance,
+and apply none of its own escapes or restrictions inside.
+A balance check alone protects nothing
+if the receiving syntax still ends the value at a non-matcher such as a quote.
+\Cref{fig:intro:sql} illustrates with SQL,
+using a matchertext literal \verb|M'(|$\dots$\verb|)'|
+in a hypothetical extension to SQL.
+The classic injected value \verb|x' OR '1'='1|
+contains no matchers at all, so it \emph{is} valid matchertext:
+checking it before splicing it between ordinary quotes
+leaves the query just as vulnerable as before.
+Only when SQL itself delimits the value with matchers
+does the quote stay data,
+and an attempt to escape the region, such as \verb|x)' OR '1'='1|,
+fails the balance check before any query is formed.
+Matchertext thus protects the \emph{boundary} of each embedded value.
+What the receiving language then does with the value,
+and which values an application should accept,
+remain the application's responsibility.
 
 This paper makes the following contributions:
 \begin{itemize}
