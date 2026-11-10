@@ -111,7 +111,7 @@ and the first closer met with an empty stack begins $s_c$.
 In \verb|M"(print("(x)"))"| from \cref{sec:intro},
 the inner \verb|)"| pops the \verb|(| before \verb|x|
 and so cannot end the literal.
-Matcher kinds matters:
+Matcher kinds matter:
 the string \verb|([)]| has as many closers as openers,
 and no prefix has more closers than openers,
 but it is not matchertext,
@@ -122,8 +122,8 @@ and a host language must reject it as a matchertext payload.
 \label{sec:design:abstract:formal}
 
 \Cref{thm:design:embed,thm:design:findend}
-are mechanized in the Lean~4 proof assistant
-using its Mathlib library,
+are mechanized in the Lean~4 proof assistant~\cite{demoura21lean4}
+using its Mathlib library~\cite{mathlib20},
 included in the \texttt{lean} directory of the artifact.
 % \Cref{thm:design:verify} has a paper proof only.
 These results concern strings:
@@ -138,7 +138,7 @@ nor the behavior of the language receiving the payload.
 %	The development relies only on the standard axioms
 %	\texttt{propext} and \texttt{Quot.sound},
 %	plus \texttt{Classical.choice} for \cref{thm:design:findend}.}
-For reference, \cref{app:lean,app:boundary} lists the Lean declarations.
+For reference, \cref{app:lean,app:boundary} list the Lean declarations.
 We summarize the result here;
 it concerns the abstract matchertext language $L$
 defined inductively in \cref{sec:design:abstract}.

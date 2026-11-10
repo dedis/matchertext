@@ -155,7 +155,8 @@ On reading the opener \verb|M"(|, the host scans the payload
 counting matcher depth and ignoring other characters,
 quotes and backslashes included.
 The sequence \verb|)"| inside the payload looks like the literal's terminator,
-but it occurs at depth two, closing the parenthesis opened before \verb|x|.
+but by matcher depth,
+it closes the parenthesis opened before \verb|x|.
 Only the first closer that would take the depth below zero,
 namely the final \verb|)|, ends the literal.
 The literal's value is the payload exactly as written,
@@ -175,7 +176,7 @@ since its lone \verb|)| would end the literal after \verb|x|.
 Non-matchertext strings must use conventional literals.
 Escapes like \verb|\x29| help only in conventional literals:
 inside \verb|M"(|$\dots$\verb|)"| the host interprets no escapes,
-so the playload \verb|\x29| remains (and denotes) exactly those four characters.
+so the payload \verb|\x29| remains (and denotes) exactly those four characters.
 
 It is already feasible to write code in existing languages
 that is also valid matchertext,
@@ -270,7 +271,7 @@ instead of matching pairs of start and end tags:
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{lllll}
 \hline
-Receiving syntax & Attack value \verb|v| & Matchertext check & Query text received by SQL & Result \\
+Receiving syntax & Attack value \verb|v| & Matchertext check & Query text received by SQL & End result \\
 \hline
 \verb|name = '|\verb|v|\verb|'|
 	& \verb|x' OR '1'='1| & none
