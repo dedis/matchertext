@@ -88,6 +88,11 @@ Balanced delimiters also nest within
 and \href{https://www.gnu.org/software/m4/manual/html_node/Quoted-strings.html}{m4} quotes.
 These languages balance only their own delimiter, however,
 and do not support general cross-language embedding.
+\TeX{} groups and Scribble @-expressions balance braces~\cite{knuth84texbook,flatt09scribble},
+though \TeX{} skips escaped \verb|\{| that matchertext counts;
+Rust token trees and Honu~\cite{rafkind12honu} balance brackets only after lexing;
+SDF, Silver, and Eco~\cite{heering89sdf,vanwyk07context,diekmann14eco} need the guest's grammar,
+and quasiquoters~\cite{mainland07quoted} host-specific quotes.
 
 Closest to matchertext,
 Wyvern's type-specific languages~\cite{omar14safely}

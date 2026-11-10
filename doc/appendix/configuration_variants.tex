@@ -24,11 +24,23 @@ A matchertext configuration $(\Sigma',\Pi')$
 is a \emph{tightening} of
 the standard matchertext configuration $(\Sigma,\Pi)$
 if it only removes characters from the alphabet ($\Sigma' \subseteq \Sigma$)
-and/or makes additional matcher pairs sensitive ($\Pi' \supseteq \Pi$).
+and/or makes additional matcher pairs sensitive ($\Pi' \supseteq \Pi$),
+where each added pair $(o,c) \in \Pi' \setminus \Pi$
+consists of two characters that are nonmatchers in the standard configuration
+($o, c \in N$).
 A string in the tightened matchertext configuration
-may be copied verbatim to an embedding context
+may then be copied verbatim to an embedding context
 expecting the standard matchertext configuration,
-but not necessarily in the other direction.
+but not necessarily in the other direction:
+by induction on its derivation,
+each nesting step with a standard pair is a nesting step in $L$,
+and each nesting step $o||m||c$ with an added pair
+concatenates the nonmatchers $o$ and $c$ around $m \in L$,
+which stays in $L$ by \cref{lem:design:concat}.
+The restriction matters:
+adding a pair such as \verb|(| with \verb|]|,
+whose characters already match other characters,
+would admit \verb|(]|, which the standard configuration rejects.
 
 As \cref{app:uri:liberal} details,
 uniform resource identifiers (URIs)~\cite{rfc3986} traditionally allow

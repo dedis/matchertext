@@ -1,8 +1,9 @@
 \section{Implementations of matchertext}
 \label{sec:impl}
 
-This section describes two implementations of matchertext:
-a reader extension for CHICKEN Scheme
+This section describes three implementations of matchertext:
+a reader extension for CHICKEN Scheme,
+matchertext literals in the Go toolchain,
 and MinML, a matchertext-based markup syntax.
 
 \subsection{Matchertext for CHICKEN Scheme}
@@ -23,12 +24,16 @@ So \verb|#M"(\([{}]))"| converts to the string \verb|\([{}])| without escapes,
 and \verb|#M{}"({greeting}, world)"| interpolates the Scheme expression
 \verb|greeting| into the literal.
 The egg currently accepts only parentheses around the literal's content.
-%Its source is available at \url{https://git.sr.ht/~nagbu/matchertext}.
-\xxx{This source code pointer should probably be
-	either omitted for the submission,
-	since it might be considered a borderline anonymity violation
-	(e.g., if the reviewers assume that CHICKEN Scheme
-	is by one of the authors of this submission).}
+
+\subsection{Matchertext literals in Go}
+\label{sec:impl:go}
+
+A 128-line patch adds the literals of \cref{sec:host:c:literals} to the Go toolchain;
+\verb|M"| is a syntax error in Go today, so no valid program changes.
+We ran the tests of four corpus repositories with stock Go, with patched Go,
+and with patched Go after rewriting the 14{,}397 literals whose value \verb|M"(|$\dots$\verb|)"| holds verbatim.
+All 242 packages with tests passed in every run,
+and the rewritten literals' toothpicks fell from 37{,}662 to 88 (\cref{app:go}).
 
 \subsection{MinML: minified matchertext markup}
 

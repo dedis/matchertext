@@ -36,10 +36,11 @@ to label safely.
 The compliance and escaping metrics below
 do not depend on this classification,
 which affects only the per-category attribution of results.
+On held-out Linguist snippets, naive Bayes labels 4.7\%, 84\% correctly; detector accuracy is unmeasured.
 
 The corpus is drawn from GitHub
 and is intended to represent mature, widely-deployed production code:
-the main repositories of \dataOrgs organizations
+every non-archived repository of \dataOrgs organizations
 behind operating-system kernels, databases, browsers,
 language toolchains, and similar infrastructure.
 It comprises \dataRepos repositories and roughly \dataFiles source files
@@ -86,9 +87,8 @@ at the level of individual embedded fragments.
 As \cref{tab:eval:compliance} shows,
 \dataStrCompliance of string-literal samples
 and \dataDocCompliance of comment samples are compliant as written.
-At the file level compliance is lower, \dataFileCompliance,
-because a single unmatched matcher anywhere in a file
-makes the whole file non-compliant,
+Per file, counting all its literals and comments, compliance is lower, \dataFileCompliance,
+because one violating fragment makes the whole file non-compliant,
 so per-sample-rare violations still touch a noticeable fraction of files.
 The relaxed rule barely changes any of these figures
 (file compliance rises only to \dataFileComplianceRelaxed,
@@ -110,14 +110,14 @@ Stream		& Samples	& Compliant	& Compliant	\\
 \hline
 String literals	& \dataStrSamplesShort	& \dataStrCompliance	& ---		\\
 Comments	& \dataDocSamplesShort	& \dataDocCompliance	& \dataDocComplianceRelaxed	\\
-Files		& \dataFilesShort	& \dataFileCompliance	& \dataFileComplianceRelaxed	\\
+Files (all fragments)	& \dataFilesShort	& \dataFileCompliance	& \dataFileComplianceRelaxed	\\
 \hline
 \end{tabular}
 \end{footnotesize}
 \end{center}
 \caption{Matchertext compliance rate and sample size by stream,
-	under the strict and relaxed rules;
-	the relaxed rule was measured only for comments and files.}
+	under the strict and relaxed rules (relaxed measured for comments and files only).
+	A file complies when all its literals and comments do.}
 \label{tab:eval:compliance}
 \end{table}
 
@@ -215,6 +215,9 @@ cutting the string-literal toothpick total
 from about \dataToothpicks to about \dataToothpicksConverted.
 Escaped binary data alone (BinaryData and PseudoBinaryData)
 holds \dataBinaryToothpicks of these toothpicks.
+The host's raw-string form could hold \dataRawHoldableShare of the compliant literals,
+and only a matchertext literal the other \dataMtOnlyShare (\eg C and Java lack raw strings);
+both counts include literals without escapes.
 As a concrete case,
 the compliant C++ regular-expression literal
 \verb|"\\b,\"axis\":(\\d+)\\b"|
@@ -229,7 +232,7 @@ The reduction is large but content-dependent.
 Across the \dataOrgs organizations it ranges
 from \dataOrgReductionMin to \dataOrgReductionMax,
 with half of them between \dataOrgReductionQOne and \dataOrgReductionQThree.
-As \cref{tab:eval:hostlang} shows, it also varies by host language:
+As \cref{tab:eval:hostlang} (\cref{app:hostlang}) shows, it also varies by host language:
 C-family languages and Java
 see most of their toothpicks eliminated
 (C \dataHostCReduction, C++ \dataHostCppReduction, Java \dataHostJavaReduction),
@@ -254,31 +257,11 @@ and still gain little from raw-string rewriting:
 the cost of becoming compliant
 and the benefit of doing so are distinct quantities.
 
-\begin{table*}[t]
-\begin{center}
-\begin{footnotesize}
-\begin{tabular}{lrrrrr}
-\hline
-Host language	& Orgs	& String samples	& Compliance	& Reduction	& Max depth	\\
-\hline
-\dataTblHostRows
-\hline
-\end{tabular}
-\end{footnotesize}
-\end{center}
-\caption{Per-host-language statistics for selected languages:
-	contributing organizations, string-sample count,
-	string-literal compliance rate, toothpick reduction,
-	and the deepest raw matcher nesting observed in any single sample.
-	\dataHostLeastCompliant is shown as the least-compliant host language in the corpus.}
-\label{tab:eval:hostlang}
-\end{table*}
-
 
 \subsection{Q4: Nested embedding}
 \label{sec:eval:nesting}
 
-Most embedding is shallow.
+Most bracket nesting is shallow.
 Most samples contain no matchers at all,
 and depth falls off sharply beyond one:
 the average per-sample maximum depth
@@ -307,10 +290,13 @@ as raw string literals or matchertext literals
 would remove \dataReduction of the toothpicks.
 The remaining violations fall where \cref{sec:embed} predicts,
 in syntaxes that use brackets singly,
-and the near-identical strict and relaxed rates show that
-the lone-matcher escapes of \cref{tab:unmatched-matchers} address them.
+and the near-identical strict and relaxed comment rates suggest that
+they are lone matchers, the case the escapes of \cref{tab:unmatched-matchers} address,
+rather than closers of the wrong kind.
 Two questions from \cref{sec:intro} remain open:
 how matchertext affects usability in common embedding tasks,
 such as editing HTTP or SQL queries,
 and how it affects the rate of syntax-related and security-related bugs,
 which a static corpus analysis cannot measure.
+Nor is the corpus a random sample: it counts forks and vendored, generated, or minified files
+without deduplication, so widely copied code weighs more.

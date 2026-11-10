@@ -51,13 +51,13 @@ Values: effect on real tokenizers and compilers.
 1. **[Fix, done]** `appendix/grammar.tex:149-157` claims C and C++ code outside literals and comments is already matchertext. False: `#define BEGIN {`, `#if` branches that each open `{`, and digraphs like `a<:0]` compile today (checked with `cc`). Fix: restrict the claim or name the exceptions.
 2. **[Fix, done]** Translation phases: C trigraphs `??)` (before C23), line splicing, and Java `\uXXXX` apply before lexing. Java `"x";` compiles (checked), so `)` would close an `M"(` literal. `design.tex:100-104` forbids host transformations. Fix: one sentence, "M-literals revert these phases as C++ raw strings do."
 3. **[Fix, done]** The escapes are not conservative. In JavaScript today, `"\[a]"` is `"[a]"` and `"\o()"` is `"o()"` (checked with `node`). Clang compiles `"\["` as `"["` (checked). The paper names only the Python conflict (`host.tex:172-180`) and says these escapes are "technically not in conflict" (`embed.tex:94-96`). Partial defense already in the paper: languages may choose their own syntax (`host.tex:181-187`). Fix: name JavaScript and C as conflicts.
-4. **[Reject]** The only implementation is a third-party CHICKEN Scheme extension that accepts parentheses only (`impl.tex:10-23`). No C, Go, Rust, or tree-sitter prototype. The appendix grammar is not implemented. Combines with R6.1. Fix: plan step 3.
+4. **[Reject, done]** The only implementation is a third-party CHICKEN Scheme extension that accepts parentheses only (`impl.tex:10-23`). No C, Go, Rust, or tree-sitter prototype. The appendix grammar is not implemented. Combines with R6.1. Fix: plan step 3.
 
 ### R3: Language designer / metaprogramming
 Draws from: Ballantyne, Thiemann, Patterson, Hemann, Weisenburger.
 Values: comparison with prior designs, generality.
 
-1. **[Fix]** Related work misses:
+1. **[Fix, done]** Related work misses:
    - Scribble @-expressions (balanced-brace text).
    - TeX brace-balanced arguments. TeX does not count `\{`; matchertext does (`embed.tex:69-74`).
    - Token trees and skeleton syntax: Rust `macro_rules`, Dylan D-expressions, Honu.
@@ -70,17 +70,17 @@ Draws from: Møller, Mitropoulos, Chida, Stefan, Zdancewic, Devriese, Vasilakis.
 Values: an explicit threat model.
 
 1. **[Fix, done]** `appendix/string_interpolation.tex:112-126` described a value "interpolated into an SQL query between quotes". That read as legacy quote-delimited SQL, where `' OR '1'='1` still breaks out. The claim holds under the premises of the injection paper (`injection-research/doc/threat.tex`, A1 and A2): the receiving language delimits the hole with matchers, as in the SQLite fork's `M'(...)'`. Wording problem, not an overclaim. Reworded to state the premise (plan step 1).
-2. **[Fix]** Parser differentials: `<code [...]>` and `attr=[...]` (`host.tex:322-336`, `host.tex:378-386`). A legacy HTML5 tokenizer reads `[` as an attribute name and ends the tag at the first `>` in the content (the `<b>` in Fig. `ml-emb`(a)). A sanitizer and a browser that disagree give mutation-XSS. Fix: one paragraph on coexistence with legacy parsers.
+2. **[Fix, done]** Parser differentials: `<code [...]>` and `attr=[...]` (`host.tex:322-336`, `host.tex:378-386`). A legacy HTML5 tokenizer reads `[` as an attribute name and ends the tag at the first `>` in the content (the `<b>` in Fig. `ml-emb`(a)). A sanitizer and a browser that disagree give mutation-XSS. Fix: one paragraph on coexistence with legacy parsers.
 
 ### R5: Empirical methodologist
 Draws from: Su, Sotiropoulos, Chaliasos, Legunsen, Shan Lu, Raychev, Fonseca.
 Values: sound sampling, threats to validity, an artifact.
 
-1. **[Reject]** The rewrite to `R"(...)"` (`eval.tex:59-65`) counts escapes for non-printable characters and binary data as removed. Escaped binary data holds 84.0M of the 178.1M toothpicks (`eval.tex:207-208`). The JavaScript gain comes mostly from binary data (`eval.tex:243-245`). A raw `"\x00\xff"` needs a NUL byte and invalid UTF-8 in the source file. The headline 94.78% (abstract, `intro.tex:250`, `concl.tex:18`) includes these escapes. "84.0 million of these" is also ambiguous: total or removed. The analyzer also has defects that affect the same figures (see plan step 2). Fix: plan step 2.
-2. **[Fix]** No baseline against existing raw strings (Go backticks, Python `r""`, Rust `r#""#`, C# `"""`, C++ `R"d(...)d"`). Matchertext literals extend and generalize raw strings, so the 94.78% is the raw-string benefit that matchertext extends to every compliant literal. The paper must say so and add the matchertext-specific number. Fix: plan step 2.
-3. **[Fix]** Corpus (`eval.tex:39-47`): no criteria for selecting the 79 organizations, no deduplication, no filter for vendored, generated, minified, or fixture code. JavaScript gives 44% of samples, and its max depth of 11,777 points to bundles. Fix: threats-to-validity paragraph, or filter and rerun.
-4. **[Fix]** Classifier (`eval.tex:29-34`): naive Bayes, no reported accuracy. The unclassified 73% of samples carry 6.24M of 8.97M violations (`eval.tex:190-193`), so Q2 explains about 30% of violations. The AI Use section says Claude wrote the classifier. Only Q2 depends on it (`eval.tex:35-37`). Fix: report accuracy on a labeled sample.
-5. **[Fix]** `eval.tex:310-313` uses near-identical strict and relaxed rates to argue that the lone-matcher escapes fix violations. The relaxed rate was not measured for string literals (`eval.tex:107-109`). Equal rates say nothing about fix cost. Fix: rephrase.
+1. **[Reject, done]** The rewrite to `R"(...)"` (`eval.tex:59-65`) counts escapes for non-printable characters and binary data as removed. Escaped binary data holds 84.0M of the 178.1M toothpicks (`eval.tex:207-208`). The JavaScript gain comes mostly from binary data (`eval.tex:243-245`). A raw `"\x00\xff"` needs a NUL byte and invalid UTF-8 in the source file. The headline 94.78% (abstract, `intro.tex:250`, `concl.tex:18`) includes these escapes. "84.0 million of these" is also ambiguous: total or removed. The analyzer also has defects that affect the same figures (see plan step 2). Fix: plan step 2.
+2. **[Fix, done]** No baseline against existing raw strings (Go backticks, Python `r""`, Rust `r#""#`, C# `"""`, C++ `R"d(...)d"`). Matchertext literals extend and generalize raw strings, so the 94.78% is the raw-string benefit that matchertext extends to every compliant literal. The paper must say so and add the matchertext-specific number. Fix: plan step 2.
+3. **[Fix, done]** Corpus (`eval.tex:39-47`): no criteria for selecting the 79 organizations, no deduplication, no filter for vendored, generated, minified, or fixture code. JavaScript gives 44% of samples, and its max depth of 11,777 points to bundles. Fix: threats-to-validity paragraph, or filter and rerun.
+4. **[Fix, partly done]** Classifier (`eval.tex:29-34`): naive Bayes, no reported accuracy. The unclassified 73% of samples carry 6.24M of 8.97M violations (`eval.tex:190-193`), so Q2 explains about 30% of violations. The AI Use section says Claude wrote the classifier. Only Q2 depends on it (`eval.tex:35-37`). Fix: report accuracy on a labeled sample.
+5. **[Fix, done]** `eval.tex:310-313` uses near-identical strict and relaxed rates to argue that the lone-matcher escapes fix violations. The relaxed rate was not measured for string literals (`eval.tex:107-109`). Equal rates say nothing about fix cost. Fix: rephrase.
 
 ### R6: Out-of-area PC member
 Draws from: Kjolstad, Jia, Holtzen, Dillig, Jingxuan He.
@@ -92,7 +92,7 @@ Values: PLDI fit, a clear contribution in the first two pages.
 Draws from: Møller, Thiemann, Ryu, Stefan.
 Values: evidence for the usability claims.
 
-1. **[Fix]** MinML has no evaluation (`impl.tex:25-83`), but the abstract calls it "concise but general". No size measurements, no round-trip results, attribute syntax not shown. Fix: tone down the abstract, or add a size and round-trip measurement.
+1. **[Fix, done]** MinML has no evaluation (`impl.tex:25-83`), but the abstract calls it "concise but general". No size measurements, no round-trip results, attribute syntax not shown. Fix: tone down the abstract, or add a size and round-trip measurement.
 
 ## 3. Triage summary
 
@@ -191,3 +191,19 @@ Removed because they apply equally to any syntax extension, or have no real impa
 - Bibliography, figures, and the rendered PDF.
 - Fixtures covered typical escapes only. Language-specific forms (Rust `\u{...}`, Swift `\(...)`, Python byte strings) were not tested.
 - The effect of the fixes on the published figures. That needs the full rerun.
+
+## 7. Status 2026-11-10
+
+- Step 2 done: full-conversion analyzer rerun; the paper's figures come from `doc/generated/numbers.tex` (`LLVM/latex.py`). The methodology states the normalization of control characters (R5.1).
+- Step 3 done: Go experiment run on 4 repositories (`go/toolchain/results/`); §6.2 reports it and appendix H gives the details (R2.4). Contribution bullet and abstract mention it. R6.1 and R3.2 are answered by the same evidence, not by new text.
+- R5.2: Q3 reports that the host's raw form could hold 81.0% of compliant literals and that 18.8% need a matchertext literal (`\dataRawHoldableShare`, `\dataMtOnlyShare`).
+- Per-host-language table moved to appendix D to make room. Body ends at line 970.
+- Item 2 fixes (2026-11-10): R3.1 (TeX, Scribble, Rust token trees, Honu, SDF, Silver, Eco, quasiquoters in `rel.tex`), R4.2 (legacy HTML5 tokenizer and mXSS paragraph in `host.tex`), R5.3 (corpus described as every non-archived repository, forks included; threats sentence in §7.6), R5.5 (strict/relaxed rephrased), R7.1 ("concise but general" removed from abstract and intro). Body ends at line 979.
+- R5.4 (2026-11-10): the old holdout (4–15% top-1) was an evaluation bug: `classify_snippet_nb` lacked the runtime's matched-trigram and match-ratio gates, so the smallest model (Kotlin) won most snippets. Fixed in `LLVM/train/generate_model.py`, which now reports coverage and precision: naive Bayes labels 4.7% of 1,579 held-out Linguist snippets, 84.0% correctly. §7.1 says so in one line and states that the deterministic detectors are untested on labeled samples (still open).
+- Item 3, synthesis of 2026-11-08 (2026-11-10):
+  - File compliance renamed to what it measures (a file complies when all its literals and comments do; Table 3 row "Files (all fragments)" and caption); Q4 says "bracket nesting" instead of "embedding".
+  - Extraction: C/C++ comments right after a string literal were dropped (fixed in `LLVM/src/Parser.cpp`, test `tests/comment_after_string.cpp`); tree-sitter files skipped as oversized, binary, or timed out were counted as compliant files with no samples (now left out of Sample Size and counted in `files.md`, test in `language_escapes_test.cpp`). `make test` passes 11 of 11. The paper's figures still come from the 2026-11-09 run; measuring the effect needs a rerun.
+  - Provenance: `LLVM/CORPUS.md` (collection policy, dates, limits) and `LLVM/corpus-repositories.txt` (13,721 repositories). Commits were not recorded.
+  - Host/guest contract: added to §3.1.1 (scope of the guarantee, nesting example, lone-closer counterexample). In the introduction, 3 lines cost 13 because the escape table moves to the next page.
+  - Configuration variations: tightening now requires added pairs over standard nonmatchers, with the inclusion argument and the `(]` counterexample.
+- 2026-11-10: merged with the co-author's commit 3034d7021b: tree-sitter and Clang cited (`brunsfeld26treesitter`, `llvm26clang`, `lattner04llvm`); CHICKEN cited (`chicken26scheme`) and the egg citation commented out until after review, because the egg's documentation names Bryan Ford and Antoine Bastide; no undefined citations. Injection paper: Verify no longer called machine-checked (`threat.tex`, `relevance.tex`), "Algorithm 2" replaced by "the depth-counting scan". Lean development builds (`lake build`).

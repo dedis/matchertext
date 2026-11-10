@@ -227,7 +227,7 @@ in both C-like languages and SGML-derived languages like HTML.
 
 One early pragmatic experiment with matchertext
 is MinML~\anoncite{ford22minml},
-a concise but general-purpose alternative syntax
+an alternative syntax
 for SGML-derived markup languages such as HTML and XML.
 MinML uses matcher characters for structure
 instead of matching pairs of start and end tags:
@@ -240,8 +240,8 @@ This paper makes the following contributions:
 \item	backward-compatible extensions that let C-like and SGML-derived languages
 	host matchertext (\cref{sec:host})
 	and write embeddable matchertext conveniently (\cref{sec:embed});
-\item	two implementations, a CHICKEN Scheme reader extension and MinML
-	(\cref{sec:impl});
+\item	three implementations: a CHICKEN Scheme reader extension, MinML,
+	and Go matchertext literals tested on four repositories (\cref{sec:impl});
 \item	an evaluation on \dataStrSamples string literals from \dataOrgs organizations
 	(\cref{sec:eval}): \dataStrCompliance are already matchertext,
 	and matchertext literals would remove \dataReduction of their backslash escapes; and
