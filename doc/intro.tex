@@ -147,6 +147,36 @@ In this matchertext-literal syntax,
 the above regular-expression example
 would be \verb|re.match(M"("[^"]*")")|.
 
+To illustrate,
+consider a host language parsing
+the matchertext literal \verb|M"(print("(x)"))"|.
+On reading the opener \verb|M"(|, the host scans the payload
+\verb|print("(x)")|
+counting matcher depth and ignoring other characters,
+quotes and backslashes included.
+The sequence \verb|)"| inside the payload looks like the literal's terminator,
+but it occurs at depth one, closing the parenthesis opened before \verb|x|.
+Only the first closer that would take the depth below zero,
+namely the final \verb|)|, ends the literal.
+The literal's value is the payload exactly as written,
+unlike the equivalent C literal
+\verb|"print(\"(x)\")"|.
+Because the whole literal is itself matchertext,
+it can be pasted unchanged into another one:
+\verb|M"(s = M"(print("(x)"))";)"|
+holds the C statement \verb|s = M"(print("(x)"))";|
+with no escapes.
+Conventional quoting needs eight backslashes
+(\verb|"s = \"print(\\\"(x)\\\")\";"|).
+This benefit has a cost:
+the payload must be matchertext.
+A matchertext literal cannot contain the payload \verb|x)y|, for example,
+since its lone \verb|)| would end the literal after \verb|x|.
+Non-matchertext strings must use conventional literals.
+Escapes like \verb|\x29| help only in conventional literals:
+inside \verb|M"(|$\dots$\verb|)"| the host interprets no escapes,
+so the playload \verb|\x29| remains (and denotes) exactly those four characters.
+
 It is already feasible to write code in existing languages
 that is also valid matchertext,
 with a bit of care.
