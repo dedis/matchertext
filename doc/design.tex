@@ -83,8 +83,10 @@ Further, $s_o$ must contain one or more open matchers in $O$
 that would be unmatched in $s_o$ alone --
 that is, $s_o$ alone \emph{cannot} be valid matchertext.
 Finally, $s_c$ must contain one or more corresponding close matchers in $C$
-that would be unmatched in $s_c$ alone,
-and $s_c$ must begin with one of them.
+that would be unmatched in $s_c$ alone.
+For simplicity we will assume below that $s_o$ ends with an opener
+and that $s_c$ begins with the corresponding closer,
+although this constraint is not strictly necessary.
 
 This embedding rule permits escapeless embedding
 because no fixed characters or strings, including $s_o$ and $s_c$,
