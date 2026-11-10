@@ -110,8 +110,6 @@ The content $m$ of such a matchertext literal
 otherwise the language processor reports a syntax error.
 Any matchertext string may be embedded verbatim in such a literal
 without exceptions or escaping.
-Like C++ raw strings, it reverts trigraphs, line splices,
-and Java's \verb|\u| escapes within $m$.
 
 We could prescribe the use in this syntax
 of one particular matcher pair of the three,
@@ -149,6 +147,13 @@ such as a hybrid variant that allows host-language escapes
 within the literal
 while also enforcing the matchertext discipline,
 \eg for security hardening (see \cref{app:interp:lower}).
+
+A host language that transforms source text before tokenizing it
+must recognize matchertext literals first,
+or else revert those transformations within $m$,
+as C++ raw strings already revert line splices.
+Java's pre-lexer translation of \verb|\u| escapes
+would require similar handling within $m$.
 
 A few languages currently prohibit certain characters appearing anywhere:
 \eg Python prohibits NUL (0) characters.
