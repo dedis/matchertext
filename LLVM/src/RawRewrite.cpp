@@ -43,9 +43,10 @@ namespace {
            parseDigits(text, i + 1, base, value) == text.size() - i - 2;
   }
 
-  /// C0 and C1 control characters, which a raw literal cannot hold.
+  /// C0 and C1 control characters other than tab, line feed, and carriage return.
+  /// A raw literal holds them verbatim, but they cannot be typed, so their escape stays.
   bool isControl(const uint32_t cp) {
-    return cp < 0x20 || (cp >= 0x7F && cp <= 0x9F);
+    return (cp < 0x20 && cp != '\t' && cp != '\n' && cp != '\r') || (cp >= 0x7F && cp <= 0x9F);
   }
 
   uint32_t controlCode(const char c) {
@@ -99,7 +100,7 @@ namespace {
   }
 
   /// Decodes one strict UTF-8 sequence at `i`; returns its length, or 0 if invalid.
-  size_t decodeUtf8(const std::string &bytes, const size_t i, uint32_t &cp) {
+  size_t decodeUtf8(const std::string_view bytes, const size_t i, uint32_t &cp) {
     const auto b = static_cast<uint8_t>(bytes[i]);
     size_t len;
     uint8_t lo = 0x80, hi = 0xBF;
@@ -267,12 +268,16 @@ namespace RawRewrite {
           return true;
         }
         // Ruby and Perl \cX, \C-x, \M-x. The Ruby grammar marks only \c, \C, or \M
-        // and leaves the rest as content. A control character is dropped, and a
-        // meta character is a byte above 0x7F, which alone is not valid UTF-8.
+        // and leaves the rest as content. A control character keeps its toothpick,
+        // and a meta character is a byte above 0x7F, which alone is not valid UTF-8.
         if (!dialect.controlLetters || !(c == 'c' || ((c == 'C' || c == 'M') && (rest.size() == 1 || rest[1] == '-'))))
           return false;
-        if (c == 'M' && rest.size() > 2)
-          push(static_cast<uint8_t>(0x80 | (static_cast<uint8_t>(rest[2]) & 0x7F)), id);
+        if (const size_t at = c == 'c' ? 1 : 2; rest.size() <= at)
+          survives[static_cast<size_t>(id)] = c == 'M' ? 1 : 3;
+        else if (c == 'M')
+          push(static_cast<uint8_t>(0x80 | (static_cast<uint8_t>(rest[at]) & 0x7F)), id);
+        else
+          push(static_cast<uint8_t>(rest[at] == '?' ? 0x7F : rest[at] & 0x1F), id);
         return true;
     }
   }
@@ -318,27 +323,32 @@ namespace RawRewrite {
         content.push_back(bytes[i++]);
         continue;
       }
-      if (id == kLiteral) {
+      if (id == kLiteral)
         literalBackslashes += cp == kBackslash;
-        content.append(bytes, i, len);
-      } else if (cp == kBackslash) {
+      else if (cp == kBackslash) {
         if (survives[static_cast<size_t>(id)] == 0)
           survives[static_cast<size_t>(id)] = 2;
-        content.push_back('\\');
-      } else if (cp == '\r') {
-        if (i + 1 >= bytes.size() || bytes[i + 1] != '\n')
-          content.push_back('\n'); // a lone CR is a line feed; CR LF keeps only the LF
-      } else if (cp == '\f' || cp == '\v')
-        content.push_back(' ');
-      else if (cp == '\t' || cp == '\n' || !isControl(cp))
-        content.append(bytes, i, len);
-      i += len; // any other control character is dropped
+      } else if (isControl(cp) && survives[static_cast<size_t>(id)] == 0)
+        survives[static_cast<size_t>(id)] = 3;
+      content.append(bytes, i, len);
+      i += len;
     }
     return literalBackslashes + static_cast<uint64_t>(survives.size() - static_cast<size_t>(std::ranges::count(survives, 0)));
   }
 
   bool Counter::Holdable() const {
     return std::ranges::find(survives, 1) == survives.end();
+  }
+
+  bool HasControl(const std::string_view content) {
+    for (size_t i = 0; i < content.size();) {
+      uint32_t cp = 0;
+      const size_t len = decodeUtf8(content, i, cp);
+      if (len > 0 && isControl(cp))
+        return true;
+      i += std::max<size_t>(len, 1);
+    }
+    return false;
   }
 
   namespace {
@@ -421,6 +431,264 @@ namespace RawRewrite {
         return !has(text, quote) && !text.ends_with(quote[0]);
       return !has(text, quote) && !has(text, "\n") && !has(text, "\r");
     }
+  }
+
+  namespace {
+    using Kind = RawFormCheck::Kind;
+
+    constexpr RawFormCheck kCpp[] = {
+      {R"x(R"(...)")x", R"x(contains )")x", Kind::Contains, R"x()")x"},
+    };
+    constexpr RawFormCheck kGo[] = {
+      {"`...`", "contains `", Kind::Contains, "`"},
+      {"`...`", "contains a CR", Kind::CarriageReturn},
+    };
+    constexpr RawFormCheck kPython[] = {
+      {R"(r"...")", R"(contains an unescaped ")", Kind::PyQuote, R"(")"},
+      {R"(r"...")", "contains an unescaped line break", Kind::PyLineBreak},
+      {R"(r"...")", "ends in an odd run of backslashes", Kind::OddBackslashes},
+      {"r'...'", "contains an unescaped '", Kind::PyQuote, "'"},
+      {"r'...'", "contains an unescaped line break", Kind::PyLineBreak},
+      {"r'...'", "ends in an odd run of backslashes", Kind::OddBackslashes},
+      {R"(r"""...""")", R"(contains an unescaped """ or ends in ")", Kind::PyQuote, R"(""")"},
+      {R"(r"""...""")", "ends in an odd run of backslashes", Kind::OddBackslashes},
+      {"r'''...'''", "contains an unescaped ''' or ends in '", Kind::PyQuote, "'''"},
+      {"r'''...'''", "ends in an odd run of backslashes", Kind::OddBackslashes},
+    };
+    constexpr RawFormCheck kTemplate[] = {
+      {"String.raw`...`", "contains an unescaped `", Kind::TemplateQuote},
+      {"String.raw`...`", "contains an unescaped ${", Kind::TemplateHole},
+      {"String.raw`...`", "contains an unescaped CR", Kind::TemplateCR},
+      {"String.raw`...`", "ends in an odd run of backslashes", Kind::OddBackslashes},
+    };
+    constexpr RawFormCheck kCSharp[] = {
+      {R"(@"...")", R"(contains ")", Kind::Contains, R"(")"},
+    };
+    constexpr RawFormCheck kRust[] = {
+      {R"(r"...")", R"(contains ")", Kind::Contains, R"(")"},
+      {R"(r"...")", "contains a CR", Kind::CarriageReturn},
+      {R"(r#"..."#)", R"(contains "#)", Kind::Contains, R"("#)"},
+      {R"(r#"..."#)", "contains a CR", Kind::CarriageReturn},
+      {R"(r##"..."##)", R"(contains "##)", Kind::Contains, R"("##)"},
+      {R"(r##"..."##)", "contains a CR", Kind::CarriageReturn},
+      {R"(r###"..."###)", R"(contains "###)", Kind::Contains, R"("###)"},
+      {R"(r###"..."###)", "contains a CR", Kind::CarriageReturn},
+    };
+    constexpr RawFormCheck kSingleQuoted[] = {
+      {"'...'", "contains '", Kind::Contains, "'"},
+      {"'...'", R"(has a backslash before \, ' or the end)", Kind::SingleQuoted},
+    };
+    constexpr RawFormCheck kLua[] = {
+      {"[[...]]", "contains ]]", Kind::Contains, "]]"},
+      {"[[...]]", "contains a CR", Kind::CarriageReturn},
+      {"[[...]]", "starts with a line feed", Kind::LeadingNewline},
+    };
+    constexpr RawFormCheck kSwift[] = {
+      {R"(#"..."#)", R"(contains "#)", Kind::Contains, R"("#)"},
+      {R"(#"..."#)", R"(contains \#)", Kind::Contains, R"(\#)"},
+      {R"(#"..."#)", "contains a line break", Kind::LineBreak},
+    };
+    constexpr RawFormCheck kKotlin[] = {
+      {R"("""...""")", R"(contains """)", Kind::Contains, R"(""")"},
+      {R"("""...""")", "contains a $ template", Kind::KotlinTemplate},
+    };
+    constexpr RawFormCheck kR[] = {
+      {R"x(r"(...)")x", R"x(contains )")x", Kind::Contains, R"x()")x"},
+    };
+    constexpr RawFormCheck kScala[] = {
+      {R"("""...""")", R"(contains """)", Kind::Contains, R"(""")"},
+      {R"("""...""")", R"(contains a \uXXXX escape)", Kind::ScalaUnicode},
+    };
+    constexpr RawFormCheck kOCaml[] = {
+      {"{|...|}", "contains |}", Kind::Contains, "|}"},
+    };
+    constexpr RawFormCheck kErlang[] = {
+      {R"(~S"...")", R"(contains ")", Kind::Contains, R"(")"},
+    };
+    constexpr RawFormCheck kElixir[] = {
+      {R"(~S"...")", R"(contains ")", Kind::Contains, R"(")"},
+      {R"(~S"...")", R"(ends with \)", Kind::EndsWith, R"(\)"},
+    };
+    constexpr RawFormCheck kDart[] = {
+      {R"(r"...")", R"(contains ")", Kind::DartQuote, R"(")"},
+      {R"(r"...")", "contains a line break", Kind::LineBreak},
+      {"r'...'", "contains '", Kind::DartQuote, "'"},
+      {"r'...'", "contains a line break", Kind::LineBreak},
+      {R"(r"""...""")", R"(contains """ or ends in ")", Kind::DartQuote, R"(""")"},
+      {"r'''...'''", "contains ''' or ends in '", Kind::DartQuote, "'''"},
+    };
+
+    /// Python raw literals: a backslash keeps the next character from closing the
+    /// literal. True if an unescaped `quote` (or, with `lineBreak`, an unescaped CR
+    /// or LF) occurs.
+    bool pythonFinds(const std::string_view text, const std::string_view quote, const bool lineBreak) {
+      for (size_t i = 0; i < text.size(); ++i) {
+        if (text[i] == '\\')
+          ++i;
+        else if (lineBreak ? text[i] == '\n' || text[i] == '\r' : text.substr(i).starts_with(quote))
+          return true;
+      }
+      return false;
+    }
+
+    /// String.raw: true if an unescaped character for which `stop` holds occurs.
+    template <typename Stop>
+    bool templateFinds(const std::string_view text, Stop stop) {
+      for (size_t i = 0; i < text.size(); ++i) {
+        if (text[i] == '\\')
+          ++i;
+        else if (stop(i))
+          return true;
+      }
+      return false;
+    }
+
+    bool oddBackslashes(const std::string_view text) {
+      const size_t last = text.find_last_not_of('\\');
+      return (text.size() - (last == std::string_view::npos ? 0 : last + 1)) % 2 == 1;
+    }
+
+    bool violated(const RawFormCheck &check, const std::string_view text) {
+      switch (check.kind) {
+        case Kind::Contains: return has(text, check.needle);
+        case Kind::EndsWith: return text.ends_with(check.needle);
+        case Kind::CarriageReturn: return has(text, "\r");
+        case Kind::LineBreak: return has(text, "\n") || has(text, "\r");
+        case Kind::LeadingNewline: return text.starts_with('\n');
+        case Kind::PyQuote:
+          return pythonFinds(text, check.needle, false) || (check.needle.size() == 3 && text.ends_with(check.needle[0]));
+        case Kind::PyLineBreak: return pythonFinds(text, {}, true);
+        case Kind::OddBackslashes: return oddBackslashes(text);
+        case Kind::DartQuote:
+          return has(text, check.needle) || (check.needle.size() == 3 && text.ends_with(check.needle[0]));
+        case Kind::TemplateQuote: return templateFinds(text, [&](const size_t i) { return text[i] == '`'; });
+        case Kind::TemplateHole:
+          return templateFinds(text, [&](const size_t i) { return text[i] == '$' && i + 1 < text.size() && text[i + 1] == '{'; });
+        case Kind::TemplateCR: return templateFinds(text, [&](const size_t i) { return text[i] == '\r'; });
+        case Kind::SingleQuoted: return !singleQuotedHolds(text) && !has(text, "'");
+        case Kind::KotlinTemplate: return !kotlinRawHolds(text) && !has(text, R"(""")");
+        case Kind::ScalaUnicode: return !scalaRawHolds(text) && !has(text, R"(""")");
+      }
+      return false;
+    }
+  }
+
+  std::span<const RawFormCheck> RawFormChecks(const LanguageEnum language) {
+    switch (language) {
+      case LanguageEnum::CPP: return kCpp;
+      case LanguageEnum::Go: return kGo;
+      case LanguageEnum::Python: return kPython;
+      case LanguageEnum::JavaScript:
+      case LanguageEnum::TypeScript: return kTemplate;
+      case LanguageEnum::CSharp: return kCSharp;
+      case LanguageEnum::Rust: return kRust;
+      case LanguageEnum::Ruby:
+      case LanguageEnum::PHP:
+      case LanguageEnum::Perl: return kSingleQuoted;
+      case LanguageEnum::Lua: return kLua;
+      case LanguageEnum::Swift: return kSwift;
+      case LanguageEnum::Kotlin: return kKotlin;
+      case LanguageEnum::R: return kR;
+      case LanguageEnum::Scala: return kScala;
+      case LanguageEnum::OCaml: return kOCaml;
+      case LanguageEnum::Erlang: return kErlang;
+      case LanguageEnum::Elixir: return kElixir;
+      case LanguageEnum::Dart: return kDart;
+      default: return {}; // C, Objective-C, GLSL, HLSL, Java, Haskell: no raw form
+    }
+  }
+
+  uint64_t RawFormViolations(const LanguageEnum language, const std::string_view content) {
+    uint64_t mask = 0;
+    const auto checks = RawFormChecks(language);
+    for (size_t i = 0; i < checks.size(); ++i)
+      if (violated(checks[i], content))
+        mask |= uint64_t{1} << i;
+    return mask;
+  }
+
+  std::vector<std::string_view> RawForms(const LanguageEnum language) {
+    std::vector<std::string_view> forms;
+    for (const auto &check: RawFormChecks(language))
+      if (forms.empty() || forms.back() != check.form)
+        forms.push_back(check.form);
+    return forms;
+  }
+
+  namespace {
+    constexpr RawFormFamily kFamilies[] = {
+      {"C++", kCpp}, {"Go", kGo}, {"Python", kPython}, {"JavaScript/TypeScript", kTemplate},
+      {"C#", kCSharp}, {"Rust", kRust}, {"Ruby/PHP/Perl", kSingleQuoted}, {"Lua", kLua},
+      {"Swift", kSwift}, {"Kotlin", kKotlin}, {"R", kR}, {"Scala", kScala}, {"OCaml", kOCaml},
+      {"Erlang", kErlang}, {"Elixir", kElixir}, {"Dart", kDart},
+    };
+
+    /// Calls `visit(family, first check, end check, form number)` for every form of
+    /// every family, with checks and forms numbered across families.
+    template <typename Visit>
+    void forEachForm(Visit visit) {
+      size_t check = 0, form = 0;
+      for (const auto &family: kFamilies)
+        for (size_t i = 0; i < family.checks.size(); ++form) {
+          const size_t first = i;
+          while (i < family.checks.size() && family.checks[i].form == family.checks[first].form)
+            ++i;
+          visit(family, check + first, check + i, form);
+          if (i == family.checks.size())
+            check += i;
+        }
+    }
+  }
+
+  std::span<const RawFormFamily> RawFormFamilies() {
+    return kFamilies;
+  }
+
+  uint64_t AllRawFormViolations(const std::string_view content) {
+    uint64_t mask = 0;
+    size_t bit = 0;
+    for (const auto &family: kFamilies)
+      for (const auto &check: family.checks)
+        mask |= static_cast<uint64_t>(violated(check, content)) << bit++;
+    return mask;
+  }
+
+  uint64_t AllRawFormsHolding(const uint64_t violations, const bool encodable) {
+    if (!encodable)
+      return 0;
+    uint64_t holding = 0;
+    forEachForm([&](const RawFormFamily &, const size_t first, const size_t end, const size_t form) {
+      const uint64_t checks = (end - first == 64 ? ~uint64_t{0} : (uint64_t{1} << (end - first)) - 1) << first;
+      if ((violations & checks) == 0)
+        holding |= uint64_t{1} << form;
+    });
+    return holding;
+  }
+
+  uint64_t OwnRawForms(const LanguageEnum language) {
+    const auto own = RawFormChecks(language);
+    uint64_t mask = 0;
+    forEachForm([&](const RawFormFamily &family, size_t, size_t, const size_t form) {
+      if (!own.empty() && family.checks.data() == own.data())
+        mask |= uint64_t{1} << form;
+    });
+    return mask;
+  }
+
+  uint64_t RawFormsHolding(const LanguageEnum language, const uint64_t violations, const bool encodable) {
+    if (!encodable)
+      return 0;
+    const auto checks = RawFormChecks(language);
+    uint64_t holding = 0;
+    for (size_t i = 0, form = 0; i < checks.size(); ++form) {
+      bool holds = true;
+      const std::string_view name = checks[i].form;
+      for (; i < checks.size() && checks[i].form == name; ++i)
+        holds = holds && !(violations >> i & 1);
+      if (holds)
+        holding |= uint64_t{1} << form;
+    }
+    return holding;
   }
 
   bool DefaultRawHolds(const LanguageEnum language, const std::string_view content, const std::string_view quote) {

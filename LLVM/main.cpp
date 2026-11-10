@@ -491,6 +491,10 @@ int main(const int argc, char *argv[]) {
         auto f = open_lang_file("language_stats.md");
         f << "# String Language Distribution\n\n";
         PrintLanguageStatsTable({{"String", pls->langStats.Snapshot()}}, f);
+      } {
+        auto f = open_lang_file("raw_forms.md");
+        f << "# Native Raw String Forms\n\n";
+        PrintRawFormStatsTable(pls->rawForms, f);
       }
     }
 

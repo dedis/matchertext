@@ -50,3 +50,32 @@ LanguageStatsSnapshot LanguageStats::Snapshot() const {
 
   return snap;
 }
+
+void RawFormStats::Counts::Record(
+  const uint64_t violations, const uint64_t holding, const bool ownHolds, const bool hasControl
+) {
+  strings.fetch_add(1, std::memory_order_relaxed);
+  if (hasControl)
+    control.fetch_add(1, std::memory_order_relaxed);
+  if (ownHolds)
+    ownForm.fetch_add(1, std::memory_order_relaxed);
+  if (holding != 0)
+    anyForm.fetch_add(1, std::memory_order_relaxed);
+  for (size_t i = 0; i < kMaxForms; ++i)
+    if (holding >> i & 1)
+      forms[i].fetch_add(1, std::memory_order_relaxed);
+  for (size_t i = 0; i < kMaxChecks; ++i)
+    if (violations >> i & 1)
+      checks[i].fetch_add(1, std::memory_order_relaxed);
+}
+
+void RawFormStats::Record(
+  const bool isInScope, const bool isMatchertext, const uint64_t violations, const uint64_t holding,
+  const bool ownHolds, const bool hasControl
+) {
+  all.Record(violations, holding, ownHolds, hasControl);
+  if (isInScope)
+    inScope.Record(violations, holding, ownHolds, hasControl);
+  if (isInScope && isMatchertext)
+    matchertext.Record(violations, holding, ownHolds, hasControl);
+}

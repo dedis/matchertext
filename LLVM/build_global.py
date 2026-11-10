@@ -9,9 +9,10 @@ Rules:
     aggregated SUM/MAX bases (you cannot average averages).
 Output: result/global/{strings,nesting,files,language_stats}.md, plus
   language_stats_by_toothpicks.md (string languages sorted by toothpicks) and
-  host_languages_by_characters.md (host languages sorted by raw characters).
+  host_languages_by_characters.md (host languages sorted by raw characters), and
+  raw_forms.md (how each host's native raw string forms hold its strings).
 """
-import os, sys
+import os, re, sys
 
 ROOT = "."
 REPOS = os.path.join(ROOT, "result", "repos")
@@ -41,7 +42,8 @@ def parse_num(s):
         return None
 
 def split_row(row):
-    return [c.strip() for c in row.strip().strip("|").split("|")]
+    """Cells of a table row; a pipe escaped as \\| stays inside its cell."""
+    return [c.strip() for c in re.split(r"(?<!\\)\|", row.strip()[1:-1])]
 
 def find_table(text, after=None):
     """Return the contiguous block of '|' table lines, optionally after a marker line."""
@@ -299,7 +301,83 @@ out.append(host_row("**Total**", tot))
 open(os.path.join(OUTDIR, "host_languages_by_characters.md"), "w").write("\n".join(out) + "\n")
 
 # ---------- console summary ----------
-print("\nWrote 6 files to %s\n" % OUTDIR)
+# =========================================================================
+# raw_forms.md  (sum result/repos/$ORG/@org/language_stats/<Language>/raw_forms.md:
+# every string of every host language against the raw forms of every language)
+# =========================================================================
+POPS = ("All Strings", "In-Scope Strings", "Matchertext Strings")
+raw = {}                            # host -> {(language, form, measure): [all, in-scope, matchertext]}
+for org in orgs:
+    base = path(org, "language_stats")
+    if not os.path.isdir(base):
+        continue
+    for lang in os.listdir(base):
+        p = os.path.join(base, lang, "raw_forms.md")
+        if not os.path.isfile(p):
+            continue
+        rows = raw.setdefault(lang, {})
+        _, _, r = find_table(open(p).read())
+        for row in r[2:]:
+            cells = split_row(row)
+            acc = rows.setdefault(tuple(cells[:3]), [0.0] * len(POPS))
+            for c in range(len(POPS)):
+                acc[c] += parse_num(cells[3 + c]) or 0.0
+STRINGS, CONTROL = ("-", "-", "String literals"), ("-", "-", "Contain control characters")
+OWN, ANY = ("Own language", "Any form", "Holds"), ("Any language", "Any form", "Holds")
+raw = {h: rows for h, rows in raw.items() if rows.get(STRINGS, [0])[0]}
+raw_total = {}
+for rows in raw.values():
+    for key, v in rows.items():
+        acc = raw_total.setdefault(key, [0.0] * len(POPS))
+        for c in range(len(POPS)):
+            acc[c] += v[c]
+forms = [k for k in raw_total if k[0] not in ("-", "Own language", "Any language")]
+get = lambda rows, key, c: rows.get(key, [0.0] * len(POPS))[c]
+pct_of = lambda rows, key, c: div(get(rows, key, c), get(rows, STRINGS, c)) * 100
+
+out = ["# Native Raw String Forms", note,
+       "<!-- Every string literal of every host language checked against the native raw "
+       "string forms of every language. All counts every string literal; In-Scope leaves out "
+       "binary data (BinaryData, PseudoBinaryData); Matchertext keeps the in-scope literals "
+       "whose decoded content a matchertext literal holds. A form holds a content it can "
+       "write verbatim; control characters other than tab, LF and CR are written verbatim. "
+       "C++ counts only R\"(...)\"; a custom delimiter R\"d(...)d\" can avoid any )\". -->", "",
+       "## Per Host Language", "",
+       "| Host Language | In-Scope Strings | Own Raw Form | Any Language's Raw Form "
+       "| Matchertext Strings | Own Raw Form | Any Language's Raw Form "
+       "| Control Characters (In-Scope) | Control Characters (All) |",
+       "|---|---|---|---|---|---|---|---|---|"]
+def summary_row(name, rows):
+    return "| %s | %s | %.2f%% | %.2f%% | %s | %.2f%% | %.2f%% | %.2f%% | %.2f%% |" % (
+        name, fmt_int(get(rows, STRINGS, 1)), pct_of(rows, OWN, 1), pct_of(rows, ANY, 1),
+        fmt_int(get(rows, STRINGS, 2)), pct_of(rows, OWN, 2), pct_of(rows, ANY, 2),
+        pct_of(rows, CONTROL, 1), pct_of(rows, CONTROL, 0))
+hosts_order = sorted(raw, key=lambda h: (-get(raw[h], STRINGS, 1), h))
+for h in hosts_order:
+    out.append(summary_row(h, raw[h]))
+out.append(summary_row("**Total**", raw_total))
+
+out += ["", "## Per Raw Form, All Host Languages", "",
+        "| Language | Raw Form | Measure | In-Scope Strings | % of In-Scope "
+        "| Matchertext Strings | % of Matchertext |",
+        "|---|---|---|---|---|---|---|"]
+for key in forms:
+    out.append("| %s | %s | %s | %s | %.2f%% | %s | %.2f%% |" % (
+        key + (fmt_int(get(raw_total, key, 1)), pct_of(raw_total, key, 1),
+               fmt_int(get(raw_total, key, 2)), pct_of(raw_total, key, 2))))
+
+holds = [k for k in forms if k[2] == "Holds"]
+out += ["", "## Held per Host Language and Raw Form", "",
+        "<!-- Share of each host language's in-scope strings (and, after the slash, of its "
+        "matchertext strings) that each raw form holds. -->", "",
+        "| Host Language | " + " | ".join("%s %s" % (k[0], k[1]) for k in holds) + " |",
+        "|---|" + "---|" * len(holds)]
+for h in hosts_order:
+    out.append("| %s | " % h + " | ".join(
+        "%.1f%% / %.1f%%" % (pct_of(raw[h], k, 1), pct_of(raw[h], k, 2)) for k in holds) + " |")
+open(os.path.join(OUTDIR, "raw_forms.md"), "w").write("\n".join(out) + "\n")
+
+print("\nWrote 7 files to %s\n" % OUTDIR)
 print("Key global figures (Strings column):")
 def gv(a, m): return a[m][0]
 print("  Sample Size            : %s" % fmt_g(gv(s_agg, "Sample Size")))

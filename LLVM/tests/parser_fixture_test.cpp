@@ -234,6 +234,18 @@ bool TestStringBucketMix() {
   return ok;
 }
 
+// The lexer reads one token past a string literal; a comment there must not be lost.
+bool TestCommentAfterString() {
+  const auto strings = Parser::STRING_STATS.Snapshot();
+  const auto docs = Parser::DOCS_STATS.Snapshot();
+
+  bool ok = true;
+  ok &= CheckEq("comment_after_string.strings.count", strings.count, 3.0);
+  ok &= CheckEq("comment_after_string.docs.count", docs.count, 4.0);
+  ok &= CheckNoFileViolations();
+  return ok;
+}
+
 bool RunFixture(const std::string &fixturePath) {
   const fs::path path(fixturePath);
   const std::string name = path.filename().string();
@@ -251,6 +263,8 @@ bool RunFixture(const std::string &fixturePath) {
     return TestPrefixedLiterals();
   if (name == "string_bucket_mix.cpp")
     return TestStringBucketMix();
+  if (name == "comment_after_string.cpp")
+    return TestCommentAfterString();
 
   std::cerr << "parser_fixture_test failed: unknown fixture " << fixturePath << '\n';
   return false;

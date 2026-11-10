@@ -7,6 +7,7 @@
 #ifndef LANGUAGE_STATS_HPP
 #define LANGUAGE_STATS_HPP
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <vector>
@@ -43,6 +44,41 @@ struct LanguageStats {
     };
 
     Entry entries_[static_cast<size_t>(LanguageEnum::COUNT)]{};
+};
+
+/// Thread-safe counters of how the native raw string forms of every language hold
+/// the decoded content of one host language's string literals (see
+/// RawRewrite::RawFormFamilies).
+struct RawFormStats {
+  static constexpr size_t kMaxChecks = 64;
+  static constexpr size_t kMaxForms = 64;
+
+  /// One population of string literals.
+  struct Counts {
+    std::atomic<uint64_t> strings{0};
+    /// Strings holding a control character other than tab, line feed, and carriage return.
+    std::atomic<uint64_t> control{0};
+    /// Strings that a raw form of their host language holds.
+    std::atomic<uint64_t> ownForm{0};
+    /// Strings that a raw form of any language holds.
+    std::atomic<uint64_t> anyForm{0};
+    /// Per form of RawRewrite::RawFormFamilies: strings it holds.
+    std::array<std::atomic<uint64_t>, kMaxForms> forms{};
+    /// Per check of RawRewrite::RawFormFamilies: strings that break it.
+    std::array<std::atomic<uint64_t>, kMaxChecks> checks{};
+
+    void Record(uint64_t violations, uint64_t holding, bool ownHolds, bool hasControl);
+  };
+
+  /// Every string literal, binary data included.
+  Counts all;
+  /// String literals within matchertext's scope (not binary data).
+  Counts inScope;
+  /// In-scope literals whose decoded content a matchertext literal holds.
+  Counts matchertext;
+
+  void Record(bool isInScope, bool isMatchertext, uint64_t violations, uint64_t holding, bool ownHolds,
+              bool hasControl);
 };
 
 #endif // LANGUAGE_STATS_HPP

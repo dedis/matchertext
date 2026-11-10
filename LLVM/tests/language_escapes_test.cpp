@@ -49,14 +49,14 @@ const char *b = "\x00\x01";
 const char *c = "\xc3\xa9";
 const char *d = "\xe9\r";
 const char *e = "\a\b\f\v\t\"";
-)src", {{.value = R"(ab\\d\n)", .converted = 1, .raw = false, .m = true}, {.value = R"(\x00\x01)", .converted = 0, .raw = false, .m = true}, {.value = R"(\xc3\xa9)", .converted = 0}, {.value = R"(\xe9\r)", .converted = 1, .raw = false, .m = false}, {.value = R"(\a\b\f\v\t\")", .converted = 0}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1, .raw = false, .m = true}, {.value = R"(\x00\x01)", .converted = 2, .raw = false, .m = true}, {.value = R"(\xc3\xa9)", .converted = 0}, {.value = R"(\xe9\r)", .converted = 1, .raw = false, .m = false}, {.value = R"(\a\b\f\v\t\")", .converted = 4}}},
 
       {LanguageEnum::CPP, "cpp", R"src(
 const char *a = R"(r\n)";
 const wchar_t *b = L"\xe9";
 const char *c = u8"\u005C\N{REVERSE SOLIDUS}";
 const char *d = "\0";
-)src", {{.value = R"(r\n)", .converted = 1, .raw = true, .m = true}, {.value = R"(\xe9)", .converted = 0, .raw = true, .m = true}, {.value = R"(\u005C\N{REVERSE SOLIDUS})", .converted = 2}, {.value = R"(\0)", .converted = 0}}},
+)src", {{.value = R"(r\n)", .converted = 1, .raw = true, .m = true}, {.value = R"(\xe9)", .converted = 0, .raw = true, .m = true}, {.value = R"(\u005C\N{REVERSE SOLIDUS})", .converted = 2}, {.value = R"(\0)", .converted = 1}}},
 
       {LanguageEnum::Go, "go", R"src(package p
 var a = "ab\\d\n"
@@ -65,7 +65,7 @@ var c = "\xc3\xa9"
 var d = "\xe9"
 var e = "\000\a\v"
 var f = "\134\x5C\u005C\U0000005C"
-)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(r\n)", .converted = 1, .raw = true, .m = true}, {.value = R"(\xc3\xa9)", .converted = 0, .raw = true, .m = true}, {.value = R"(\xe9)", .converted = 1, .raw = false, .m = false}, {.value = R"(\000\a\v)", .converted = 0}, {.value = R"(\134\x5C\u005C\U0000005C)", .converted = 4}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(r\n)", .converted = 1, .raw = true, .m = true}, {.value = R"(\xc3\xa9)", .converted = 0, .raw = true, .m = true}, {.value = R"(\xe9)", .converted = 1, .raw = false, .m = false}, {.value = R"(\000\a\v)", .converted = 3}, {.value = R"(\134\x5C\u005C\U0000005C)", .converted = 4}}},
 
       {LanguageEnum::Python, "py", R"src(
 a = "ab\\d\n"
@@ -75,7 +75,7 @@ d = "\xe9"
 e = "\N{REVERSE SOLIDUS}\d"
 f = "\N{NULL}\N{DEGREE SIGN}"
 g = "\134\x5C\u005C\U0000005C\0"
-)src", {{.value = R"(ab\\d\n)", .converted = 1, .raw = false, .m = true}, {.value = R"(r\n)", .converted = 1}, {.value = R"(\xe9)", .converted = 0}, {.value = R"(\xe9)", .converted = 0}, {.value = R"(\N{REVERSE SOLIDUS}\d)", .converted = 2, .raw = true, .m = true}, {.value = R"(\N{NULL}\N{DEGREE SIGN})", .converted = 0}, {.value = R"(\134\x5C\u005C\U0000005C\0)", .converted = 4}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1, .raw = false, .m = true}, {.value = R"(r\n)", .converted = 1}, {.value = R"(\xe9)", .converted = 0}, {.value = R"(\xe9)", .converted = 0}, {.value = R"(\N{REVERSE SOLIDUS}\d)", .converted = 2, .raw = true, .m = true}, {.value = R"(\N{NULL}\N{DEGREE SIGN})", .converted = 1}, {.value = R"(\134\x5C\u005C\U0000005C\0)", .converted = 5}}},
 
       {LanguageEnum::JavaScript, "js", R"src(
 a = "ab\\d\n";
@@ -85,12 +85,12 @@ d = "\uD83D";
 e = "a\[b";
 f = "\134\x5C\u{5C}\1";
 g = "a`b(";
-)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(t\nu)", .converted = 0}, {.value = R"(\uD83D\uDE00)", .converted = 0}, {.value = R"(\uD83D)", .converted = 1, .raw = false, .m = false}, {.value = R"(a\[b)", .converted = 1, .raw = true, .m = false}, {.value = R"(\134\x5C\u{5C}\1)", .converted = 3}, {.value = R"(a`b()", .converted = 0, .raw = false, .m = false}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(t\nu)", .converted = 0}, {.value = R"(\uD83D\uDE00)", .converted = 0}, {.value = R"(\uD83D)", .converted = 1, .raw = false, .m = false}, {.value = R"(a\[b)", .converted = 1, .raw = true, .m = false}, {.value = R"(\134\x5C\u{5C}\1)", .converted = 4}, {.value = R"(a`b()", .converted = 0, .raw = false, .m = false}}},
 
       {LanguageEnum::TypeScript, "ts", R"src(
 let a: string = "ab\\d\n";
 let b = "\x00";
-)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(\x00)", .converted = 0}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(\x00)", .converted = 1}}},
 
       {LanguageEnum::Java, "java", R"src(
 class T {
@@ -99,7 +99,7 @@ class T {
   String c = "\uD83D\uDE00";
   String d = "\134\177";
 }
-)src", {{.value = R"(ab\\d\n)", .converted = 1, .raw = false, .m = true}, {.value = R"(\0\s)", .converted = 0}, {.value = R"(\uD83D\uDE00)", .converted = 0}, {.value = R"(\134\177)", .converted = 1}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1, .raw = false, .m = true}, {.value = R"(\0\s)", .converted = 1}, {.value = R"(\uD83D\uDE00)", .converted = 0}, {.value = R"(\134\177)", .converted = 2}}},
 
       {LanguageEnum::CSharp, "cs", R"src(
 class T {
@@ -108,7 +108,7 @@ class T {
   string c = "\e\x41";
   string d = "\x0000\u005C";
 }
-)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(v\n)", .converted = 1}, {.value = R"(\e\x41)", .converted = 0}, {.value = R"(\x0000\u005C)", .converted = 1}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(v\n)", .converted = 1}, {.value = R"(\e\x41)", .converted = 1}, {.value = R"(\x0000\u005C)", .converted = 2}}},
 
       {LanguageEnum::Rust, "rs", R"src(
 fn f() {
@@ -118,7 +118,7 @@ fn f() {
   let d = "\u{1F600}\0";
   let e = "\x00\x5C";
 }
-)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(r\n)", .converted = 1}, {.value = R"(\xe9)", .converted = 0}, {.value = R"(\u{1F600}\0)", .converted = 0}, {.value = R"(\x00\x5C)", .converted = 1}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(r\n)", .converted = 1}, {.value = R"(\xe9)", .converted = 0}, {.value = R"(\u{1F600}\0)", .converted = 1}, {.value = R"(\x00\x5C)", .converted = 2}}},
 
       {LanguageEnum::Ruby, "rb", R"src(
 a = "ab\\d\n"
@@ -128,7 +128,7 @@ d = "\xe9"
 e = %q(a\\b\n(x))
 f = "\134\x5C\0"
 g = "\C-a\M-a\e"
-)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(a\\b\n)", .converted = 2, .raw = true, .m = true}, {.value = R"(\e\cA\u{41 42})", .converted = 0}, {.value = R"(\xe9)", .converted = 1}, {.value = R"(a\\b\n(x))", .converted = 2}, {.value = R"(\134\x5C\0)", .converted = 2}, {.value = R"(\C-a\M-a\e)", .converted = 0}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(a\\b\n)", .converted = 2, .raw = true, .m = true}, {.value = R"(\e\cA\u{41 42})", .converted = 2}, {.value = R"(\xe9)", .converted = 1}, {.value = R"(a\\b\n(x))", .converted = 2}, {.value = R"(\134\x5C\0)", .converted = 3}, {.value = R"(\C-a\M-a\e)", .converted = 3}}},
 
       {LanguageEnum::PHP, "php", R"src(<?php
 $a = "ab\\d\n";
@@ -136,7 +136,7 @@ $b = 'a\\b\n';
 $c = "\d\e";
 $d = "\u{41}\x41";
 $e = "\x00\101";
-)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(a\\b\n)", .converted = 2}, {.value = R"(\d\e)", .converted = 1}, {.value = R"(\u{41}\x41)", .converted = 0}, {.value = R"(\x00\101)", .converted = 0}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(a\\b\n)", .converted = 2}, {.value = R"(\d\e)", .converted = 2}, {.value = R"(\u{41}\x41)", .converted = 0}, {.value = R"(\x00\101)", .converted = 1}}},
 
       {LanguageEnum::Perl, "pl", R"src(
 my $a = "ab\\d\n";
@@ -145,7 +145,7 @@ my $c = "\e\cA\x{41}";
 my $d = "\xe9";
 my $e = "\x00\101\x{5C}";
 my $f = q{a\\b\}};
-)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(a\\b\n)", .converted = 2}, {.value = R"(\e\cA\x{41})", .converted = 0}, {.value = R"(\xe9)", .converted = 1}, {.value = R"(\x00\101\x{5C})", .converted = 1}, {.value = std::nullopt, .converted = 3}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(a\\b\n)", .converted = 2}, {.value = R"(\e\cA\x{41})", .converted = 2}, {.value = R"(\xe9)", .converted = 1}, {.value = R"(\x00\101\x{5C})", .converted = 2}, {.value = std::nullopt, .converted = 3}}},
 
       {LanguageEnum::Lua, "lua", R"src(
 a = "ab\\d\n"
@@ -161,7 +161,7 @@ let b = #"r\n"#
 let c = #"a\#nb"#
 let d = "\0\u{1F600}"
 let e = "\u{5C}\u{7F}"
-)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = std::nullopt, .converted = 1}, {.value = std::nullopt, .converted = 0}, {.value = R"(\0\u{1F600})", .converted = 0}, {.value = R"(\u{5C}\u{7F})", .converted = 1}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = std::nullopt, .converted = 1}, {.value = std::nullopt, .converted = 0}, {.value = R"(\0\u{1F600})", .converted = 1}, {.value = R"(\u{5C}\u{7F})", .converted = 2}}},
 
       {LanguageEnum::Kotlin, "kt", R"src(
 val a = "ab\\d\n"
@@ -184,14 +184,14 @@ object T {
   val c = """t\n"""
   val d = "\u0000\u005C"
 }
-)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = std::nullopt, .converted = 1}, {.value = R"(t\n)", .converted = 1}, {.value = R"(\u0000\u005C)", .converted = 1}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = std::nullopt, .converted = 1}, {.value = R"(t\n)", .converted = 1}, {.value = R"(\u0000\u005C)", .converted = 2}}},
 
       {LanguageEnum::Haskell, "hs", R"src(
 a = "ab\\d\n"
 b = "\SOH\&x\92\
     \y"
 c = '\n'
-)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = std::nullopt, .converted = 1}, {.value = R"(\n)", .converted = 0}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = std::nullopt, .converted = 2}, {.value = R"(\n)", .converted = 0}}},
 
       {LanguageEnum::OCaml, "ml", R"src(
 let a = "ab\\d\n"
@@ -201,27 +201,27 @@ let c = "\092\o134\d"
 
       {LanguageEnum::Erlang, "erl", R"src(
 f() -> {"ab\\d\n", "\^A\d\x{41}", ~S"s\n", ~s"t\n", $\n}.
-)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(\^A\d\x{41})", .converted = 0}, {.value = std::nullopt, .converted = 1}, {.value = std::nullopt, .converted = 0}, {.value = std::nullopt, .converted = 0}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(\^A\d\x{41})", .converted = 2}, {.value = std::nullopt, .converted = 1}, {.value = std::nullopt, .converted = 0}, {.value = std::nullopt, .converted = 0}}},
 
       {LanguageEnum::Elixir, "ex", R"src(
 a = "ab\\d\n"
 b = ~S(s\n)
 c = "\e\xe9"
 d = "\d\x00\x41"
-)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(s\n)", .converted = 1}, {.value = R"(\e\xe9)", .converted = 1}, {.value = R"(\d\x00\x41)", .converted = 0}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(s\n)", .converted = 1}, {.value = R"(\e\xe9)", .converted = 2}, {.value = R"(\d\x00\x41)", .converted = 2}}},
 
       {LanguageEnum::Dart, "dart", R"src(
 var a = "ab\\d\n";
 var b = r"r\n";
 var c = "\x00\0";
 var d = "\x5C\u{5C}\u005C";
-)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(r\n)", .converted = 1}, {.value = R"(\x00\0)", .converted = 0}, {.value = R"(\x5C\u{5C}\u005C)", .converted = 3}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(r\n)", .converted = 1}, {.value = R"(\x00\0)", .converted = 1}, {.value = R"(\x5C\u{5C}\u005C)", .converted = 3}}},
 
       {LanguageEnum::Objective_C, "m", R"src(
 const char *a = "ab\\d\n";
 NSString *b = @"\xc3\xa9\a";
 const char *c = "\x00\134";
-)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(\xc3\xa9\a)", .converted = 0}, {.value = R"(\x00\134)", .converted = 1}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(\xc3\xa9\a)", .converted = 1}, {.value = R"(\x00\134)", .converted = 2}}},
 
       {LanguageEnum::GLSL, "glsl", R"src(#version 450
 // comment with an unmatched (
@@ -231,7 +231,7 @@ void main() {}
       {LanguageEnum::HLSL, "hlsl", R"src(
 string s = "ab\\d\n";
 string t = "\x00\134";
-)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(\x00\134)", .converted = 1}}},
+)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = R"(\x00\134)", .converted = 2}}},
     };
     return cases;
   }

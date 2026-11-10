@@ -421,7 +421,23 @@ namespace {
     bool rawHolds = false;
     /// A matchertext literal M"(...)" holds the rewritten content verbatim.
     bool mHolds = false;
+    /// RawRewrite::AllRawFormViolations and AllRawFormsHolding of the rewritten content.
+    uint64_t rawFormViolations = 0;
+    uint64_t rawFormsHolding = 0;
+    /// One of the language's own raw forms holds the rewritten content.
+    bool ownRawForm = false;
+    /// The rewritten content holds a control character other than tab, LF, and CR.
+    bool control = false;
   };
+
+  // Native raw form outcome of a rewritten content.
+  Rewrite rawForms(const LanguageEnum language, Rewrite out, const std::string_view content, const bool encodable) {
+    out.rawFormViolations = RawRewrite::AllRawFormViolations(content);
+    out.rawFormsHolding = RawRewrite::AllRawFormsHolding(out.rawFormViolations, encodable);
+    out.ownRawForm = (out.rawFormsHolding & RawRewrite::OwnRawForms(language)) != 0;
+    out.control = RawRewrite::HasControl(content);
+    return out;
+  }
 
   Rewrite rewrite(const LanguageEnum language, const TSNode node, const std::string_view src, const std::string_view body, const EscapeRules &rules, StringScratch &scratch) {
     const std::string_view text = nodeText(node, src);
@@ -431,7 +447,7 @@ namespace {
     if (quote != std::string_view::npos)
       quoteRun = text.substr(quote, text.substr(quote, 3) == std::string(3, text[quote]) ? 3 : 1);
     if (body.find('\\') == std::string_view::npos)
-      return {0, RawRewrite::DefaultRawHolds(language, body, quoteRun), RawRewrite::MatchertextHolds(body)};
+      return rawForms(language, {0, RawRewrite::DefaultRawHolds(language, body, quoteRun), RawRewrite::MatchertextHolds(body)}, body, true);
 
     RawRewrite::Counter &counter = scratch.counter;
     counter.Reset(rules.dialect);
@@ -487,8 +503,9 @@ namespace {
     if (!matchertext)
       converted = static_cast<uint64_t>(std::ranges::count(body, '\\'));
     if (!counter.Holdable())
-      return {converted, false, false};
-    return {converted, RawRewrite::DefaultRawHolds(language, counter.Content(), quoteRun), matchertext};
+      return rawForms(language, {converted, false, false}, counter.Content(), false);
+    return rawForms(language, {converted, RawRewrite::DefaultRawHolds(language, counter.Content(), quoteRun), matchertext},
+                    counter.Content(), true);
   }
 
   // Body text of the spans: a view into `src` for one span, else concatenated.
@@ -525,13 +542,17 @@ namespace {
         case Kind::String: {
           bodySpans(node, src, scratch.spans);
           const std::string_view body = bodyText(src, scratch.spans, scratch.body);
-          const auto [converted, rawHolds, mHolds] = rewrite(language, node, src, body, rules, scratch);
+          const Rewrite r = rewrite(language, node, src, body, rules, scratch);
           out.PushBack(Serde::JSON::Object({
             {"kind", Serde::JSON("string")},
             {"value", Serde::JSON(body)},
-            {"convertedToothpicks", Serde::JSON(static_cast<double>(converted))},
-            {"rawHolds", Serde::JSON(rawHolds ? 1.0 : 0.0)},
-            {"mHolds", Serde::JSON(mHolds ? 1.0 : 0.0)}
+            {"convertedToothpicks", Serde::JSON(static_cast<double>(r.converted))},
+            {"rawHolds", Serde::JSON(r.rawHolds ? 1.0 : 0.0)},
+            {"mHolds", Serde::JSON(r.mHolds ? 1.0 : 0.0)},
+            {"rawFormViolations", Serde::JSON(static_cast<double>(r.rawFormViolations))},
+            {"rawFormsHolding", Serde::JSON(static_cast<double>(r.rawFormsHolding))},
+            {"ownRawForm", Serde::JSON(r.ownRawForm ? 1.0 : 0.0)},
+            {"control", Serde::JSON(r.control ? 1.0 : 0.0)}
           }));
           continue;
         }

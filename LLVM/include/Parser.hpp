@@ -26,6 +26,7 @@ struct PerLanguageStats {
   NestedStats docsRelaxedNestedStats;
   FileStats fileStats;
   LanguageStats langStats;
+  RawFormStats rawForms;
 };
 
 /**
@@ -111,7 +112,9 @@ class Parser final {
       std::string_view sourcePath = {}, std::string_view inputPath = {},
       EmbeddedStats *extraEmbedded = nullptr, NestedStats *extraNested = nullptr,
       LanguageStats *extraLangStats = nullptr, uint64_t convertedToothpicksHint = 0,
-      bool rawHoldsHint = false, bool mHoldsHint = false
+      bool rawHoldsHint = false, bool mHoldsHint = false,
+      RawFormStats *rawForms = nullptr, uint64_t rawFormViolations = 0, uint64_t rawFormsHolding = 0,
+      bool ownRawFormHint = false, bool controlHint = false
     );
 };
 

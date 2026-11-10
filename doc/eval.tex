@@ -69,9 +69,9 @@ as the equivalent escapeless C++ raw string literal \verb|R"(|$\dots$\verb|)"|
 and the surviving backslashes are counted,
 yielding a \emph{toothpick reduction}.
 The rewrite decodes every escape, \verb|\x5B| included,
-and drops its backslash unless it decodes to one;
-\verb|\r\n| and \verb|\r| become line feeds, \verb|\f| and \verb|\v| spaces, and other controls vanish.
-An escape that cannot be written raw, such as a non-UTF-8 byte, keeps its backslash,
+and drops its backslash unless it decodes to one
+or to a control other than tab, LF, or CR, which is kept verbatim.
+An escape that cannot be written raw, such as a non-UTF-8 byte, keeps its backslash too,
 as does every escape of a literal whose decoded content is not matchertext.
 Binary-data literals (BinaryData and PseudoBinaryData,
 such as file headers, test vectors, or terminal codes) are out of scope:

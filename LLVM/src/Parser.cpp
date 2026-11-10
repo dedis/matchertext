@@ -447,12 +447,18 @@ bool Parser::ParseC_CPP(const std::string &path, const LanguageEnum language, Se
       /// is not matchertext cannot be rewritten and keeps all its toothpicks.
       if (!RawRewrite::MatchertextHolds(literal.content))
         convertedToothpicks = static_cast<uint64_t>(std::ranges::count(value, '\\'));
+      const uint64_t violations = RawRewrite::AllRawFormViolations(literal.content);
+      const uint64_t holding = RawRewrite::AllRawFormsHolding(violations, literal.holdable);
       result.PushBack(Serde::JSON::Object({
         {"kind", Serde::JSON("string")},
         {"value", Serde::JSON(value)},
         {"convertedToothpicks", Serde::JSON(static_cast<double>(convertedToothpicks))},
         {"rawHolds", Serde::JSON(literal.holdable && RawRewrite::DefaultRawHolds(language, literal.content, {}) ? 1.0 : 0.0)},
-        {"mHolds", Serde::JSON(literal.holdable && RawRewrite::MatchertextHolds(literal.content) ? 1.0 : 0.0)}
+        {"mHolds", Serde::JSON(literal.holdable && RawRewrite::MatchertextHolds(literal.content) ? 1.0 : 0.0)},
+        {"rawFormViolations", Serde::JSON(static_cast<double>(violations))},
+        {"rawFormsHolding", Serde::JSON(static_cast<double>(holding))},
+        {"ownRawForm", Serde::JSON((holding & RawRewrite::OwnRawForms(language)) != 0 ? 1.0 : 0.0)},
+        {"control", Serde::JSON(RawRewrite::HasControl(literal.content) ? 1.0 : 0.0)}
       }));
       continue;
     }
@@ -480,13 +486,19 @@ void Parser::GatherStatistics(
       const auto convertedToothpicks = static_cast<uint64_t>(e["convertedToothpicks"].GetNumber());
       const bool rawHolds = e["rawHolds"].GetNumber() != 0.0;
       const bool mHolds = e["mHolds"].GetNumber() != 0.0;
+      const auto number = [&](const char *key) {
+        return e.Contains(key) ? static_cast<uint64_t>(e[key].GetNumber()) : uint64_t{0};
+      };
       const uint64_t violations = process(
         std::move(value), STRING_STATS, STRING_NESTED_STATS, &STRING_LANG_STATS, false, path,
         inputPath.empty() ? std::string_view(path) : inputPath,
         perLang ? &perLang->stringStats : nullptr,
         perLang ? &perLang->stringNestedStats : nullptr,
         perLang ? &perLang->langStats : nullptr,
-        convertedToothpicks, rawHolds, mHolds
+        convertedToothpicks, rawHolds, mHolds,
+        perLang ? &perLang->rawForms : nullptr,
+        number("rawFormViolations"), number("rawFormsHolding"), number("ownRawForm") != 0,
+        number("control") != 0
       );
       fileViolations += violations;
       fileViolationsRelaxed += violations;
@@ -526,7 +538,9 @@ uint64_t Parser::process(
   LanguageStats *langStats, const bool relaxed,
   const std::string_view sourcePath, const std::string_view inputPath,
   EmbeddedStats *extraEmbedded, NestedStats *extraNested, LanguageStats *extraLangStats,
-  const uint64_t convertedToothpicksHint, const bool rawHoldsHint, const bool mHoldsHint
+  const uint64_t convertedToothpicksHint, const bool rawHoldsHint, const bool mHoldsHint,
+  RawFormStats *rawForms, const uint64_t rawFormViolations, const uint64_t rawFormsHolding,
+  const bool ownRawFormHint, const bool controlHint
 ) {
   uint64_t toothpicks = 0;
   for (const unsigned char c: string) {
@@ -563,6 +577,9 @@ uint64_t Parser::process(
       );
     }
   }
+
+  if (rawForms)
+    rawForms->Record(inScope, mHoldsHint, rawFormViolations, rawFormsHolding, ownRawFormHint, controlHint);
 
   if (inScope) {
     nestedStats.Record(maxDepth, maxValidDepth);
