@@ -201,15 +201,12 @@ or a longer sequence such as \verb|\m[|$m$\verb|]|.
 Any choice may conflict with existing syntax in \emph{some} language:
 \eg
 \verb|\(|$m$\verb|)| conflicts with
-string interpolation in Swift,
-\verb|\[|$m$\verb|]| conflicts with
-unrecognized escapes in Python, JavaScript, and C (GCC, Clang),
+string interpolation in Swift~\cite{apple22swift},
+\verb|\[|$m$\verb|]| conflicts with the current handling of
+unrecognized escapes in Python, JavaScript, and C~\cite{python26reference,ecma26ecmascript},
 and
 \verb|\{|$m$\verb|}| conflicts with
-Unicode escapes in Ceylon
-(\href{https://docs.swift.org/swift-book/LanguageGuide/StringsAndCharacters.html#ID292}{Swift},
-\href{https://docs.python.org/3/reference/lexical_analysis.html#escape-sequences}{Python},
-\href{https://ceylon-lang.org/documentation/1.3/reference/literal/string/}{Ceylon}).
+Unicode escapes in Ceylon~\cite{king17ceylon}.
 Fortunately, different languages need not agree on
 the precise syntax for hosting matchertext strings,
 and can choose whatever syntax best suits that particular language.
