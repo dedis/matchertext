@@ -20,11 +20,11 @@ and answers four questions that source code can answer directly:
 
 The analysis extracts embedded text directly from each language's
 own lexical structure rather than from ad-hoc pattern matching.
-For C and C++ it uses the Clang lexer,
+For C and C++ it uses the Clang lexer~\cite{lattner04llvm,llvm26clang},
 recognizing all string-literal forms (including the wide, UTF-8,
 UTF-16, UTF-32, and raw variants) and both comment styles;
-for the remaining languages it uses in-process tree-sitter grammars\cite{XXX}.
-\xxx{tree-sitter needs a citation}
+for the remaining languages it uses
+in-process tree-sitter grammars~\cite{brunsfeld26treesitter}.
 Both paths emit string-literal and comment samples
 that feed the same metric computation.
 Each candidate string is further classified by content --
