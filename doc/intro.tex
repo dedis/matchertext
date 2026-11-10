@@ -265,7 +265,7 @@ instead of matching pairs of start and end tags:
 \eg \verb|em[emphasis]| rather than \verb|<em>emphasis</em>|.
 \Cref{sec:impl} describes MinML and its tools.
 
-\begin{figure}[t]
+\begin{table}[t]
 \begin{center}
 \begin{footnotesize}
 \setlength{\tabcolsep}{4pt}
@@ -293,8 +293,8 @@ Receiving syntax & Attack value \verb|v| & Matchertext check & Query text receiv
 	only when the receiving syntax is matchertext-aware.
 	\texttt{M'(}\dots\texttt{)'} is a matchertext literal
 	in a hypothetical matchertext extension to SQL.}
-\label{fig:intro:sql}
-\end{figure}
+\label{tab:intro:sql}
+\end{table}
 
 Matchertext is a contract between
 text being embedded and the language receiving it.
@@ -305,7 +305,7 @@ find the region's end by matcher balance,
 and apply none of its own escapes or restrictions inside.
 A balance check alone protects nothing
 if the receiving syntax still ends the value at a non-matcher such as a quote.
-\Cref{fig:intro:sql} illustrates with SQL,
+\Cref{tab:intro:sql} illustrates with SQL,
 using a matchertext literal \verb|M'(|$\dots$\verb|)'|
 in a hypothetical extension to SQL.
 The classic injected value \verb|x' OR '1'='1|

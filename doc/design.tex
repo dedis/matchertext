@@ -47,9 +47,10 @@ inductively (\ie generatively) as follows:
 	is also a matchertext string in $L$.
 \end{itemize}
 
-Formally, $L$ is the \emph{Dyck Language}~\cite{chomsky63algebraic} over $\Pi$ where the nonmatchers are classified
+Formally, $L$ is the Dyck Language~\cite{chomsky63algebraic} over $\Pi$ where the nonmatchers are classified
 as neutral symbols. Equivalently, a string is matchertext if and only if it becomes a Dyck word once all the
-nonmatchers are removed from it. With $|\Pi| = 1$ this is the language of balanced parentheses.
+nonmatchers are removed from it.
+With $|\Pi| = 1$ this is the language of balanced parentheses.
 
 Intuitively, this definition captures the basic rule
 that \emph{matchers must match} in matchertext.
@@ -60,9 +61,10 @@ but nonmatchers may be interspersed throughout with no constraints.
 Matchertext is a purely syntactic rule.
 We call it a \emph{syntactic discipline} rather than a language
 because it assigns no meaning to the strings in $L$
-and no structure beyond the rule that matchers must match;
-each matchertext-aware language defines
-the meaning of all characters, matchers and nonmatchers alike.
+and no structure beyond the rule that matchers must match.
+Each matchertext-aware language defines
+the meaning of all characters, matchers and nonmatchers alike,
+and defines any further structure beyond matching of matchers.
 
 \subsubsection{Escapeless embedding in matchertext}
 \label{sec:design:abstract:embed}
@@ -79,8 +81,8 @@ some pair of strings $s_o, s_c$ defined by the host language $L_h$,
 such that the full embedding sequence is $s_o || m || s_c$ in $L_h$.
 Further, $s_o$ must contain one or more open matchers in $O$
 that would be unmatched in $s_o$ alone --
-that is, $s_o$ alone \emph{cannot} be valid matchertext --
-and $s_c$ must contain one or more corresponding close matchers in $C$
+that is, $s_o$ alone \emph{cannot} be valid matchertext.
+Finally, $s_c$ must contain one or more corresponding close matchers in $C$
 that would be unmatched in $s_c$ alone,
 and $s_c$ must begin with one of them.
 
