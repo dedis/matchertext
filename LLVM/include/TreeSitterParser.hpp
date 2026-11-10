@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include "FileStats.hpp"
 #include "JSON.hpp"
 #include "LanguageClassifier.hpp"
 
@@ -16,9 +17,12 @@ namespace TreeSitter {
 
   /// Parse `path` for `language`, appending {"kind","value"} objects to
   /// `result` (made an array if it isn't one). Thread-safe (thread_local
-  /// parser). Returns false only on unreadable file / unsupported language;
-  /// parse errors yield whatever was collected (possibly empty).
-  bool Parse(LanguageEnum language, const std::string &path, Serde::JSON &result);
+  /// parser). Returns false on unreadable file / unsupported language, and on a
+  /// file it skips (over 16 MiB, containing NUL, or not parsed within the
+  /// timeout), which it reports in `skip`; parse errors yield whatever was
+  /// collected (possibly empty).
+  bool Parse(LanguageEnum language, const std::string &path, Serde::JSON &result,
+             SkipReason *skip = nullptr);
 }
 
 #endif // TREE_SITTER_PARSER_HPP

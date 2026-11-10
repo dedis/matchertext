@@ -104,7 +104,7 @@ class Parser final {
     static uint64_t CountRawStringToothpicks(std::string_view body, RawLiteral *literal = nullptr, bool wide = false);
   private:
     /// Processes a string/doc and updates the given stat
-    /// @returns the number of MatcherText violations found
+    /// @returns the number of MatcherText violations found, 0 for out-of-scope binary data
     static uint64_t process(
       std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats,
       LanguageStats *langStats = nullptr, bool relaxed = false,

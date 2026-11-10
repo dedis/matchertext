@@ -127,6 +127,8 @@ add_test(NAME parser_fixture_prefixed_literals
     COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/prefixed_literals.cpp)
 add_test(NAME parser_fixture_string_bucket_mix
     COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/string_bucket_mix.cpp)
+add_test(NAME parser_fixture_comment_after_string
+    COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/comment_after_string.cpp)
 
 add_executable(DebugLanguageOutputTests
     tests/debug_language_output_test.cpp

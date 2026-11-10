@@ -8,6 +8,18 @@
 
 CREATE_STATS_CPP(FileStats, FILE_STATS_FIELDS)
 
+void RecordSkip(FileStats &fs, const SkipReason reason) {
+  std::atomic<double> *field = nullptr;
+  switch (reason) {
+    case SkipReason::Oversized: field = &fs.skippedOversized; break;
+    case SkipReason::Binary: field = &fs.skippedBinary; break;
+    case SkipReason::Timeout: field = &fs.skippedTimeout; break;
+    case SkipReason::None: return;
+  }
+  for (double v = field->load(std::memory_order_relaxed);
+       !field->compare_exchange_weak(v, v + 1.0, std::memory_order_relaxed);) {}
+}
+
 void FileStats::DeriveStats() {
   const double n = count.load(std::memory_order_relaxed);
   const double v = violationCount.load(std::memory_order_relaxed);

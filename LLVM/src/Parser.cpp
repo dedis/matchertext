@@ -402,10 +402,14 @@ bool Parser::ParseC_CPP(const std::string &path, const LanguageEnum language, Se
   if (!result.IsArray())
     result = Serde::JSON::Array();
 
-  /// Tokenize the file until EOF.
+  /// Tokenize the file until EOF. After a string literal the lexer has already
+  /// read the next token, which the following iteration must process, not skip.
   clang::Token tok{};
+  bool pending = false;
   while (true) {
-    lexer.LexFromRawLexer(tok);
+    if (!pending)
+      lexer.LexFromRawLexer(tok);
+    pending = false;
     if (tok.is(clang::tok::eof))
       break;
 
@@ -438,6 +442,7 @@ bool Parser::ParseC_CPP(const std::string &path, const LanguageEnum language, Se
       } while (IsStringToken(current));
 
       tok = current;
+      pending = true;
       /// Decoding can create matchers (\x5B is '['). A literal whose decoded content
       /// is not matchertext cannot be rewritten and keeps all its toothpicks.
       if (!RawRewrite::MatchertextHolds(literal.content))
@@ -542,9 +547,13 @@ uint64_t Parser::process(
   const uint64_t convertedToothpicks =
       compliantStringLiteral ? convertedToothpicksHint : toothpicks;
 
+  /// Binary data is out of matchertext's scope (see InMatchertextScope): it counts
+  /// toward the sample, character, toothpick and language stats only.
+  bool inScope = true;
   if (langStats != nullptr) {
     /// Classify the embedded language and record per-language stats only for strings.
     if (const auto [lang, confidence] = ClassifyString(string); lang != LanguageEnum::Unknown) {
+      inScope = InMatchertextScope(lang);
       langStats->Record(lang, unmatched, toothpicks);
       if (extraLangStats)
         extraLangStats->Record(lang, unmatched, toothpicks);
@@ -555,9 +564,11 @@ uint64_t Parser::process(
     }
   }
 
-  nestedStats.Record(maxDepth, maxValidDepth);
-  if (extraNested)
-    extraNested->Record(maxDepth, maxValidDepth);
+  if (inScope) {
+    nestedStats.Record(maxDepth, maxValidDepth);
+    if (extraNested)
+      extraNested->Record(maxDepth, maxValidDepth);
+  }
 
   auto applyEmbedded = [&](EmbeddedStats &s) {
     AtomicAdd(s.count, 1.0);
@@ -568,6 +579,12 @@ uint64_t Parser::process(
     AtomicAdd(s.toothpicks, static_cast<double>(toothpicks));
     if (AtomicMax(s.toothpicksMax, static_cast<double>(toothpicks)))
       s.stringMaxToothpicks.set(string);
+
+    if (!inScope)
+      return;
+    AtomicAdd(s.scopeCount, 1.0);
+    AtomicAdd(s.scopeToothpicks, static_cast<double>(toothpicks));
+    AtomicMax(s.scopeToothpicksMax, static_cast<double>(toothpicks));
 
     if (convertedToothpicks > 0)
       AtomicAdd(s.withToothpicksConverted, 1.0);
@@ -612,5 +629,5 @@ uint64_t Parser::process(
   if (extraEmbedded)
     applyEmbedded(*extraEmbedded);
 
-  return unmatched;
+  return inScope ? unmatched : 0;
 }

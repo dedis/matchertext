@@ -109,6 +109,9 @@ def main():
 
     str_n, doc_n = g["Sample Size"][0], g["Sample Size"][1]
     toothpicks = g["Total Toothpicks"][0]
+    # Reduction and compliance cover only in-scope samples: all but BinaryData and
+    # PseudoBinaryData string literals. Results from before the split have no such rows.
+    scope_toothpicks = g.get("In-Scope Toothpicks", g["Total Toothpicks"])[0]
     converted = g["Total Toothpicks (Converted)"][0]
     violations = g["Non-Compliance Count"][0]
     reduction = g["Toothpick Reduction Total (%)"][0]
@@ -130,12 +133,15 @@ def main():
             if not os.path.isfile(p):
                 continue
             s = metrics(p)
-            h = hosts.setdefault(lang, dict(orgs=0, n=0, compliant=0, tp=0, tpc=0,
+            h = hosts.setdefault(lang, dict(orgs=0, n=0, scope_n=0, compliant=0, tp=0,
+                                            scope_tp=0, tpc=0,
                                             maxdepth=0, maxdepth_valid=0, cats={}))
             h["orgs"] += 1
             h["n"] += s["Sample Size"][0]
+            h["scope_n"] += s.get("In-Scope Samples", s["Sample Size"])[0]
             h["compliant"] += s["Compliant Samples"][0]
             h["tp"] += s["Total Toothpicks"][0]
+            h["scope_tp"] += s.get("In-Scope Toothpicks", s["Total Toothpicks"])[0]
             h["tpc"] += s["Total Toothpicks (Converted)"][0]
             depth = s["Highest Per-Sample Raw Max Depth"][0]
             if depth > h["maxdepth"]:
@@ -150,8 +156,8 @@ def main():
                     for field in c:
                         c[field] += v[field]
     for h in hosts.values():
-        h["compliance"] = 100 * h["compliant"] / h["n"]
-        h["reduction"] = 100 * (h["tp"] - h["tpc"]) / h["tp"] if h["tp"] else 0.0
+        h["compliance"] = 100 * h["compliant"] / h["scope_n"] if h["scope_n"] else 100.0
+        h["reduction"] = 100 * (h["scope_tp"] - h["tpc"]) / h["scope_tp"] if h["scope_tp"] else 0.0
 
     def cat_rate(lang, cat):
         c = hosts[lang]["cats"][cat]
@@ -221,6 +227,7 @@ def main():
         ("Reduction", pct(reduction)),
         ("ReductionRound", pct(reduction, 0)),
         ("Toothpicks", millions(toothpicks)),
+        ("ScopeToothpicks", millions(scope_toothpicks)),
         ("ToothpicksConverted", millions(converted)),
         ("BinaryToothpicks", millions(cats["BinaryData"]["tp"] + cats["PseudoBinaryData"]["tp"])),
         ("OrgReductionMin", pct(min(org_reduction))),
@@ -228,6 +235,12 @@ def main():
         ("OrgReductionQOne", pct(q1, 0)),
         ("OrgReductionQThree", pct(q3, 0)),
         ("TsRegexToothpickShare", pct(cat_toothpick_share("TypeScript", "Regex"), 1)),
+        # Q3: compliant literals the host's existing raw form already holds, and
+        # those only a matchertext literal holds
+        ("RawHoldable", millions(g["Raw-Form Holdable"][0])),
+        ("RawHoldableShare", pct(100 * g["Raw-Form Holdable"][0] / g["Compliant Samples"][0], 1)),
+        ("MtOnly", millions(g["Matchertext-Only"][0])),
+        ("MtOnlyShare", pct(100 * g["Matchertext-Only"][0] / g["Compliant Samples"][0], 1)),
         # Q4: nesting
         ("StrAvgDepth", f"{g['Avg Per-Sample Raw Max Depth'][0]:.3f}"),
         ("DocAvgDepth", f"{g['Avg Per-Sample Raw Max Depth'][1]:.3f}"),

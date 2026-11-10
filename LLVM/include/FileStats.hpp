@@ -23,7 +23,16 @@
   X(violationCountRelaxed, "Total Relaxed Violations", "Total relaxed violation count accumulated across all files.") \
   X(violationMaxRelaxed, "Maximum Relaxed Violations", "Highest relaxed violation count observed in a single file.") \
   X(violationAvgRelaxed, "Average Relaxed Violations", "Average relaxed violation count per file.") \
-  X(complianceRateRelaxed, "Compliance Rate Relaxed", "Percentage of files without relaxed non-compliance.")
+  X(complianceRateRelaxed, "Compliance Rate Relaxed", "Percentage of files without relaxed non-compliance.") \
+  X(skippedOversized, "Skipped Oversized", "Files not parsed because they exceed 16 MiB; not in Sample Size.") \
+  X(skippedBinary, "Skipped Binary", "Files not parsed because they contain a NUL byte; not in Sample Size.") \
+  X(skippedTimeout, "Skipped Timeout", "Files whose parse did not finish within 5 seconds; not in Sample Size.")
 CREATE_STATS_HPP_NO_EXTRA(FileStats, FILE_STATS_FIELDS)
+
+/// Why a file yielded no samples without being parsed.
+enum class SkipReason { None, Oversized, Binary, Timeout };
+
+/// Counts a skipped file in `fs`.
+void RecordSkip(FileStats &fs, SkipReason reason);
 
 #endif //FILESTATS_HPP

@@ -68,13 +68,16 @@ as the equivalent escapeless C++ raw string literal \verb|R"(|$\dots$\verb|)"|
 	and for the raw-string closer sequence.}
 and the surviving backslashes are counted,
 yielding a \emph{toothpick reduction}.
-The rewrite decodes every escape, numeric and named ones like \verb|\x5B| included,
-and drops its backslash unless it decodes to a backslash.
-Raw literals hold no control characters,
-so \verb|\r\n| and \verb|\r| become line feeds, \verb|\f| and \verb|\v| spaces,
-and other controls are dropped.
-An escape that cannot be written raw, such as a byte that is not valid UTF-8, keeps its backslash,
-and a literal whose decoded content is not matchertext keeps all of them.
+The rewrite decodes every escape, \verb|\x5B| included,
+and drops its backslash unless it decodes to one;
+\verb|\r\n| and \verb|\r| become line feeds, \verb|\f| and \verb|\v| spaces, and other controls vanish.
+An escape that cannot be written raw, such as a non-UTF-8 byte, keeps its backslash,
+as does every escape of a literal whose decoded content is not matchertext.
+Binary-data literals (BinaryData and PseudoBinaryData,
+such as file headers, test vectors, or terminal codes) are out of scope:
+they are not readable text, writing their byte escapes raw would break the encoding,
+and their brackets are byte values, not delimiters.
+They count only toward sample and toothpick totals.
 Finally, \emph{nesting depth} is the deepest matcher nesting a sample reaches;
 \emph{raw} depth also counts unclosed openers.
 
@@ -85,7 +88,7 @@ Finally, \emph{nesting depth} is the deepest matcher nesting a sample reaches;
 Existing code is already highly matchertext-compliant
 at the level of individual embedded fragments.
 As \cref{tab:eval:compliance} shows,
-\dataStrCompliance of string-literal samples
+\dataStrCompliance of in-scope string-literal samples
 and \dataDocCompliance of comment samples are compliant as written.
 Per file, counting all its literals and comments, compliance is lower, \dataFileCompliance,
 because one violating fragment makes the whole file non-compliant,
@@ -210,11 +213,10 @@ Category	& Share		& Violations	& Toothpicks	\\
 The central benefit of matchertext is the escaping it removes.
 Rewriting each compliant string literal
 as an equivalent C++ raw string literal
-eliminates \dataReduction of all toothpicks in the corpus,
-cutting the string-literal toothpick total
-from about \dataToothpicks to about \dataToothpicksConverted.
-Escaped binary data alone (BinaryData and PseudoBinaryData)
-holds \dataBinaryToothpicks of these toothpicks.
+eliminates \dataReduction of the in-scope toothpicks,
+cutting them
+from about \dataScopeToothpicks to about \dataToothpicksConverted.
+Escaped binary data, out of scope, holds another \dataBinaryToothpicks.
 The host's raw-string form could hold \dataRawHoldableShare of the compliant literals,
 and only a matchertext literal the other \dataMtOnlyShare (\eg C and Java lack raw strings);
 both counts include literals without escapes.
@@ -287,7 +289,7 @@ and the benefit could be large.
 Over \dataStrComplianceFloor of string literals and over \dataDocComplianceFloor of comments need no change,
 and rewriting the compliant majority
 as raw string literals or matchertext literals
-would remove \dataReduction of the toothpicks.
+would remove \dataReduction of the in-scope toothpicks.
 The remaining violations fall where \cref{sec:embed} predicts,
 in syntaxes that use brackets singly,
 and the near-identical strict and relaxed comment rates suggest that

@@ -109,4 +109,8 @@ struct ClassificationResult {
 /// @return The detected language and confidence score.
 ClassificationResult ClassifyString(std::string_view body, float minConfidence = 0.5f);
 
+/// False for BinaryData and PseudoBinaryData, which are out of matchertext's scope:
+/// their matchers are byte values, and a raw literal cannot hold their content.
+bool InMatchertextScope(LanguageEnum lang);
+
 #endif // LANGUAGE_CLASSIFIER_HPP

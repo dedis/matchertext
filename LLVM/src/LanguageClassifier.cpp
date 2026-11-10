@@ -232,6 +232,10 @@ namespace {
   }
 } // namespace
 
+bool InMatchertextScope(const LanguageEnum lang) {
+  return lang != LanguageEnum::BinaryData && lang != LanguageEnum::PseudoBinaryData;
+}
+
 ClassificationResult ClassifyString(const std::string_view body, const float minConfidence) {
   if (body.size() < 2)
     return {LanguageEnum::Unknown, 0.0f};

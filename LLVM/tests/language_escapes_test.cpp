@@ -338,11 +338,26 @@ string t = "\x00\134";
   }
 }
 
+// A file the tree-sitter path does not parse reports why, instead of passing
+// as a parsed file with no samples.
+size_t RunSkipCases(const fs::path &dir) {
+  const fs::path path = dir / "binary.go";
+  std::ofstream(path, std::ios::binary) << std::string("package p\nvar s = \"x\"\n\0", 23);
+  Serde::JSON result;
+  SkipReason skip = SkipReason::None;
+  if (LanguageParser::ExtractData(LanguageEnum::Go, path.string(), result, &skip) ||
+      skip != SkipReason::Binary) {
+    std::cerr << "skip: a Go file containing NUL was not reported as skipped (binary)\n";
+    return 1;
+  }
+  return 0;
+}
+
 int main() {
   const fs::path dir = fs::temp_directory_path() / "language_escapes_test";
   fs::create_directories(dir);
 
-  size_t failures = RunRawCases();
+  size_t failures = RunRawCases() + RunSkipCases(dir);
   for (const Case &c: Cases())
     failures += Run(c, dir) ? 0 : 1;
 

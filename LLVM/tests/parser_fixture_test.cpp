@@ -204,17 +204,21 @@ bool TestStringBucketMix() {
   const auto lang = Parser::STRING_LANG_STATS.Snapshot();
 
   bool ok = true;
-  ok &= CheckEq("bucket_mix.strings.count", strings.count, 7.0);
-  // kBinary's nine backslashes all belong to hex escapes. The rewrite decodes them:
-  // CR and LF become line feeds, other controls are dropped, and only \x89, which
-  // alone is not valid UTF-8, keeps its toothpick.
-  ok &= CheckEq("bucket_mix.strings.with_toothpicks", strings.withToothpicks, 1.0);
-  ok &= CheckEq("bucket_mix.strings.toothpicks", strings.toothpicks, 9.0);
-  ok &= CheckEq("bucket_mix.strings.toothpicks_converted", strings.toothpicksConverted, 1.0);
-  ok &= CheckEq("bucket_mix.strings.raw_chars", strings.rawChars, 297.0);
+  ok &= CheckEq("bucket_mix.strings.count", strings.count, 8.0);
+  // kBinary and kAnsi are PseudoBinaryData, out of matchertext's scope: their 13
+  // toothpicks count, but not toward the rewrite, and kAnsi's unmatched '[' bytes
+  // are not violations and add no nesting.
+  ok &= CheckEq("bucket_mix.strings.with_toothpicks", strings.withToothpicks, 2.0);
+  ok &= CheckEq("bucket_mix.strings.toothpicks", strings.toothpicks, 13.0);
+  ok &= CheckEq("bucket_mix.strings.scope_count", strings.scopeCount, 6.0);
+  ok &= CheckEq("bucket_mix.strings.scope_toothpicks", strings.scopeToothpicks, 0.0);
+  ok &= CheckEq("bucket_mix.strings.toothpicks_converted", strings.toothpicksConverted, 0.0);
+  ok &= CheckEq("bucket_mix.strings.non_compliance", strings.nonComplianceCount, 0.0);
+  ok &= CheckEq("bucket_mix.strings.compliance_rate", strings.complianceRate, 100.0);
+  ok &= CheckEq("bucket_mix.strings.raw_chars", strings.rawChars, 334.0);
   ok &= CheckEq("bucket_mix.docs.count", docs.count, 0.0);
   ok &= CheckEq("bucket_mix.docs_relaxed.count", docsRelaxed.count, 0.0);
-  ok &= CheckEq("bucket_mix.lang.total", static_cast<double>(lang.total), 7.0);
+  ok &= CheckEq("bucket_mix.lang.total", static_cast<double>(lang.total), 8.0);
   ok &= CheckEq("bucket_mix.nesting.raw_levels_size",
                 static_cast<double>(stringNested.rawLevels.size()), 0.0);
   ok &= CheckEq("bucket_mix.nesting.valid_levels_size",
@@ -225,7 +229,7 @@ bool TestStringBucketMix() {
   ok &= CheckLanguageCount(lang, LanguageEnum::YAML, 1);
   ok &= CheckLanguageCount(lang, LanguageEnum::Shell, 1);
   ok &= CheckLanguageCount(lang, LanguageEnum::HexData, 1);
-  ok &= CheckLanguageCount(lang, LanguageEnum::PseudoBinaryData, 1);
+  ok &= CheckLanguageCount(lang, LanguageEnum::PseudoBinaryData, 2);
   ok &= CheckNoFileViolations();
   return ok;
 }

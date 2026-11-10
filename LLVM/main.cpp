@@ -373,8 +373,14 @@ int main(const int argc, char *argv[]) {
       #endif
       for (const auto &[filePath, inputPath]: lang.second) {
         try {
-          if (Serde::JSON result; LanguageParser::ExtractData(lang.first, filePath, result))
+          SkipReason skip = SkipReason::None;
+          if (Serde::JSON result; LanguageParser::ExtractData(lang.first, filePath, result, &skip))
             Parser::GatherStatistics(std::move(result), filePath, inputPath, pls);
+          else if (skip != SkipReason::None) {
+            // Skipped files stay out of Sample Size; count them separately.
+            RecordSkip(Parser::FILE_STATS, skip);
+            RecordSkip(pls->fileStats, skip);
+          }
         } catch (const std::exception &e) {
           #pragma omp critical
           {

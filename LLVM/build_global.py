@@ -7,7 +7,9 @@ Rules:
   - MAX metrics: max across orgs.
   - DERIVED metrics (averages / rates / reduction %): recomputed from the
     aggregated SUM/MAX bases (you cannot average averages).
-Output: result/global/{strings,nesting,files,language_stats}.md
+Output: result/global/{strings,nesting,files,language_stats}.md, plus
+  language_stats_by_toothpicks.md (string languages sorted by toothpicks) and
+  host_languages_by_characters.md (host languages sorted by raw characters).
 """
 import os, sys
 
@@ -81,8 +83,10 @@ S_SUM = {"Sample Size", "With Toothpicks", "Total Toothpicks", "With Non-Complia
          "Total Toothpicks (Converted)", "Raw-Form Holdable", "Matchertext-Only",
          "With Raw Nested Embedding",
          "Sum Of Per-Sample Raw Max Depth", "With Valid Nested Embedding",
-         "Sum Of Per-Sample Valid Max Depth", "Raw Character Count"}
+         "Sum Of Per-Sample Valid Max Depth", "Raw Character Count",
+         "In-Scope Samples", "In-Scope Toothpicks"}
 S_MAX = {"Maximum Toothpicks", "Non-Compliance Max", "Maximum Toothpicks (Converted)",
+         "In-Scope Maximum Toothpicks",
          "Highest Per-Sample Raw Max Depth", "Highest Per-Sample Valid Max Depth"}
 S_DERIVED = {"Average Toothpicks", "Average With Toothpicks",
              "Avg Unmatched Matchers Per Sample", "Compliance Rate",
@@ -142,22 +146,29 @@ def build_simple(fname, sum_set, max_set, derived_fn, derived_names):
 
 def s_derived(m, c, a):
     g = lambda k: a[k][c] if k in a else 0.0
+    # Compliance, rewrite and nesting stats cover only in-scope samples (all
+    # samples except BinaryData and PseudoBinaryData string literals). Results
+    # from before the split have no in-scope rows: everything was in scope.
+    scoped = "In-Scope Samples" in a
+    n = g("In-Scope Samples") if scoped else g("Sample Size")
+    tp = g("In-Scope Toothpicks") if scoped else g("Total Toothpicks")
+    tp_max = g("In-Scope Maximum Toothpicks") if scoped else g("Maximum Toothpicks")
     if m == "Average Toothpicks":            return div(g("Total Toothpicks"), g("Sample Size"))
     if m == "Average With Toothpicks":       return div(g("Total Toothpicks"), g("With Toothpicks"))
-    if m == "Avg Unmatched Matchers Per Sample": return div(g("Non-Compliance Count"), g("Sample Size"))
-    if m == "Compliance Rate":               return div(g("Compliant Samples"), g("Sample Size")) * 100
-    if m == "Average Toothpicks (Converted)":     return div(g("Total Toothpicks (Converted)"), g("Sample Size"))
+    if m == "Avg Unmatched Matchers Per Sample": return div(g("Non-Compliance Count"), n)
+    if m == "Compliance Rate":               return div(g("Compliant Samples"), n) * 100
+    if m == "Average Toothpicks (Converted)":     return div(g("Total Toothpicks (Converted)"), n)
     if m == "Average With Toothpicks (Converted)": return div(g("Total Toothpicks (Converted)"), g("With Toothpicks (Converted)"))
     if m == "Toothpick Reduction Total (%)":
-        return div(g("Total Toothpicks") - g("Total Toothpicks (Converted)"), g("Total Toothpicks")) * 100
+        return div(tp - g("Total Toothpicks (Converted)"), tp) * 100
     if m == "Toothpick Reduction Average (%)":
-        avg = div(g("Total Toothpicks"), g("Sample Size"))
-        avgc = div(g("Total Toothpicks (Converted)"), g("Sample Size"))
+        avg = div(tp, n)
+        avgc = div(g("Total Toothpicks (Converted)"), n)
         return div(avg - avgc, avg) * 100
     if m == "Toothpick Reduction Maximum (%)":
-        return div(g("Maximum Toothpicks") - g("Maximum Toothpicks (Converted)"), g("Maximum Toothpicks")) * 100
-    if m == "Avg Per-Sample Raw Max Depth":  return div(g("Sum Of Per-Sample Raw Max Depth"), g("Sample Size"))
-    if m == "Avg Per-Sample Valid Max Depth": return div(g("Sum Of Per-Sample Valid Max Depth"), g("Sample Size"))
+        return div(tp_max - g("Maximum Toothpicks (Converted)"), tp_max) * 100
+    if m == "Avg Per-Sample Raw Max Depth":  return div(g("Sum Of Per-Sample Raw Max Depth"), n)
+    if m == "Avg Per-Sample Valid Max Depth": return div(g("Sum Of Per-Sample Valid Max Depth"), n)
     return 0.0
 
 s_agg, s_ncols = build_simple("strings.md", S_SUM, S_MAX, s_derived, S_DERIVED)
@@ -166,7 +177,8 @@ s_agg, s_ncols = build_simple("strings.md", S_SUM, S_MAX, s_derived, S_DERIVED)
 # files.md
 # =========================================================================
 F_SUM = {"Sample Size", "With Violation", "Total Violations",
-         "With Violation Relaxed", "Total Relaxed Violations"}
+         "With Violation Relaxed", "Total Relaxed Violations",
+         "Skipped Oversized", "Skipped Binary", "Skipped Timeout"}
 F_MAX = {"Maximum Violations", "Maximum Relaxed Violations"}
 F_DERIVED = {"Average Violations", "Compliance Rate",
              "Average Relaxed Violations", "Compliance Rate Relaxed"}
@@ -229,8 +241,65 @@ for name in sorted(langs, key=lambda k: (-langs[k][0], k)):
     out.append("| %s | %s | %.2f%% | %s | %s |" % (name, fmt_int(cnt), pct, fmt_int(vio), fmt_int(tp)))
 open(os.path.join(OUTDIR, "language_stats.md"), "w").write("\n".join(out) + "\n")
 
+# language_stats_by_toothpicks.md  (the same string languages, sorted by toothpicks)
+tp_total = sum(v[2] for v in langs.values())
+out = ["# String Language Distribution by Toothpicks", note, "",
+       "| String Language | Toothpicks | % of Toothpicks | Count | % of Strings | Violations |",
+       "|---|---|---|---|---|---|"]
+for name in sorted(langs, key=lambda k: (-langs[k][2], k)):
+    cnt, vio, tp = langs[name]
+    out.append("| %s | %s | %.2f%% | %s | %.2f%% | %s |" % (
+        name, fmt_int(tp), div(tp, tp_total) * 100, fmt_int(cnt), div(cnt, total) * 100, fmt_int(vio)))
+open(os.path.join(OUTDIR, "language_stats_by_toothpicks.md"), "w").write("\n".join(out) + "\n")
+
+# =========================================================================
+# host_languages_by_characters.md  (string stats per host language, summed from
+# result/repos/$ORG/@org/language_stats/<Language>/strings.md)
+# =========================================================================
+H_SUM = {"Raw Character Count": "chars", "Sample Size": "n", "Total Toothpicks": "tp",
+         "In-Scope Samples": "scope_n", "In-Scope Toothpicks": "scope_tp",
+         "Total Toothpicks (Converted)": "tpc", "Non-Compliance Count": "viol",
+         "Compliant Samples": "ok"}
+hosts = {}                          # host language -> {field: sum}
+for org in orgs:
+    base = path(org, "language_stats")
+    if not os.path.isdir(base):
+        continue
+    for lang in os.listdir(base):
+        p = os.path.join(base, lang, "strings.md")
+        if not os.path.isfile(p):
+            continue
+        acc = hosts.setdefault(lang, dict.fromkeys(H_SUM.values(), 0.0))
+        _, _, r = find_table(open(p).read(), after="## Data")
+        row = {split_row(x)[0]: parse_num(split_row(x)[1]) or 0.0 for x in r[2:]}
+        row.setdefault("In-Scope Samples", row.get("Sample Size", 0.0))
+        row.setdefault("In-Scope Toothpicks", row.get("Total Toothpicks", 0.0))
+        for metric, key in H_SUM.items():
+            acc[key] += row.get(metric, 0.0)
+tot = {k: sum(h[k] for h in hosts.values()) for k in H_SUM.values()}
+out = ["# String Statistics per Host Language by Characters", note,
+       "<!-- Characters, strings and toothpicks count every string literal; reduction "
+       "and compliance cover only in-scope ones (not BinaryData or PseudoBinaryData). "
+       "Per-org character counts are stored with 6 significant digits, so the last "
+       "digits of the sums are approximate. -->", "",
+       "| Host Language | Characters | % of Characters | Strings | % of Strings | Toothpicks "
+       "| % of Toothpicks | Reduction | Violations | Compliance |",
+       "|---|---|---|---|---|---|---|---|---|---|"]
+def host_row(name, h):
+    return "| %s | %s | %.2f%% | %s | %.2f%% | %s | %.2f%% | %.2f%% | %s | %.2f%% |" % (
+        name, fmt_int(h["chars"]), div(h["chars"], tot["chars"]) * 100,
+        fmt_int(h["n"]), div(h["n"], tot["n"]) * 100,
+        fmt_int(h["tp"]), div(h["tp"], tot["tp"]) * 100,
+        div(h["scope_tp"] - h["tpc"], h["scope_tp"]) * 100,
+        fmt_int(h["viol"]), div(h["ok"], h["scope_n"]) * 100)
+for name in sorted(hosts, key=lambda k: (-hosts[k]["chars"], k)):
+    if hosts[name]["n"]:            # hosts with comments but no strings are left out
+        out.append(host_row(name, hosts[name]))
+out.append(host_row("**Total**", tot))
+open(os.path.join(OUTDIR, "host_languages_by_characters.md"), "w").write("\n".join(out) + "\n")
+
 # ---------- console summary ----------
-print("\nWrote 4 files to %s\n" % OUTDIR)
+print("\nWrote 6 files to %s\n" % OUTDIR)
 print("Key global figures (Strings column):")
 def gv(a, m): return a[m][0]
 print("  Sample Size            : %s" % fmt_g(gv(s_agg, "Sample Size")))

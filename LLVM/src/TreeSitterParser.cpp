@@ -594,7 +594,13 @@ bool TreeSitter::IsTreeSitterLanguage(const LanguageEnum language) {
   return languageFor(language) != nullptr;
 }
 
-bool TreeSitter::Parse(const LanguageEnum language, const std::string &path, Serde::JSON &result) {
+bool TreeSitter::Parse(const LanguageEnum language, const std::string &path, Serde::JSON &result,
+                       SkipReason *skip) {
+  const auto skipped = [skip](const SkipReason reason) {
+    if (skip)
+      *skip = reason;
+    return false;
+  };
   const TSLanguage *tsLang = languageFor(language);
   if (!tsLang)
     return false;
@@ -612,7 +618,7 @@ bool TreeSitter::Parse(const LanguageEnum language, const std::string &path, Ser
 
   // Oversized file: skip before allocating/parsing to bound peak memory.
   if (size > kMaxFileBytes)
-    return true;
+    return skipped(SkipReason::Oversized);
 
   std::string src(static_cast<size_t>(size), '\0');
   in.seekg(0);
@@ -625,7 +631,7 @@ bool TreeSitter::Parse(const LanguageEnum language, const std::string &path, Ser
   // never contains one — and feeding binary to the GLR parser triggers
   // pathological error-recovery blowups the parse timeout can't always catch.
   if (std::memchr(src.data(), '\0', src.size()) != nullptr)
-    return true;
+    return skipped(SkipReason::Binary);
 
   thread_local ParserHolder holder;
   TSParser *parser = holder.get();
@@ -644,7 +650,7 @@ bool TreeSitter::Parse(const LanguageEnum language, const std::string &path, Ser
 
   TSTree *tree = ts_parser_parse_with_options(parser, nullptr, input, opts);
   if (!tree)
-    return true; // timed out or nothing parsed; empty array is valid
+    return skipped(SkipReason::Timeout); // the progress callback cancelled the parse
 
   walk(language, ts_tree_root_node(tree), src, classifierFor(language), escapeRulesFor(language), result);
   ts_tree_delete(tree);
