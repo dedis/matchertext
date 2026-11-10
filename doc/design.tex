@@ -103,28 +103,42 @@ a host language \emph{must not} apply
 transformations (\eg escapes)
 or restrictions (\eg forbidden characters or sequences)
 within the embedded matchertext.
-Exceptions to this rule
-reduce verbatim embedding compatibility
+Exceptions reduce verbatim embedding compatibility
 (\cref{app:concrete:variations}).
-Only embeddings that follow this rule gain the guarantee:
-an SQL string literal does not become safe merely because its input balances.
-Regions nest, as in \verb|M"(f(M"(x)"))"|.
-A C string with a lone closer, such as \verb|"a)b"|, is not matchertext
-until written with an escape of \cref{tab:unmatched-matchers}, as \verb|"a\c()b"|.
+Operationally, after reading $s_o$ the host scans with an empty stack:
+each opener pushes its kind, each closer must match the top,
+and the first closer met with an empty stack begins $s_c$.
+In \verb|M"(print("(x)"))"| from \cref{sec:intro},
+the inner \verb|)"| pops the \verb|(| before \verb|x|
+and so cannot end the literal.
+Matcher kinds matters:
+the string \verb|([)]| has as many closers as openers,
+and no prefix has more closers than openers,
+but it is not matchertext,
+and a host language must reject it as a matchertext payload.
 
 
 \subsubsection{A formal guarantee of embeddability}
 \label{sec:design:abstract:formal}
 
-The reasoning above is verified
-with the Lean~4 proof assistant
+\Cref{thm:design:embed,thm:design:findend}
+are mechanized in the Lean~4 proof assistant
 using its Mathlib library,
-included in the \texttt{lean} directory of the artifact
-(\href{https://lean-lang.org}{Lean}, \href{https://leanprover-community.github.io}{Mathlib}).\footnote{%
-	The development relies only on the standard axioms
-	\texttt{propext} and \texttt{Quot.sound},
-	plus \texttt{Classical.choice} for \cref{thm:design:findend}.}
-For reference, \cref{app:lean,app:boundary} list the Lean declarations.
+included in the \texttt{lean} directory of the artifact.
+% \Cref{thm:design:verify} has a paper proof only.
+These results concern strings:
+they do not verify any particular compiler extension,
+nor the behavior of the language receiving the payload.
+%
+%The reasoning above is verified
+%with the Lean~4 proof assistant
+%using its Mathlib library,
+%included in the \texttt{lean} directory of the artifact
+%(\href{https://lean-lang.org}{Lean}, \href{https://leanprover-community.github.io}{Mathlib}).\footnote{%
+%	The development relies only on the standard axioms
+%	\texttt{propext} and \texttt{Quot.sound},
+%	plus \texttt{Classical.choice} for \cref{thm:design:findend}.}
+For reference, \cref{app:lean,app:boundary} lists the Lean declarations.
 We summarize the result here;
 it concerns the abstract matchertext language $L$
 defined inductively in \cref{sec:design:abstract}.
@@ -270,11 +284,18 @@ then every prefix of $m$ has depth at least $0$,
 $m$ has depth $0$, and $m||c$ has depth $-1$.
 \end{theorem}
 
-A host therefore scans the text after $s_o$ with a depth counter
-starting at $0$, or equivalently with the stack of \cref{alg:design:verify},
-and stops at the first closer that makes the depth negative:
-by \cref{thm:design:findend} this is the first character of $s_c$,
+A host language that has already validated $m$ as matchertext,
+for example because $m$ was produced by
+the process in \cref{thm:design:embed},
+can therefore scan the text after $s_o$ with a depth counter starting at $0$
+and stop at the first closer that makes the depth negative.
+By \cref{thm:design:findend} this is the first character of $s_c$,
 which \cref{def:design:delim} makes a closer.
+A host language reading untrusted input, by contrast,
+must instead use the typed stack of
+\cref{alg:design:verify},
+since a depth counter alone accepts wrong-kind pairs such as \verb|([)]|.
+The host must then check that the complete $s_c$ follows.
 
 
 \subsection{Concrete matchertext in practice}
