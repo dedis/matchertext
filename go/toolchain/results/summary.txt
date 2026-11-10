@@ -1,0 +1,4 @@
+uniseg f77ce1977fd8 packages=1 pass=1 fail=0 patched=same rewritten=same files=28 changed=8 literals=10742 escaped=10601 toothpicks=33493 converted=3310 written=7739 writtenBefore=24831 writtenAfter=6
+text 6070ac32abcd packages=63 pass=48 fail=0 patched=same rewritten=same files=423 changed=132 literals=114596 escaped=21997 toothpicks=88846 converted=11828 written=3042 writtenBefore=6470 writtenAfter=40
+net 3de643db5065 packages=41 pass=36 fail=0 patched=same rewritten=same files=712 changed=87 literals=42963 escaped=1618 toothpicks=10133 converted=2110 written=924 writtenBefore=1630 writtenAfter=9
+tools 588ada3c4d4d packages=217 pass=157 fail=0 patched=same rewritten=same files=1456 changed=446 literals=79066 escaped=3246 toothpicks=7714 converted=766 written=2692 writtenBefore=4731 writtenAfter=33

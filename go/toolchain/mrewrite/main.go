@@ -1,17 +1,22 @@
 // Command mrewrite counts and rewrites Go string literals as matchertext literals
 // M"(...)".
 //
-// Counting follows the analyzer (LLVM/src/RawRewrite.cpp). In an interpreted
-// string literal "...", \\ leaves one toothpick; \n, \t, \", and \' leave none; the
-// control escapes \a, \b, \f, \r, \v keep their toothpick; and the encoding escapes
-// (\xHH, \u and \U code points, octal) stay as written and are not counted, before or
-// after. A literal whose source text is not matchertext keeps all its toothpicks.
+// Counting follows the analyzer (LLVM/src/RawRewrite.cpp), which decodes every
+// escape. Before the rewrite, every backslash of an interpreted string literal
+// "..." is a toothpick. After it, an escape keeps one toothpick if it decodes to a
+// backslash (\\, \x5c, \u005c, ...) or to bytes that are not valid UTF-8 (\xff);
+// every other escape, encodings (\x41, \u00e9, \101) and controls (\n, \a, \x00)
+// included, loses its backslash. A literal whose source text or value is not
+// matchertext keeps all its toothpicks.
 //
-// mrewrite writes M"(...)" only where the value stays the same: the literal has
-// a backslash, no encoding or control escape, and the matchers (), [], {} of its
-// value match. Import paths and struct tags stay unchanged, because the compiler
-// unquotes them directly. Directories named testdata or vendor are skipped, as
-// are files that import "C".
+// mrewrite writes M"(...)" only where the value stays the same: the literal has a
+// backslash, its source text and value are matchertext, and its value is valid
+// UTF-8 with no control character other than \n and \t and no BOM. The analyzer
+// counts the other compliant literals as rewritten even though M"(...)" cannot
+// hold their value; written, writtenBefore, and writtenAfter count only what
+// mrewrite writes. Import paths and struct tags stay unchanged, because the
+// compiler unquotes them directly. Directories named testdata or vendor are
+// skipped, as are files that import "C".
 //
 // Usage: mrewrite [-n] dir...
 //
@@ -33,6 +38,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/dedis/matchertext/go/matchertext"
 )
@@ -123,35 +129,20 @@ func rewriteFile(path string, dryRun bool, c *counts) error {
 			return true
 		}
 		c.escaped++
-		e := scanEscapes(body)
-		before := e.backslashes - e.encodings
-		c.toothpicks += before
-		compliant, scanErr := isMatchertext(body)
-		if scanErr != nil {
-			err = scanErr
-			return false
-		}
-		if !compliant {
-			c.converted += before
-			return true
-		}
-		c.converted += e.kept
-		if e.encodings > 0 || e.controls > 0 {
-			return true
-		}
-		value, unquoteErr := strconv.Unquote(lit.Value)
-		if unquoteErr != nil {
+		r, ok := decode(body)
+		if !ok {
 			return true // not valid Go: leave it
 		}
-		if balanced, scanErr := isMatchertext(value); scanErr != nil || !balanced {
-			err = scanErr
-			return scanErr == nil
+		c.toothpicks += r.before
+		c.converted += r.after
+		if !r.writable {
+			return true
 		}
 		c.written++
-		c.before += before
-		c.after += strings.Count(value, `\`)
+		c.before += r.before
+		c.after += r.after
 		start := fset.Position(lit.Pos()).Offset
-		edits = append(edits, edit{start, start + len(lit.Value), `M"(` + value + `)"`})
+		edits = append(edits, edit{start, start + len(lit.Value), `M"(` + r.value + `)"`})
 		return true
 	})
 	if err != nil {
@@ -179,54 +170,80 @@ func rewriteFile(path string, dryRun bool, c *counts) error {
 	return os.WriteFile(path, []byte(out.String()), info.Mode().Perm())
 }
 
-// escapes describes the escapes of an interpreted string literal's body.
-type escapes struct {
-	backslashes int // all backslashes
-	encodings   int // escapes that encode a character by number: \x, \u, \U, octal
-	controls    int // \a, \b, \f, \r, \v: characters a raw literal cannot hold
-	kept        int // toothpicks after the rewrite: one per \\ and per control escape
+// rewrite is an interpreted string literal under the analyzer's rewrite.
+type rewrite struct {
+	before, after int    // toothpicks in the source text and after the rewrite
+	value         string // the literal's value
+	writable      bool   // M"(value)" holds the value verbatim
 }
 
-func scanEscapes(body string) escapes {
-	var e escapes
-	for i := 0; i < len(body); i++ {
-		if body[i] != '\\' {
+// decode decodes the body of an interpreted string literal as the analyzer does,
+// recording which escape produced each byte of the value. It reports false if the
+// body is not valid Go.
+func decode(body string) (rewrite, bool) {
+	r := rewrite{before: strings.Count(body, `\`)}
+	var value []byte
+	var owner []int // per byte of value: the escape that produced it, or -1
+	var kept []bool // per escape: it keeps its toothpick
+	for s := body; s != ""; {
+		if s[0] != '\\' {
+			value = append(value, s[0])
+			owner = append(owner, -1)
+			s = s[1:]
 			continue
 		}
-		e.backslashes++
-		if i+1 == len(body) {
-			break
+		v, multibyte, tail, err := strconv.UnquoteChar(s, '"')
+		if err != nil {
+			return r, false
 		}
-		switch c := body[i+1]; {
-		case c == 'x':
-			e.encodings++
-			i += 3
-		case c == 'u':
-			e.encodings++
-			i += 5
-		case c == 'U':
-			e.encodings++
-			i += 9
-		case c >= '0' && c <= '7':
-			e.encodings++
-			i += 3
-		case strings.IndexByte("abfrv", c) >= 0:
-			e.controls++
-			e.kept++
-			i++
-		case c == '\\':
-			e.backslashes++
-			e.kept++
-			i++
-		default: // \n, \t, \", \'
-			i++
+		id := len(kept)
+		kept = append(kept, false)
+		n := len(value)
+		if c := s[1]; !multibyte && (c == 'x' || c >= '0' && c <= '7') {
+			value = append(value, byte(v)) // \xHH and octal encode a byte
+		} else {
+			value = utf8.AppendRune(value, v)
+		}
+		for ; n < len(value); n++ {
+			owner = append(owner, id)
+		}
+		s = tail
+	}
+
+	// An escape keeps its toothpick if it decodes to a backslash or to bytes
+	// that are not valid UTF-8, which a raw literal cannot hold.
+	r.writable = true
+	for i := 0; i < len(value); {
+		c, size := utf8.DecodeRune(value[i:])
+		if c == utf8.RuneError && size == 1 {
+			r.writable = false
+			if owner[i] >= 0 {
+				kept[owner[i]] = true
+			}
+		} else if c == '\\' && owner[i] >= 0 {
+			kept[owner[i]] = true
+		} else if c == 0xFEFF || c != '\n' && c != '\t' && (c < 0x20 || c >= 0x7F && c <= 0x9F) {
+			r.writable = false // the compiler rejects NUL and BOM; other controls would be invisible
+		}
+		i += size
+	}
+	r.value = string(value)
+
+	if !isMatchertext(body) || !isMatchertext(r.value) {
+		r.after = r.before
+		r.writable = false
+		return r, true
+	}
+	for _, k := range kept {
+		if k {
+			r.after++
 		}
 	}
-	return e
+	return r, true
 }
 
 // isMatchertext reports whether the matchers (), [], {} of s match.
-func isMatchertext(s string) (bool, error) {
+func isMatchertext(s string) bool {
 	unmatched, err := matchertext.UnmatchedOffsets(strings.NewReader(s))
-	return err == nil && len(unmatched) == 0, err
+	return err == nil && len(unmatched) == 0
 }
