@@ -36,7 +36,6 @@ to label safely.
 The compliance and escaping metrics below
 do not depend on this classification,
 which affects only the per-category attribution of results.
-On held-out Linguist snippets, naive Bayes labels 4.7\%, 84\% correctly; detector accuracy is unmeasured.
 
 The corpus is drawn from GitHub
 and is intended to represent mature, widely-deployed production code:
@@ -162,14 +161,15 @@ wherever they appear, and acutely in JavaScript,
 where regular expressions average \dataJsRegexRate violations per sample,
 shell fragments \dataJsShellRate, and CSS \dataJsCssRate.
 The second is absolute \emph{contribution}, which is partly volume-driven:
-in C++ and Java the single largest source of violations
-is ordinary prose (\dataCppProseViolationShare and \dataJavaProseViolationShare of each language's violations),
+in every major host but Swift the largest source of violations
+is strings of a single character or of punctuation alone, such as \verb|"["|
+(\dataCppLoneViolationShare of C++'s violations and \dataJavaLoneViolationShare of Java's),
+and ordinary prose still causes \dataCppProseViolationShare and \dataJavaProseViolationShare,
 not because prose is error-prone --
 its rate is only about \dataProseRate{} --
 but because prose strings are so numerous.
-The category leading a host's violations thus differs by host,
-but the categories intrinsically most likely to violate
-are consistent across hosts.
+The categories most likely to violate
+are thus consistent across hosts.
 
 Most string literals are not cross-language embeddings at all:
 plain prose, identifier-like tokens, and file paths
@@ -219,9 +219,9 @@ Category	& Toothpicks	& Share	\\
 \end{subtable}
 \end{footnotesize}
 \caption{Largest embedded-string categories by share of the \dataClassified classified string samples
-	(\dataClassifiedShare of all), with their samples, violations and toothpicks; categories below 1\% are omitted.
-	Unknown holds the \dataUnclassified unclassified samples.
-	(b) ranks as many categories by toothpicks, as a share of all string-literal toothpicks.}
+	(\dataClassifiedShare of all), with their samples, violations and toothpicks; numbers, empty strings, and categories below 1\% other than CSS and regular expressions are omitted.
+	Unknown holds the unclassified samples.
+	(b) ranks by toothpicks, as a share of all string-literal toothpicks.}
 \label{tab:eval:categories}
 \end{table}
 
@@ -236,7 +236,7 @@ eliminates \dataReduction of the in-scope toothpicks,
 cutting them
 from about \dataScopeToothpicks to about \dataToothpicksConverted.
 Of those left, \dataKeptNonCompliant are in non-compliant literals, which are not rewritten;
-the rest are backslashes a raw literal still holds:
+the rest are mostly backslashes a raw literal still holds:
 escaped ones as in regular expressions (\dataKeptBackslash),
 those of literals already raw (\dataKeptRaw) or opening a Swift interpolation (\dataKeptInterpolation),
 and control characters kept verbatim (\dataKeptControl).
