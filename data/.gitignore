@@ -7,3 +7,6 @@ build-test
 result/**
 train/__pycache__
 repos/**
+# Dependencies fetched by fetch-extern.sh
+extern/Serde/
+extern/tree-sitter/*/

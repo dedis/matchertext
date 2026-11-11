@@ -9,11 +9,16 @@ This tool parses multi-language source trees with LLVM/Clang and reports:
 
 ## Build
 
-From the `data/` directory:
+From the `data/` directory, fetch the dependencies (Serde, and tree-sitter with
+its grammars) at the pinned commits, then build:
 
 ```sh
+./fetch-extern.sh
 make train build
 ```
+
+The Perl and Swift grammars do not ship a generated parser, so the build needs
+the `tree-sitter` CLI on the `PATH` to generate it.
 
 The build produces:
 
