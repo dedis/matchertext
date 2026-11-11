@@ -62,12 +62,10 @@ following the term ``leaning toothpick syndrome'' of \cref{sec:bg}.
 
 To estimate the escaping that matchertext would remove,
 each compliant string literal is rewritten
-as the equivalent escapeless C++ raw string literal \verb|R"(|$\dots$\verb|)"|
-(same toothpicks as \verb|M"(|$\dots$\verb|)"|)
-\xxx{not quite exactly the same toothpicks!
-	there will be a difference for unmatched matchers
-	and for the raw-string closer sequence.}
-and the surviving backslashes are counted,
+as an equivalent escapeless matchertext literal \verb|M"(|$\dots$\verb|)"|,
+or equivalently a C++ raw string literal \verb|R"|$d$\verb|(|$\dots$\verb|)|$d$\verb|"|
+with a suitable delimiter $d$ (the toothpick count is the same).
+The surviving backslashes are counted,
 yielding a \emph{toothpick reduction}.
 The rewrite decodes every escape, \verb|\x5B| included,
 and drops its backslash unless it decodes to a backslash, to a non-UTF-8 byte,
@@ -235,7 +233,7 @@ Category	& Toothpicks	& Share	\\
 A tangible benefit of matchertext is the escaping it can remove,
 as we measure next.
 Matchertext is not the only way to reduce toothpicks, of course.
-If lower toothpick count was our \emph{only} concern,
+If lower toothpick count were our \emph{only} concern,
 then ``adopt C++ raw string literals'' might be as good advice
 as ``adopt matchertext'',
 since C++'s variable-delimiter format
@@ -258,14 +256,14 @@ Of those left, \dataKeptNonCompliant are in non-compliant literals, which are no
 the rest are mostly backslashes a raw literal still holds:
 escaped ones as in regular expressions (\dataKeptBackslash),
 those of literals already raw (\dataKeptRaw) or opening a Swift interpolation (\dataKeptInterpolation),
-and control characters kept verbatim (\dataKeptControl).
+and escaped control characters (\dataKeptControl).
 Escaped binary data, out of scope, holds another \dataBinaryToothpicks.
 The host's raw-string form could hold \dataRawHoldableShare
 of the compliant literals;
 another \dataMtOnlyShare fit matchertext literals
 but not the host's raw strings
 (\eg C and Java lack raw strings).
-Both counts are for literals without escapes.
+Both counts include literals without escapes.
 As a concrete case,
 the compliant C++ regular-expression literal
 \verb|"\\b,\"axis\":(\\d+)\\b"|
