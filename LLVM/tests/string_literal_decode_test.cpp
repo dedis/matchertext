@@ -61,9 +61,48 @@ void ExpectContent(const std::string_view label, const std::string_view body, co
   std::cerr << "string_literal_decode_test FAILED: " << label
             << " | body=<" << body << "> content=<" << literal.content << "> expected=<" << content << ">\n";
 }
+// Expects the toothpicks the rewrite of a narrow C literal keeps, by cause.
+void ExpectKept(const std::string_view label, const std::string_view body, const RawRewrite::Kept &kept) {
+  ++checks;
+  Parser::RawLiteral literal;
+  const uint64_t converted = Parser::CountRawStringToothpicks(body, &literal);
+  const auto &k = literal.kept;
+  if (converted == kept.Total() && k.raw == kept.raw && k.unknownEscape == kept.unknownEscape &&
+      k.backslash == kept.backslash && k.unwritable == kept.unwritable && k.control == kept.control)
+    return;
+  ++failures;
+  std::cerr << "string_literal_decode_test FAILED: " << label << " | body=<" << body << "> converted=" << converted
+            << " raw=" << k.raw << " unknown=" << k.unknownEscape << " backslash=" << k.backslash
+            << " unwritable=" << k.unwritable << " control=" << k.control << '\n';
+}
 } // namespace
 
 int main() {
+  // --- Why the kept toothpicks survive ---
+  ExpectKept("kept: escaped backslash", R"(skip \\d+)", {.backslash = 1});
+  ExpectKept("kept: control character", R"(bell\a)", {.control = 1});
+  ExpectKept("kept: byte that is not UTF-8", R"(caf\xe9)", {.unwritable = 1});
+  ExpectKept("kept: none for a removed escape", R"(a\nb\x5B)", {});
+  ExpectKept("kept: two causes", R"(\\\a\n)", {.backslash = 1, .control = 1});
+  {
+    // An unknown escape kept as written (PHP, OCaml), and literal text of a raw literal.
+    ++checks;
+    RawRewrite::Dialect php;
+    php.unknownKeepsBackslash = true;
+    RawRewrite::Counter counter;
+    counter.Reset(php);
+    counter.Literal(R"(raw \w )");
+    counter.Escape(R"(\d)");
+    counter.Escape(R"(\n)");
+    const uint64_t converted = counter.Count();
+    const auto &k = counter.KeptToothpicks();
+    if (converted != 2 || k.raw != 1 || k.unknownEscape != 1 || k.Total() != 2) {
+      ++failures;
+      std::cerr << "string_literal_decode_test FAILED: kept: unknown escape and raw text | converted=" << converted
+                << " raw=" << k.raw << " unknown=" << k.unknownEscape << '\n';
+    }
+  }
+
   // --- Escapes the rewrite removes ---
   Expect("plain text, no escapes", R"(plain text, no escapes here)", 0);
   Expect("empty body", R"()", 0);

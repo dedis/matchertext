@@ -235,6 +235,11 @@ as an equivalent C++ raw string literal
 eliminates \dataReduction of the in-scope toothpicks,
 cutting them
 from about \dataScopeToothpicks to about \dataToothpicksConverted.
+Of those left, \dataKeptNonCompliant are in non-compliant literals, which are not rewritten;
+the rest are backslashes a raw literal still holds:
+escaped ones as in regular expressions (\dataKeptBackslash),
+those of literals already raw (\dataKeptRaw) or opening a Swift interpolation (\dataKeptInterpolation),
+and control characters kept verbatim (\dataKeptControl).
 Escaped binary data, out of scope, holds another \dataBinaryToothpicks.
 The host's raw-string form could hold \dataRawHoldableShare of the compliant literals,
 and only a matchertext literal the other \dataMtOnlyShare (\eg C and Java lack raw strings);

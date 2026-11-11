@@ -43,6 +43,14 @@
   X(toothpicksReductionTotal, "Toothpick Reduction Total (%)", "Percentage reduction in in-scope toothpicks after rewriting matchertext-compliant string literals as C++ raw string literals.") \
   X(toothpicksReductionAvg, "Toothpick Reduction Average (%)", "Mean of each in-scope sample's own percentage reduction in toothpicks after rewriting matchertext-compliant string literals as C++ raw string literals (samples without toothpicks count as 0%).") \
   X(toothpicksReductionMax, "Toothpick Reduction Maximum (%)", "Percentage reduction in the maximum per-sample in-scope toothpick count after rewriting matchertext-compliant string literals as C++ raw string literals.") \
+  X(keptNonCompliant, "Kept Toothpicks: Non-Compliant", "Converted toothpicks of in-scope string literals that are not matchertext-compliant, so not rewritten: all their toothpicks.") \
+  X(keptNotMatchertext, "Kept Toothpicks: Not Matchertext Decoded", "Converted toothpicks of compliant string literals whose decoded content is not matchertext (\\x5B is [), so not rewritten: all their toothpicks.") \
+  X(keptRaw, "Kept Toothpicks: Already Raw", "Converted toothpicks that are literal backslashes of an already raw literal or segment, such as R\"(\\d)\" or r'\\d'.") \
+  X(keptUnknownEscape, "Kept Toothpicks: Unknown Escape", "Converted toothpicks of unknown escapes the language keeps as written, backslash included (PHP, OCaml \\d).") \
+  X(keptInterpolation, "Kept Toothpicks: Interpolation", "Converted toothpicks that open an interpolation, such as Swift's \\(name), which a raw literal writes as \\#(name).") \
+  X(keptBackslash, "Kept Toothpicks: Escaped Backslash", "Converted toothpicks of escapes that decode to a backslash, such as \\\\ in a regular expression.") \
+  X(keptUnwritable, "Kept Toothpicks: Not Writable Raw", "Converted toothpicks of escapes a raw literal cannot write, such as a byte that is not valid UTF-8 or a lone surrogate.") \
+  X(keptControl, "Kept Toothpicks: Control Character", "Converted toothpicks of escapes of control characters other than tab, line feed, and carriage return, kept verbatim.") \
   X(rawHoldable, "Raw-Form Holdable", "Number of matchertext-compliant string literals whose content the language's default raw string form holds verbatim.") \
   X(matchertextOnly, "Matchertext-Only", "Number of matchertext-compliant string literals whose content a matchertext literal M\"(...)\" holds verbatim but the language's default raw string form does not.") \
   \

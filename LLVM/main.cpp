@@ -447,11 +447,32 @@ int main(const int argc, char *argv[]) {
       f << "# String Language Distribution\n\n";
       PrintLanguageStatsTable({{"String", Parser::STRING_LANG_STATS.Snapshot()}}, f);
     } {
-      // One line per distinct file content: hash, files, string samples. build_global.py
-      // merges them across organizations to count exact duplicates.
+      // One line per distinct file content: its hash, how many files have it, their
+      // string samples, and the stats of one copy. build_global.py merges them across
+      // organizations to count exact duplicates and to build the deduplicated tables.
       auto f = open_stat_file("file_contents.tsv");
-      for (const auto &[hash, content]: Parser::FILE_CONTENTS)
-        f << std::hex << hash << std::dec << '\t' << content.files << '\t' << content.strings << '\n';
+      f << "#hash\tfiles\tstrings\tcopy strings\tin-scope strings\tcompliant strings\ttoothpicks"
+           "\tin-scope toothpicks\tconverted toothpicks\tkept non-compliant\tkept not matchertext"
+           "\tkept raw\tkept unknown escape\tkept interpolation\tkept backslash\tkept unwritable\tkept control"
+           "\tcomments\tcompliant comments\tcompliant comments relaxed"
+           "\tfragments\tfragments relaxed\twhole\twhole relaxed"
+           "\tcategories (name:count:violations:toothpicks:converted,...)\n";
+      for (const auto &[hash, content]: Parser::FILE_CONTENTS) {
+        const auto &a = content.first;
+        f << std::hex << hash << std::dec << '\t' << content.files << '\t' << content.strings << '\t'
+          << a.strings << '\t' << a.scopeStrings << '\t' << a.compliantStrings << '\t' << a.toothpicks << '\t'
+          << a.scopeToothpicks << '\t' << a.converted;
+        for (const uint64_t kept: a.kept)
+          f << '\t' << kept;
+        f << '\t' << a.docs << '\t' << a.docsCompliant << '\t' << a.docsCompliantRelaxed << '\t' << a.fragments
+          << '\t' << a.fragmentsRelaxed << '\t' << a.whole << '\t' << a.wholeRelaxed << '\t';
+        for (size_t i = 0; i < a.categories.size(); ++i) {
+          const auto &c = a.categories[i];
+          f << (i ? "," : "") << LanguageName(c.language) << ':' << c.count << ':' << c.violations << ':'
+            << c.toothpicks << ':' << c.converted;
+        }
+        f << '\n';
+      }
     }
 
     for (const auto &[lang, pls]: perLangStats) {

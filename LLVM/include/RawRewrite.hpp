@@ -45,6 +45,33 @@ namespace RawRewrite {
     bool byteEscapes = false;
   };
 
+  /// The toothpicks a raw rewrite keeps, by cause.
+  struct Kept {
+    /// Backslashes of literal text, as in a literal that is already raw.
+    uint64_t raw = 0;
+    /// Unknown escapes a language keeps as written, backslash included (PHP, OCaml).
+    uint64_t unknownEscape = 0;
+    /// Backslashes that open an interpolation, such as Swift's \(name).
+    uint64_t interpolation = 0;
+    /// Escapes that decode to a backslash, such as \\ in a regular expression.
+    uint64_t backslash = 0;
+    /// Escapes a raw literal cannot write, such as a byte that is not valid UTF-8.
+    uint64_t unwritable = 0;
+    /// Escapes of control characters other than tab, line feed, and carriage return.
+    uint64_t control = 0;
+
+    [[nodiscard]] uint64_t Total() const { return raw + unknownEscape + interpolation + backslash + unwritable + control; }
+    Kept &operator+=(const Kept &other) {
+      raw += other.raw;
+      unknownEscape += other.unknownEscape;
+      interpolation += other.interpolation;
+      backslash += other.backslash;
+      unwritable += other.unwritable;
+      control += other.control;
+      return *this;
+    }
+  };
+
   /// Collects the content of one literal in source order and counts the
   /// toothpicks that survive the raw rewrite. Reuse one instance with Reset().
   class Counter {
@@ -60,8 +87,12 @@ namespace RawRewrite {
       [[nodiscard]] bool Holdable() const;
       /// After Count(): the raw-literal content, every escape decoded and normalized.
       [[nodiscard]] std::string_view Content() const { return content; }
+      /// After Count(): the toothpicks it returned, by cause.
+      [[nodiscard]] const Kept &KeptToothpicks() const { return kept; }
     private:
       static constexpr int32_t kLiteral = -1;
+      /// Owner of an unknown escape kept as written.
+      static constexpr int32_t kKeptEscape = -2;
 
       Dialect dialect;
       /// Decoded bytes before normalization; owner is the escape index or kLiteral.
@@ -70,6 +101,7 @@ namespace RawRewrite {
       /// Per escape: 0 removed, 1 cannot be written, 2 decoded backslash, 3 control character.
       std::vector<uint8_t> survives;
       std::string content;
+      Kept kept;
       /// A \u high-surrogate escape waiting for its low half: its index, or -1.
       int32_t pendingHigh = -1;
       uint32_t pendingValue = 0;

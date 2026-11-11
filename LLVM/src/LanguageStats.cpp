@@ -10,12 +10,13 @@
 
 void LanguageStats::Record(
   const LanguageEnum lang, const uint64_t violations,
-  const uint64_t toothpicks
+  const uint64_t toothpicks, const uint64_t converted
 ) {
   const auto idx = static_cast<size_t>(lang);
   entries_[idx].count.fetch_add(1, std::memory_order_relaxed);
   entries_[idx].violations.fetch_add(violations, std::memory_order_relaxed);
   entries_[idx].toothpicks.fetch_add(toothpicks, std::memory_order_relaxed);
+  entries_[idx].converted.fetch_add(converted, std::memory_order_relaxed);
 }
 
 LanguageStatsSnapshot LanguageStats::Snapshot() const {
@@ -30,7 +31,8 @@ LanguageStatsSnapshot LanguageStats::Snapshot() const {
       {
         static_cast<LanguageEnum>(i), c,
         entries_[i].violations.load(std::memory_order_relaxed),
-        entries_[i].toothpicks.load(std::memory_order_relaxed), 0.0,
+        entries_[i].toothpicks.load(std::memory_order_relaxed),
+        entries_[i].converted.load(std::memory_order_relaxed), 0.0,
       }
     );
   }

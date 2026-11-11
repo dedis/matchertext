@@ -11,8 +11,10 @@ Output: result/global/{strings,nesting,files,language_stats}.md, plus
   language_stats_by_toothpicks.md (string languages sorted by toothpicks) and
   host_languages_by_characters.md (host languages sorted by raw characters), and
   raw_forms.md (how each host's native raw string forms hold its strings),
-  whole_file.md (files compliant fragment by fragment vs. as a whole), and
-  duplicates.md (exact content duplicates across the corpus).
+  whole_file.md (files compliant fragment by fragment vs. as a whole),
+  toothpick_survivors.md (why the toothpicks left after the rewrite survive),
+  duplicates.md (exact content duplicates across the corpus), and
+  deduplicated.md (the main figures with each distinct file content counted once).
 """
 import os, re, sys
 
@@ -89,6 +91,11 @@ S_SUM = {"Sample Size", "With Toothpicks", "Total Toothpicks", "With Non-Complia
          "Sum Of Per-Sample Raw Max Depth", "With Valid Nested Embedding",
          "Sum Of Per-Sample Valid Max Depth", "Raw Character Count",
          "In-Scope Samples", "In-Scope Toothpicks"}
+KEPT = ("Kept Toothpicks: Non-Compliant", "Kept Toothpicks: Not Matchertext Decoded",
+        "Kept Toothpicks: Already Raw", "Kept Toothpicks: Unknown Escape",
+        "Kept Toothpicks: Interpolation", "Kept Toothpicks: Escaped Backslash", "Kept Toothpicks: Not Writable Raw",
+        "Kept Toothpicks: Control Character")
+S_SUM |= set(KEPT)
 S_MAX = {"Maximum Toothpicks", "Non-Compliance Max", "Maximum Toothpicks (Converted)",
          "In-Scope Maximum Toothpicks",
          "Highest Per-Sample Raw Max Depth", "Highest Per-Sample Valid Max Depth"}
@@ -185,7 +192,11 @@ F_SUM = {"Sample Size", "With Violation", "Total Violations",
          "Skipped Oversized", "Skipped Binary", "Skipped Timeout",
          "Whole-File Compliant", "Whole-File Compliant Relaxed",
          "Fragments And Whole File Compliant", "Fragments Compliant Only",
-         "Whole File Compliant Only", "Neither Compliant"}
+         "Whole File Compliant Only", "Neither Compliant",
+         "Fragments And Whole File Compliant Relaxed", "Fragments Compliant Only Relaxed",
+         "Whole File Compliant Only Relaxed", "Neither Compliant Relaxed",
+         "Fragment-Free Files", "Fragment-Free Whole-File Compliant",
+         "Fragment-Free Whole-File Compliant Relaxed"}
 F_MAX = {"Maximum Violations", "Maximum Relaxed Violations"}
 F_DERIVED = {"Average Violations", "Compliance Rate",
              "Average Relaxed Violations", "Compliance Rate Relaxed",
@@ -228,12 +239,13 @@ for lvl in sorted(levels):
 open(os.path.join(OUTDIR, "nesting.md"), "w").write("\n".join(out) + "\n")
 
 # =========================================================================
-# language_stats.md  (sum Count/Violations/Toothpicks per language; recompute %)
+# language_stats.md  (sum Count/Violations/Toothpicks/Converted per language;
+# recompute % and the reduction)
 # =========================================================================
+OUT_OF_SCOPE = {"BinaryData", "PseudoBinaryData"}   # not rewritten: no reduction
 ref = open(path(orgs[0], "language_stats.md")).read()
 llines, _, lrows = find_table(ref)
-lhdr = split_row(lrows[0])          # String Language | Count | % | Violations | Toothpicks
-langs = {}                          # name -> [count, violations, toothpicks]
+langs = {}                          # name -> [count, violations, toothpicks, converted]
 for org in orgs:
     _, _, r = find_table(open(path(org, "language_stats.md")).read())
     for row in r[2:]:
@@ -242,25 +254,36 @@ for org in orgs:
         cnt = parse_num(cells[1]) or 0.0
         vio = parse_num(cells[3]) or 0.0
         tp = parse_num(cells[4]) or 0.0
-        acc = langs.setdefault(name, [0.0, 0.0, 0.0])
-        acc[0] += cnt; acc[1] += vio; acc[2] += tp
+        # results from before the per-category rewrite have no converted column
+        conv = parse_num(cells[5]) if len(cells) > 5 and parse_num(cells[5]) is not None else tp
+        acc = langs.setdefault(name, [0.0, 0.0, 0.0, 0.0])
+        acc[0] += cnt; acc[1] += vio; acc[2] += tp; acc[3] += conv
 total = sum(v[0] for v in langs.values())
-out = [llines[0], note, "", lrows[0], lrows[1]]
+def reduction(name, tp, conv):
+    return "-" if name in OUT_OF_SCOPE or not tp else "%.2f%%" % (div(tp - conv, tp) * 100)
+out = [llines[0], note, "",
+       "| String Language | Count | % | Violations | Toothpicks | Converted Toothpicks | Reduction |",
+       "|---|---|---|---|---|---|---|"]
 for name in sorted(langs, key=lambda k: (-langs[k][0], k)):
-    cnt, vio, tp = langs[name]
-    pct = div(cnt, total) * 100
-    out.append("| %s | %s | %.2f%% | %s | %s |" % (name, fmt_int(cnt), pct, fmt_int(vio), fmt_int(tp)))
+    cnt, vio, tp, conv = langs[name]
+    out.append("| %s | %s | %.2f%% | %s | %s | %s | %s |" % (
+        name, fmt_int(cnt), div(cnt, total) * 100, fmt_int(vio), fmt_int(tp), fmt_int(conv),
+        reduction(name, tp, conv)))
 open(os.path.join(OUTDIR, "language_stats.md"), "w").write("\n".join(out) + "\n")
 
 # language_stats_by_toothpicks.md  (the same string languages, sorted by toothpicks)
 tp_total = sum(v[2] for v in langs.values())
+conv_total = sum(v[3] for k, v in langs.items() if k not in OUT_OF_SCOPE)
 out = ["# String Language Distribution by Toothpicks", note, "",
-       "| String Language | Toothpicks | % of Toothpicks | Count | % of Strings | Violations |",
-       "|---|---|---|---|---|---|"]
+       "| String Language | Toothpicks | % of Toothpicks | Converted Toothpicks | % of Converted "
+       "| Reduction | Count | % of Strings | Violations |",
+       "|---|---|---|---|---|---|---|---|---|"]
 for name in sorted(langs, key=lambda k: (-langs[k][2], k)):
-    cnt, vio, tp = langs[name]
-    out.append("| %s | %s | %.2f%% | %s | %.2f%% | %s |" % (
-        name, fmt_int(tp), div(tp, tp_total) * 100, fmt_int(cnt), div(cnt, total) * 100, fmt_int(vio)))
+    cnt, vio, tp, conv = langs[name]
+    conv_share = "-" if name in OUT_OF_SCOPE else "%.2f%%" % (div(conv, conv_total) * 100)
+    out.append("| %s | %s | %.2f%% | %s | %s | %s | %s | %.2f%% | %s |" % (
+        name, fmt_int(tp), div(tp, tp_total) * 100, fmt_int(conv), conv_share,
+        reduction(name, tp, conv), fmt_int(cnt), div(cnt, total) * 100, fmt_int(vio)))
 open(os.path.join(OUTDIR, "language_stats_by_toothpicks.md"), "w").write("\n".join(out) + "\n")
 
 # =========================================================================
@@ -308,6 +331,51 @@ for name in sorted(hosts, key=lambda k: (-hosts[k]["chars"], k)):
         out.append(host_row(name, hosts[name]))
 out.append(host_row("**Total**", tot))
 open(os.path.join(OUTDIR, "host_languages_by_characters.md"), "w").write("\n".join(out) + "\n")
+
+# =========================================================================
+# toothpick_survivors.md  (why the toothpicks left after the rewrite survive, per
+# host language, from @org/language_stats/<Language>/strings.md)
+# =========================================================================
+CAUSE_LABELS = ("Non-Compliant", "Not Matchertext Decoded", "Already Raw", "Unknown Escape",
+                "Interpolation", "Escaped Backslash", "Not Writable Raw", "Control Character")
+survivors = {}                      # host -> [converted, causes...]
+for org in orgs:
+    base = path(org, "language_stats")
+    if not os.path.isdir(base):
+        continue
+    for lang in os.listdir(base):
+        p = os.path.join(base, lang, "strings.md")
+        if not os.path.isfile(p):
+            continue
+        _, _, r = find_table(open(p).read(), after="## Data")
+        row = {split_row(x)[0]: parse_num(split_row(x)[1]) or 0.0 for x in r[2:]}
+        if KEPT[0] not in row:
+            continue                # results from before the per-cause breakdown
+        acc = survivors.setdefault(lang, [0.0] * (1 + len(KEPT)))
+        acc[0] += row.get("Total Toothpicks (Converted)", 0.0)
+        for k, metric in enumerate(KEPT):
+            acc[1 + k] += row.get(metric, 0.0)
+survivors = {h: v for h, v in survivors.items() if v[0]}
+surv_total = [sum(v[k] for v in survivors.values()) for k in range(1 + len(KEPT))]
+out = ["# Toothpicks Left After the Rewrite, by Cause", note,
+       "<!-- In-scope string literals only. Non-Compliant literals are not rewritten and keep all "
+       "their toothpicks, as do compliant literals whose decoded content is not matchertext "
+       "(\\x5B is [). In a rewritten literal, a toothpick survives as a literal backslash of an "
+       "already raw literal, an unknown escape kept as written (PHP, OCaml), a backslash opening an "
+       "interpolation (Swift \\\\(name)), an escape decoding to "
+       "a backslash, an escape a raw literal cannot write (a byte that is not UTF-8, a lone "
+       "surrogate), or a control character other than tab, LF, and CR, kept verbatim. Each "
+       "row's causes add up to its converted toothpicks. -->", "",
+       "| Host Language | Converted Toothpicks | " + " | ".join(CAUSE_LABELS) + " |",
+       "|---|---|" + "---|" * len(CAUSE_LABELS)]
+def survivor_row(name, v):
+    return "| %s | %s | " % (name, fmt_int(v[0])) + " | ".join(
+        "%s (%.1f%%)" % (fmt_int(c), div(c, v[0]) * 100) for c in v[1:]) + " |"
+for h in sorted(survivors, key=lambda k: (-survivors[k][0], k)):
+    out.append(survivor_row(h, survivors[h]))
+if survivors:
+    out.append(survivor_row("**Total**", surv_total))
+open(os.path.join(OUTDIR, "toothpick_survivors.md"), "w").write("\n".join(out) + "\n")
 
 # ---------- console summary ----------
 # =========================================================================
@@ -392,6 +460,9 @@ open(os.path.join(OUTDIR, "raw_forms.md"), "w").write("\n".join(out) + "\n")
 # =========================================================================
 CELLS = ("Fragments And Whole File Compliant", "Fragments Compliant Only",
          "Whole File Compliant Only", "Neither Compliant")
+RELAXED_CELLS = tuple(c + " Relaxed" for c in CELLS)
+FREE = ("Fragment-Free Files", "Fragment-Free Whole-File Compliant",
+        "Fragment-Free Whole-File Compliant Relaxed")
 EXAMPLES_PER_CELL = 10
 whole = {}                          # host -> {metric: sum}
 examples = {}                       # host -> (fragments only, whole only) example paths
@@ -408,7 +479,7 @@ for org in orgs:
         if "Whole-File Compliant" not in row:
             continue                # results from before the whole-file check
         acc = whole.setdefault(lang, {})
-        for metric in ("Sample Size", "Whole-File Compliant", "Whole-File Compliant Relaxed") + CELLS:
+        for metric in ("Sample Size", "Whole-File Compliant", "Whole-File Compliant Relaxed") + CELLS + RELAXED_CELLS + FREE:
             acc[metric] = acc.get(metric, 0.0) + row.get(metric, 0.0)
         ex = examples.setdefault(lang, ([], []))
         ep = os.path.join(base, lang, "file_examples.md")
@@ -421,23 +492,43 @@ for org in orgs:
                     ex[cell].append("%s/%s" % (org, line[2:].strip()))
 whole = {h: v for h, v in whole.items() if v["Sample Size"]}
 whole_total = {m: sum(v[m] for v in whole.values()) for m in next(iter(whole.values()), {})}
+whole_hosts = sorted(whole, key=lambda k: (-whole[k]["Sample Size"], k))
 out = ["# Whole-File Compliance", note,
-       "<!-- Fragments: all string literals and comments of the file are compliant (strict); "
-       "this is the file compliance of files.md. Whole file: the file's entire source text is "
-       "matchertext (strict). Character literals are not fragments, so they count only in the "
-       "whole-file check. -->", "",
-       "| Host Language | Files | Both | Fragments Only | Whole File Only | Neither "
-       "| Whole-File Compliance | Whole-File Compliance (Relaxed) |",
-       "|---|---|---|---|---|---|---|---|"]
-def whole_row(name, v):
-    n = v["Sample Size"]
-    return "| %s | %s | %s | %s | %s | %s | %.2f%% | %.2f%% |" % (
-        (name, fmt_int(n)) + tuple(fmt_int(v[c]) for c in CELLS) +
-        (div(v["Whole-File Compliant"], n) * 100, div(v["Whole-File Compliant Relaxed"], n) * 100))
-for h in sorted(whole, key=lambda k: (-whole[k]["Sample Size"], k)):
-    out.append(whole_row(h, whole[h]))
-if whole:
-    out.append(whole_row("**Total**", whole_total))
+       "<!-- Fragments: all string literals and comments of the file are compliant; this is the "
+       "file compliance of files.md. Whole file: the file's entire source text is matchertext, "
+       "string literals of binary data (out of matchertext's scope, like in the fragments) blanked "
+       "out. Character literals are not fragments, so they count only in the whole-file check. "
+       "Fragment-free files have no string literal and no comment, so their fragments are "
+       "compliant by default. -->"]
+
+def matrix(title, comment, cells, wholes, drop_free):
+    """One 2x2 table per host. With drop_free, fragment-free files (all in the first two
+    cells, by whether the whole file is compliant) are left out."""
+    rows = ["", "## " + title, "", comment, "",
+            "| Host Language | Files | Both | Fragments Only | Whole File Only | Neither "
+            "| Fragment-Free Files | Whole-File Compliance |",
+            "|---|---|---|---|---|---|---|---|"]
+    def row(name, v):
+        both, frag, wonly, neither = (v[c] for c in cells)
+        free, free_whole = v[FREE[0]], v[wholes[1]]
+        n, w = v["Sample Size"], v[wholes[0]]
+        if drop_free:
+            both, frag, n, w = both - free_whole, frag - (free - free_whole), n - free, w - free_whole
+        return "| %s | %s | %s | %s | %s | %s | %s | %.2f%% |" % (
+            name, fmt_int(n), fmt_int(both), fmt_int(frag), fmt_int(wonly), fmt_int(neither),
+            "-" if drop_free else fmt_int(free), div(w, n) * 100)
+    rows += [row(h, whole[h]) for h in whole_hosts]
+    if whole:
+        rows.append(row("**Total**", whole_total))
+    return rows
+
+out += matrix("Strict", "<!-- Comments and the whole file under the strict rule. -->",
+              CELLS, ("Whole-File Compliant", FREE[1]), False)
+out += matrix("Relaxed", "<!-- Comments and the whole file under the relaxed rule; string literals are strict either way. -->",
+              RELAXED_CELLS, ("Whole-File Compliant Relaxed", FREE[2]), False)
+out += matrix("Strict, Without Fragment-Free Files",
+              "<!-- The strict matrix over the files with at least one string literal or comment. -->",
+              CELLS, ("Whole-File Compliant", FREE[1]), True)
 for title, cell in (("Fragments Compliant, Whole File Not", 0), ("Whole File Compliant, Fragments Not", 1)):
     out += ["", "## Examples: %s" % title, ""]
     for h in sorted(examples):
@@ -446,19 +537,53 @@ for title, cell in (("Fragments Compliant, Whole File Not", 0), ("Whole File Com
 open(os.path.join(OUTDIR, "whole_file.md"), "w").write("\n".join(out) + "\n")
 
 # =========================================================================
-# duplicates.md  (merge result/repos/$ORG/@org/file_contents.tsv: one line per
-# distinct file content, hash<TAB>files<TAB>string samples)
+# duplicates.md and deduplicated.md  (merge result/repos/$ORG/@org/file_contents.tsv:
+# one line per distinct file content, its hash, how many files have it, their
+# string samples, and the stats of one copy)
 # =========================================================================
+# Stats of one copy, in file_contents.tsv order after the hash, files, and strings.
+COPY = ("strings", "scope", "compliant", "tp", "scope_tp", "conv") + tuple("kept%d" % k for k in range(len(KEPT))) + \
+       ("docs", "docs_ok", "docs_ok_relaxed", "fragments", "fragments_relaxed", "whole", "whole_relaxed")
 contents = {}                       # hash -> files * 2**32 + string samples
+dedup = dict.fromkeys(COPY, 0.0)    # each distinct content once
+alld = dict.fromkeys(COPY, 0.0)     # every copy
+cells = {"distinct": [0.0] * 4, "all": [0.0] * 4}
+cats_dedup, cats_all = {}, {}       # category -> [count, violations, toothpicks, converted]
+have_copies = False
 for org in orgs:
     p = path(org, "file_contents.tsv")
     if not os.path.isfile(p):
         continue
     with open(p) as f:
         for line in f:
-            h, files, strings = line.split("\t")
-            key = int(h, 16)
-            contents[key] = contents.get(key, 0) + (int(files) << 32) + int(strings)
+            if line.startswith("#"):
+                continue
+            cols = line.rstrip("\n").split("\t")
+            key = int(cols[0], 16)
+            files, strings = int(cols[1]), int(cols[2])
+            first = key not in contents
+            contents[key] = contents.get(key, 0) + (files << 32) + strings
+            if len(cols) < 4 + len(COPY):
+                continue            # results from before the per-content stats
+            have_copies = True
+            copy = dict(zip(COPY, map(float, cols[3:3 + len(COPY)])))
+            cell = 2 * (copy["fragments"] == 0) + (copy["whole"] == 0)   # both, fragments only, whole only, neither
+            parsed = [c.split(":") for c in cols[3 + len(COPY)].split(",") if c]
+            for k in COPY:
+                alld[k] += copy[k] * files
+            cells["all"][cell] += files
+            for name, *nums in parsed:
+                acc = cats_all.setdefault(name, [0.0] * 4)
+                for n in range(4):
+                    acc[n] += float(nums[n]) * files
+            if first:               # the first copy seen stands for the content
+                for k in COPY:
+                    dedup[k] += copy[k]
+                cells["distinct"][cell] += 1
+                for name, *nums in parsed:
+                    acc = cats_dedup.setdefault(name, [0.0] * 4)
+                    for n in range(4):
+                        acc[n] += float(nums[n])
 files_total = strings_total = dup_files = dup_strings = 0
 for packed in contents.values():
     files, strings = packed >> 32, packed & 0xFFFFFFFF
@@ -479,9 +604,54 @@ out = ["# Exact Content Duplicates", note,
        "| String Samples in Duplicate Files | %s |" % fmt_int(dup_strings),
        "| Duplicate String Sample Share (%%) | %.2f |" % (div(dup_strings, strings_total) * 100)]
 open(os.path.join(OUTDIR, "duplicates.md"), "w").write("\n".join(out) + "\n")
+
+if have_copies:
+    n_distinct = sum(cells["distinct"])
+    def both(label, fn, fmt):
+        a, d = fn(alld, files_total), fn(dedup, n_distinct)
+        return "| %s | %s | %s |" % (label, fmt(a), fmt(d))
+    pct = lambda x: "%.2f%%" % x
+    out = ["# Deduplicated Figures", note,
+           "<!-- The main figures over every parsed file, and with each distinct file content "
+           "(64-bit FNV-1a hash) counted once, from the stats of its first copy. All Files counts every "
+           "copy with the stats of the first, so it can differ slightly from strings.md when one "
+           "content is parsed as two languages (a .h file as C and as C++). File compliance: "
+           "all string literals and comments compliant; whole file: the entire source text, binary "
+           "data literals blanked out, is matchertext. -->", "",
+           "| Metric | All Files | Distinct Contents |", "|---|---|---|",
+           both("Files", lambda a, n: n, fmt_int),
+           both("String Samples", lambda a, n: a["strings"], fmt_int),
+           both("In-Scope String Samples", lambda a, n: a["scope"], fmt_int),
+           both("String Compliance", lambda a, n: div(a["compliant"], a["scope"]) * 100, pct),
+           both("Total Toothpicks", lambda a, n: a["tp"], fmt_int),
+           both("In-Scope Toothpicks", lambda a, n: a["scope_tp"], fmt_int),
+           both("Converted Toothpicks", lambda a, n: a["conv"], fmt_int),
+           both("Toothpick Reduction", lambda a, n: div(a["scope_tp"] - a["conv"], a["scope_tp"]) * 100, pct)]
+    for k, metric in enumerate(KEPT):
+        out.append(both(metric + " (% of converted)",
+                        lambda a, n, k=k: div(a["kept%d" % k], a["conv"]) * 100, pct))
+    out += [both("Comments", lambda a, n: a["docs"], fmt_int),
+            both("Comment Compliance", lambda a, n: div(a["docs_ok"], a["docs"]) * 100, pct),
+            both("Comment Compliance Relaxed", lambda a, n: div(a["docs_ok_relaxed"], a["docs"]) * 100, pct),
+            both("File Compliance", lambda a, n: div(a["fragments"], n) * 100, pct),
+            both("File Compliance Relaxed", lambda a, n: div(a["fragments_relaxed"], n) * 100, pct),
+            both("Whole-File Compliance", lambda a, n: div(a["whole"], n) * 100, pct),
+            both("Whole-File Compliance Relaxed", lambda a, n: div(a["whole_relaxed"], n) * 100, pct)]
+    for c, label in enumerate(("Both", "Fragments Only", "Whole File Only", "Neither")):
+        out.append("| %s (files) | %s | %s |" % (label, fmt_int(cells["all"][c]), fmt_int(cells["distinct"][c])))
+    out += ["", "## String Categories, Each Distinct Content Once", "",
+            "| String Language | Count | % | Violations | Toothpicks | Converted Toothpicks | Reduction |",
+            "|---|---|---|---|---|---|---|"]
+    cat_total = sum(v[0] for v in cats_dedup.values())
+    for name in sorted(cats_dedup, key=lambda k: (-cats_dedup[k][0], k)):
+        cnt, vio, tp, conv = cats_dedup[name]
+        out.append("| %s | %s | %.2f%% | %s | %s | %s | %s |" % (
+            name, fmt_int(cnt), div(cnt, cat_total) * 100, fmt_int(vio), fmt_int(tp), fmt_int(conv),
+            reduction(name, tp, conv)))
+    open(os.path.join(OUTDIR, "deduplicated.md"), "w").write("\n".join(out) + "\n")
 del contents
 
-print("\nWrote 9 files to %s\n" % OUTDIR)
+print("\nWrote %d files to %s\n" % (11 if have_copies else 10, OUTDIR))
 print("Key global figures (Strings column):")
 def gv(a, m): return a[m][0]
 print("  Sample Size            : %s" % fmt_g(gv(s_agg, "Sample Size")))

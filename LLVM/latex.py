@@ -257,6 +257,12 @@ def main():
         ("Toothpicks", millions(toothpicks)),
         ("ScopeToothpicks", millions(scope_toothpicks)),
         ("ToothpicksConverted", millions(converted)),
+        # why the toothpicks left after the rewrite survive, as shares of them
+        *((f"Kept{key}", pct(100 * g[f"Kept Toothpicks: {row}"][0] / converted, 0)
+           if f"Kept Toothpicks: {row}" in g else PENDING)
+          for key, row in (("NonCompliant", "Non-Compliant"), ("Backslash", "Escaped Backslash"),
+                           ("Raw", "Already Raw"), ("Interpolation", "Interpolation"),
+                           ("Control", "Control Character"))),
         ("BinaryToothpicks", millions(cats["BinaryData"]["tp"] + cats["PseudoBinaryData"]["tp"])),
         ("OrgReductionMin", pct(min(org_reduction))),
         ("OrgReductionMax", pct(max(org_reduction))),

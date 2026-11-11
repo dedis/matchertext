@@ -148,14 +148,20 @@ void PrintLanguageStatsTable(
     if (snap.entries.empty())
       continue;
 
-    out << "| " << category << " Language | Count | % | Violations | Toothpicks |\n";
-    out << "|---|---|---|---|---|\n";
+    out << "| " << category << " Language | Count | % | Violations | Toothpicks | Converted Toothpicks | Reduction |\n";
+    out << "|---|---|---|---|---|---|---|\n";
 
     for (const auto &e: snap.entries) {
       char pctBuf[16];
       std::snprintf(pctBuf, sizeof(pctBuf), "%.2f%%", e.percentage);
+      /// Binary data is out of matchertext's scope, so it has no reduction.
+      char reductionBuf[16] = "-";
+      if (InMatchertextScope(e.language) && e.toothpicks > 0)
+        std::snprintf(reductionBuf, sizeof(reductionBuf), "%.2f%%",
+                      100.0 * static_cast<double>(e.toothpicks - e.converted) / static_cast<double>(e.toothpicks));
       out << "| " << LanguageName(e.language) << " | " << e.count << " | "
-          << pctBuf << " | " << e.violations << " | " << e.toothpicks << " |\n";
+          << pctBuf << " | " << e.violations << " | " << e.toothpicks << " | " << e.converted << " | "
+          << reductionBuf << " |\n";
     }
     out << '\n';
   }

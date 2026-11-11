@@ -428,6 +428,10 @@ namespace {
     bool ownRawForm = false;
     /// The rewritten content holds a control character other than tab, LF, and CR.
     bool control = false;
+    /// The converted toothpicks, by cause, and whether the decoded content is not
+    /// matchertext, which keeps all of them.
+    RawRewrite::Kept kept;
+    bool notMatchertext = false;
   };
 
   // Native raw form outcome of a rewritten content.
@@ -437,6 +441,28 @@ namespace {
     out.ownRawForm = (out.rawFormsHolding & RawRewrite::OwnRawForms(language)) != 0;
     out.control = RawRewrite::HasControl(content);
     return out;
+  }
+
+  // Interpolations a Swift string body opens: \( in a plain string, where \\ is an
+  // escaped backslash, and \ then `hashes` #s then ( in an extended-delimiter one.
+  uint64_t swiftInterpolations(const std::string_view body, const size_t hashes) {
+    uint64_t count = 0;
+    for (size_t i = 0; i + 1 < body.size(); ++i) {
+      if (body[i] != '\\')
+        continue;
+      size_t j = i + 1;
+      if (hashes == 0 && body[j] != '(') {
+        ++i; // an escape: \\, \n, ...
+        continue;
+      }
+      size_t k = 0;
+      while (k < hashes && j < body.size() && body[j] == '#')
+        ++k, ++j;
+      if (k == hashes && j < body.size() && body[j] == '(')
+        ++count;
+      i = j - 1;
+    }
+    return count;
   }
 
   Rewrite rewrite(const LanguageEnum language, const TSNode node, const std::string_view src, const std::string_view body, const EscapeRules &rules, StringScratch &scratch) {
@@ -502,10 +528,20 @@ namespace {
     const bool matchertext = RawRewrite::MatchertextHolds(counter.Content());
     if (!matchertext)
       converted = static_cast<uint64_t>(std::ranges::count(body, '\\'));
-    if (!counter.Holdable())
-      return rawForms(language, {converted, false, false}, counter.Content(), false);
-    return rawForms(language, {converted, RawRewrite::DefaultRawHolds(language, counter.Content(), quoteRun), matchertext},
-                    counter.Content(), true);
+    Rewrite out = counter.Holdable()
+      ? Rewrite{converted, RawRewrite::DefaultRawHolds(language, counter.Content(), quoteRun), matchertext}
+      : Rewrite{converted, false, false};
+    out.kept = counter.KeptToothpicks();
+    out.notMatchertext = !matchertext;
+    /// A Swift interpolation \(name), \#(name) in #"..."#, is literal text to the
+    /// rewrite; its backslash is not that of an already raw literal.
+    if (rules.source == EscapeSource::Swift) {
+      const uint64_t opened = swiftInterpolations(body, context.hashes == std::string_view::npos ? 0 : context.hashes);
+      const uint64_t moved = std::min(opened, out.kept.raw);
+      out.kept.raw -= moved;
+      out.kept.interpolation += moved;
+    }
+    return rawForms(language, out, counter.Content(), counter.Holdable());
   }
 
   // Body text of the spans: a view into `src` for one span, else concatenated.
@@ -552,7 +588,16 @@ namespace {
             {"rawFormViolations", Serde::JSON(static_cast<double>(r.rawFormViolations))},
             {"rawFormsHolding", Serde::JSON(static_cast<double>(r.rawFormsHolding))},
             {"ownRawForm", Serde::JSON(r.ownRawForm ? 1.0 : 0.0)},
-            {"control", Serde::JSON(r.control ? 1.0 : 0.0)}
+            {"control", Serde::JSON(r.control ? 1.0 : 0.0)},
+            {"keptRaw", Serde::JSON(static_cast<double>(r.kept.raw))},
+            {"keptUnknownEscape", Serde::JSON(static_cast<double>(r.kept.unknownEscape))},
+            {"keptInterpolation", Serde::JSON(static_cast<double>(r.kept.interpolation))},
+            {"keptBackslash", Serde::JSON(static_cast<double>(r.kept.backslash))},
+            {"keptUnwritable", Serde::JSON(static_cast<double>(r.kept.unwritable))},
+            {"keptControl", Serde::JSON(static_cast<double>(r.kept.control))},
+            {"notMatchertext", Serde::JSON(r.notMatchertext ? 1.0 : 0.0)},
+            {"begin", Serde::JSON(static_cast<double>(ts_node_start_byte(node)))},
+            {"end", Serde::JSON(static_cast<double>(ts_node_end_byte(node)))}
           }));
           continue;
         }

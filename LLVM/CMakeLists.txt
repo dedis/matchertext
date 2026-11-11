@@ -133,6 +133,10 @@ add_test(NAME parser_fixture_whole_file_fragments_only
     COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/whole_file_fragments_only.cpp)
 add_test(NAME parser_fixture_whole_file_whole_only
     COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/whole_file_whole_only.cpp)
+add_test(NAME parser_fixture_kept_causes
+    COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/kept_causes.cpp)
+add_test(NAME parser_fixture_fragment_free
+    COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/fragment_free.cpp)
 
 add_executable(DebugLanguageOutputTests
     tests/debug_language_output_test.cpp

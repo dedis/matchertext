@@ -299,7 +299,7 @@ namespace RawRewrite {
         push(static_cast<uint8_t>(controlCode(c)), id);
       else if (dialect.unknownKeepsBackslash && c != '\\' && c != '"' && c != '\'' && c != '$')
         for (const char r: text) // an unknown escape is kept as written, backslash included
-          push(static_cast<uint8_t>(r), kLiteral);
+          push(static_cast<uint8_t>(r), kKeptEscape);
       else
         for (const char r: rest) // identity escape: decodes to the escaped character itself
           push(static_cast<uint8_t>(r), id);
@@ -312,7 +312,7 @@ namespace RawRewrite {
   uint64_t Counter::Count() {
     flushPending();
     content.clear();
-    uint64_t literalBackslashes = 0;
+    kept = {};
     for (size_t i = 0; i < bytes.size();) {
       uint32_t cp = 0;
       const size_t len = decodeUtf8(bytes, i, cp);
@@ -324,7 +324,9 @@ namespace RawRewrite {
         continue;
       }
       if (id == kLiteral)
-        literalBackslashes += cp == kBackslash;
+        kept.raw += cp == kBackslash;
+      else if (id == kKeptEscape)
+        kept.unknownEscape += cp == kBackslash;
       else if (cp == kBackslash) {
         if (survives[static_cast<size_t>(id)] == 0)
           survives[static_cast<size_t>(id)] = 2;
@@ -333,7 +335,15 @@ namespace RawRewrite {
       content.append(bytes, i, len);
       i += len;
     }
-    return literalBackslashes + static_cast<uint64_t>(survives.size() - static_cast<size_t>(std::ranges::count(survives, 0)));
+    for (const uint8_t code: survives) {
+      if (code == 1)
+        kept.unwritable++;
+      else if (code == 2)
+        kept.backslash++;
+      else if (code == 3)
+        kept.control++;
+    }
+    return kept.Total();
   }
 
   bool Counter::Holdable() const {

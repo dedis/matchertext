@@ -31,6 +31,8 @@ namespace {
     /// Expected rawHolds and mHolds flags; nullopt skips the check.
     std::optional<bool> raw = std::nullopt;
     std::optional<bool> m = std::nullopt;
+    /// Expected toothpicks kept because they open an interpolation; nullopt skips the check.
+    std::optional<uint64_t> interpolation = std::nullopt;
   };
 
   struct Case {
@@ -161,7 +163,9 @@ let b = #"r\n"#
 let c = #"a\#nb"#
 let d = "\0\u{1F600}"
 let e = "\u{5C}\u{7F}"
-)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = std::nullopt, .converted = 1}, {.value = std::nullopt, .converted = 0}, {.value = R"(\0\u{1F600})", .converted = 1}, {.value = R"(\u{5C}\u{7F})", .converted = 2}}},
+let f = "hi \(name)!"
+let g = #"x \#(n) \d"#
+)src", {{.value = R"(ab\\d\n)", .converted = 1}, {.value = std::nullopt, .converted = 1}, {.value = std::nullopt, .converted = 0}, {.value = R"(\0\u{1F600})", .converted = 1}, {.value = R"(\u{5C}\u{7F})", .converted = 2, .interpolation = 0}, {.value = std::nullopt, .converted = 1, .interpolation = 1}, {.value = std::nullopt, .converted = 2, .interpolation = 1}}},
 
       {LanguageEnum::Kotlin, "kt", R"src(
 val a = "ab\\d\n"
@@ -315,12 +319,14 @@ string t = "\x00\134";
       const auto converted = static_cast<uint64_t>(e["convertedToothpicks"].GetNumber());
       const bool raw = e["rawHolds"].GetNumber() != 0.0;
       const bool m = e["mHolds"].GetNumber() != 0.0;
+      const auto interpolation = static_cast<uint64_t>(e["keptInterpolation"].GetNumber());
       if (strings >= c.strings.size()) {
         std::cerr << name << ": unexpected string <" << value << ">\n";
         ok = false;
       } else if (const Sample &want = c.strings[strings];
                  (want.value && value != *want.value) || converted != want.converted ||
-                 (want.raw && raw != *want.raw) || (want.m && m != *want.m)) {
+                 (want.raw && raw != *want.raw) || (want.m && m != *want.m) ||
+                 (want.interpolation && interpolation != *want.interpolation)) {
         std::cerr << name << ": string " << strings << " <" << value << "> converted=" << converted << " raw=" << raw << " m=" << m
                   << ", expected <" << want.value.value_or("(any)") << "> converted=" << want.converted
                   << " raw=" << (want.raw ? std::to_string(*want.raw) : "(any)")
