@@ -103,7 +103,7 @@ int main() {
     },
     {
       "sql_leader_without_secondary_keyword", "SELECT id",
-      LanguageEnum::Unknown
+      LanguageEnum::PlainText
     },
     {
       "escaped_json", "{\\\"items\\\": [\\\"one\\\", \\\"two\\\"], \\\"count\\\": 2}",
@@ -200,9 +200,9 @@ int main() {
       LanguageEnum::FormatString
     },
     {
-      "xml_false_positive_single_colon_placeholder",
+      "angle_placeholder_xml",
       "<decode:run>",
-      LanguageEnum::Unknown
+      LanguageEnum::XML
     },
     {"css", ".hero { color: red; margin: 0; padding: 4px; }", LanguageEnum::CSS},
     {"regex", "^(?:foo|bar)\\d{2,4}$", LanguageEnum::Regex},
@@ -242,12 +242,12 @@ int main() {
     {
       "resource_identifier",
       "metrics/ui.startup/FirstContentfulPaint",
-      LanguageEnum::Unknown
+      LanguageEnum::IdentifierLike
     },
     {
       "slash_identifier_without_extension",
       "foo/bar/baz",
-      LanguageEnum::Unknown
+      LanguageEnum::IdentifierLike
     },
     {
       "plain_text", "This function returns the current device state.",
@@ -367,16 +367,16 @@ int main() {
       LanguageEnum::Unknown, 0.99f
     },
     {
-      "separator_stars_unknown", "**************************************\\n",
-      LanguageEnum::Unknown
+      "separator_stars_punctuation", "**************************************\\n",
+      LanguageEnum::Punctuation
     },
     {
-      "separator_dashes_unknown", "--------------------------------------------\\n",
-      LanguageEnum::Unknown
+      "separator_dashes_punctuation", "--------------------------------------------\\n",
+      LanguageEnum::Punctuation
     },
     {
-      "separator_equals_unknown", "==========",
-      LanguageEnum::Unknown
+      "separator_equals_punctuation", "==========",
+      LanguageEnum::Punctuation
     },
     {
       "separator_short_alpha_islands_unknown",
@@ -384,9 +384,9 @@ int main() {
       LanguageEnum::Unknown
     },
     {
-      "repeated_digits_unknown",
+      "repeated_digits_number",
       "111111111111111",
-      LanguageEnum::Unknown
+      LanguageEnum::Number
     },
     {
       "repeated_letters_unknown",
@@ -394,7 +394,81 @@ int main() {
       LanguageEnum::Unknown
     },
     {"codeish_unknown", "foo::bar->baz", LanguageEnum::Unknown},
-    {"unknown_short", "ok", LanguageEnum::Unknown},
+    {"short_word", "ok", LanguageEnum::PlainText},
+    {"empty_string", "", LanguageEnum::Empty},
+    {"single_character", "x", LanguageEnum::SingleCharacter},
+    {"single_escaped_character", "\\\"", LanguageEnum::SingleCharacter},
+    {"whitespace_only", "   ", LanguageEnum::Punctuation},
+    {"newline_escape_only", "\\n", LanguageEnum::Punctuation},
+    {"punctuation_only", ") + (", LanguageEnum::Punctuation},
+    {"integer_number", "32769", LanguageEnum::Number},
+    {"signed_number", "-1", LanguageEnum::Number},
+    {"unit_number", "1.25rem", LanguageEnum::Number},
+    {"ipv4_cidr_number", "10.0.2.0/24", LanguageEnum::Number},
+    {"ipv4_port_number", "127.0.0.1:5672", LanguageEnum::Number},
+    {"ipv6_number", "2001:db8::1", LanguageEnum::Number},
+    {"date_number", "2021-07-01", LanguageEnum::Number},
+    {"datetime_number", "2022-05-16 08:16:53", LanguageEnum::Number},
+    {"numeric_list_number", "123,456;789.0", LanguageEnum::Number},
+    {"hex_number", "0xFFFF", LanguageEnum::HexData},
+    {"unicode_escaped_text", "\\u4e2d\\u592e\\u590f\\u4ee4\\u65f6", LanguageEnum::PlainText},
+    {"escaped_controls_plain", "\\u0000\\u0000\\u0000", LanguageEnum::PlainText},
+    {"single_unicode_escape", "\\u2014", LanguageEnum::SingleCharacter},
+    {"call_identifier", "getFilePath()", LanguageEnum::IdentifierLike},
+    {"signature_identifier", "load(String)", LanguageEnum::IdentifierLike},
+    {"npm_package_identifier", "@azure/identity", LanguageEnum::IdentifierLike},
+    {"sigil_identifier", "$injector", LanguageEnum::IdentifierLike},
+    {"jvm_descriptor_identifier", "(ILjava/lang/String;)V", LanguageEnum::IdentifierLike},
+    {"name_list_identifier", "top,middle,bottom", LanguageEnum::IdentifierLike},
+    {"digit_token_identifier", "x86_64", LanguageEnum::IdentifierLike},
+    {"long_flag_shell", "--diff-filter=ACMRT", LanguageEnum::Shell},
+    {"short_flag_shell", "-Xlog:vtables=debug", LanguageEnum::Shell},
+    {"html_entity", "&laquo;", LanguageEnum::HTML},
+    {"xml_closing_tag", "</object>", LanguageEnum::XML},
+    {"angle_placeholder", "<subscription-id>", LanguageEnum::XML},
+    {"scheme_stub_url", "https://", LanguageEnum::URL},
+    {"go_struct_tag", "json:\"name,omitempty\" yaml:\"name\"", LanguageEnum::Go},
+    {"css_pseudo_class", ":not(h1)", LanguageEnum::CSS},
+    {"css_attribute_selector", "[data-toggle=\"collapse\"]", LanguageEnum::CSS},
+    {"css_function", "translateX(", LanguageEnum::CSS},
+    {"css_selector_list", ".widget-title h3", LanguageEnum::CSS},
+    {"css_vendor_property", "-webkit-border-radius", LanguageEnum::CSS},
+    {"log_prefix_not_css", "[ERROR] the run failed", LanguageEnum::PlainText},
+    {"c_directive", "#pragma", LanguageEnum::C},
+    {"guid_not_placeholder", "{57DC5D59-11C2-4955-A7B4-D7699D677E93}", LanguageEnum::Unknown},
+    {"hyphen_placeholder", "deploying to {backend-id}", LanguageEnum::FormatString},
+    {"go_method_expression_identifier", "(*UnixConn).CloseRead", LanguageEnum::IdentifierLike},
+    {"empty_block_not_placeholder", "pub fn foo() {}", LanguageEnum::Rust},
+    {"code_statement_not_identifier", "console.log(1);", LanguageEnum::TypeScript},
+    {"padded_pipe_not_single_character", " | ", LanguageEnum::Shell},
+    {"bare_word", "focused", LanguageEnum::PlainText},
+    {"bare_word_with_colon", "Error:", LanguageEnum::PlainText},
+    {"bare_word_cyrillic", "Привет", LanguageEnum::PlainText},
+    {"snake_identifier", "UNINTENDED_PURCHASE", LanguageEnum::IdentifierLike},
+    {"kebab_identifier", "aria-expanded", LanguageEnum::IdentifierLike},
+    {"camel_identifier", "repositoryPublicKey", LanguageEnum::IdentifierLike},
+    {"package_path_identifier", "k8s.io/utils/ptr", LanguageEnum::IdentifierLike},
+    {"mangled_symbol_identifier", "_ZN4llvm10AllocaInstC1Ev", LanguageEnum::IdentifierLike},
+    {"scope_identifier", "internal::", LanguageEnum::IdentifierLike},
+    {"bare_file_name", "driver_config.yml", LanguageEnum::FilePath},
+    {"dimension_number", "50px", LanguageEnum::Number},
+    {"version_number", "2.4.1", LanguageEnum::Number},
+    {"base64_blob_unknown", "MIIDQjCCAiqgAwIBAgIEW8i6BzANBgkqhkiG9w0B", LanguageEnum::Unknown},
+    {"hex_color_css", "#e9c7cd", LanguageEnum::CSS},
+    {"short_phrase", "TEST PASSED", LanguageEnum::PlainText},
+    {"short_phrase_with_number", "300 values", LanguageEnum::PlainText},
+    {"class_list_unknown", "grid gap-2", LanguageEnum::Unknown},
+    {"cyrillic_sentence", "Привет мир, как дела сегодня?", LanguageEnum::PlainText},
+    {
+      "docstring_quoting_code",
+      "Close the client and release its pool. Use ``client.close()`` when you are done with all of the requests.",
+      LanguageEnum::PlainText
+    },
+    {"go_format_verb", "failed to create client: %v", LanguageEnum::FormatString},
+    {"rust_format_placeholder", "Terminating execution of shard {}.", LanguageEnum::FormatString},
+    {"rust_debug_placeholder", "unknown label {:?}", LanguageEnum::FormatString},
+    {"swift_interpolation", "Hello \\(name)!", LanguageEnum::FormatString},
+    {"double_brace_template", "{{ month }} {{ day }}", LanguageEnum::FormatString},
     // --- Email: practical valid cases ---
     {"email_plus_tag", "user+tag@example.com", LanguageEnum::Email},
     {"email_dots_local", "first.last@example.com", LanguageEnum::Email},
@@ -421,9 +495,9 @@ int main() {
     {"email_numeric_domain_label_invalid", "user@server1", LanguageEnum::Unknown},
     {"email_numeric_tld_invalid", "user@example.123", LanguageEnum::Unknown},
     {"email_mixed_tld_invalid", "user@example.c0m", LanguageEnum::Unknown},
-    {"email_missing_at", "userexample.com", LanguageEnum::Unknown},
+    {"email_missing_at", "userexample.com", LanguageEnum::IdentifierLike},
     {"email_multiple_at", "user@@example.com", LanguageEnum::Unknown},
-    {"email_empty_local", "@example.com", LanguageEnum::Unknown},
+    {"email_empty_local", "@example.com", LanguageEnum::IdentifierLike},
     {"email_empty_domain", "user@", LanguageEnum::Unknown},
     {"path_with_at_not_email", "/plb/opb/serial@ef600500", LanguageEnum::FilePath},
     {"display_mode_at_not_email", "1024x768-32@60", LanguageEnum::Unknown},

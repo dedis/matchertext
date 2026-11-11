@@ -1,5 +1,6 @@
 #include "../include/TreeSitterParser.hpp"
 
+#include <algorithm>
 #include <cctype>
 #include <chrono>
 #include <cstring>
@@ -11,6 +12,8 @@
 #include <vector>
 
 #include <tree_sitter/api.h>
+
+#include "../include/RawRewrite.hpp"
 
 // Each grammar's language function lives in its vendored parser.c.
 extern "C" {
@@ -113,6 +116,51 @@ namespace {
     return it == table.end() ? kEmpty : it->second;
   }
 
+  // ---- escape rules ---------------------------------------------------------
+  // Where a grammar puts escape sequences: as nodes, or inside one text token that
+  // a lexer must split. Ruby single-quoted and Swift extended-delimiter strings
+  // have no escape nodes but still contain escapes. The Perl grammar marks only the
+  // first two characters of an escape (\x of \xe9).
+  enum class EscapeSource : uint8_t { Nodes, Kotlin, Erlang, Haskell, Perl, Ruby, Swift };
+
+  struct EscapeRules {
+    RawRewrite::Dialect dialect;
+    EscapeSource source = EscapeSource::Nodes;
+  };
+
+  const EscapeRules &escapeRulesFor(const LanguageEnum lang) {
+    static const std::unordered_map<LanguageEnum, EscapeRules> table = [] {
+      std::unordered_map<LanguageEnum, EscapeRules> m;
+      using enum RawRewrite::Dialect::Digits;
+      const RawRewrite::Dialect c{.controls = "abefnrtv", .byteEscapes = true};
+      m[LanguageEnum::JavaScript] = {{.controls = "bfnrtv"}};
+      m[LanguageEnum::TypeScript] = {{.controls = "bfnrtv"}};
+      m[LanguageEnum::Java] = {{.controls = "bfnrt"}};
+      m[LanguageEnum::CSharp] = {{.controls = "abefnrtv"}};
+      m[LanguageEnum::Rust] = {{.controls = "nrt"}};
+      m[LanguageEnum::Ruby] = {{.controls = "abefnrtv", .controlLetters = true, .byteEscapes = true}, EscapeSource::Ruby};
+      m[LanguageEnum::PHP] = {{.controls = "efnrtv", .unknownKeepsBackslash = true, .byteEscapes = true}};
+      m[LanguageEnum::Perl] = {{.controls = "abefnrt", .controlLetters = true, .byteEscapes = true}, EscapeSource::Perl};
+      m[LanguageEnum::Lua] = {{.controls = "abfnrtv", .empty = "z", .digits = Decimal, .byteEscapes = true}};
+      m[LanguageEnum::Swift] = {{.controls = "nrt"}, EscapeSource::Swift};
+      m[LanguageEnum::Kotlin] = {{.controls = "bnrt"}, EscapeSource::Kotlin};
+      m[LanguageEnum::R] = {{.controls = "abfnrtv", .byteEscapes = true}};
+      m[LanguageEnum::Scala] = {{.controls = "bfnrt"}};
+      m[LanguageEnum::Haskell] = {{.controls = "abfnrtv", .empty = "&", .digits = Decimal}, EscapeSource::Haskell};
+      m[LanguageEnum::OCaml] = {{.controls = "bnrt", .digits = Decimal, .unknownKeepsBackslash = true, .byteEscapes = true}};
+      m[LanguageEnum::Erlang] = {{.controls = "bdefnrtv"}, EscapeSource::Erlang};
+      m[LanguageEnum::Elixir] = {{.controls = "abdefnrtv", .byteEscapes = true}};
+      m[LanguageEnum::Dart] = {{.controls = "bfnrtv", .digits = None}};
+      m[LanguageEnum::Objective_C] = {c};
+      m[LanguageEnum::GLSL] = {c};
+      m[LanguageEnum::HLSL] = {c};
+      m[LanguageEnum::Go] = {{.controls = "abfnrtv", .byteEscapes = true}};
+      m[LanguageEnum::Python] = {{.controls = "abfnrtv"}};
+      return m;
+    }();
+    return table.at(lang);
+  }
+
   // ---- text helpers --------------------------------------------------------
   // A node's source bytes as a view into `src` (no copy).
   std::string_view nodeText(const TSNode node, const std::string_view src) {
@@ -150,35 +198,360 @@ namespace {
     return s.substr(bodyStart, bodyEnd - bodyStart);
   }
 
-  // Body of a string node, returned as a view. Prefer content/fragment children
-  // (delimiters and interpolation markers excluded for free); otherwise strip
-  // delimiters off the whole node. The rare multi-child case concatenates into
-  // `scratch` (reused across nodes) and returns a view into it.
-  std::string_view stringBody(const TSNode node, const std::string_view src, std::string &scratch) {
+  // Source byte range [start, end).
+  struct Span {
+    uint32_t start, end;
+  };
+
+  bool isContent(const char *type) {
+    return std::strstr(type, "content") || std::strstr(type, "fragment");
+  }
+
+  // Escape nodes across the vendored grammars; a text check skips Python's `{{`.
+  bool isEscape(const TSNode node, const std::string_view src) {
+    const std::string_view t(ts_node_type(node));
+    return (t == "escape_sequence" || t == "str_escaped_char" || t == "character_escape_seq") &&
+           nodeText(node, src).starts_with('\\');
+  }
+
+  Span spanOf(const TSNode node) {
+    return {ts_node_start_byte(node), ts_node_end_byte(node)};
+  }
+
+  // Body of a string node as source spans in order. Content/fragment children
+  // exclude delimiters and interpolations; escape and ERROR nodes beside them
+  // belong to the body too. Without content children, the body is the node text without its
+  // delimiters.
+  void bodySpans(const TSNode node, const std::string_view src, std::vector<Span> &spans) {
+    spans.clear();
     const uint32_t n = ts_node_named_child_count(node);
-    int firstContent = -1;
-    int contentCount = 0;
-    for (uint32_t i = 0; i < n; ++i) {
-      const char *t = ts_node_type(ts_node_named_child(node, i));
-      if (std::strstr(t, "content") || std::strstr(t, "fragment")) {
-        if (firstContent < 0)
-          firstContent = static_cast<int>(i);
-        ++contentCount;
-      }
-    }
-    if (contentCount == 1)
-      return nodeText(ts_node_named_child(node, static_cast<uint32_t>(firstContent)), src);
-    if (contentCount > 1) {
-      scratch.clear();
+    bool content = false;
+    for (uint32_t i = 0; i < n && !content; ++i)
+      content = isContent(ts_node_type(ts_node_named_child(node, i)));
+    if (content) {
       for (uint32_t i = 0; i < n; ++i) {
         const TSNode c = ts_node_named_child(node, i);
-        const char *t = ts_node_type(c);
-        if (std::strstr(t, "content") || std::strstr(t, "fragment"))
-          scratch.append(nodeText(c, src));
+        // ERROR children hold text the grammar rejects, such as OCaml's \d.
+        if (isContent(ts_node_type(c)) || isEscape(c, src) || ts_node_is_error(c))
+          spans.push_back(spanOf(c));
       }
-      return scratch;
+      return;
     }
-    return stripDelimiters(nodeText(node, src));
+    const std::string_view text = stripDelimiters(nodeText(node, src));
+    const auto start = static_cast<uint32_t>(text.data() - src.data());
+    spans.push_back({start, start + static_cast<uint32_t>(text.size())});
+  }
+
+  // Escape nodes of a string node's subtree, in source order.
+  void escapeSpans(const TSNode node, const std::string_view src, std::vector<TSNode> &stack, std::vector<Span> &escapes) {
+    escapes.clear();
+    stack.assign(1, node);
+    while (!stack.empty()) {
+      const TSNode n = stack.back();
+      stack.pop_back();
+      if (isEscape(n, src)) {
+        escapes.push_back(spanOf(n));
+        continue;
+      }
+      for (uint32_t i = ts_node_child_count(n); i-- > 0;)
+        stack.push_back(ts_node_child(n, i));
+    }
+  }
+
+  bool isHex(const char c) { return std::isxdigit(static_cast<unsigned char>(c)) != 0; }
+
+  // Length of the escape that starts with the backslash at text[i], for grammars
+  // that keep escapes inside a text token. 0 means the backslash is literal.
+  // Lexer context: the delimiters a single-quoted Ruby or Perl form escapes (empty for
+  // a Perl double-quoted form), and the # count of a Swift extended-delimiter string.
+  struct LexContext {
+    std::string_view delimiters;
+    size_t hashes = 0;
+  };
+
+  size_t escapeLength(const EscapeSource source, const std::string_view text, const size_t i, const LexContext &context) {
+    const size_t n = text.size();
+    size_t j = i + 1;
+    switch (source) {
+      case EscapeSource::Ruby: // '...' and %q(...): only \\ and an escaped delimiter
+        return j < n && (text[j] == '\\' || context.delimiters.find(text[j]) != std::string_view::npos) ? 2 : 0;
+      case EscapeSource::Perl: {
+        if (!context.delimiters.empty()) // '...' and q(...): only \\ and an escaped delimiter
+          return j < n && (text[j] == '\\' || context.delimiters.find(text[j]) != std::string_view::npos) ? 2 : 0;
+        if (j >= n)
+          return 1;
+        const char c = text[j];
+        if ((c == 'x' || c == 'o' || c == 'N') && j + 1 < n && text[j + 1] == '{') {
+          const size_t close = text.find('}', j);
+          return close == std::string_view::npos ? 2 : close + 1 - i;
+        }
+        size_t k = j + 1;
+        if (c == 'x') {
+          while (k < n && k < j + 3 && isHex(text[k]))
+            ++k;
+          return k - i;
+        }
+        if (c >= '0' && c <= '7') {
+          while (k < n && k < j + 3 && text[k] >= '0' && text[k] <= '7')
+            ++k;
+          return k - i;
+        }
+        if (c == 'c')
+          return j + 1 < n ? 3 : 2;
+        return 2;
+      }
+      case EscapeSource::Swift: // extended delimiters: \#n is an escape in #"..."#
+        for (size_t k = 0; k < context.hashes; ++k, ++j)
+          if (j >= n || text[j] != '#')
+            return 0;
+        if (j >= n || text[j] == '(')
+          return 0; // interpolation, not an escape
+        if (text[j] == 'u' && j + 1 < n && text[j + 1] == '{') {
+          const size_t close = text.find('}', j);
+          return close == std::string_view::npos ? 0 : close + 1 - i;
+        }
+        return j + 1 - i;
+      case EscapeSource::Kotlin:
+        if (j + 4 < n && text[j] == 'u' && isHex(text[j + 1]) && isHex(text[j + 2]) && isHex(text[j + 3]) && isHex(text[j + 4]))
+          return 6;
+        return j < n ? 2 : 1;
+      case EscapeSource::Erlang:
+        if (j >= n)
+          return 1;
+        if (text[j] == '^')
+          return j + 1 < n ? 3 : 2;
+        if (text[j] == 'x') {
+          if (j + 1 < n && text[j + 1] == '{') {
+            const size_t close = text.find('}', j);
+            return close == std::string_view::npos ? 2 : close + 1 - i;
+          }
+          size_t k = j + 1;
+          while (k < n && k < j + 3 && isHex(text[k]))
+            ++k;
+          return k - i;
+        }
+        if (text[j] >= '0' && text[j] <= '7') {
+          size_t k = j;
+          while (k < n && k < j + 3 && text[k] >= '0' && text[k] <= '7')
+            ++k;
+          return k - i;
+        }
+        return 2;
+      case EscapeSource::Haskell: {
+        if (j >= n)
+          return 1;
+        const char c = text[j];
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') { // string gap, up to the closing backslash
+          const size_t close = text.find('\\', j);
+          return close == std::string_view::npos ? n - i : close + 1 - i;
+        }
+        if (c == '^')
+          return j + 1 < n ? 3 : 2;
+        size_t k = j;
+        if (c >= '0' && c <= '9') {
+          while (k < n && text[k] >= '0' && text[k] <= '9')
+            ++k;
+          return k - i;
+        }
+        if ((c == 'o' || c == 'x') && j + 1 < n) {
+          k = j + 1;
+          while (k < n && (c == 'x' ? isHex(text[k]) : text[k] >= '0' && text[k] <= '7'))
+            ++k;
+          return k > j + 1 ? k - i : 2;
+        }
+        // ASCII control names, longest match first (SOH before SO).
+        for (const size_t len: {size_t{3}, size_t{2}})
+          if (j + len <= n)
+            for (const std::string_view name: {"NUL", "SOH", "STX", "ETX", "EOT", "ENQ", "ACK", "BEL", "BS", "HT", "LF",
+                                               "VT", "FF", "CR", "SO", "SI", "DLE", "DC1", "DC2", "DC3", "DC4", "NAK",
+                                               "SYN", "ETB", "CAN", "EM", "SUB", "ESC", "FS", "GS", "RS", "US", "SP", "DEL"})
+              if (name.size() == len && text.substr(j, len) == name)
+                return 1 + len;
+        return 2;
+      }
+      case EscapeSource::Nodes:
+        break;
+    }
+    return 0;
+  }
+
+  // The delimiters of a quote-like form whose opening delimiter starts `text`
+  // (Ruby %q, Perl q): a bracket pair, or the character itself.
+  std::string_view quoteDelimiters(const std::string_view text) {
+    constexpr std::string_view pairs = "()[]{}<>";
+    const size_t p = pairs.find(text[0]);
+    return p == std::string_view::npos ? text.substr(0, 1) : pairs.substr(p - p % 2, 2);
+  }
+
+  // Splits `text` into literal runs and escapes for grammars without escape nodes.
+  void lexEscapes(const EscapeSource source, const std::string_view text, const LexContext &context, RawRewrite::Counter &counter, std::string &escape) {
+    size_t literal = 0;
+    for (size_t i = 0; i < text.size();) {
+      const size_t len = text[i] == '\\' ? escapeLength(source, text, i, context) : 0;
+      if (len == 0) {
+        ++i;
+        continue;
+      }
+      counter.Literal(text.substr(literal, i - literal));
+      if (source == EscapeSource::Swift) { // drop the #s: \#n decodes like \n
+        escape.assign(1, '\\');
+        escape.append(text.substr(i + 1 + context.hashes, len - 1 - context.hashes));
+        counter.Escape(escape);
+      } else
+        counter.Escape(text.substr(i, len));
+      i = literal = i + len;
+    }
+    counter.Literal(text.substr(literal));
+  }
+
+  // Per-walk buffers, reused across string nodes.
+  struct StringScratch {
+    std::vector<Span> spans;
+    std::vector<Span> escapes;
+    std::vector<TSNode> stack;
+    std::string body;
+    std::string escape;
+    RawRewrite::Counter counter;
+  };
+
+  // Outcome of rewriting one string as a raw literal (see RawRewrite.hpp).
+  struct Rewrite {
+    uint64_t converted = 0;
+    /// The language's default raw form holds the rewritten content verbatim.
+    bool rawHolds = false;
+    /// A matchertext literal M"(...)" holds the rewritten content verbatim.
+    bool mHolds = false;
+    /// RawRewrite::AllRawFormViolations and AllRawFormsHolding of the rewritten content.
+    uint64_t rawFormViolations = 0;
+    uint64_t rawFormsHolding = 0;
+    /// One of the language's own raw forms holds the rewritten content.
+    bool ownRawForm = false;
+    /// The rewritten content holds a control character other than tab, LF, and CR.
+    bool control = false;
+    /// The converted toothpicks, by cause, and whether the decoded content is not
+    /// matchertext, which keeps all of them.
+    RawRewrite::Kept kept;
+    bool notMatchertext = false;
+  };
+
+  // Native raw form outcome of a rewritten content.
+  Rewrite rawForms(const LanguageEnum language, Rewrite out, const std::string_view content, const bool encodable) {
+    out.rawFormViolations = RawRewrite::AllRawFormViolations(content);
+    out.rawFormsHolding = RawRewrite::AllRawFormsHolding(out.rawFormViolations, encodable);
+    out.ownRawForm = (out.rawFormsHolding & RawRewrite::OwnRawForms(language)) != 0;
+    out.control = RawRewrite::HasControl(content);
+    return out;
+  }
+
+  // Interpolations a Swift string body opens: \( in a plain string, where \\ is an
+  // escaped backslash, and \ then `hashes` #s then ( in an extended-delimiter one.
+  uint64_t swiftInterpolations(const std::string_view body, const size_t hashes) {
+    uint64_t count = 0;
+    for (size_t i = 0; i + 1 < body.size(); ++i) {
+      if (body[i] != '\\')
+        continue;
+      size_t j = i + 1;
+      if (hashes == 0 && body[j] != '(') {
+        ++i; // an escape: \\, \n, ...
+        continue;
+      }
+      size_t k = 0;
+      while (k < hashes && j < body.size() && body[j] == '#')
+        ++k, ++j;
+      if (k == hashes && j < body.size() && body[j] == '(')
+        ++count;
+      i = j - 1;
+    }
+    return count;
+  }
+
+  Rewrite rewrite(const LanguageEnum language, const TSNode node, const std::string_view src, const std::string_view body, const EscapeRules &rules, StringScratch &scratch) {
+    const std::string_view text = nodeText(node, src);
+    const size_t quote = text.find_first_of("\"'`");
+    // The opening quote run, for languages whose raw form keeps the quote style.
+    std::string_view quoteRun;
+    if (quote != std::string_view::npos)
+      quoteRun = text.substr(quote, text.substr(quote, 3) == std::string(3, text[quote]) ? 3 : 1);
+    if (body.find('\\') == std::string_view::npos)
+      return rawForms(language, {0, RawRewrite::DefaultRawHolds(language, body, quoteRun), RawRewrite::MatchertextHolds(body)}, body, true);
+
+    RawRewrite::Counter &counter = scratch.counter;
+    counter.Reset(rules.dialect);
+
+    EscapeSource source = rules.source;
+    LexContext context;
+    if (source == EscapeSource::Ruby) {
+      if (text.starts_with('\''))
+        context.delimiters = "'";
+      else if (text.starts_with("%q") && text.size() > 2)
+        context.delimiters = quoteDelimiters(text.substr(2));
+      else
+        source = EscapeSource::Nodes;
+    } else if (source == EscapeSource::Perl && std::string_view(ts_node_type(node)) == "string_literal") {
+      // '...' or q(...); double-quoted forms are interpolated_string_literal.
+      context.delimiters = text.starts_with('q') && text.size() > 1 ? quoteDelimiters(text.substr(1)) : "'";
+    } else if (source == EscapeSource::Swift) {
+      context.hashes = text.find_first_not_of('#');
+      if (context.hashes == 0 || context.hashes == std::string_view::npos)
+        source = EscapeSource::Nodes;
+    }
+    // Verbatim forms: Kotlin """...""", Erlang triple-quoted strings and sigils, ~B, ~S.
+    const bool verbatim =
+        (source == EscapeSource::Kotlin && text.starts_with("\"\"\"")) ||
+        (source == EscapeSource::Erlang &&
+         (text.starts_with("\"\"\"") ||
+          (text.starts_with('~') && text.size() > 1 &&
+           (std::isupper(static_cast<unsigned char>(text[1])) || text.substr(1).starts_with("\"\"\"")))));
+
+    if (source == EscapeSource::Nodes) {
+      escapeSpans(node, src, scratch.stack, scratch.escapes);
+      size_t e = 0;
+      for (const auto [start, end]: scratch.spans) {
+        uint32_t at = start;
+        for (; e < scratch.escapes.size() && scratch.escapes[e].start < end; ++e) {
+          if (scratch.escapes[e].start < at)
+            continue;
+          counter.Literal(src.substr(at, scratch.escapes[e].start - at));
+          counter.Escape(src.substr(scratch.escapes[e].start, scratch.escapes[e].end - scratch.escapes[e].start));
+          at = scratch.escapes[e].end;
+        }
+        counter.Literal(src.substr(at, end - at));
+      }
+    } else if (verbatim)
+      counter.Literal(body);
+    else
+      for (const auto [start, end]: scratch.spans)
+        lexEscapes(source, src.substr(start, end - start), context, counter, scratch.escape);
+    uint64_t converted = counter.Count();
+    // Decoding can create matchers (\x5B is '['). A literal whose decoded content
+    // is not matchertext cannot be rewritten and keeps all its toothpicks.
+    const bool matchertext = RawRewrite::MatchertextHolds(counter.Content());
+    if (!matchertext)
+      converted = static_cast<uint64_t>(std::ranges::count(body, '\\'));
+    Rewrite out = counter.Holdable()
+      ? Rewrite{converted, RawRewrite::DefaultRawHolds(language, counter.Content(), quoteRun), matchertext}
+      : Rewrite{converted, false, false};
+    out.kept = counter.KeptToothpicks();
+    out.notMatchertext = !matchertext;
+    /// A Swift interpolation \(name), \#(name) in #"..."#, is literal text to the
+    /// rewrite; its backslash is not that of an already raw literal.
+    if (rules.source == EscapeSource::Swift) {
+      const uint64_t opened = swiftInterpolations(body, context.hashes == std::string_view::npos ? 0 : context.hashes);
+      const uint64_t moved = std::min(opened, out.kept.raw);
+      out.kept.raw -= moved;
+      out.kept.interpolation += moved;
+    }
+    return rawForms(language, out, counter.Content(), counter.Holdable());
+  }
+
+  // Body text of the spans: a view into `src` for one span, else concatenated.
+  std::string_view bodyText(const std::string_view src, const std::vector<Span> &spans, std::string &out) {
+    if (spans.size() == 1)
+      return src.substr(spans[0].start, spans[0].end - spans[0].start);
+    out.clear();
+    for (const auto [start, end]: spans)
+      out.append(src.substr(start, end - start));
+    return out;
   }
 
   Serde::JSON makeObj(const char *kind, const std::string_view value) {
@@ -189,21 +562,45 @@ namespace {
   // Iterative (explicit stack) to avoid recursion-depth blowups on deep trees.
   // String/comment nodes are emitted whole and not descended into; ERROR nodes
   // are descended through so well-formed descendants are still collected.
-  void walk(const TSNode root, const std::string_view src, const Classifier &cls, Serde::JSON &out) {
+  void walk(const LanguageEnum language, const TSNode root, const std::string_view src, const Classifier &cls, const EscapeRules &rules, Serde::JSON &out) {
     std::vector<TSNode> stack;
-    std::string scratch; // reused buffer for multi-child string concatenation
+    StringScratch scratch; // reused across string nodes
     stack.push_back(root);
     while (!stack.empty()) {
       const TSNode node = stack.back();
       stack.pop_back();
 
-      switch (cls.classify(ts_node_type(node))) {
+      // Anonymous nodes are tokens such as the TypeScript `string` keyword.
+      switch (ts_node_is_named(node) ? cls.classify(ts_node_type(node)) : Kind::Other) {
         case Kind::Comment:
           out.PushBack(makeObj("comment", nodeText(node, src)));
           continue;
-        case Kind::String:
-          out.PushBack(makeObj("string", stringBody(node, src, scratch)));
+        case Kind::String: {
+          bodySpans(node, src, scratch.spans);
+          const std::string_view body = bodyText(src, scratch.spans, scratch.body);
+          const Rewrite r = rewrite(language, node, src, body, rules, scratch);
+          out.PushBack(Serde::JSON::Object({
+            {"kind", Serde::JSON("string")},
+            {"value", Serde::JSON(body)},
+            {"convertedToothpicks", Serde::JSON(static_cast<double>(r.converted))},
+            {"rawHolds", Serde::JSON(r.rawHolds ? 1.0 : 0.0)},
+            {"mHolds", Serde::JSON(r.mHolds ? 1.0 : 0.0)},
+            {"rawFormViolations", Serde::JSON(static_cast<double>(r.rawFormViolations))},
+            {"rawFormsHolding", Serde::JSON(static_cast<double>(r.rawFormsHolding))},
+            {"ownRawForm", Serde::JSON(r.ownRawForm ? 1.0 : 0.0)},
+            {"control", Serde::JSON(r.control ? 1.0 : 0.0)},
+            {"keptRaw", Serde::JSON(static_cast<double>(r.kept.raw))},
+            {"keptUnknownEscape", Serde::JSON(static_cast<double>(r.kept.unknownEscape))},
+            {"keptInterpolation", Serde::JSON(static_cast<double>(r.kept.interpolation))},
+            {"keptBackslash", Serde::JSON(static_cast<double>(r.kept.backslash))},
+            {"keptUnwritable", Serde::JSON(static_cast<double>(r.kept.unwritable))},
+            {"keptControl", Serde::JSON(static_cast<double>(r.kept.control))},
+            {"notMatchertext", Serde::JSON(r.notMatchertext ? 1.0 : 0.0)},
+            {"begin", Serde::JSON(static_cast<double>(ts_node_start_byte(node)))},
+            {"end", Serde::JSON(static_cast<double>(ts_node_end_byte(node)))}
+          }));
           continue;
+        }
         case Kind::Other:
           break;
       }
@@ -263,7 +660,13 @@ bool TreeSitter::IsTreeSitterLanguage(const LanguageEnum language) {
   return languageFor(language) != nullptr;
 }
 
-bool TreeSitter::Parse(const LanguageEnum language, const std::string &path, Serde::JSON &result) {
+bool TreeSitter::Parse(const LanguageEnum language, const std::string &path, Serde::JSON &result,
+                       SkipReason *skip) {
+  const auto skipped = [skip](const SkipReason reason) {
+    if (skip)
+      *skip = reason;
+    return false;
+  };
   const TSLanguage *tsLang = languageFor(language);
   if (!tsLang)
     return false;
@@ -281,7 +684,7 @@ bool TreeSitter::Parse(const LanguageEnum language, const std::string &path, Ser
 
   // Oversized file: skip before allocating/parsing to bound peak memory.
   if (size > kMaxFileBytes)
-    return true;
+    return skipped(SkipReason::Oversized);
 
   std::string src(static_cast<size_t>(size), '\0');
   in.seekg(0);
@@ -294,7 +697,7 @@ bool TreeSitter::Parse(const LanguageEnum language, const std::string &path, Ser
   // never contains one — and feeding binary to the GLR parser triggers
   // pathological error-recovery blowups the parse timeout can't always catch.
   if (std::memchr(src.data(), '\0', src.size()) != nullptr)
-    return true;
+    return skipped(SkipReason::Binary);
 
   thread_local ParserHolder holder;
   TSParser *parser = holder.get();
@@ -313,9 +716,9 @@ bool TreeSitter::Parse(const LanguageEnum language, const std::string &path, Ser
 
   TSTree *tree = ts_parser_parse_with_options(parser, nullptr, input, opts);
   if (!tree)
-    return true; // timed out or nothing parsed; empty array is valid
+    return skipped(SkipReason::Timeout); // the progress callback cancelled the parse
 
-  walk(ts_tree_root_node(tree), src, classifierFor(language), result);
+  walk(language, ts_tree_root_node(tree), src, classifierFor(language), escapeRulesFor(language), result);
   ts_tree_delete(tree);
   return true;
 }

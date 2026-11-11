@@ -25,7 +25,8 @@
 #   2. Clone them in parallel (bounded by JOBS). The instant a repo is on disk
 #      its tree is handed to `parser <repo>` in the background, so parsing
 #      overlaps with the next download. The org's special `.github` repo is
-#      never parsed.
+#      never parsed. A repo whose result/<repo path>/strings.md already exists
+#      is not parsed again.
 #   3. Once every clone and every per-repo parse has finished, run one more
 #      `parser` pass over the whole org folder, then delete that folder and
 #      move on to the next org.
@@ -258,27 +259,53 @@ export -f draw_bars
 # open read-write (fd 3) so enqueuing clones never block on a missing reader,
 # and stops on the `__DONE__` sentinel the org driver sends once cloning ends.
 parse_consumer() {
-  local repo
+  local repo out
   exec 3<>"${PARSE_FIFO}"
   while IFS= read -r repo <&3; do
     [ "${repo}" = "__DONE__" ] && break
-    [ -d "${repo}" ] && { "${PARSER}" "${repo}" >/dev/null 2>&1 || true; }
+    # Skip repos already parsed by an earlier run. The path rule matches the
+    # parser's default output: ./result/<relative path>, or
+    # ./result/<last component> for an absolute path.
+    case ${repo} in
+      /*) out="result/${repo##*/}" ;;
+      *)  out="result/${repo#./}" ;;
+    esac
+    [ -d "${repo}" ] && [ ! -f "${out}/strings.md" ] && { "${PARSER}" "${repo}" >/dev/null 2>&1 || true; }
     printf 'P\n' >> "${PARSE_LOG}"
   done
   exec 3<&-
 }
 
-# Tear down any live progress watcher / parse consumer on exit, even on error.
+# Tear down any live progress watcher, parse consumer, and parser on exit, even
+# on error or signal.
 CURRENT_WATCHER=""
 CURRENT_CONSUMER=""
 CURRENT_FIFO=""
+FINISHED=0
 cleanup() {
+  local rc=$?
   [ -n "${CURRENT_WATCHER}" ] && kill "${CURRENT_WATCHER}" 2>/dev/null
-  [ -n "${CURRENT_CONSUMER}" ] && kill "${CURRENT_CONSUMER}" 2>/dev/null
+  # The consumer's parser ignores SIGINT (it is a child of a background job)
+  # and is reparented when the consumer dies, so kill it explicitly. Stop the
+  # consumer first so that it cannot start another parser in between.
+  if [ -n "${CURRENT_CONSUMER}" ]; then
+    kill -STOP "${CURRENT_CONSUMER}" 2>/dev/null || true
+    pkill -P "${CURRENT_CONSUMER}" 2>/dev/null || true
+    kill -TERM "${CURRENT_CONSUMER}" 2>/dev/null || true
+    kill -CONT "${CURRENT_CONSUMER}" 2>/dev/null || true
+  fi
+  # The whole-org parser is a child of this shell. It keeps running when only
+  # this shell gets the signal (bash runs this trap without waiting for it).
+  pkill -x -P $$ "${PARSER##*/}" 2>/dev/null || true
   wait "${CURRENT_WATCHER}" 2>/dev/null || true
   wait "${CURRENT_CONSUMER}" 2>/dev/null || true
   [ -n "${CURRENT_FIFO}" ] && rm -f "${CURRENT_FIFO}"
   rm -f "${CLONE_LOG}" "${PARSE_LOG}" "${PARSE_QUEUE_LOG}"
+  # Keep the exit status: bash 3.2 exits with the status of the last command
+  # of this trap. It also leaves $? at 0 when set -u stops the script, so an
+  # exit before the end of the script is a failure even when rc is 0.
+  [ "${FINISHED}" = 1 ] || [ "${rc}" -ne 0 ] || rc=1
+  return "${rc}"
 }
 trap cleanup EXIT
 
@@ -317,9 +344,9 @@ parse_org_only() {
 
   rm -rf "${org_dir}/.github"
   log "${org}: parsing whole org tree ${org_dir} (--parse-org)"
-  # Same result location as the normal whole-org pass (OUTPUT/<org>/<org>) so a
+  # Same result location as the normal whole-org pass (OUTPUT/<org>/@org) so a
   # re-parse overwrites the aggregate rather than writing somewhere new.
-  if "${PARSER}" "${org_dir}" --output "${OUTPUT#./}/${org_owner}/${org_owner}"; then
+  if "${PARSER}" "${org_dir}" --output "${OUTPUT#./}/${org_owner}/@org"; then
     log "${org}: whole-org parse complete"
   else
     log "warning: whole-org parse failed for ${org}"
@@ -381,8 +408,10 @@ parse_only() {
   CURRENT_WATCHER=$!
 
   # Enqueue every repo; the consumer parses them one at a time. Writes block
-  # under backpressure when the consumer falls behind, which is fine.
-  for d in "${repos[@]}"; do
+  # under backpressure when the consumer falls behind, which is fine. The
+  # ${repos[@]+...} form expands to nothing for an empty org; bash 3.2 with
+  # set -u rejects a plain "${repos[@]}" on an empty array.
+  for d in ${repos[@]+"${repos[@]}"}; do
     printf '%s\n' "${d}" > "${PARSE_FIFO}"
   done
 
@@ -396,7 +425,7 @@ parse_only() {
   # Whole-org pass (the "+1"). Drop the org `.github` repo first so the walk
   # skips it; same result location as the normal flow.
   rm -rf "${org_dir}/.github"
-  if ! "${PARSER}" "${org_dir}" --output "${OUTPUT#./}/${org_owner}/${org_owner}" >/dev/null 2>&1; then
+  if ! "${PARSER}" "${org_dir}" --output "${OUTPUT#./}/${org_owner}/@org" >/dev/null 2>&1; then
     log "warning: whole-org parse failed for ${org}"
     TOTAL_FAIL=$(( TOTAL_FAIL + 1 ))
   fi
@@ -508,9 +537,10 @@ process_org() {
   if [ -d "${org_dir}" ]; then
     rm -rf "${org_dir}/.github"
     # Put the whole-org aggregate in its own subdir alongside the per-repo
-    # results: ./result/<output-root>/<org>/<org> (e.g. result/repos/dedis/dedis),
-    # so it doesn't collide with the per-repo dirs at result/repos/dedis/<repo>.
-    "${PARSER}" "${org_dir}" --output "${OUTPUT#./}/${org_owner}/${org_owner}" >/dev/null 2>&1 \
+    # results: ./result/<output-root>/<org>/@org (e.g. result/repos/dedis/@org).
+    # GitHub repo names cannot contain '@', so it never collides with a
+    # per-repo dir at result/repos/dedis/<repo>, even for a repo named dedis.
+    "${PARSER}" "${org_dir}" --output "${OUTPUT#./}/${org_owner}/@org" >/dev/null 2>&1 \
       || log "warning: whole-org parse failed for ${org}"
     printf 'P\n' >> "${PARSE_LOG}"
     org_parsed=1
@@ -551,4 +581,5 @@ done
 
 log ""
 log "all orgs done"
+FINISHED=1
 [ "${TOTAL_FAIL}" -eq 0 ]

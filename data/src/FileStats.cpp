@@ -8,6 +8,18 @@
 
 CREATE_STATS_CPP(FileStats, FILE_STATS_FIELDS)
 
+void RecordSkip(FileStats &fs, const SkipReason reason) {
+  std::atomic<double> *field = nullptr;
+  switch (reason) {
+    case SkipReason::Oversized: field = &fs.skippedOversized; break;
+    case SkipReason::Binary: field = &fs.skippedBinary; break;
+    case SkipReason::Timeout: field = &fs.skippedTimeout; break;
+    case SkipReason::None: return;
+  }
+  for (double v = field->load(std::memory_order_relaxed);
+       !field->compare_exchange_weak(v, v + 1.0, std::memory_order_relaxed);) {}
+}
+
 void FileStats::DeriveStats() {
   const double n = count.load(std::memory_order_relaxed);
   const double v = violationCount.load(std::memory_order_relaxed);
@@ -19,4 +31,8 @@ void FileStats::DeriveStats() {
   complianceRate.store(100.0 * (n > 0.0 ? (n - wv) / n : 0.0), std::memory_order_relaxed);
   violationAvgRelaxed.store(n > 0.0 ? vr / n : 0.0, std::memory_order_relaxed);
   complianceRateRelaxed.store(100.0 * (n > 0.0 ? (n - wvr) / n : 0.0), std::memory_order_relaxed);
+  wholeComplianceRate.store(
+    100.0 * (n > 0.0 ? wholeCompliant.load(std::memory_order_relaxed) / n : 0.0), std::memory_order_relaxed);
+  wholeComplianceRateRelaxed.store(
+    100.0 * (n > 0.0 ? wholeCompliantRelaxed.load(std::memory_order_relaxed) / n : 0.0), std::memory_order_relaxed);
 }

@@ -55,6 +55,8 @@ add_executable(${PROJECT_NAME}
     include/LanguageModel.generated.hpp
     src/LanguageParser.cpp
     src/TreeSitterParser.cpp
+    src/RawRewrite.cpp
+    include/RawRewrite.hpp
     include/LanguageParser.hpp
     include/LanguageData.hpp
     include/TreeSitterParser.hpp
@@ -70,6 +72,13 @@ add_executable(LanguageClassifierTests
 )
 target_include_directories(LanguageClassifierTests PRIVATE include)
 add_test(NAME language_detection COMMAND LanguageClassifierTests)
+
+add_executable(MatcherTextTests
+    tests/matcher_text_test.cpp
+    include/MatcherText.hpp
+)
+target_include_directories(MatcherTextTests PRIVATE include)
+add_test(NAME matcher_text COMMAND MatcherTextTests)
 
 add_executable(ParserFixtureTests
     tests/parser_fixture_test.cpp
@@ -94,6 +103,8 @@ add_executable(ParserFixtureTests
     include/LanguageModel.generated.hpp
     src/LanguageParser.cpp
     src/TreeSitterParser.cpp
+    src/RawRewrite.cpp
+    include/RawRewrite.hpp
     include/LanguageParser.hpp
     include/LanguageData.hpp
     include/TreeSitterParser.hpp
@@ -116,6 +127,16 @@ add_test(NAME parser_fixture_prefixed_literals
     COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/prefixed_literals.cpp)
 add_test(NAME parser_fixture_string_bucket_mix
     COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/string_bucket_mix.cpp)
+add_test(NAME parser_fixture_comment_after_string
+    COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/comment_after_string.cpp)
+add_test(NAME parser_fixture_whole_file_fragments_only
+    COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/whole_file_fragments_only.cpp)
+add_test(NAME parser_fixture_whole_file_whole_only
+    COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/whole_file_whole_only.cpp)
+add_test(NAME parser_fixture_kept_causes
+    COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/kept_causes.cpp)
+add_test(NAME parser_fixture_fragment_free
+    COMMAND ParserFixtureTests ${CMAKE_SOURCE_DIR}/tests/fragment_free.cpp)
 
 add_executable(DebugLanguageOutputTests
     tests/debug_language_output_test.cpp
@@ -140,6 +161,8 @@ add_executable(DebugLanguageOutputTests
     include/LanguageModel.generated.hpp
     src/LanguageParser.cpp
     src/TreeSitterParser.cpp
+    src/RawRewrite.cpp
+    include/RawRewrite.hpp
     include/LanguageParser.hpp
     include/LanguageData.hpp
     include/TreeSitterParser.hpp
@@ -180,6 +203,8 @@ add_executable(StringLiteralDecodeTests
     include/LanguageModel.generated.hpp
     src/LanguageParser.cpp
     src/TreeSitterParser.cpp
+    src/RawRewrite.cpp
+    include/RawRewrite.hpp
     include/LanguageParser.hpp
     include/LanguageData.hpp
     include/TreeSitterParser.hpp
@@ -193,6 +218,45 @@ else ()
     target_compile_definitions(StringLiteralDecodeTests PRIVATE USE_OPENMP=0)
 endif ()
 add_test(NAME string_literal_decode COMMAND StringLiteralDecodeTests)
+
+add_executable(LanguageEscapeTests
+    tests/language_escapes_test.cpp
+    src/Parser.cpp
+    src/EmbeddedStats.cpp
+    src/NestedStats.cpp
+    src/Stats.cpp
+    src/FileStats.cpp
+    src/LanguageClassifier.cpp
+    ${CLASSIFIER_SOURCES}
+    src/LanguageStats.cpp
+    include/Parser.hpp
+    include/EmbeddedStats.hpp
+    include/NestedStats.hpp
+    include/Stats.hpp
+    include/MatcherText.hpp
+    include/AtomicString.hpp
+    include/FileStats.hpp
+    include/StatsGenerator.hpp
+    include/LanguageClassifier.hpp
+    include/LanguageStats.hpp
+    include/LanguageModel.generated.hpp
+    src/LanguageParser.cpp
+    src/TreeSitterParser.cpp
+    src/RawRewrite.cpp
+    include/RawRewrite.hpp
+    include/LanguageParser.hpp
+    include/LanguageData.hpp
+    include/TreeSitterParser.hpp
+)
+target_include_directories(LanguageEscapeTests PRIVATE include)
+target_link_libraries(LanguageEscapeTests clangLex clangBasic)
+if (OpenMP_CXX_FOUND)
+    target_compile_definitions(LanguageEscapeTests PRIVATE USE_OPENMP=1)
+    target_link_libraries(LanguageEscapeTests OpenMP::OpenMP_CXX)
+else ()
+    target_compile_definitions(LanguageEscapeTests PRIVATE USE_OPENMP=0)
+endif ()
+add_test(NAME language_escapes COMMAND LanguageEscapeTests)
 
 # === LLVM & Clang ===
 find_package(LLVM REQUIRED CONFIG)
@@ -218,6 +282,7 @@ target_link_libraries(LanguageClassifierTests Serde)
 target_link_libraries(ParserFixtureTests Serde)
 target_link_libraries(DebugLanguageOutputTests Serde)
 target_link_libraries(StringLiteralDecodeTests Serde)
+target_link_libraries(LanguageEscapeTests Serde)
 
 # === tree-sitter (in-process grammars for ~21 programming languages) ===
 add_subdirectory(extern/tree-sitter)
@@ -225,6 +290,7 @@ target_link_libraries(${PROJECT_NAME} tree-sitter-grammars)
 target_link_libraries(ParserFixtureTests tree-sitter-grammars)
 target_link_libraries(DebugLanguageOutputTests tree-sitter-grammars)
 target_link_libraries(StringLiteralDecodeTests tree-sitter-grammars)
+target_link_libraries(LanguageEscapeTests tree-sitter-grammars)
 
 # --------------------------
 # Build Configs

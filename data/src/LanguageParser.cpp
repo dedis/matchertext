@@ -193,15 +193,15 @@ namespace {
 }
 
 bool LanguageParser::ExtractData(
-  const LanguageEnum language, const std::string &filePath, Serde::JSON &result
+  const LanguageEnum language, const std::string &filePath, Serde::JSON &result, SkipReason *skip
 ) {
   // C/C++ use the in-process clang lexer; every other supported language uses an
   // in-process tree-sitter grammar (see src/TreeSitterParser.cpp).
   if (language == LanguageEnum::C || language == LanguageEnum::CPP)
-    return Parser::ParseC_CPP(filePath, result) && result.IsArray();
+    return Parser::ParseC_CPP(filePath, language, result) && result.IsArray();
 
   if (TreeSitter::IsTreeSitterLanguage(language))
-    return TreeSitter::Parse(language, filePath, result) && result.IsArray();
+    return TreeSitter::Parse(language, filePath, result, skip) && result.IsArray();
 
   return false;
 }

@@ -119,9 +119,12 @@ MIN_FEATURE_DOC_FREQ = 2
 MIN_TOTAL_TRIGRAM_MASS = 512.0
 
 # Optional NB-only holdout evaluation buckets. These evaluate only the trigram
-# model, not the deterministic structural detectors used at runtime.
+# model, not the deterministic structural detectors used at runtime. The gates
+# mirror NaiveBayesClassify and ClassifyString in src/LanguageClassifier.cpp.
 EVAL_GAP_THRESHOLD = 0.30
 EVAL_CONFIDENCE_THRESHOLD = 0.85
+EVAL_MIN_MATCHED = 6
+EVAL_MIN_BYTES = 15
 LENGTH_BUCKETS = (
     (8, 15),
     (16, 31),
@@ -1067,13 +1070,16 @@ def iter_language_results(
 
 def build_eval_index(
     models: dict[str, tuple[int, dict[int, float], float]]
-) -> tuple[dict[int, list[tuple[str, float]]], dict[str, tuple[float, float]]]:
-    """Prepare a compact index for Python-side holdout evaluation."""
+) -> tuple[dict[int, list[tuple[str, float]]], dict[str, tuple[float, float, int]]]:
+    """Prepare a compact index for Python-side holdout evaluation.
+
+    language_meta holds (log prior, unseen log probability, model size).
+    """
     trigram_index: dict[int, list[tuple[str, float]]] = {}
-    language_meta: dict[str, tuple[float, float]] = {}
+    language_meta: dict[str, tuple[float, float, int]] = {}
 
     for enum_name, (_, trigrams, unseen) in models.items():
-        language_meta[enum_name] = (math.log(1.0 / len(models)), unseen)
+        language_meta[enum_name] = (math.log(1.0 / len(models)), unseen, len(trigrams))
         for tri, adjusted in trigrams.items():
             trigram_index.setdefault(tri, []).append((enum_name, adjusted))
 
@@ -1083,9 +1089,15 @@ def build_eval_index(
 def classify_snippet_nb(
     text: str,
     trigram_index: dict[int, list[tuple[str, float]]],
-    language_meta: dict[str, tuple[float, float]],
+    language_meta: dict[str, tuple[float, float, int]],
 ) -> tuple[str | None, str | None]:
     """Classify a snippet using the generated NB tables only.
+
+    The accepted label applies the same gates as the runtime: a minimum length,
+    a minimum number and ratio of matched trigrams for the best model, a score
+    gap, and a confidence. Without the matched-trigram gates the model with the
+    smallest table wins most snippets, because every unseen trigram costs its
+    unseen log probability.
 
     Returns:
       (raw_best_label, accepted_label_or_None)
@@ -1099,10 +1111,12 @@ def classify_snippet_nb(
         label: meta[0] + num_trigrams * meta[1]
         for label, meta in language_meta.items()
     }
+    matched: Counter[str] = Counter()
 
     for tri, count in trigram_counts.items():
         for label, adjusted in trigram_index.get(tri, ()):
             scores[label] += adjusted * count
+            matched[label] += count
 
     sorted_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)
     best_label, max_score = sorted_scores[0]
@@ -1116,8 +1130,14 @@ def classify_snippet_nb(
     confidence = 1.0 / sum_exp if sum_exp > 0.0 else 0.0
     gap = (max_score - second_score) / num_trigrams if num_trigrams > 0 else 0.0
 
+    model_size = max(language_meta[best_label][2], 1)
+    required_ratio = min(0.80, 0.18 + 7.0 / math.sqrt(model_size))
     accepted = best_label if (
-        confidence >= EVAL_CONFIDENCE_THRESHOLD and gap >= EVAL_GAP_THRESHOLD
+        len(text.encode("utf-8", errors="ignore")) >= EVAL_MIN_BYTES
+        and matched[best_label] >= EVAL_MIN_MATCHED
+        and matched[best_label] / num_trigrams >= required_ratio
+        and gap >= EVAL_GAP_THRESHOLD
+        and confidence >= EVAL_CONFIDENCE_THRESHOLD
     ) else None
     return best_label, accepted
 
@@ -1138,7 +1158,11 @@ def evaluate_models(
     eval_samples: dict[str, list[str]],
     models: dict[str, tuple[int, dict[int, float], float]],
 ) -> None:
-    """Run an NB-only holdout evaluation by snippet length bucket."""
+    """Run an NB-only holdout evaluation by snippet length bucket.
+
+    Coverage is the share of snippets that get a label; precision is the share
+    of labeled snippets whose label is right.
+    """
     trigram_index, language_meta = build_eval_index(models)
     stats: dict[str, Counter[str]] = {}
 
@@ -1148,11 +1172,9 @@ def evaluate_models(
             bucket_stats = stats.setdefault(bucket, Counter())
             bucket_stats["total"] += 1
 
-            raw_best, accepted = classify_snippet_nb(
+            _, accepted = classify_snippet_nb(
                 snippet, trigram_index, language_meta
             )
-            if raw_best == label:
-                bucket_stats["top1"] += 1
             if accepted is None:
                 bucket_stats["rejected"] += 1
                 continue
@@ -1164,7 +1186,7 @@ def evaluate_models(
         print("\nHoldout evaluation: no snippets collected")
         return
 
-    print("\nHoldout evaluation (Naive Bayes only):")
+    print("\nHoldout evaluation (Naive Bayes only, runtime gates):")
     ordered_buckets = [length_bucket_name(low) for low, _ in LENGTH_BUCKETS]
     seen = set()
     for bucket in ordered_buckets + sorted(stats):
@@ -1174,17 +1196,26 @@ def evaluate_models(
         bucket_stats = stats[bucket]
         total = max(bucket_stats["total"], 1)
         accepted = bucket_stats["accepted"]
-        accepted_acc = (
+        precision = (
             100.0 * bucket_stats["accepted_correct"] / accepted if accepted else 0.0
         )
         print(
             "  "
             f"{bucket}: "
-            f"top1={100.0 * bucket_stats['top1'] / total:5.1f}% "
-            f"accepted={100.0 * accepted / total:5.1f}% "
-            f"accepted_acc={accepted_acc:5.1f}% "
-            f"n={bucket_stats['total']}"
+            f"coverage={100.0 * accepted / total:5.1f}% "
+            f"precision={precision:5.1f}% "
+            f"labeled={accepted} n={bucket_stats['total']}"
         )
+
+    all_total = sum(b["total"] for b in stats.values())
+    all_accepted = sum(b["accepted"] for b in stats.values())
+    all_correct = sum(b["accepted_correct"] for b in stats.values())
+    print(
+        "  "
+        f"all: coverage={100.0 * all_accepted / max(all_total, 1):5.1f}% "
+        f"precision={100.0 * all_correct / max(all_accepted, 1):5.1f}% "
+        f"labeled={all_accepted} n={all_total}"
+    )
 
 
 # ---------------------------------------------------------------------------
