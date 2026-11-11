@@ -1,7 +1,6 @@
 # Corpus record
 
-What the evaluation's corpus contains and how it was collected. The paper's
-figures (`doc/generated/numbers.tex`) are generated from `result/` by `latex.py`.
+What the evaluation's corpus contains and how it was collected.
 
 ## Collection
 
