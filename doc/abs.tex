@@ -5,11 +5,12 @@ but usually requires tedious and error-prone
 ``escaping'' transformations on the embedded string.
 We propose a simple cross-language syntactic discipline,
 \emph{matchertext},
-embodied in the single rule that \emph{matchers must match} --
+embodied in the single rule that \emph{matchers must match}
+without exception --
 where \emph{matchers} are the ASCII character pairs
 \texttt{()}, \texttt{[]}, and \texttt{\{\}}.
 This discipline
-enables the safe embedding any matchertext-compliant string
+enables the safe embedding of any matchertext-compliant string
 into any matchertext-aware language via simple ``copy-and-paste'' --
 with no escaping, obfuscation, or expansion of embedded strings.
 Simple string-literal syntax extensions like \texttt{M"(}$\dots$\texttt{)"},

@@ -59,6 +59,7 @@ as a violation, while a \emph{relaxed} rule permits it.
 A \emph{violation} is one unmatched or wrong-kind matcher.
 A \emph{toothpick} is a single backslash character in a sample,
 following the term ``leaning toothpick syndrome'' of \cref{sec:bg}.
+
 To estimate the escaping that matchertext would remove,
 each compliant string literal is rewritten
 as the equivalent escapeless C++ raw string literal \verb|R"(|$\dots$\verb|)"|
@@ -69,10 +70,12 @@ as the equivalent escapeless C++ raw string literal \verb|R"(|$\dots$\verb|)"|
 and the surviving backslashes are counted,
 yielding a \emph{toothpick reduction}.
 The rewrite decodes every escape, \verb|\x5B| included,
-and drops its backslash unless it decodes to one
-or to a control other than tab, LF, or CR, which is kept verbatim.
-An escape that cannot be written raw, such as a non-UTF-8 byte, keeps its backslash too,
-as does every escape of a literal whose decoded content is not matchertext.
+and drops its backslash unless it decodes to a backslash, to a non-UTF-8 byte,
+or to an untypeable control character (any but tab, LF, and CR).
+A CR is written raw: the hosting rule (\cref{sec:design:abstract:embed})
+requires a matchertext literal to preserve it,
+unlike Go's raw strings.
+A literal whose decoded content is not matchertext keeps every backslash.
 Binary-data literals (BinaryData and PseudoBinaryData,
 such as file headers, test vectors, or terminal codes) are out of scope:
 they are not readable text, writing their byte escapes raw would break the encoding,
@@ -229,8 +232,24 @@ Category	& Toothpicks	& Share	\\
 \subsection{Q3: Escape reduction}
 \label{sec:eval:reduction}
 
-The central benefit of matchertext is the escaping it removes.
-Rewriting each compliant string literal
+A tangible benefit of matchertext is the escaping it can remove,
+as we measure next.
+Matchertext is not the only way to reduce toothpicks, of course.
+If lower toothpick count was our \emph{only} concern,
+then ``adopt C++ raw string literals'' might be as good advice
+as ``adopt matchertext'',
+since C++'s variable-delimiter format
+\verb|R"|$d$\verb|(|$\dots$\verb|)|$d$\verb|"|
+ensures that \emph{some} short closing delimiter can always be found
+that any desired payload does not contain.
+But \emph{finding a safe delimiter} for a given payload takes effort,
+and neglecting to do so risks errors.
+Matchertext's distinctive benefit is reduced escaping
+with fixed delimiters, unlimited nesting,
+and no safe-delimiter search.
+
+In our analysis,
+rewriting each compliant string literal
 as an equivalent C++ raw string literal
 eliminates \dataReduction of the in-scope toothpicks,
 cutting them
@@ -241,9 +260,12 @@ escaped ones as in regular expressions (\dataKeptBackslash),
 those of literals already raw (\dataKeptRaw) or opening a Swift interpolation (\dataKeptInterpolation),
 and control characters kept verbatim (\dataKeptControl).
 Escaped binary data, out of scope, holds another \dataBinaryToothpicks.
-The host's raw-string form could hold \dataRawHoldableShare of the compliant literals,
-and only a matchertext literal the other \dataMtOnlyShare (\eg C and Java lack raw strings);
-both counts include literals without escapes.
+The host's raw-string form could hold \dataRawHoldableShare
+of the compliant literals;
+another \dataMtOnlyShare fit matchertext literals
+but not the host's raw strings
+(\eg C and Java lack raw strings).
+Both counts are for literals without escapes.
 As a concrete case,
 the compliant C++ regular-expression literal
 \verb|"\\b,\"axis\":(\\d+)\\b"|
