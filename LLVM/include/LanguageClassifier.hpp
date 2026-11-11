@@ -67,6 +67,11 @@ enum class LanguageEnum : uint8_t {
   PseudoURL,
   PseudoEmail,
   PseudoBinaryData,
+  // Value shapes
+  Empty,
+  SingleCharacter,
+  Number,
+  Punctuation,
   COUNT
 };
 

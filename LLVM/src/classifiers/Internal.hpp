@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <ranges>
 #include <string>
 #include <string_view>
@@ -151,6 +152,43 @@ namespace classifier_internal {
     return UnescapeCommonSequences(StripCommentDecorators(body));
   }
 
+  /// Decodes the UTF-8 code point at `pos` and advances past it; returns
+  /// UINT32_MAX on a malformed sequence.
+  inline uint32_t DecodeCodePoint(const std::string_view s, size_t &pos) {
+    const auto b0 = static_cast<unsigned char>(s[pos]);
+    int extra = b0 < 0x80 ? 0 : (b0 >> 5) == 0x6 ? 1 : (b0 >> 4) == 0xE ? 2 : (b0 >> 3) == 0x1E ? 3 : -1;
+    if (extra < 0 || pos + extra >= s.size()) {
+      pos++;
+      return UINT32_MAX;
+    }
+    uint32_t cp = extra == 0 ? b0 : b0 & (0x3F >> extra);
+    for (int i = 1; i <= extra; i++) {
+      const auto b = static_cast<unsigned char>(s[pos + i]);
+      if ((b & 0xC0) != 0x80) {
+        pos++;
+        return UINT32_MAX;
+      }
+      cp = (cp << 6) | (b & 0x3F);
+    }
+    pos += extra + 1;
+    return cp;
+  }
+
+  /// A letter of some script: ASCII letters, and non-ASCII code points outside
+  /// the punctuation, symbol, emoji, and private-use blocks.
+  inline bool IsLetterCodePoint(const uint32_t cp) {
+    if (cp < 0x80)
+      return std::isalpha(static_cast<int>(cp)) != 0;
+    if (cp < 0xC0 || cp == 0xD7 || cp == 0xF7)
+      return false;
+    if ((cp >= 0x2000 && cp <= 0x2BFF) || (cp >= 0x3000 && cp <= 0x303F) ||
+        (cp >= 0xE000 && cp <= 0xF8FF) || (cp >= 0xFE30 && cp <= 0xFE4F) ||
+        (cp >= 0xFF00 && cp <= 0xFF20) || (cp >= 0xFF3B && cp <= 0xFF40) ||
+        (cp >= 0xFF5B && cp <= 0xFF65) || cp >= 0x1F000)
+      return false;
+    return cp != UINT32_MAX;
+  }
+
   struct YAMLAnalysis {
     int docMarkers = 0;
     int keyValueLines = 0;
@@ -215,4 +253,15 @@ namespace classifier_internal {
   ClassificationResult DetectCPPDeclarationFragment(std::string_view s);
   ClassificationResult DetectPlainText(std::string_view s);
   ClassificationResult DetectSeparatorLine(std::string_view s);
+  ClassificationResult DetectWordOrToken(std::string_view s);
+  ClassificationResult DetectNotation(std::string_view s);
+  ClassificationResult DetectNumber(std::string_view s);
+  /// Empty after trimming (Punctuation) or a single code point (SingleCharacter).
+  ClassificationResult DetectStructure(std::string_view text);
+  /// Only punctuation, symbols, and whitespace.
+  ClassificationResult DetectPunctuation(std::string_view text);
+  bool IsSymbolCodePoint(uint32_t cp);
+  /// True if `s` is only \u, \U, \x, and octal escapes with separators between
+  /// them; `decoded` receives the characters they encode.
+  bool DecodeEscapeOnly(std::string_view s, std::string &decoded);
 } // namespace classifier_internal

@@ -64,7 +64,8 @@ bool TestBasicLiterals() {
   ok &= CheckEq("basic.docs_relaxed.count", docsRelaxed.count, 1.0);
   // Unclassified strings count as Unknown, so every string is in the total.
   ok &= CheckEq("basic.lang.total", static_cast<double>(lang.total), 6.0);
-  ok &= CheckLanguageCount(lang, LanguageEnum::Unknown, 4);
+  ok &= CheckLanguageCount(lang, LanguageEnum::Unknown, 3);
+  ok &= CheckLanguageCount(lang, LanguageEnum::IdentifierLike, 1);
 
   const uint64_t rawLevel1 =
       stringNested.rawLevels.size() > 1 ? stringNested.rawLevels[1] : 0;
@@ -148,7 +149,7 @@ bool TestCommentsAndRelaxed() {
   ok &= CheckEq("comments.file.with_violation_relaxed", file.withViolationRelaxed, 0.0);
   ok &= CheckEq("comments.file.violation_count_relaxed", file.violationCountRelaxed, 0.0);
   ok &= CheckEq("comments.lang.total", static_cast<double>(lang.total), 1.0);
-  ok &= CheckLanguageCount(lang, LanguageEnum::Unknown, 1);
+  ok &= CheckLanguageCount(lang, LanguageEnum::IdentifierLike, 1);
 
   const uint64_t docsRawLevel2 =
       docsNested.rawLevels.size() > 2 ? docsNested.rawLevels[2] : 0;
@@ -184,7 +185,7 @@ bool TestPrefixedLiterals() {
   ok &= CheckEq("prefixed.docs.count", docs.count, 0.0);
   ok &= CheckEq("prefixed.docs_relaxed.count", docsRelaxed.count, 0.0);
   ok &= CheckEq("prefixed.lang.total", static_cast<double>(lang.total), 5.0);
-  ok &= CheckLanguageCount(lang, LanguageEnum::Unknown, 1);
+  ok &= CheckLanguageCount(lang, LanguageEnum::IdentifierLike, 1);
 
   const uint64_t rawLevel1 =
       stringNested.rawLevels.size() > 1 ? stringNested.rawLevels[1] : 0;

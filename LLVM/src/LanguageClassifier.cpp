@@ -26,6 +26,7 @@ const char *LanguageName(const LanguageEnum lang) {
     "Objective-C", "GLSL", "HLSL", "IdentifierLike",
     "HexData", "BinaryData", "InlineAsm", "Email",
     "PseudoURL", "PseudoEmail", "PseudoBinaryData",
+    "Empty", "SingleCharacter", "Number", "Punctuation",
   };
   static_assert(std::size(names) == static_cast<size_t>(LanguageEnum::COUNT));
   const auto idx = static_cast<size_t>(lang);
@@ -65,78 +66,6 @@ namespace {
     if (maxRunLength != nullptr)
       *maxRunLength = maxRepeatedRun;
     return hasRepeatedRun;
-  }
-
-  bool IsTokenLikeSeparator(const char c) {
-    return c == '_' || c == '-' || c == '.' || c == '/' || c == ':';
-  }
-
-  bool LooksLikeTokenLikeUnknown(const std::string_view s) {
-    const auto trimmed = classifier_internal::Trim(s);
-    if (trimmed.size() < 4 || trimmed.size() > 160)
-      return false;
-
-    if (trimmed.find_first_of(" \t\n\r") != std::string_view::npos)
-      return false;
-    if (classifier_internal::LooksLikeBareDomainLikeToken(trimmed))
-      return false;
-
-    int letters = 0;
-    int digits = 0;
-    int separators = 0;
-    int camelTransitions = 0;
-    int componentStarts = 0;
-    bool hasDoubleColon = false;
-    bool hasDot = false;
-    bool hasSlash = false;
-
-    char prev = '\0';
-    bool prevWasSeparator = true;
-    for (const char c: trimmed) {
-      if (const auto uc = static_cast<unsigned char>(c); std::isalnum(uc)) {
-        if (std::isalpha(uc))
-          letters++;
-        if (std::isdigit(uc))
-          digits++;
-        if (prevWasSeparator)
-          componentStarts++;
-        if (std::islower(static_cast<unsigned char>(prev)) &&
-            std::isupper(uc))
-          camelTransitions++;
-        prevWasSeparator = false;
-      } else if (IsTokenLikeSeparator(c)) {
-        separators++;
-        prevWasSeparator = true;
-        if (c == '.')
-          hasDot = true;
-        if (c == '/')
-          hasSlash = true;
-        if (c == ':' && prev == ':')
-          hasDoubleColon = true;
-      } else {
-        return false;
-      }
-      prev = c;
-    }
-
-    if (letters == 0 || (separators == 0 && camelTransitions == 0))
-      return false;
-
-    const float letterRatio = static_cast<float>(letters) /
-                              static_cast<float>(trimmed.size());
-    if (letterRatio < 0.45f)
-      return false;
-
-    const int signals = componentStarts + camelTransitions +
-                        (hasDoubleColon ? 2 : 0) + (hasDot ? 1 : 0) +
-                        (hasSlash ? 1 : 0);
-    if (signals < 2)
-      return false;
-
-    if (digits > 0 && letters < 3)
-      return false;
-
-    return true;
   }
 
   uint32_t PackTrigram(const char a, const char b, const char c) {
@@ -237,11 +166,17 @@ bool InMatchertextScope(const LanguageEnum lang) {
 }
 
 ClassificationResult ClassifyString(const std::string_view body, const float minConfidence) {
-  if (body.size() < 2)
-    return {LanguageEnum::Unknown, 0.0f};
+  if (body.empty())
+    return {LanguageEnum::Empty, 0.99f};
 
   const std::string normalized = classifier_internal::NormalizeForClassification(body);
   const std::string_view text = normalized.empty() ? body : std::string_view(normalized);
+
+  /// Whitespace only, or a single character once \n-style escapes are decoded;
+  /// checked on the string as written, since normalizing trims each line.
+  if (const auto result = classifier_internal::DetectStructure(classifier_internal::UnescapeCommonSequences(body));
+    result.confidence >= minConfidence)
+    return result;
 
   if (const auto result = classifier_internal::DetectEmail(text);
     result.confidence >= minConfidence)
@@ -259,8 +194,23 @@ ClassificationResult ClassifyString(const std::string_view body, const float min
     result.confidence >= minConfidence)
     return result;
 
-  if (classifier_internal::LooksLikeBareDomainLikeToken(text))
+  /// A string of escapes alone (\u4e2d\u592e, \x1b) is classified by the characters
+  /// it encodes: a single one is a single character, and the rest, text of any
+  /// script and control characters alike, is plain text.
+  if (std::string decoded; classifier_internal::DecodeEscapeOnly(text, decoded)) {
+    if (const auto result = classifier_internal::DetectStructure(decoded);
+      result.language == LanguageEnum::SingleCharacter)
+      return result;
+    return {LanguageEnum::PlainText, 0.80f};
+  }
+
+  /// A bare domain-like token (default.yaml, a.b.c, 1.25rem) skips the content detectors.
+  if (classifier_internal::LooksLikeBareDomainLikeToken(text)) {
+    for (const auto detect: {classifier_internal::DetectNumber, classifier_internal::DetectWordOrToken})
+      if (const auto result = detect(text); result.confidence >= minConfidence)
+        return result;
     return {LanguageEnum::Unknown, 0.0f};
+  }
 
   using Detector = ClassificationResult (*)(std::string_view);
   static constexpr Detector detectors[] = {
@@ -284,20 +234,13 @@ ClassificationResult ClassifyString(const std::string_view body, const float min
       return result;
   }
 
-  if (LooksLikeTokenLikeUnknown(text)) {
-    bool hasCamelTransition = false;
-    for (size_t i = 1; i < text.size(); i++) {
-      if (std::islower(static_cast<unsigned char>(text[i - 1])) &&
-          std::isupper(static_cast<unsigned char>(text[i]))) {
-        hasCamelTransition = true;
-        break;
-      }
-    }
-    if (text.find('/') == std::string_view::npos &&
-        (text.find("::") != std::string_view::npos || hasCamelTransition))
-      return {LanguageEnum::IdentifierLike, 0.95f};
-    return {LanguageEnum::Unknown, 0.95f};
-  }
+  /// Value shapes and notations: numbers, dates, and IPs; tags, flags, CSS,
+  /// calls and other names; strings of punctuation alone; then single words and
+  /// tokens, where bare words are plain text and the rest identifiers.
+  for (const auto detect: {classifier_internal::DetectNumber, classifier_internal::DetectNotation,
+                           classifier_internal::DetectPunctuation, classifier_internal::DetectWordOrToken})
+    if (const auto result = detect(text); result.confidence >= minConfidence)
+      return result;
 
   if (const auto result = classifier_internal::DetectPlainText(text);
     result.confidence >= minConfidence)

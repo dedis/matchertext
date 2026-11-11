@@ -258,7 +258,7 @@ C-family languages and Java
 see most of their toothpicks eliminated
 (C \dataHostCReduction, C++ \dataHostCppReduction, Java \dataHostJavaReduction),
 while others reduce much less,
-most strikingly Go (\dataHostGoReduction), Python (\dataHostPythonReduction),
+most strikingly Swift (\dataHostSwiftReduction), Python (\dataHostPythonReduction),
 and TypeScript (\dataHostTypeScriptReduction).
 
 A notable finding is that compliance and escape relief
@@ -291,8 +291,8 @@ and \dataDocAvgDepth for comments.
 Deep nesting does occur in a heavy tail --
 the single deepest string sample reaches a raw depth of \dataStrMaxDepth,
 in \dataStrMaxDepthHost (though that literal's deepest \emph{matched} nesting is at most \dataStrMaxDepthValidBound),
-followed by maxima in JavaScript (\dataHostJavaScriptMaxDepth), C\# (\dataHostCSharpMaxDepth),
-and Python (\dataHostPythonMaxDepth) --
+followed by maxima in C\# (\dataHostCSharpMaxDepth), Python (\dataHostPythonMaxDepth),
+and PHP (\dataHostPHPMaxDepth) --
 but such cases are vanishingly rare.
 Comments nest more on average than string literals,
 consistent with comments containing structured examples and prose,
