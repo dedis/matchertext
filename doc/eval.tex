@@ -230,9 +230,9 @@ Category	& Toothpicks	& Share	\\
 \subsection{Q3: Escape reduction}
 \label{sec:eval:reduction}
 
-A tangible benefit of matchertext is the escaping it can remove,
+A tangible benefit of matchertext is reduced escaping,
 as we measure next.
-Matchertext is not the only way to reduce toothpicks, of course.
+Matchertext is not the only way to cut toothpicks, of course.
 If lower toothpick count were our \emph{only} concern,
 then ``adopt C++ raw string literals'' might be as good advice
 as ``adopt matchertext'',
@@ -244,6 +244,7 @@ But \emph{finding a safe delimiter} for a given payload takes effort,
 and neglecting to do so risks errors.
 Matchertext's distinctive benefit is reduced escaping
 with fixed delimiters, unlimited nesting,
+no expansion of payload \emph{or} delimiters,
 and no safe-delimiter search.
 
 In our analysis,
