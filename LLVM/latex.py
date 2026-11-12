@@ -134,6 +134,19 @@ def main():
            if os.path.isfile(dup_path) else {})
     if not dup.get("Parsed Files"):
         dup = {}                    # results from before the duplicate check
+    # The main figures with each distinct file content counted once.
+    dedup_path = os.path.join(GLOBAL, "deduplicated.md")
+    dedup = ({k: float(v[1].rstrip("%")) for k, v in table(dedup_path, after=None).items()}
+             if os.path.isfile(dedup_path) else {})
+    dd = lambda k, fmt=pct: fmt(dedup[k]) if k in dedup else PENDING
+    # Compliant literals with at least one toothpick, with duplicates. Results from
+    # before these counters take them from a later rerun's table in result/rerun.
+    with_key = "Matchertext-Only (% of compliant with toothpicks)"
+    with_tp = {}
+    for path in (dedup_path, os.path.join(RESULT, "rerun", "deduplicated.md")):
+        if with_key not in with_tp and os.path.isfile(path):
+            with_tp = {k: float(v[0].rstrip("%")) for k, v in table(path, after=None).items()}
+    wt = lambda k: pct(with_tp[k], 0) if k in with_tp else PENDING
     if unknown is None:             # results from before the Unknown row
         unknown = dict(count=str_n - classified,
                        viol=violations - sum(c["viol"] for c in cats.values()),
@@ -236,6 +249,15 @@ def main():
         # exact content duplicates across the corpus
         ("DupFileShare", pct(dup["Duplicate File Share (%)"], 1) if dup else PENDING),
         ("DupStringShare", pct(dup["Duplicate String Sample Share (%)"], 1) if dup else PENDING),
+        # the main figures with each distinct file content counted once
+        ("DedupStrCompliance", dd("String Compliance")),
+        ("DedupDocCompliance", dd("Comment Compliance")),
+        ("DedupFileCompliance", dd("File Compliance")),
+        ("DedupWholeFileCompliance", dd("Whole-File Compliance")),
+        ("DedupScopeToothpicks", dd("In-Scope Toothpicks", millions)),
+        ("DedupReduction", dd("Toothpick Reduction")),
+        ("DedupKeptNonCompliant", dd("Kept Toothpicks: Non-Compliant (% of converted)", lambda x: pct(x, 0))),
+        ("DedupKeptControl", dd("Kept Toothpicks: Control Character (% of converted)", lambda x: pct(x, 0))),
         ("HostComplianceMin", pct(hosts[least_compliant]["compliance"])),
         ("HostComplianceMax", pct(max(h["compliance"] for h in hosts.values()))),
         ("HostLeastCompliant", tex_name(least_compliant)),
@@ -290,6 +312,7 @@ def main():
         ("RawHoldableShare", pct(100 * g["Raw-Form Holdable"][0] / g["Compliant Samples"][0], 1)),
         ("MtOnly", millions(g["Matchertext-Only"][0])),
         ("MtOnlyShare", pct(100 * g["Matchertext-Only"][0] / g["Compliant Samples"][0], 1)),
+        ("MtOnlyShareWith", wt(with_key)),
         # Q4: nesting
         ("StrAvgDepth", f"{g['Avg Per-Sample Raw Max Depth'][0]:.3f}"),
         ("DocAvgDepth", f"{g['Avg Per-Sample Raw Max Depth'][1]:.3f}"),

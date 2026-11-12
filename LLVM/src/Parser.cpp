@@ -548,6 +548,17 @@ void Parser::GatherStatistics(
         file.converted += outcome.converted;
         for (size_t cause = 0; cause < KeptCauseCount; ++cause)
           file.kept[cause] += outcome.kept[cause];
+        file.rawHoldable += outcome.rawHoldable;
+        file.matchertextOnly += outcome.matchertextOnly;
+        if (outcome.toothpicks > 0) {
+          ++file.scopeWithToothpicks;
+          file.compliantWithToothpicks += outcome.violations == 0;
+          file.clearedWithToothpicks += outcome.converted == 0;
+          file.rawHoldableWithToothpicks += outcome.rawHoldable;
+          file.matchertextOnlyWithToothpicks += outcome.matchertextOnly;
+          file.reductionSumWith += 100.0 * static_cast<double>(outcome.toothpicks - outcome.converted) /
+                                   static_cast<double>(outcome.toothpicks);
+        }
       } else if (e.Contains("end") && number("end") > number("begin")) {
         outOfScope.emplace_back(number("begin"), number("end"));
       }
@@ -725,6 +736,8 @@ Parser::SampleOutcome Parser::process(
   outcome.inScope = inScope;
   outcome.violations = inScope ? unmatched : 0;
   outcome.converted = inScope && langStats != nullptr ? convertedToothpicks : 0;
+  outcome.rawHoldable = inScope && compliantStringLiteral && hint.rawHolds;
+  outcome.matchertextOnly = inScope && compliantStringLiteral && hint.mHolds && !hint.rawHolds;
 
   if (rawForms)
     rawForms->Record(inScope, hint.mHolds, hint.rawFormViolations, hint.rawFormsHolding, hint.ownRawForm, hint.control);
@@ -778,6 +791,19 @@ Parser::SampleOutcome Parser::process(
       AtomicAdd(s.rawHoldable, 1.0);
     if (compliantStringLiteral && hint.mHolds && !hint.rawHolds)
       AtomicAdd(s.matchertextOnly, 1.0);
+
+    /// The same over the samples with at least one toothpick.
+    if (toothpicks > 0) {
+      AtomicAdd(s.scopeWithToothpicks, 1.0);
+      if (unmatched == 0)
+        AtomicAdd(s.compliantWithToothpicks, 1.0);
+      if (convertedToothpicks == 0)
+        AtomicAdd(s.clearedWithToothpicks, 1.0);
+      if (outcome.rawHoldable)
+        AtomicAdd(s.rawHoldableWithToothpicks, 1.0);
+      if (outcome.matchertextOnly)
+        AtomicAdd(s.matchertextOnlyWithToothpicks, 1.0);
+    }
 
     if (unmatched > 0)
       AtomicAdd(s.withNonCompliance, 1.0);

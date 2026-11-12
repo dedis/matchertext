@@ -250,7 +250,7 @@ and no safe-delimiter search.
 In our analysis,
 rewriting each compliant string literal
 as an equivalent C++ raw string literal
-eliminates \dataReduction of the in-scope toothpicks,
+eliminates \dataReduction of the in-scope toothpicks (\dataDedupReduction deduplicated),
 cutting them
 from about \dataScopeToothpicks to about \dataToothpicksConverted.
 Of those left, \dataKeptNonCompliant are in non-compliant literals, which are not rewritten;
@@ -263,8 +263,8 @@ The host's raw-string form could hold \dataRawHoldableShare
 of the compliant literals;
 another \dataMtOnlyShare fit matchertext literals
 but not the host's raw strings
-(\eg C and Java lack raw strings).
-Both counts include literals without escapes.
+(\eg C and Java lack raw strings),
+and \dataMtOnlyShareWith of those with toothpicks.
 As a concrete case,
 the compliant C++ regular-expression literal
 \verb|"\\b,\"axis\":(\\d+)\\b"|

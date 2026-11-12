@@ -90,7 +90,9 @@ S_SUM = {"Sample Size", "With Toothpicks", "Total Toothpicks", "With Non-Complia
          "With Raw Nested Embedding",
          "Sum Of Per-Sample Raw Max Depth", "With Valid Nested Embedding",
          "Sum Of Per-Sample Valid Max Depth", "Raw Character Count",
-         "In-Scope Samples", "In-Scope Toothpicks"}
+         "In-Scope Samples", "In-Scope Toothpicks", "In-Scope With Toothpicks",
+         "Compliant With Toothpicks", "Cleared With Toothpicks", "Raw-Form Holdable With Toothpicks",
+         "Matchertext-Only With Toothpicks", "Sum Of Per-Sample Toothpick Reduction (%)"}
 KEPT = ("Kept Toothpicks: Non-Compliant", "Kept Toothpicks: Not Matchertext Decoded",
         "Kept Toothpicks: Already Raw", "Kept Toothpicks: Unknown Escape",
         "Kept Toothpicks: Interpolation", "Kept Toothpicks: Escaped Backslash", "Kept Toothpicks: Not Writable Raw",
@@ -104,7 +106,7 @@ S_DERIVED = {"Average Toothpicks", "Average With Toothpicks",
              "Average Toothpicks (Converted)", "Average With Toothpicks (Converted)",
              "Toothpick Reduction Total (%)", "Toothpick Reduction Average (%)",
              "Toothpick Reduction Maximum (%)", "Avg Per-Sample Raw Max Depth",
-             "Avg Per-Sample Valid Max Depth"}
+             "Avg Per-Sample Valid Max Depth", "Toothpick Reduction Average With Toothpicks (%)"}
 
 def build_simple(fname, sum_set, max_set, derived_fn, derived_names):
     """For strings.md / files.md: keep descriptions + Data header from ref, regenerate rows."""
@@ -176,6 +178,8 @@ def s_derived(m, c, a):
         avg = div(tp, n)
         avgc = div(g("Total Toothpicks (Converted)"), n)
         return div(avg - avgc, avg) * 100
+    if m == "Toothpick Reduction Average With Toothpicks (%)":
+        return div(g("Sum Of Per-Sample Toothpick Reduction (%)"), g("In-Scope With Toothpicks"))
     if m == "Toothpick Reduction Maximum (%)":
         return div(tp_max - g("Maximum Toothpicks (Converted)"), tp_max) * 100
     if m == "Avg Per-Sample Raw Max Depth":  return div(g("Sum Of Per-Sample Raw Max Depth"), n)
@@ -544,12 +548,19 @@ open(os.path.join(OUTDIR, "whole_file.md"), "w").write("\n".join(out) + "\n")
 # Stats of one copy, in file_contents.tsv order after the hash, files, and strings.
 COPY = ("strings", "scope", "compliant", "tp", "scope_tp", "conv") + tuple("kept%d" % k for k in range(len(KEPT))) + \
        ("docs", "docs_ok", "docs_ok_relaxed", "fragments", "fragments_relaxed", "whole", "whole_relaxed")
+# Columns after the categories, in results from 2026-11-12 on: raw-form holdable and
+# matchertext-only literals, then the in-scope literals with at least one toothpick (all,
+# compliant, cleared by the rewrite, raw-form holdable, matchertext-only, and the sum of
+# their own percentage reductions).
+EXTRA = ("raw", "mt", "swt", "cwt", "clwt", "rawwt", "mtwt", "redwt")
+NCOPY = len(COPY)                   # columns before the categories
+COPY += EXTRA
 contents = {}                       # hash -> files * 2**32 + string samples
 dedup = dict.fromkeys(COPY, 0.0)    # each distinct content once
 alld = dict.fromkeys(COPY, 0.0)     # every copy
 cells = {"distinct": [0.0] * 4, "all": [0.0] * 4}
 cats_dedup, cats_all = {}, {}       # category -> [count, violations, toothpicks, converted]
-have_copies = False
+have_copies = have_extra = False
 for org in orgs:
     p = path(org, "file_contents.tsv")
     if not os.path.isfile(p):
@@ -563,12 +574,13 @@ for org in orgs:
             files, strings = int(cols[1]), int(cols[2])
             first = key not in contents
             contents[key] = contents.get(key, 0) + (files << 32) + strings
-            if len(cols) < 4 + len(COPY):
+            if len(cols) < 4 + NCOPY:
                 continue            # results from before the per-content stats
             have_copies = True
-            copy = dict(zip(COPY, map(float, cols[3:3 + len(COPY)])))
+            have_extra |= len(cols) >= 4 + len(COPY)
+            copy = dict(zip(COPY, map(float, cols[3:3 + NCOPY] + cols[4 + NCOPY:4 + len(COPY)])))
             cell = 2 * (copy["fragments"] == 0) + (copy["whole"] == 0)   # both, fragments only, whole only, neither
-            parsed = [c.split(":") for c in cols[3 + len(COPY)].split(",") if c]
+            parsed = [c.split(":") for c in cols[3 + NCOPY].split(",") if c]
             for k in COPY:
                 alld[k] += copy[k] * files
             cells["all"][cell] += files
@@ -630,6 +642,18 @@ if have_copies:
     for k, metric in enumerate(KEPT):
         out.append(both(metric + " (% of converted)",
                         lambda a, n, k=k: div(a["kept%d" % k], a["conv"]) * 100, pct))
+    if have_extra:
+        out += [both("Raw-Form Holdable (% of compliant)", lambda a, n: div(a["raw"], a["compliant"]) * 100, pct),
+                both("Matchertext-Only (% of compliant)", lambda a, n: div(a["mt"], a["compliant"]) * 100, pct),
+                both("In-Scope With Toothpicks", lambda a, n: a["swt"], fmt_int),
+                both("With Toothpicks (% of in-scope)", lambda a, n: div(a["swt"], a["scope"]) * 100, pct),
+                both("Compliant (% of with toothpicks)", lambda a, n: div(a["cwt"], a["swt"]) * 100, pct),
+                both("Cleared By Rewrite (% of with toothpicks)", lambda a, n: div(a["clwt"], a["swt"]) * 100, pct),
+                both("Raw-Form Holdable (% of compliant with toothpicks)",
+                     lambda a, n: div(a["rawwt"], a["cwt"]) * 100, pct),
+                both("Matchertext-Only (% of compliant with toothpicks)",
+                     lambda a, n: div(a["mtwt"], a["cwt"]) * 100, pct),
+                both("Mean Per-Literal Reduction (with toothpicks)", lambda a, n: div(a["redwt"], a["swt"]), pct)]
     out += [both("Comments", lambda a, n: a["docs"], fmt_int),
             both("Comment Compliance", lambda a, n: div(a["docs_ok"], a["docs"]) * 100, pct),
             both("Comment Compliance Relaxed", lambda a, n: div(a["docs_ok_relaxed"], a["docs"]) * 100, pct),
