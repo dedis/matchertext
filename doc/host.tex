@@ -424,10 +424,10 @@ Matchertext embedding, in contrast,
 preserves JavaScript's ``syntactic freedom''
 of using one quote character to quote a verbatim instance of the other.
 
-A legacy HTML5 tokenizer reads \verb|<code [|
-as an attribute name ending at the first \verb|>|,
-and \verb|attr=[| as an unquoted value;
-a sanitizer and a browser that disagree on the syntax
+Legacy HTML5 reads \verb|<code [|$\dots$ as a start tag
+with junk attributes ending at the first \verb|>|,
+and \verb|attr=[|$\dots$ as an unquoted value ending at the first space.
+A sanitizer and a browser that disagree on syntax
 enable mutation XSS~\cite{heiderich13mxss},
 so every processor of such a document must parse the extensions.
 

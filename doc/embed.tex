@@ -49,7 +49,7 @@ as in:
 \verb|  scanChar(']')| 
 \end{quote}
 
-Printing and scanning code like this generally violates the matchertext rule,
+Code like this generally violates the matchertext rule,
 and adapting such code most likely represents the biggest ``pain point''
 in any venture to write readily-embeddable matchertext.
 
@@ -118,11 +118,11 @@ the syntax of a particular language,
 and hence does not know what a ``comment'' is --
 so the matchertext discipline must disallow unmatched matchers even in comments.
 
-Since comments are generally intended for humans reading the source code,
-it is usually possible simply to rephrase the comment
-to avoid a literal use of unmatched matcher characters:
-\eg just name it (`open parenthesis')
-instead of writing it (`\verb|(|').
+Since comments are generally intended for humans,
+they might simply be rephrased
+to avoid literal use of unmatched matchers:
+\eg just name them (`open parenthesis')
+instead of writing them (`\verb|(|').
 Another alternative,
 if a language adopts the above extensions for string literals,
 is simply to use these matchertext-friendly escapes in comments as well
@@ -142,8 +142,8 @@ becomes `Parse a (' in the formatted output generated from the code.
 \subsection{SGML-derived languages}
 \label{sec:embed:ml}
 
-Considerations similar to those above for string literals
-apply when we wish to embed \ml-language markup
+Similar considerations apply
+when we wish to embed \ml-language markup
 into other languages as matchertext.
 The most common reason unmatched matchers appear in markup
 is when needed in literal text being marked up:
@@ -151,14 +151,13 @@ is when needed in literal text being marked up:
 or syntactic constructs built from them,
 or code examples that contain unmatched matchers.
 
-As with C-style string literals,
-\ml languages already offer a workaround:
-simply use character references,
+\ml languages already offer a workaround
+via character references,
 either named (like \verb|&lpar;|)
 or numeric (\verb|&#x0028;|).
-For the same reasons as above,
-we may like to have extensions
-offering more visually-obvious alternatives for writing matchertext:
+As above,
+we may desire extensions
+providing more visual alternatives for writing matchertext:
 \eg \verb|&(<);| and \verb|&(>);|
 for open and close parentheses (\cref{tab:unmatched-matchers}).
 

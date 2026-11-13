@@ -37,18 +37,18 @@ and the rewritten literals' toothpicks fell from 37{,}662 to 88 (\cref{app:go}).
 
 \subsection{MinML: minified matchertext markup}
 
-MinML~\cite{anon-ford22minml} pushes beyond the extensions above,
+MinML~\cite{anon-ford22minml} pushes beyond the above extensions,
 reformulating \ml syntax
-to rely on matching brackets
-rather than start/end tags for basic structure.
-For example, \emph{emphasis} is written like
+to use matching brackets
+instead of start/end tags for basic structure:
+\eg \emph{emphasis} is written like
 \verb|em[emphasis]| rather than \verb|<em>emphasis</em>|.
 Character references are written like
 \verb|[star]| instead of \verb|&star;|.
 
-A ``quotation'' delimited by matching quote characters
+A ``quotation'' using matching quote characters
 may be written like
-\verb|"[quotation]| in MinML instead of \verb|&ldquo;quotation&rdquo;|.
+\verb|"[quotation]| instead of \verb|&ldquo;quotation&rdquo;|.
 A comment is \verb|-[comment]| instead of \verb|<!--comment-->|.
 A raw embedded text sequence
 is written \verb|+[verbatim]| instead of \verb|<![CDATA[verbatim]]>|.

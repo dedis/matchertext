@@ -24,9 +24,9 @@ but when embedded in a C-like language must be written
 like \verb|re.match("\"[^\"]*\"")|,
 escaping all the embedded instances of double-quote characters,
 so that the embedded quotes will not prematurely end the string literal.
-Accidentally forgetting necessary escaping
-is naturally a common source of errors
-in manual embedding practice~\cite{eghbali20strings}.
+Forgetting necessary escaping,
+or otherwise mangling code embedded in strings,
+is a common source of bugs~\cite{eghbali20strings}.
 \emph{Automated} embedding is also common practice, however,
 such as accepting an arbitrary user-entered string on a web form
 and embedding it into HTML via a scripting language like PHP.
