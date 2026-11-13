@@ -18,24 +18,24 @@ and answers four questions that source code can answer directly:
 \subsection{Methodology}
 \label{sec:eval:methodology}
 
-The analysis extracts embedded text directly from each language's
-own lexical structure rather than from ad-hoc pattern matching.
-For C and C++ it uses the Clang lexer~\cite{lattner04llvm,llvm26clang},
+Our analysis extracts embedded text directly from each language's
+lexical structure rather than via ad-hoc pattern matching.
+For C and C++ we use the Clang lexer~\cite{lattner04llvm,llvm26clang},
 recognizing all string-literal forms (including the wide, UTF-8,
-UTF-16, UTF-32, and raw variants) and both comment styles;
-for the remaining languages it uses
+UTF-16, UTF-32, and raw variants) and both comment styles.
+For other languages we use
 in-process tree-sitter grammars~\cite{brunsfeld26treesitter}.
 Both paths emit string-literal and comment samples
 that feed the same metric computation.
-Each candidate string is further classified by content --
+We further classify each candidate string by content --
 \eg as a URI, regular expression, HTML, SQL, or shell fragment --
 using deterministic structural detectors backed by
 a trigram naive-Bayes model,
 with an explicit \emph{Unknown} bucket for samples too short or ambiguous
 to label safely.
 The compliance and escaping metrics below
-do not depend on this classification,
-which affects only the per-category attribution of results.
+do not depend on this classification;
+it affects only the per-category attribution of results.
 
 The corpus is drawn from GitHub
 and is intended to represent mature, widely-deployed production code:
@@ -83,11 +83,11 @@ Finally, \emph{nesting depth} is the deepest matcher nesting a sample reaches;
 \emph{raw} depth also counts unclosed openers.
 
 
-\subsection{Q1: Compliance of existing code}
+\subsection{Q1: Matchertext compliance of existing code}
 \label{sec:eval:compliance}
 
-Existing code is already highly matchertext-compliant
-at the level of individual embedded fragments.
+Existing code is already highly compliant
+in terms of individual embedded fragments.
 As \cref{tab:eval:compliance} shows,
 \dataStrCompliance of in-scope string-literal samples
 and \dataDocCompliance of comment samples are compliant as written.
@@ -130,7 +130,7 @@ Files (all fragments)	& \dataFilesShort	& \dataFileCompliance	& \dataFileComplia
 \end{table}
 
 
-\subsection{Q2: Where violations concentrate}
+\subsection{Q2: Where matchertext violations concentrate}
 \label{sec:eval:where}
 
 Violations are far from evenly spread across embedded-language categories.
@@ -148,7 +148,7 @@ The pattern is that unmatched matchers cluster
 in exactly the categories whose syntax routinely uses brackets singly,
 rather than in the bulk categories
 (plain prose, identifiers, file paths)
-that dominate the sample count.
+that dominate the overall sample count.
 
 This is the pain point we anticipate
 in \cref{sec:embed:c}:
@@ -156,13 +156,13 @@ printing and parsing code that emits or matches
 lone, unmatched matchers within string literals --
 \eg \verb|print("[")| or \verb|case "]"| --
 is where the matchertext discipline bites.
-Resolving the data by host language separates two effects.
-The first is the per-sample violation \emph{rate}:
+Considering host language separates two effects.
+First is per-sample violation \emph{rate}:
 the bracket-single-use categories are most violation-prone
 wherever they appear, and acutely in JavaScript,
 where regular expressions average \dataJsRegexRate violations per sample,
 shell fragments \dataJsShellRate, and CSS \dataJsCssRate.
-The second is absolute \emph{contribution}, which is partly volume-driven:
+Second is absolute \emph{contribution}, which is partly volume-driven:
 in every major host but Swift the largest source of violations
 is strings of a single character or of punctuation alone, such as \verb|"["|
 (\dataCppLoneViolationShare of C++'s violations and \dataJavaLoneViolationShare of Java's),
@@ -251,7 +251,8 @@ and no safe-delimiter search.
 In our analysis,
 rewriting each compliant string literal
 as an equivalent C++ raw string literal
-eliminates \dataReduction of the in-scope toothpicks (\dataDedupReduction deduplicated),
+eliminates \dataReduction of in-scope toothpicks
+(\dataDedupReduction deduplicated),
 cutting them
 from about \dataScopeToothpicks to about \dataToothpicksConverted.
 Of those left,
@@ -322,7 +323,7 @@ string literals more often hold a single flat fragment.
 \label{sec:eval:open}
 
 The results suggest that most existing text already complies
-and the benefit could be large.
+and the benefit could be substantial.
 Over \dataStrComplianceFloor of string literals and over \dataDocComplianceFloor of comments need no change,
 and rewriting the compliant majority
 as raw string literals or matchertext literals
