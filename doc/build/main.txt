@@ -999,7 +999,7 @@
 742   static website generator, a Language Server Protocol server with diagnostics, hover, and completion
 743   for Visual Studio Code, JetBrains IDEs, and five other editors (https://anonymous.4open.science/r/
 744   matchertext-D61C/dev/vscode/minml-preview), and a pandoc extension that converts to and from
-745   MinML (ANONYMIZED).
+745   MinML (https://anonymous.4open.science/r/pandoc-0EE1/).
 746
 747   7 Evaluation
 748
