@@ -10,7 +10,7 @@ and answers four questions that source code can answer directly:
 \item[\textbf{Q1}] How matchertext-compliant is existing code? (\cref{sec:eval:compliance})
 \item[\textbf{Q2}] Which embedded languages carry the violations? (\cref{sec:eval:where})
 \item[\textbf{Q3}] How much escaping would matchertext remove? (\cref{sec:eval:reduction})
-\item[\textbf{Q4}] How deeply does embedding nest in practice? (\cref{sec:eval:nesting})
+\item[\textbf{Q4}] How deeply do matchers nest in practice? (\cref{sec:eval:nesting})
 \end{itemize}
 \Cref{sec:eval:open} discusses the questions the corpus cannot answer.
 
@@ -263,8 +263,9 @@ The host's raw-string form could hold \dataRawHoldableShare
 of the compliant literals;
 another \dataMtOnlyShare fit matchertext literals
 but not the host's raw strings
-(\eg C and Java lack raw strings),
-and \dataMtOnlyShareWith of those with toothpicks.
+(\eg C and Java lack raw strings).
+This \dataMtOnlyShare rises to \dataMtOnlyShareWith
+among only compliant literals containing toothpicks.
 As a concrete case,
 the compliant C++ regular-expression literal
 \verb|"\\b,\"axis\":(\\d+)\\b"|
@@ -305,25 +306,25 @@ the cost of becoming compliant
 and the benefit of doing so are distinct quantities.
 
 
-\subsection{Q4: Nested embedding}
+\subsection{Q4: Matcher nesting depth}
 \label{sec:eval:nesting}
 
-Most bracket nesting is shallow.
-Most samples contain no matchers at all,
-and depth falls off sharply beyond one:
-the average per-sample maximum depth
-is only \dataStrAvgDepth for string literals
+Matcher nesting is usually shallow.
+Most samples contain no matchers,
+and depth falls sharply beyond one:
+average per-sample maximum depth
+is \dataStrAvgDepth for string literals
 and \dataDocAvgDepth for comments.
-Deep nesting does occur in a heavy tail --
+Deep nesting occurs in a heavy tail --
 the single deepest string sample reaches a raw depth of \dataStrMaxDepth,
 in \dataStrMaxDepthHost (though that literal's deepest \emph{matched} nesting is at most \dataStrMaxDepthValidBound),
 followed by maxima in C\# (\dataHostCSharpMaxDepth), Python (\dataHostPythonMaxDepth),
 and PHP (\dataHostPHPMaxDepth) --
 but such cases are vanishingly rare.
 Comments nest more on average than string literals,
-consistent with comments containing structured examples and prose,
-whereas string literals more often hold a single flat fragment.
-For reference, \cref{app:nesting} plots the full depth distribution.
+consistent with their containing structured examples and prose;
+string literals more often hold a single flat fragment.
+\Cref{app:nesting} plots the full depth distribution.
 
 
 \subsection{Discussion and open questions}
@@ -345,5 +346,8 @@ how matchertext affects usability in common embedding tasks,
 such as editing HTTP or SQL queries,
 and how it affects the rate of syntax-related and security-related bugs,
 which a static corpus analysis cannot measure.
-Nor is the corpus a random sample: it counts forks and vendored, generated, or minified files
-without deduplication, so widely copied code weighs more.
+Nor is the corpus a random sample:
+it includes generated and minified files,
+and widely copied code weighs more,
+though deduplicating exact copies leaves compliance at \dataDedupStrCompliance{}
+and the reduction at \dataDedupReduction{}.
