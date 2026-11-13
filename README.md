@@ -19,7 +19,7 @@ by counting balance, so no character inside the value needs escaping and no
 character can end the value early.
 
 For the idea in full, see
-[the matchertext paper](https://bford.info/pub/lang/matchertext/).
+[the matchertext paper](doc).
 
 ## Two papers live here
 
@@ -35,12 +35,12 @@ instructions here.
 
 | Directory                                  | Contents                                                                             |
 |--------------------------------------------|--------------------------------------------------------------------------------------|
-| [`doc`](doc)                               | LaTeX source for the matchertext paper                                               |
-| [`lean`](lean)                             | Machine-checked proofs of the properties both papers rely on                         |
-| [`go`](go)                                 | Go reference implementation: the matchertext scanner, MinML, and the language server |
 | [`dev`](dev)                               | Editor support: tree-sitter grammar, VS Code, Neovim, Emacs, Sublime Text, Zed, Helix, JetBrains |
-| [`LLVM`](LLVM)                             | Clang-based tool that measures matchertext compliance across source trees            |
+| [`doc`](doc)                               | LaTeX source for the matchertext paper                                               |
+| [`go`](go)                                 | Go reference implementation: the matchertext scanner, MinML, and the language server |
 | [`injection-research`](injection-research) | The injection study: CVE pipeline, corpus, and a matchertext-aware SQLite            |
+| [`lean`](lean)                             | Machine-checked proofs of the properties both papers rely on                         |
+| [`LLVM`](LLVM)                             | Clang-based tool that measures matchertext compliance across source trees            |
 
 Smaller items with no README of their own: `perl/escapes.pl` and
 `raku/escapes.raku` sketch matcher escape sequences for those languages, and

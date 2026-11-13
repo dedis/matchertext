@@ -1,22 +1,19 @@
-\documentclass[fullpage,twocolumn]{article}
+\documentclass[acmsmall,screen,review,anonymous,nonacm]{acmart}
 \pdfoutput=1
 
-\usepackage{times}
 \usepackage{xspace}
-\usepackage{cite} % sort citation numbers
-\usepackage{amsthm}
 \usepackage{xurl}
-\usepackage[hyperindex,breaklinks,colorlinks,
-	    linkcolor=blue,citecolor=blue,urlcolor=black]{hyperref}
+\hypersetup{breaklinks,colorlinks,
+	    linkcolor=blue,citecolor=blue,urlcolor=black}
+\setlength{\emergencystretch}{3em}	% break lines around long \verb text
 \usepackage{algorithm}
-\usepackage{algpseudocode}
+\usepackage[noend]{algpseudocode}
+\usepackage{subcaption}
 \usepackage{cleveref}
 \newtheorem{theorem}{Theorem}
 \newtheorem{lemma}{Lemma}
 \newtheorem{definition}{Definition}
 \crefname{algorithm}{Algorithm}{Algorithms}
-\usepackage{graphicx}
-\usepackage[T1]{fontenc}
 \usepackage{listings}
 \lstdefinelanguage{Lean}{
   morekeywords={inductive,theorem,def,where,variable,import,Prop,Set,List,Type},
@@ -35,6 +32,10 @@
   showstringspaces=false,
   literate=
     {α}{{$\alpha$}}1
+    {Σ}{{$\Sigma$}}1
+    {Π}{{$\Pi$}}1
+    {≤}{{$\le$}}1
+    {≥}{{$\ge$}}1
     {∃}{{$\exists$}}1
     {∈}{{$\in$}}1
     {∨}{{$\lor$}}1
@@ -78,12 +79,22 @@
 % Conference abbreviations: \bibconf[Nth]{SOSP}{Symposium on ...}
 \newcommand{\bibconf}[3][]{#1 \bibbrev{#2}{#3 (#2)}}
 
+% Cite own work as entry anon-<key> in the anonymous version
+\makeatletter
+\DeclareRobustCommand{\anoncite}[1]{%
+	\if@ACM@anonymous\cite{anon-#1}\else\cite{#1}\fi}
+\makeatother
+
 % for paralist compactitem envs
 %\defaultleftmargin{\parindent}{}{}{}
 
 % Common abbreviations
 \newcommand{\ie}{{\em i.e.},\xspace}
 \newcommand{\eg}{{\em e.g.},\xspace}
+
+% Every corpus figure quoted in the text, generated from LLVM/result/
+% by LLVM/latex.py. Regenerate with: python3 LLVM/latex.py
+\input{generated/numbers}
 
 %%%%%%%%%%%%%%%%%%%%%%
 
@@ -92,19 +103,22 @@
 
 \begin{document}
 
-\title{Matchertext: Towards Verbatim Interlanguage Embedding \\
-	\Large{%\texttt{preliminary draft - not yet for redistribution} \\
-	~\\
-	%Working project repository:
-	\url{https://github.com/dedis/matchertext}}}
+\title{Matchertext: Towards Verbatim Interlanguage Embedding}
 
-\author{Bryan Ford, Antoine Bastide \\ EPFL}
-
-\maketitle
+\author{Bryan Ford}
+\affiliation{%
+  \institution{EPFL}
+  \city{Lausanne}
+  \country{Switzerland}}
+\author{Antoine Bastide}
+\affiliation{%
+  \institution{EPFL}
+  \city{Lausanne}
+  \country{Switzerland}}
 
 \input{abs}
 
-\tableofcontents
+\maketitle
 
 \input{intro}
 \input{bg}
@@ -117,16 +131,67 @@
 \input{rel}
 \input{concl}
 
-\appendix
-\onecolumn
-\input{always_embeddability}
-\twocolumn
+\section*{AI Use}
 
-\bibliographystyle{plain}
+We used Claude Code (Anthropic) to write the Python content classifier
+of the evaluation (\cref{sec:eval:methodology}),
+to optimize parts of the source-code analyzer,
+to write the script that fetches the corpus repositories from GitHub,
+and to figure out quirks when learning and writing Lean~4 proofs.
+
+\begin{acks}
+We wish to thank
+Henry Corrigan-Gibbs,
+Russ Cox,
+Philip Hamelink,
+Hernán Ibarra Mejia,
+and
+Terence Parr
+for valuable feedback on earlier drafts of this paper.
+
+\xxx{samller contributions and funding acknowledgments here}
+\end{acks}
+
+\section*{Data-Availability Statement}
+
+The artifact, available at \url{https://anonymous.4open.science/r/matchertext-D61C/}, comprises
+the Lean~4 proofs of the embeddability and boundary results (\cref{app:lean,app:boundary}),
+the Go library and command-line tool that converts MinML to HTML or XML,
+a patch that adds matchertext literals to the Go toolchain,
+with the script that rewrites the string literals of four Go repositories
+as matchertext literals and runs their tests before and after, and its results,
+and the source-code analyzer and corpus-collection scripts
+used in the evaluation (\cref{sec:eval}),
+together with the analyzer's raw results.
+The corpus itself (about 1.5~TiB) is not included;
+the scripts rebuild it by cloning the repositories,
+whose later changes can cause small differences
+from the numbers reported here.
+We will submit the artifact to Artifact Evaluation.
+
+\bibliographystyle{ACM-Reference-Format}
 \arxiv{
 \bibliography{lang,net,sec,soc,thesis}
 }{
 \bibliography{main,thesis}
 }
+
+\newpage
+
+\appendix
+\crefalias{section}{appendix}
+\crefalias{subsection}{appendix}
+\crefalias{subsubsection}{appendix}
+\input{appendix/formal}
+\input{appendix/always_embeddability}
+\input{appendix/embeded_boundary}
+\input{appendix/nesting}
+\input{appendix/host_languages}
+\input{appendix/uri}
+\input{appendix/string_interpolation}
+\input{appendix/grammar}
+\input{appendix/go_experiment}
+\input{appendix/configuration_variants}
+\input{appendix/regular_expression}
 
 \end{document}

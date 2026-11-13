@@ -16,5 +16,5 @@ build:
 
 test:
 	@cmake -B $(TEST_BUILD_DIR) -S .
-	@cmake --build $(TEST_BUILD_DIR) --target LanguageClassifierTests ParserFixtureTests DebugLanguageOutputTests StringLiteralDecodeTests
+	@cmake --build $(TEST_BUILD_DIR) --target LanguageClassifierTests MatcherTextTests ParserFixtureTests DebugLanguageOutputTests StringLiteralDecodeTests LanguageEscapeTests
 	@ctest --test-dir $(TEST_BUILD_DIR) --output-on-failure

@@ -118,7 +118,7 @@ Inertness then rests on three premises, each separately dischargeable:
 	matcher depth, $v$ returns to depth zero, and the context closer is the
 	first character to drive it negative. Language-independent and machine-checked
 	(\cref{sec:appendix:lean}); what remains is verifying a concrete locator
-	(Algorithm~2 of~\cite{matchertext}) against it.
+	(the depth-counting scan of~\cite{matchertext}) against it.
 \item[\textbf{L2}] \emph{Parse inertness.} In $G$ the hole derives exactly one
 	terminal with that lexeme, and no other production derives structure from
 	within it: the parser does not re-enter $G$ on hole content. Reparse-based
@@ -133,8 +133,8 @@ parse skeleton independent of $v$; and L3 carries that independence through to
 execution. Thus
 $\mathrm{closure}\wedge\mathrm{L1}\wedge\mathrm{L2}\wedge\mathrm{L3}\Rightarrow$
 inertness.
-Closure and the correctness of \textsc{Verify} are machine-checked in the
-formalism of~\cite{matchertext}. This paper discharges L1 once for all host languages
+Closure is machine-checked in the formalism of~\cite{matchertext},
+which gives the correctness of \textsc{Verify} a paper proof sketch. This paper discharges L1 once for all host languages
 (\cref{sec:appendix:lean}), and the per-host-language L2 and L3 for a matchertext-aware
 SQLite in \cref{sec:prevent:exec}.
 

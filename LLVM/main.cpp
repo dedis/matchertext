@@ -273,6 +273,9 @@ int main(const int argc, char *argv[]) {
   // task. is_directory/is_regular_file consume the file type cached by readdir
   // where the platform provides it, avoiding extra stat calls. Errors (e.g.
   // permission denied) skip the offending entry rather than aborting the walk.
+  // Symlinks are skipped: a directory link can form a cycle (apple/SwiftUsd
+  // links to its own root), and a file link duplicates a file counted at its
+  // real path.
   std::function<void(const fs::path &, const std::string &)> walk =
       [&](const fs::path &dir, const std::string &inputPath) {
     std::vector<fs::path> subdirs;
@@ -280,6 +283,8 @@ int main(const int argc, char *argv[]) {
     for (fs::directory_iterator it(dir, fs::directory_options::skip_permission_denied, wec), end;
          !wec && it != end; it.increment(wec)) {
       std::error_code tec;
+      if (it->is_symlink(tec))
+        continue;
       if (it->is_directory(tec))
         subdirs.push_back(it->path());
       else if (it->is_regular_file(tec))
@@ -368,8 +373,14 @@ int main(const int argc, char *argv[]) {
       #endif
       for (const auto &[filePath, inputPath]: lang.second) {
         try {
-          if (Serde::JSON result; LanguageParser::ExtractData(lang.first, filePath, result))
+          SkipReason skip = SkipReason::None;
+          if (Serde::JSON result; LanguageParser::ExtractData(lang.first, filePath, result, &skip))
             Parser::GatherStatistics(std::move(result), filePath, inputPath, pls);
+          else if (skip != SkipReason::None) {
+            // Skipped files stay out of Sample Size; count them separately.
+            RecordSkip(Parser::FILE_STATS, skip);
+            RecordSkip(pls->fileStats, skip);
+          }
         } catch (const std::exception &e) {
           #pragma omp critical
           {
@@ -435,6 +446,38 @@ int main(const int argc, char *argv[]) {
       auto f = open_stat_file("language_stats.md");
       f << "# String Language Distribution\n\n";
       PrintLanguageStatsTable({{"String", Parser::STRING_LANG_STATS.Snapshot()}}, f);
+    } {
+      // One line per distinct file content: its hash, how many files have it, their
+      // string samples, and the stats of one copy. build_global.py merges them across
+      // organizations to count exact duplicates and to build the deduplicated tables.
+      auto f = open_stat_file("file_contents.tsv");
+      f << "#hash\tfiles\tstrings\tcopy strings\tin-scope strings\tcompliant strings\ttoothpicks"
+           "\tin-scope toothpicks\tconverted toothpicks\tkept non-compliant\tkept not matchertext"
+           "\tkept raw\tkept unknown escape\tkept interpolation\tkept backslash\tkept unwritable\tkept control"
+           "\tcomments\tcompliant comments\tcompliant comments relaxed"
+           "\tfragments\tfragments relaxed\twhole\twhole relaxed"
+           "\tcategories (name:count:violations:toothpicks:converted,...)"
+           "\traw-form holdable\tmatchertext-only\tin-scope with toothpicks\tcompliant with toothpicks"
+           "\tcleared with toothpicks\traw-form holdable with toothpicks\tmatchertext-only with toothpicks"
+           "\tsum of per-sample reduction with toothpicks\n";
+      for (const auto &[hash, content]: Parser::FILE_CONTENTS) {
+        const auto &a = content.first;
+        f << std::hex << hash << std::dec << '\t' << content.files << '\t' << content.strings << '\t'
+          << a.strings << '\t' << a.scopeStrings << '\t' << a.compliantStrings << '\t' << a.toothpicks << '\t'
+          << a.scopeToothpicks << '\t' << a.converted;
+        for (const uint64_t kept: a.kept)
+          f << '\t' << kept;
+        f << '\t' << a.docs << '\t' << a.docsCompliant << '\t' << a.docsCompliantRelaxed << '\t' << a.fragments
+          << '\t' << a.fragmentsRelaxed << '\t' << a.whole << '\t' << a.wholeRelaxed << '\t';
+        for (size_t i = 0; i < a.categories.size(); ++i) {
+          const auto &c = a.categories[i];
+          f << (i ? "," : "") << LanguageName(c.language) << ':' << c.count << ':' << c.violations << ':'
+            << c.toothpicks << ':' << c.converted;
+        }
+        f << '\t' << a.rawHoldable << '\t' << a.matchertextOnly << '\t' << a.scopeWithToothpicks << '\t'
+          << a.compliantWithToothpicks << '\t' << a.clearedWithToothpicks << '\t' << a.rawHoldableWithToothpicks
+          << '\t' << a.matchertextOnlyWithToothpicks << '\t' << std::to_string(a.reductionSumWith) << '\n';
+      }
     }
 
     for (const auto &[lang, pls]: perLangStats) {
@@ -480,6 +523,19 @@ int main(const int argc, char *argv[]) {
         auto f = open_lang_file("language_stats.md");
         f << "# String Language Distribution\n\n";
         PrintLanguageStatsTable({{"String", pls->langStats.Snapshot()}}, f);
+      } {
+        auto f = open_lang_file("raw_forms.md");
+        f << "# Native Raw String Forms\n\n";
+        PrintRawFormStatsTable(pls->rawForms, f);
+      } {
+        auto f = open_lang_file("file_examples.md");
+        f << "# Whole-File Compliance Examples\n\n";
+        f << "## Fragments Compliant Only\n\n";
+        for (const auto &example: pls->fragmentsOnlyExamples)
+          f << "- " << example << '\n';
+        f << "\n## Whole File Compliant Only\n\n";
+        for (const auto &example: pls->wholeOnlyExamples)
+          f << "- " << example << '\n';
       }
     }
 

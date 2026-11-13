@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -27,6 +28,7 @@
 #include "../include/Parser.hpp"
 #include "../include/LanguageClassifier.hpp"
 #include "../include/MatcherText.hpp"
+#include "../include/RawRewrite.hpp"
 
 namespace Serde {
   class JSON;
@@ -271,166 +273,81 @@ static std::string ExtractLiteralBody(std::string_view spelling, bool &isRaw) {
   return std::string(spelling.substr(open + 1, close - open - 1));
 }
 
-// Counts the backslash bytes that would remain if a C/C++ string literal body were
-// rewritten verbatim inside a raw string literal R"(...)" — i.e. the number of '\'
-// characters in the *decoded* content. Escape sequences are decoded semantically:
-// only sequences that actually produce a 0x5C code unit are counted (\\, octal \ooo,
-// hex \xH..., the \uXXXX / \UXXXXXXXX universal-character-name forms, and the C++23
-// delimited forms \x{...} / \o{...} / \u{...} / \N{REVERSE SOLIDUS}). `body` is
-// expected to already have line splices removed
-// (clang::Lexer::getSpelling does this); bodies taken from raw literals — or from
-// normal+raw adjacent-literal concatenations — are decoded as if normal and may be
-// over-collapsed, which is an accepted approximation here.
-uint64_t Parser::CountRawStringToothpicks(std::string_view body) {
-  const auto hexDigit = [](const unsigned char c) -> int {
-    if (c >= '0' && c <= '9')
-      return c - '0';
-    if (c >= 'a' && c <= 'f')
-      return c - 'a' + 10;
-    if (c >= 'A' && c <= 'F')
-      return c - 'A' + 10;
-    return -1;
-  };
-  const auto octDigit = [](const unsigned char c) -> int {
-    return c >= '0' && c <= '7' ? c - '0' : -1;
-  };
-
+// End of the C/C++ escape sequence that starts with the backslash at `i`.
+static size_t EscapeEnd(const std::string_view body, const size_t i) {
   const size_t n = body.size();
+  size_t j = i + 1;
+  if (j >= n)
+    return n; // dangling backslash
+  const char e = body[j++];
+  const auto isHex = [](const char c) { return std::isxdigit(static_cast<unsigned char>(c)) != 0; };
 
-  // Reads exactly `digits` hex digits starting at body[i]; advances i past them on success.
-  const auto parseFixedHex = [&](size_t &i, const int digits, uint32_t &value) -> bool {
-    value = 0;
-    for (int k = 0; k < digits; ++k) {
-      if (i >= n)
-        return false;
-      const int d = hexDigit(static_cast<unsigned char>(body[i]));
-      if (d < 0)
-        return false;
-      value = value * 16u + static_cast<uint32_t>(d);
-      ++i;
-    }
-    return true;
-  };
+  // C++23 delimited forms \x{...}, \o{...}, \u{...}, \N{...}.
+  if ((e == 'x' || e == 'o' || e == 'u' || e == 'N') && j < n && body[j] == '{') {
+    const size_t close = body.find('}', j);
+    return close == std::string_view::npos ? j : close + 1;
+  }
+  if (e == 'x') {
+    while (j < n && isHex(body[j]))
+      ++j;
+    return j;
+  }
+  if (e == 'u' || e == 'U') {
+    const size_t digits = e == 'u' ? 4 : 8;
+    size_t k = j;
+    while (k < n && k - j < digits && isHex(body[k]))
+      ++k;
+    return k - j == digits ? k : j;
+  }
+  if (e >= '0' && e <= '7') {
+    while (j < n && j - i < 4 && body[j] >= '0' && body[j] <= '7')
+      ++j;
+    return j;
+  }
+  return j;
+}
 
-  // Reads a "{ digits }" run in the given base starting at body[i]; advances i past the
-  // closing brace on success. Requires at least one digit.
-  const auto parseBracedNumber = [&](size_t &i, const int base, uint32_t &value) -> bool {
-    if (i >= n || body[i] != '{')
-      return false;
-    ++i;
+// True for a wide C/C++ literal (L"", u"", U"", and their raw forms), not u8"".
+static bool IsWidePrefix(const std::string_view spelling) {
+  return spelling.starts_with('L') || spelling.starts_with('U') ||
+         (spelling.starts_with('u') && !spelling.starts_with("u8"));
+}
 
-    value = 0;
-    bool any = false;
-    while (i < n && body[i] != '}') {
-      const int d = base == 16
-                      ? hexDigit(static_cast<unsigned char>(body[i]))
-                      : octDigit(static_cast<unsigned char>(body[i]));
-      if (d < 0)
-        return false;
-      value = value * static_cast<uint32_t>(base) + static_cast<uint32_t>(d);
-      any = true;
-      ++i;
-    }
-    if (i >= n || body[i] != '}')
-      return false;
-    ++i;
-    return any;
-  };
+// Counts the toothpicks left if a C/C++ string literal body were rewritten verbatim
+// inside a raw string literal R"(...)" (see RawRewrite.hpp). In a wide literal
+// (L, u, U) a \x or octal escape is a code unit, else a byte. `body` is expected to
+// already have line splices removed (clang::Lexer::getSpelling does this); bodies
+// taken from raw literals are treated as if normal and may be over-collapsed, which
+// is an accepted approximation here.
+uint64_t Parser::CountRawStringToothpicks(const std::string_view body, RawLiteral *literal, const bool wide) {
+  constexpr RawRewrite::Dialect dialect{.controls = "abefnrtv", .byteEscapes = true};
+  constexpr RawRewrite::Dialect wideDialect{.controls = "abefnrtv"};
+  thread_local RawRewrite::Counter counter;
+  counter.Reset(wide ? wideDialect : dialect);
 
-  uint64_t count = 0;
-  for (size_t i = 0; i < n;) {
+  size_t literalStart = 0;
+  for (size_t i = 0; i < body.size();) {
     if (body[i] != '\\') {
       ++i;
       continue;
     }
-
-    // Start of an escape sequence; the leading backslash itself does not survive.
-    if (++i >= n)
-      break; // dangling backslash — not valid source, ignore.
-
-    const auto e = static_cast<unsigned char>(body[i]);
-
-    if (e == '\\') { // \\ -> one literal backslash survives
-      ++count;
-      ++i;
-      continue;
-    }
-
-    if (e == 'x') { // \xH... or (C++23) \x{ H... }
-      ++i;
-      uint32_t value = 0;
-      if (i < n && body[i] == '{') {
-        if (parseBracedNumber(i, 16, value) && value == 0x5Cu)
-          ++count;
-        continue;
-      }
-      bool any = false;
-      while (i < n) {
-        const int d = hexDigit(static_cast<unsigned char>(body[i]));
-        if (d < 0)
-          break;
-        value = value * 16u + static_cast<uint32_t>(d);
-        any = true;
-        ++i;
-      }
-      if (any && value == 0x5Cu)
-        ++count;
-      continue;
-    }
-
-    if (e == 'o') { // (C++23) \o{ O... }
-      ++i;
-      uint32_t value = 0;
-      if (i < n && body[i] == '{' && parseBracedNumber(i, 8, value) && value == 0x5Cu)
-        ++count;
-      continue;
-    }
-
-    if (e == 'u' || e == 'U') { // \uHHHH, \UHHHHHHHH, or (C++23) \u{ H... }
-      ++i;
-      uint32_t value = 0;
-      if (i < n && body[i] == '{') {
-        if (parseBracedNumber(i, 16, value) && value == 0x5Cu)
-          ++count;
-        continue;
-      }
-      if (parseFixedHex(i, e == 'u' ? 4 : 8, value) && value == 0x5Cu)
-        ++count;
-      continue;
-    }
-
-    if (e == 'N') { // (C++23) named universal character escape \N{ NAME }
-      ++i;
-      constexpr std::string_view reverseSolidus = "{REVERSE SOLIDUS}";
-      if (body.substr(i, reverseSolidus.size()) == reverseSolidus) {
-        ++count;
-        i += reverseSolidus.size();
-      }
-      continue;
-    }
-
-    if (e >= '0' && e <= '7') { // \ooo octal escape, up to 3 digits
-      uint32_t value = 0;
-      for (int d = 0; d < 3 && i < n; ++d) {
-        const int od = octDigit(static_cast<unsigned char>(body[i]));
-        if (od < 0)
-          break;
-        value = value * 8u + static_cast<uint32_t>(od);
-        ++i;
-      }
-      if (value == 0x5Cu)
-        ++count;
-      continue;
-    }
-
-    // Simple escapes (\n \t \r \v \f \a \b \" \' \? ...): none decodes to a backslash.
-    ++i;
+    counter.Literal(body.substr(literalStart, i - literalStart));
+    const size_t end = EscapeEnd(body, i);
+    counter.Escape(body.substr(i, end - i));
+    i = literalStart = end;
+  }
+  counter.Literal(body.substr(literalStart));
+  const uint64_t count = counter.Count();
+  if (literal) {
+    literal->content.append(counter.Content());
+    literal->holdable = literal->holdable && counter.Holdable();
+    literal->kept += counter.KeptToothpicks();
   }
   return count;
 }
 
 void Parser::ParseFile(const std::string &filePath, const std::string &inputPath) {
-  if (Serde::JSON result; ParseC_CPP(filePath, result) && result.IsArray())
+  if (Serde::JSON result; ParseC_CPP(filePath, LanguageEnum::CPP, result) && result.IsArray())
     GatherStatistics(std::move(result), filePath, inputPath);
 }
 
@@ -444,7 +361,7 @@ void Parser::FlushDebugLanguageLogs() {
   GetDebugLanguageLogger().Flush();
 }
 
-bool Parser::ParseC_CPP(const std::string &path, Serde::JSON &result) {
+bool Parser::ParseC_CPP(const std::string &path, const LanguageEnum language, Serde::JSON &result) {
   /// Read-only after construction — safe to share across threads.
   static clang::DiagnosticOptions diagOpts;
   static auto diagIDs = llvm::makeIntrusiveRefCnt<clang::DiagnosticIDs>();
@@ -486,10 +403,14 @@ bool Parser::ParseC_CPP(const std::string &path, Serde::JSON &result) {
   if (!result.IsArray())
     result = Serde::JSON::Array();
 
-  /// Tokenize the file until EOF.
+  /// Tokenize the file until EOF. After a string literal the lexer has already
+  /// read the next token, which the following iteration must process, not skip.
   clang::Token tok{};
+  bool pending = false;
   while (true) {
-    lexer.LexFromRawLexer(tok);
+    if (!pending)
+      lexer.LexFromRawLexer(tok);
+    pending = false;
     if (tok.is(clang::tok::eof))
       break;
 
@@ -497,7 +418,12 @@ bool Parser::ParseC_CPP(const std::string &path, Serde::JSON &result) {
     if (IsStringToken(tok)) {
       std::string value;
       uint64_t convertedToothpicks = 0;
+      RawLiteral literal; // the raw rewrite of the concatenated segments
       clang::Token current = tok;
+      /// Byte range of the literal in the file, to blank out out-of-scope literals
+      /// of the whole-file check.
+      const unsigned begin = srcMgr.getFileOffset(tok.getLocation());
+      unsigned end = begin;
 
       /// Concatenate adjacent string literals ("a" "b").
       do {
@@ -510,19 +436,47 @@ bool Parser::ParseC_CPP(const std::string &path, Serde::JSON &result) {
         /// their own mode. A raw literal is already raw, so its backslashes are
         /// literal and kept verbatim; a normal literal's escapes decode down to the
         /// backslashes their content actually holds.
-        convertedToothpicks += isRaw
-          ? static_cast<uint64_t>(std::count(body.begin(), body.end(), '\\'))
-          : CountRawStringToothpicks(body);
+        if (isRaw) {
+          const auto backslashes = static_cast<uint64_t>(std::ranges::count(body, '\\'));
+          convertedToothpicks += backslashes;
+          literal.kept.raw += backslashes;
+          literal.content += body;
+        } else
+          convertedToothpicks += CountRawStringToothpicks(body, &literal, IsWidePrefix(spelling));
+        end = srcMgr.getFileOffset(current.getLocation()) + current.getLength();
 
         value += body;
         lexer.LexFromRawLexer(current);
       } while (IsStringToken(current));
 
       tok = current;
+      pending = true;
+      /// Decoding can create matchers (\x5B is '['). A literal whose decoded content
+      /// is not matchertext cannot be rewritten and keeps all its toothpicks.
+      const bool notMatchertext = !RawRewrite::MatchertextHolds(literal.content);
+      if (notMatchertext)
+        convertedToothpicks = static_cast<uint64_t>(std::ranges::count(value, '\\'));
+      const uint64_t violations = RawRewrite::AllRawFormViolations(literal.content);
+      const uint64_t holding = RawRewrite::AllRawFormsHolding(violations, literal.holdable);
       result.PushBack(Serde::JSON::Object({
         {"kind", Serde::JSON("string")},
         {"value", Serde::JSON(value)},
-        {"convertedToothpicks", Serde::JSON(static_cast<double>(convertedToothpicks))}
+        {"convertedToothpicks", Serde::JSON(static_cast<double>(convertedToothpicks))},
+        {"rawHolds", Serde::JSON(literal.holdable && RawRewrite::DefaultRawHolds(language, literal.content, {}) ? 1.0 : 0.0)},
+        {"mHolds", Serde::JSON(literal.holdable && RawRewrite::MatchertextHolds(literal.content) ? 1.0 : 0.0)},
+        {"rawFormViolations", Serde::JSON(static_cast<double>(violations))},
+        {"rawFormsHolding", Serde::JSON(static_cast<double>(holding))},
+        {"ownRawForm", Serde::JSON((holding & RawRewrite::OwnRawForms(language)) != 0 ? 1.0 : 0.0)},
+        {"control", Serde::JSON(RawRewrite::HasControl(literal.content) ? 1.0 : 0.0)},
+        {"keptRaw", Serde::JSON(static_cast<double>(literal.kept.raw))},
+        {"keptUnknownEscape", Serde::JSON(static_cast<double>(literal.kept.unknownEscape))},
+        {"keptInterpolation", Serde::JSON(static_cast<double>(literal.kept.interpolation))},
+        {"keptBackslash", Serde::JSON(static_cast<double>(literal.kept.backslash))},
+        {"keptUnwritable", Serde::JSON(static_cast<double>(literal.kept.unwritable))},
+        {"keptControl", Serde::JSON(static_cast<double>(literal.kept.control))},
+        {"notMatchertext", Serde::JSON(notMatchertext ? 1.0 : 0.0)},
+        {"begin", Serde::JSON(static_cast<double>(begin))},
+        {"end", Serde::JSON(static_cast<double>(end))}
       }));
       continue;
     }
@@ -537,39 +491,100 @@ bool Parser::ParseC_CPP(const std::string &path, Serde::JSON &result) {
   return true;
 }
 
+namespace {
+  /// 64-bit FNV-1a hash of a file's content, to find exact duplicates across the corpus.
+  uint64_t ContentHash(const std::string_view text) {
+    uint64_t hash = 0xcbf29ce484222325;
+    for (const unsigned char c: text)
+      hash = (hash ^ c) * 0x100000001b3;
+    return hash;
+  }
+}
+
 void Parser::GatherStatistics(
   Serde::JSON &&json, const std::string &path, const std::string_view inputPath, PerLanguageStats *perLang
 ) {
   uint64_t fileViolations = 0;
   uint64_t fileViolationsRelaxed = 0;
+  /// The file's stats, kept per distinct content for the deduplicated tables.
+  ContentAggregate file;
+  /// Byte ranges of the out-of-scope string literals, blanked out of the whole-file check.
+  std::vector<std::pair<size_t, size_t>> outOfScope;
 
   for (auto e: json.GetArray()) {
     std::string value = e["value"].GetString();
     if (e["kind"].GetString() == "string") {
-      const uint64_t convertedToothpicks = e.Contains("convertedToothpicks")
-        ? static_cast<uint64_t>(e["convertedToothpicks"].GetNumber())
-        : 0;
-      const uint64_t violations = process(
+      const auto number = [&](const char *key) {
+        return e.Contains(key) ? static_cast<uint64_t>(e[key].GetNumber()) : uint64_t{0};
+      };
+      StringHints hints;
+      hints.converted = number("convertedToothpicks");
+      hints.rawHolds = number("rawHolds") != 0;
+      hints.mHolds = number("mHolds") != 0;
+      hints.rawFormViolations = number("rawFormViolations");
+      hints.rawFormsHolding = number("rawFormsHolding");
+      hints.ownRawForm = number("ownRawForm") != 0;
+      hints.control = number("control") != 0;
+      hints.kept = {number("keptRaw"), number("keptUnknownEscape"), number("keptInterpolation"),
+                    number("keptBackslash"), number("keptUnwritable"), number("keptControl")};
+      hints.notMatchertext = number("notMatchertext") != 0;
+      const SampleOutcome outcome = process(
         std::move(value), STRING_STATS, STRING_NESTED_STATS, &STRING_LANG_STATS, false, path,
         inputPath.empty() ? std::string_view(path) : inputPath,
         perLang ? &perLang->stringStats : nullptr,
         perLang ? &perLang->stringNestedStats : nullptr,
         perLang ? &perLang->langStats : nullptr,
-        convertedToothpicks
+        &hints, perLang ? &perLang->rawForms : nullptr
       );
-      fileViolations += violations;
-      fileViolationsRelaxed += violations;
+      fileViolations += outcome.violations;
+      fileViolationsRelaxed += outcome.violations;
+
+      ++file.strings;
+      file.toothpicks += outcome.toothpicks;
+      if (outcome.inScope) {
+        ++file.scopeStrings;
+        file.compliantStrings += outcome.violations == 0;
+        file.scopeToothpicks += outcome.toothpicks;
+        file.converted += outcome.converted;
+        for (size_t cause = 0; cause < KeptCauseCount; ++cause)
+          file.kept[cause] += outcome.kept[cause];
+        file.rawHoldable += outcome.rawHoldable;
+        file.matchertextOnly += outcome.matchertextOnly;
+        if (outcome.toothpicks > 0) {
+          ++file.scopeWithToothpicks;
+          file.compliantWithToothpicks += outcome.violations == 0;
+          file.clearedWithToothpicks += outcome.converted == 0;
+          file.rawHoldableWithToothpicks += outcome.rawHoldable;
+          file.matchertextOnlyWithToothpicks += outcome.matchertextOnly;
+          file.reductionSumWith += 100.0 * static_cast<double>(outcome.toothpicks - outcome.converted) /
+                                   static_cast<double>(outcome.toothpicks);
+        }
+      } else if (e.Contains("end") && number("end") > number("begin")) {
+        outOfScope.emplace_back(number("begin"), number("end"));
+      }
+      auto category = std::ranges::find(file.categories, outcome.language, &CategoryCount::language);
+      if (category == file.categories.end())
+        category = file.categories.insert(file.categories.end(), CategoryCount{outcome.language});
+      category->count++;
+      category->violations += outcome.violations;
+      category->toothpicks += outcome.toothpicks;
+      category->converted += outcome.inScope ? outcome.converted : outcome.toothpicks;
     } else {
-      fileViolations += process(
+      const uint64_t violations = process(
         std::string(value), DOCS_STATS, DOCS_NESTED_STATS, nullptr, false, {}, {},
         perLang ? &perLang->docsStats : nullptr,
         perLang ? &perLang->docsNestedStats : nullptr
-      );
-      fileViolationsRelaxed += process(
+      ).violations;
+      const uint64_t violationsRelaxed = process(
         std::move(value), DOCS_RELAXED_STATS, DOCS_RELAXED_NESTED_STATS, nullptr, true, {}, {},
         perLang ? &perLang->docsRelaxedStats : nullptr,
         perLang ? &perLang->docsRelaxedNestedStats : nullptr
-      );
+      ).violations;
+      fileViolations += violations;
+      fileViolationsRelaxed += violationsRelaxed;
+      ++file.docs;
+      file.docsCompliant += violations == 0;
+      file.docsCompliantRelaxed += violationsRelaxed == 0;
     }
   }
 
@@ -588,20 +603,87 @@ void Parser::GatherStatistics(
   updateFileStats(FILE_STATS, fileViolations, fileViolationsRelaxed);
   if (perLang)
     updateFileStats(perLang->fileStats, fileViolations, fileViolationsRelaxed);
+
+  /// The whole source text: is it matchertext as a whole, and is it an exact
+  /// duplicate of another file in the corpus? Out-of-scope binary literals are
+  /// blanked out, as they are out of the fragments.
+  std::ifstream in(path, std::ios::binary);
+  if (!in)
+    return;
+  const std::string text{std::istreambuf_iterator(in), std::istreambuf_iterator<char>()};
+  std::string masked;
+  if (!outOfScope.empty()) {
+    masked = text;
+    for (const auto [begin, end]: outOfScope)
+      if (end <= masked.size())
+        std::fill(masked.begin() + static_cast<std::ptrdiff_t>(begin), masked.begin() + static_cast<std::ptrdiff_t>(end), ' ');
+  }
+  const std::string_view checked = outOfScope.empty() ? std::string_view(text) : std::string_view(masked);
+  const bool whole = AnalyzeMatcherText(checked, false).unmatched == 0;
+  const bool wholeRelaxed = AnalyzeMatcherText(checked, true).unmatched == 0;
+  const bool fragments = fileViolations == 0;
+  const bool fragmentsRelaxed = fileViolationsRelaxed == 0;
+  const bool fragmentFree = file.strings == 0 && file.docs == 0;
+  file.fragments = fragments;
+  file.fragmentsRelaxed = fragmentsRelaxed;
+  file.whole = whole;
+  file.wholeRelaxed = wholeRelaxed;
+  const auto updateWholeFile = [&](FileStats &fs) {
+    if (whole)
+      AtomicAdd(fs.wholeCompliant, 1.0);
+    if (wholeRelaxed)
+      AtomicAdd(fs.wholeCompliantRelaxed, 1.0);
+    AtomicAdd(fragments ? (whole ? fs.bothCompliant : fs.fragmentsOnlyCompliant)
+                        : (whole ? fs.wholeOnlyCompliant : fs.neitherCompliant), 1.0);
+    AtomicAdd(fragmentsRelaxed ? (wholeRelaxed ? fs.bothCompliantRelaxed : fs.fragmentsOnlyCompliantRelaxed)
+                               : (wholeRelaxed ? fs.wholeOnlyCompliantRelaxed : fs.neitherCompliantRelaxed), 1.0);
+    if (fragmentFree) {
+      AtomicAdd(fs.fragmentFree, 1.0);
+      if (whole)
+        AtomicAdd(fs.fragmentFreeWholeCompliant, 1.0);
+      if (wholeRelaxed)
+        AtomicAdd(fs.fragmentFreeWholeCompliantRelaxed, 1.0);
+    }
+  };
+  updateWholeFile(FILE_STATS);
+  if (perLang) {
+    updateWholeFile(perLang->fileStats);
+    if (fragments != whole) {
+      std::string relative = path;
+      if (!inputPath.empty() && relative.starts_with(inputPath))
+        relative.erase(0, inputPath.size() + (relative.size() > inputPath.size() && relative[inputPath.size()] == '/'));
+      std::lock_guard lock(perLang->examplesMutex);
+      if (auto &examples = fragments ? perLang->fragmentsOnlyExamples : perLang->wholeOnlyExamples;
+          examples.size() < PerLanguageStats::kMaxExamples)
+        examples.push_back(std::move(relative));
+    }
+  }
+
+  const uint64_t hash = ContentHash(text);
+  const uint64_t strings = file.strings;
+  std::lock_guard lock(FILE_CONTENTS_MUTEX);
+  auto &content = FILE_CONTENTS[hash];
+  if (content.files++ == 0)
+    content.first = std::move(file);
+  content.strings += strings;
 }
 
-uint64_t Parser::process(
+Parser::SampleOutcome Parser::process(
   std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats,
   LanguageStats *langStats, const bool relaxed,
   const std::string_view sourcePath, const std::string_view inputPath,
   EmbeddedStats *extraEmbedded, NestedStats *extraNested, LanguageStats *extraLangStats,
-  const uint64_t convertedToothpicksHint
+  const StringHints *hints, RawFormStats *rawForms
 ) {
+  static constexpr StringHints kNoHints{};
+  const StringHints &hint = hints ? *hints : kNoHints;
+  SampleOutcome outcome;
   uint64_t toothpicks = 0;
   for (const unsigned char c: string) {
     if (c == '\\')
       ++toothpicks;
   }
+  outcome.toothpicks = toothpicks;
 
   const auto [unmatched, maxDepth, maxValidDepth, rawChars] = AnalyzeMatcherText(string, relaxed);
 
@@ -610,28 +692,61 @@ uint64_t Parser::process(
   /// string literal (langStats is non-null only for string literals); everything
   /// else (non-compliant strings, comments) is counted unchanged. The converted
   /// count for compliant literals is computed per-segment at extraction time
-  /// (convertedToothpicksHint) so raw and adjacent normal+raw literals are each
-  /// counted in their own mode rather than re-decoding the concatenated body.
+  /// (hint.converted) so raw and adjacent normal+raw literals are each counted in
+  /// their own mode rather than re-decoding the concatenated body.
   const bool compliantStringLiteral = langStats != nullptr && unmatched == 0;
-  const uint64_t convertedToothpicks =
-      compliantStringLiteral ? convertedToothpicksHint : toothpicks;
+  const uint64_t convertedToothpicks = compliantStringLiteral ? hint.converted : toothpicks;
 
+  /// Binary data is out of matchertext's scope (see InMatchertextScope): it counts
+  /// toward the sample, character, toothpick and language stats only.
+  bool inScope = true;
   if (langStats != nullptr) {
-    /// Classify the embedded language and record per-language stats only for strings.
-    if (const auto [lang, confidence] = ClassifyString(string); lang != LanguageEnum::Unknown) {
-      langStats->Record(lang, unmatched, toothpicks);
-      if (extraLangStats)
-        extraLangStats->Record(lang, unmatched, toothpicks);
-      GetDebugLanguageLogger().Record(
-        inputPath, lang, sourcePath, string,
-        confidence, unmatched, toothpicks
-      );
+    /// Classify the embedded language and record per-language stats only for
+    /// strings; unclassified strings are recorded as Unknown.
+    const auto [lang, confidence] = ClassifyString(string);
+    inScope = InMatchertextScope(lang);
+    outcome.language = lang;
+    /// Out-of-scope binary data is not rewritten.
+    const uint64_t categoryConverted = inScope ? convertedToothpicks : toothpicks;
+    langStats->Record(lang, unmatched, toothpicks, categoryConverted);
+    if (extraLangStats)
+      extraLangStats->Record(lang, unmatched, toothpicks, categoryConverted);
+    GetDebugLanguageLogger().Record(
+      inputPath, lang, sourcePath, string,
+      confidence, unmatched, toothpicks
+    );
+
+    /// Why the toothpicks of an in-scope string literal survive its rewrite. The
+    /// causes add up to its converted toothpicks.
+    if (inScope) {
+      if (unmatched > 0)
+        outcome.kept[KeptNonCompliant] = toothpicks;
+      else if (hint.notMatchertext)
+        outcome.kept[KeptNotMatchertext] = toothpicks;
+      else {
+        outcome.kept[KeptRaw] = hint.kept.raw;
+        outcome.kept[KeptUnknownEscape] = hint.kept.unknownEscape;
+        outcome.kept[KeptInterpolation] = hint.kept.interpolation;
+        outcome.kept[KeptBackslash] = hint.kept.backslash;
+        outcome.kept[KeptUnwritable] = hint.kept.unwritable;
+        outcome.kept[KeptControl] = hint.kept.control;
+      }
     }
   }
+  outcome.inScope = inScope;
+  outcome.violations = inScope ? unmatched : 0;
+  outcome.converted = inScope && langStats != nullptr ? convertedToothpicks : 0;
+  outcome.rawHoldable = inScope && compliantStringLiteral && hint.rawHolds;
+  outcome.matchertextOnly = inScope && compliantStringLiteral && hint.mHolds && !hint.rawHolds;
 
-  nestedStats.Record(maxDepth, maxValidDepth);
-  if (extraNested)
-    extraNested->Record(maxDepth, maxValidDepth);
+  if (rawForms)
+    rawForms->Record(inScope, hint.mHolds, hint.rawFormViolations, hint.rawFormsHolding, hint.ownRawForm, hint.control);
+
+  if (inScope) {
+    nestedStats.Record(maxDepth, maxValidDepth);
+    if (extraNested)
+      extraNested->Record(maxDepth, maxValidDepth);
+  }
 
   auto applyEmbedded = [&](EmbeddedStats &s) {
     AtomicAdd(s.count, 1.0);
@@ -642,6 +757,12 @@ uint64_t Parser::process(
     AtomicAdd(s.toothpicks, static_cast<double>(toothpicks));
     if (AtomicMax(s.toothpicksMax, static_cast<double>(toothpicks)))
       s.stringMaxToothpicks.set(string);
+
+    if (!inScope)
+      return;
+    AtomicAdd(s.scopeCount, 1.0);
+    AtomicAdd(s.scopeToothpicks, static_cast<double>(toothpicks));
+    AtomicMax(s.scopeToothpicksMax, static_cast<double>(toothpicks));
 
     if (convertedToothpicks > 0)
       AtomicAdd(s.withToothpicksConverted, 1.0);
@@ -656,6 +777,33 @@ uint64_t Parser::process(
         s.toothpicksReductionSum,
         100.0 * static_cast<double>(toothpicks - convertedToothpicks) / static_cast<double>(toothpicks)
       );
+
+    std::atomic<double> *keptFields[KeptCauseCount] = {
+      &s.keptNonCompliant, &s.keptNotMatchertext, &s.keptRaw, &s.keptUnknownEscape,
+      &s.keptInterpolation, &s.keptBackslash, &s.keptUnwritable, &s.keptControl,
+    };
+    for (size_t cause = 0; cause < KeptCauseCount; ++cause)
+      if (outcome.kept[cause] > 0)
+        AtomicAdd(*keptFields[cause], static_cast<double>(outcome.kept[cause]));
+
+    /// Which literal form holds the rewritten content verbatim (compliant literals only).
+    if (compliantStringLiteral && hint.rawHolds)
+      AtomicAdd(s.rawHoldable, 1.0);
+    if (compliantStringLiteral && hint.mHolds && !hint.rawHolds)
+      AtomicAdd(s.matchertextOnly, 1.0);
+
+    /// The same over the samples with at least one toothpick.
+    if (toothpicks > 0) {
+      AtomicAdd(s.scopeWithToothpicks, 1.0);
+      if (unmatched == 0)
+        AtomicAdd(s.compliantWithToothpicks, 1.0);
+      if (convertedToothpicks == 0)
+        AtomicAdd(s.clearedWithToothpicks, 1.0);
+      if (outcome.rawHoldable)
+        AtomicAdd(s.rawHoldableWithToothpicks, 1.0);
+      if (outcome.matchertextOnly)
+        AtomicAdd(s.matchertextOnlyWithToothpicks, 1.0);
+    }
 
     if (unmatched > 0)
       AtomicAdd(s.withNonCompliance, 1.0);
@@ -680,5 +828,5 @@ uint64_t Parser::process(
   if (extraEmbedded)
     applyEmbedded(*extraEmbedded);
 
-  return unmatched;
+  return outcome;
 }

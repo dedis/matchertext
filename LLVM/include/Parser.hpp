@@ -7,13 +7,18 @@
 #ifndef PARSER_HPP
 #define PARSER_HPP
 
+#include <array>
+#include <cstdint>
+#include <mutex>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "FileStats.hpp"
 #include "JSON.hpp"
 #include "LanguageStats.hpp"
+#include "RawRewrite.hpp"
 #include "Stats.hpp"
 
 /// Owned stats for a single source language (used for per-language output).
@@ -26,6 +31,13 @@ struct PerLanguageStats {
   NestedStats docsRelaxedNestedStats;
   FileStats fileStats;
   LanguageStats langStats;
+  RawFormStats rawForms;
+  /// Example files (paths relative to the input) for the off-diagonal cells of
+  /// fragments compliant x whole file compliant (strict), at most kMaxExamples each.
+  static constexpr size_t kMaxExamples = 5;
+  std::mutex examplesMutex;
+  std::vector<std::string> fragmentsOnlyExamples;
+  std::vector<std::string> wholeOnlyExamples;
 };
 
 /**
@@ -62,7 +74,7 @@ class Parser final {
      * @param path Absolute or relative path to the source file to scan.
      * @param result
      */
-    static bool ParseC_CPP(const std::string &path, Serde::JSON &result);
+    static bool ParseC_CPP(const std::string &path, LanguageEnum language, Serde::JSON &result);
 
     static void GatherStatistics(
       Serde::JSON &&json, const std::string &path, std::string_view inputPath = {}, PerLanguageStats *perLang = nullptr
@@ -92,16 +104,95 @@ class Parser final {
     /// Per-language classification statistics for strings
     inline static LanguageStats STRING_LANG_STATS{};
 
-    static uint64_t CountRawStringToothpicks(std::string_view body);
+    /// What the extraction of a string literal tells about its raw rewrite.
+    struct StringHints {
+      uint64_t converted = 0;  // toothpicks left after the rewrite
+      bool rawHolds = false;   // the language's default raw form holds the content
+      bool mHolds = false;     // a matchertext literal holds the content
+      uint64_t rawFormViolations = 0;
+      uint64_t rawFormsHolding = 0;
+      bool ownRawForm = false;
+      bool control = false;    // the content holds a control character
+      RawRewrite::Kept kept;   // the converted toothpicks, by cause
+      bool notMatchertext = false; // decoded, the content is not matchertext
+    };
+
+    /// Why the toothpicks of an in-scope string literal survive its rewrite.
+    enum KeptCause : uint8_t {
+      KeptNonCompliant, KeptNotMatchertext, KeptRaw, KeptUnknownEscape, KeptInterpolation,
+      KeptBackslash, KeptUnwritable, KeptControl, KeptCauseCount
+    };
+
+    /// What processing one sample found.
+    struct SampleOutcome {
+      uint64_t violations = 0; // 0 for out-of-scope binary data
+      bool inScope = true;
+      LanguageEnum language = LanguageEnum::Unknown;
+      uint64_t toothpicks = 0;
+      uint64_t converted = 0;  // after the rewrite; in-scope string literals only
+      std::array<uint64_t, KeptCauseCount> kept{};
+      bool rawHoldable = false, matchertextOnly = false; // compliant string literals only
+    };
+
+    /// One string category of a file: samples, violations, toothpicks before and
+    /// after the rewrite.
+    struct CategoryCount {
+      LanguageEnum language;
+      uint64_t count = 0;
+      uint64_t violations = 0;
+      uint64_t toothpicks = 0;
+      uint64_t converted = 0;
+    };
+
+    /// The stats of one file, kept per distinct content for the deduplicated tables.
+    struct ContentAggregate {
+      uint64_t strings = 0, scopeStrings = 0, compliantStrings = 0;
+      uint64_t toothpicks = 0, scopeToothpicks = 0, converted = 0;
+      std::array<uint64_t, KeptCauseCount> kept{};
+      uint64_t rawHoldable = 0, matchertextOnly = 0;
+      // In-scope string literals with at least one toothpick: all, compliant, left
+      // without toothpicks by the rewrite, raw-form holdable, matchertext-only, and
+      // the sum of their own percentage reductions.
+      uint64_t scopeWithToothpicks = 0, compliantWithToothpicks = 0, clearedWithToothpicks = 0;
+      uint64_t rawHoldableWithToothpicks = 0, matchertextOnlyWithToothpicks = 0;
+      double reductionSumWith = 0;
+      uint64_t docs = 0, docsCompliant = 0, docsCompliantRelaxed = 0;
+      bool fragments = false, fragmentsRelaxed = false, whole = false, wholeRelaxed = false;
+      std::vector<CategoryCount> categories;
+    };
+
+    /// One distinct file content (keyed by its 64-bit FNV-1a hash): how many parsed
+    /// files have it, their string samples, and the stats of its first copy. Used to
+    /// measure exact duplicates and to build the deduplicated tables.
+    struct FileContent {
+      uint64_t files = 0;
+      uint64_t strings = 0;
+      ContentAggregate first;
+    };
+    inline static std::unordered_map<uint64_t, FileContent> FILE_CONTENTS{};
+    inline static std::mutex FILE_CONTENTS_MUTEX;
+
+    /// What adjacent C/C++ literal segments add up to in a raw rewrite.
+    struct RawLiteral {
+      std::string content;  // the raw literal's content
+      bool holdable = true; // every escape decodes to characters a raw literal can hold
+      RawRewrite::Kept kept; // the toothpicks the rewrite keeps, by cause
+    };
+
+    /// Toothpicks left after rewriting a C/C++ literal body as a raw literal. If given,
+    /// `literal` accumulates the segment's content and counts. `wide` is set for L, u,
+    /// and U literals, whose \x and octal escapes are code units rather than bytes.
+    static uint64_t CountRawStringToothpicks(std::string_view body, RawLiteral *literal = nullptr, bool wide = false);
   private:
-    /// Processes a string/doc and updates the given stat
-    /// @returns the number of MatcherText violations found
-    static uint64_t process(
+    /// Processes a string/doc and updates the given stats. `hints` is set for string
+    /// literals only.
+    static SampleOutcome process(
       std::string &&string, EmbeddedStats &stats, NestedStats &nestedStats,
       LanguageStats *langStats = nullptr, bool relaxed = false,
       std::string_view sourcePath = {}, std::string_view inputPath = {},
       EmbeddedStats *extraEmbedded = nullptr, NestedStats *extraNested = nullptr,
-      LanguageStats *extraLangStats = nullptr, uint64_t convertedToothpicksHint = 0
+      LanguageStats *extraLangStats = nullptr, const StringHints *hints = nullptr,
+      RawFormStats *rawForms = nullptr
     );
 };
 

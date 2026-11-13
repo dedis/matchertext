@@ -35,10 +35,10 @@ Second, membership in $L$ is decided by a single linear scan, the
 Third, a total encoder \textsc{ToMatchertext} maps \emph{any} string into $L$ by
 escaping only its unmatched matchers, so free-form input that legitimately
 contains an unmatched bracket need not be rejected.
-Closure and the correctness of \textsc{Verify} are machine-checked. So is
+Closure is machine-checked, and so is
 \textsc{ToMatchertext}'s landing in $L$ on every input
 (\cref{sec:appendix:tomatchertext}), leaving only its decoder round-trip
-informal.
+informal; the correctness of \textsc{Verify} has a paper proof sketch.
 For the rationale behind $\Pi$, the hosting syntaxes, and the empirical
 compliance study, see~\cite{matchertext}.
 
