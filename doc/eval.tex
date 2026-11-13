@@ -95,7 +95,8 @@ Per file, counting all its literals and comments, compliance is lower, \dataFile
 because one violating fragment makes the whole file non-compliant,
 so per-sample-rare violations still touch a noticeable fraction of files.
 As whole source texts, \dataWholeFileCompliance of files are matchertext;
-\dataFilesFragmentsOnly files comply fragment by fragment but not as a whole (\eg \verb|'['|),
+\dataFilesFragmentsOnly files comply fragment by fragment
+but not as a whole (\eg a C character constant \verb|'['|),
 and \dataFilesWholeOnly the reverse (\eg \verb|"["| \dots\ \verb|"]"|).
 The relaxed rule barely changes any of these figures
 (file compliance rises only to \dataFileComplianceRelaxed,
@@ -253,8 +254,9 @@ as an equivalent C++ raw string literal
 eliminates \dataReduction of the in-scope toothpicks (\dataDedupReduction deduplicated),
 cutting them
 from about \dataScopeToothpicks to about \dataToothpicksConverted.
-Of those left, \dataKeptNonCompliant are in non-compliant literals, which are not rewritten;
-the rest are mostly backslashes a raw literal still holds:
+Of those left,
+\dataKeptNonCompliant are in non-compliant literals, which are not rewritten.
+The rest are mostly backslashes the rewritten literal still needs:
 escaped ones as in regular expressions (\dataKeptBackslash),
 those of literals already raw (\dataKeptRaw) or opening a Swift interpolation (\dataKeptInterpolation),
 and escaped control characters (\dataKeptControl).
@@ -288,22 +290,11 @@ while others reduce much less,
 most strikingly Swift (\dataHostSwiftReduction), Python (\dataHostPythonReduction),
 and TypeScript (\dataHostTypeScriptReduction).
 
-A notable finding is that compliance and escape relief
-are largely \emph{independent},
-turning on where a language's escaping actually lives.
-TypeScript is the clearest case:
-its string literals are \dataHostTypeScriptCompliance compliant,
-among the highest in the corpus,
-yet rewriting them removes only \dataHostTypeScriptReduction of their toothpicks,
-among the lowest.
-The reason is that most of its backslashes (\dataTsRegexToothpickShare)
-sit in regular expressions,
-whose own escapes, like the three in the example above,
-survive the rewriting.
-A language can therefore satisfy the matchertext rule almost everywhere
-and still gain little from raw-string rewriting:
-the cost of becoming compliant
-and the benefit of doing so are distinct quantities.
+Compliance and escape relief are distinct quantities.
+TypeScript's literals are \dataHostTypeScriptCompliance{} compliant,
+yet rewriting removes only \dataHostTypeScriptReduction{} of their toothpicks,
+because \dataTsRegexToothpickShare{} of them sit in regular expressions,
+whose own escapes survive.
 
 
 \subsection{Q4: Matcher nesting depth}
@@ -330,7 +321,7 @@ string literals more often hold a single flat fragment.
 \subsection{Discussion and open questions}
 \label{sec:eval:open}
 
-The results suggest that the adoption cost is small
+The results suggest that most existing text already complies
 and the benefit could be large.
 Over \dataStrComplianceFloor of string literals and over \dataDocComplianceFloor of comments need no change,
 and rewriting the compliant majority

@@ -40,7 +40,7 @@ C-like	& Literal
 	& String escape
 	& \verb|"|$\dots$\verb|\[|$m$\verb|]|$\dots$\verb|"|
 	& \verb|"now \[quoting's "easy"] in matchertext"|
-	& \ref{sec:host:c} \\
+	& \ref{sec:host:c:escapes} \\
 	& & & & \\
 \ml	& Element
 	& \verb|<|\textit{tag attrs}\verb| [|$m$\verb|]>|
@@ -424,9 +424,11 @@ Matchertext embedding, in contrast,
 preserves JavaScript's ``syntactic freedom''
 of using one quote character to quote a verbatim instance of the other.
 
-A legacy HTML5 tokenizer reads \verb|<code [| as an attribute name ending at the first \verb|>|,
+A legacy HTML5 tokenizer reads \verb|<code [|
+as an attribute name ending at the first \verb|>|,
 and \verb|attr=[| as an unquoted value;
-a sanitizer and a browser that disagree on the syntax enable mutation XSS~\cite{heiderich13mxss},
+a sanitizer and a browser that disagree on the syntax
+enable mutation XSS~\cite{heiderich13mxss},
 so every processor of such a document must parse the extensions.
 
 

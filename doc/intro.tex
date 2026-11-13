@@ -25,7 +25,8 @@ like \verb|re.match("\"[^\"]*\"")|,
 escaping all the embedded instances of double-quote characters,
 so that the embedded quotes will not prematurely end the string literal.
 Accidentally forgetting necessary escaping
-is naturally a common source of syntax errors in manual embedding practice~\cite{eghbali20strings}.
+is naturally a common source of errors
+in manual embedding practice~\cite{eghbali20strings}.
 \emph{Automated} embedding is also common practice, however,
 such as accepting an arbitrary user-entered string on a web form
 and embedding it into HTML via a scripting language like PHP.
@@ -336,16 +337,19 @@ This paper makes the following contributions:
 	(\cref{sec:design:abstract:formal}).
 \end{itemize}
 
-Although matchertext has promising security implications
+Although matchertext shows potential for security
 as \cref{tab:intro:sql} illustrates,
-a systematic exploration of these security implications
-is beyond this paper's scope
-and remains future work.
+systematicaly exploring these security implications
+remains future work beyond this paper's scope (\cref{sec:eval:open}).
 
-\Cref{sec:bg} reviews current embedding practice,
-\cref{sec:rel} discusses related work, and \cref{sec:concl} concludes.
-How matchertext affects usability and the rate of security bugs
-remains open (\cref{sec:eval:open}).
+\Cref{sec:bg} reviews background,
+\cref{sec:design} details matchertext,
+\cref{sec:host} and \cref{sec:embed} cover
+hosting and embedding considerations respectively,
+\cref{sec:impl} summarizes implementations,
+\cref{sec:eval} evaluates matchertext's benefits and costs,
+\cref{sec:rel} outlines related work,
+and \cref{sec:concl} concludes.
 
 
 \xxx{

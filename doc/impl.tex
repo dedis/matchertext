@@ -37,15 +37,10 @@ and the rewritten literals' toothpicks fell from 37{,}662 to 88 (\cref{app:go}).
 
 \subsection{MinML: minified matchertext markup}
 
-One early experiment in matchertext-friendly syntax design
-is MinML~\anoncite{ford22minml},
-an alternative syntax for SGML-derived markup languages like HTML and XML.
-
-Beyond merely adding matchertext hosting and embedding extensions
-as discussed in the sections above,
-MinML more ambitiously reformulates the basic \ml syntax
-to rely on matching brackets for basic structure
-rather than matching start/end tags as in SGML tradition.
+MinML~\cite{anon-ford22minml} pushes beyond the extensions above,
+reformulating \ml syntax
+to rely on matching brackets
+rather than start/end tags for basic structure.
 For example, \emph{emphasis} is written like
 \verb|em[emphasis]| rather than \verb|<em>emphasis</em>|.
 Character references are written like
@@ -86,7 +81,7 @@ Braces		& \verb|{}|	& \verb|[{<}]|	& \verb|[{>}]|	\\
 
 MinML tools include
 a Go library and command-line tool that convert MinML to HTML or XML
-(\anon[\url{https://anonymous.4open.science/r/matchertext-D61C/go/matchertext}]{\url{https://github.com/dedis/matchertext/tree/main/go/matchertext}}),
+(\anon[\url{https://anonymous.4open.science/r/matchertext-D61C/go/markup/minml}]{\url{https://github.com/dedis/matchertext/tree/main/go/markup/minml}}),
 an \anon[extension]{\href{https://github.com/bford/hugo}{extension}}
 to the Hugo static website generator,
 a Language Server Protocol server with diagnostics, hover, and completion
