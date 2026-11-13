@@ -45,5 +45,8 @@ void EmbeddedStats::DeriveStats() {
   // genuinely distinct from the aggregate total: (tp-tpc)/tp weights each sample by
   // its toothpick count, whereas this weights every sample equally.
   toothpicksReductionAvg.store(sn > 0.0 ? trs / sn : 0.0, std::memory_order_relaxed);
+  const double swn = scopeWithToothpicks.load(std::memory_order_relaxed);
+  toothpicksReductionSumWith.store(trs, std::memory_order_relaxed);
+  toothpicksReductionAvgWith.store(swn > 0.0 ? trs / swn : 0.0, std::memory_order_relaxed);
   toothpicksReductionMax.store(tpMax > 0.0 ? 100.0 * (tpMax - tpcMax) / tpMax : 0.0, std::memory_order_relaxed);
 }

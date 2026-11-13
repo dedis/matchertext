@@ -131,6 +131,7 @@ class Parser final {
       uint64_t toothpicks = 0;
       uint64_t converted = 0;  // after the rewrite; in-scope string literals only
       std::array<uint64_t, KeptCauseCount> kept{};
+      bool rawHoldable = false, matchertextOnly = false; // compliant string literals only
     };
 
     /// One string category of a file: samples, violations, toothpicks before and
@@ -148,6 +149,13 @@ class Parser final {
       uint64_t strings = 0, scopeStrings = 0, compliantStrings = 0;
       uint64_t toothpicks = 0, scopeToothpicks = 0, converted = 0;
       std::array<uint64_t, KeptCauseCount> kept{};
+      uint64_t rawHoldable = 0, matchertextOnly = 0;
+      // In-scope string literals with at least one toothpick: all, compliant, left
+      // without toothpicks by the rewrite, raw-form holdable, matchertext-only, and
+      // the sum of their own percentage reductions.
+      uint64_t scopeWithToothpicks = 0, compliantWithToothpicks = 0, clearedWithToothpicks = 0;
+      uint64_t rawHoldableWithToothpicks = 0, matchertextOnlyWithToothpicks = 0;
+      double reductionSumWith = 0;
       uint64_t docs = 0, docsCompliant = 0, docsCompliantRelaxed = 0;
       bool fragments = false, fragmentsRelaxed = false, whole = false, wholeRelaxed = false;
       std::vector<CategoryCount> categories;

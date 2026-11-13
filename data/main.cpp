@@ -456,7 +456,10 @@ int main(const int argc, char *argv[]) {
            "\tkept raw\tkept unknown escape\tkept interpolation\tkept backslash\tkept unwritable\tkept control"
            "\tcomments\tcompliant comments\tcompliant comments relaxed"
            "\tfragments\tfragments relaxed\twhole\twhole relaxed"
-           "\tcategories (name:count:violations:toothpicks:converted,...)\n";
+           "\tcategories (name:count:violations:toothpicks:converted,...)"
+           "\traw-form holdable\tmatchertext-only\tin-scope with toothpicks\tcompliant with toothpicks"
+           "\tcleared with toothpicks\traw-form holdable with toothpicks\tmatchertext-only with toothpicks"
+           "\tsum of per-sample reduction with toothpicks\n";
       for (const auto &[hash, content]: Parser::FILE_CONTENTS) {
         const auto &a = content.first;
         f << std::hex << hash << std::dec << '\t' << content.files << '\t' << content.strings << '\t'
@@ -471,7 +474,9 @@ int main(const int argc, char *argv[]) {
           f << (i ? "," : "") << LanguageName(c.language) << ':' << c.count << ':' << c.violations << ':'
             << c.toothpicks << ':' << c.converted;
         }
-        f << '\n';
+        f << '\t' << a.rawHoldable << '\t' << a.matchertextOnly << '\t' << a.scopeWithToothpicks << '\t'
+          << a.compliantWithToothpicks << '\t' << a.clearedWithToothpicks << '\t' << a.rawHoldableWithToothpicks
+          << '\t' << a.matchertextOnlyWithToothpicks << '\t' << std::to_string(a.reductionSumWith) << '\n';
       }
     }
 

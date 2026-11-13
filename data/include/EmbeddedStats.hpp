@@ -53,6 +53,13 @@
   X(keptControl, "Kept Toothpicks: Control Character", "Converted toothpicks of escapes of control characters other than tab, line feed, and carriage return, kept verbatim.") \
   X(rawHoldable, "Raw-Form Holdable", "Number of matchertext-compliant string literals whose content the language's default raw string form holds verbatim.") \
   X(matchertextOnly, "Matchertext-Only", "Number of matchertext-compliant string literals whose content a matchertext literal M\"(...)\" holds verbatim but the language's default raw string form does not.") \
+  X(scopeWithToothpicks, "In-Scope With Toothpicks", "Number of in-scope samples containing at least one toothpick.") \
+  X(compliantWithToothpicks, "Compliant With Toothpicks", "Number of in-scope samples with no matchertext non-compliance and at least one toothpick.") \
+  X(clearedWithToothpicks, "Cleared With Toothpicks", "Number of in-scope samples with at least one toothpick and none left after rewriting each matchertext-compliant string literal as an equivalent C++ raw string literal.") \
+  X(rawHoldableWithToothpicks, "Raw-Form Holdable With Toothpicks", "Raw-Form Holdable string literals with at least one toothpick.") \
+  X(matchertextOnlyWithToothpicks, "Matchertext-Only With Toothpicks", "Matchertext-Only string literals with at least one toothpick.") \
+  X(toothpicksReductionSumWith, "Sum Of Per-Sample Toothpick Reduction (%)", "Sum of each in-scope sample's own percentage reduction in toothpicks after rewriting matchertext-compliant string literals as C++ raw string literals, over the samples with at least one toothpick.") \
+  X(toothpicksReductionAvgWith, "Toothpick Reduction Average With Toothpicks (%)", "Mean of each in-scope sample's own percentage reduction in toothpicks after rewriting matchertext-compliant string literals as C++ raw string literals, over the samples with at least one toothpick.") \
   \
   X(withNesting, "With Raw Nested Embedding", "Number of in-scope samples whose raw nesting depth exceeds 1, even if the nesting is never closed.") \
   X(nestingDepthTotal, "Sum Of Per-Sample Raw Max Depth", "Sum of each in-scope sample's maximum raw nesting depth, counting unmatched openers such as '((('.") \
