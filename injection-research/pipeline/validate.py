@@ -1,13 +1,14 @@
-"""Stage 3d: measure matchertext prevention on the payload corpora and check the
-CWE taxonomy against labeled ground truth.
+"""Stage 3d: classify the payload corpora under the matchertext threat model and
+check the CWE taxonomy against labeled ground truth.
 
 Two things the CVE record alone cannot supply:
 
-  1. Prevention rate. The CVE-derived measurement covers only the CVEs with an
-     extractable PoC payload, a few thousand records. fuzzdb, PayloadsAllTheThings
-     and SecLists supply attack strings directly, per sink type, so every payload
-     in a matcher-hostable syntax can be run through VERIFY (matchertext.assess)
-     instead of only those a PoC file happened to expose.
+  1. Mechanism split. fuzzdb, PayloadsAllTheThings and SecLists supply attack
+     strings directly, per sink type, so every payload in a matcher-hostable
+     syntax can be run through VERIFY (matchertext.assess): inert or rejected.
+     Whether a payload is in scope at all follows from its syntax, except for
+     the javascript: sinks of HTML/DOM, so the in-scope share is the threat
+     model's, not a measurement of containment.
 
   2. Anchor coverage. OWASP Benchmark and the SARD Juliet suites label cases with
      a CWE and, for Benchmark, a verdict. Resolving those CWEs through the same
@@ -73,7 +74,7 @@ def run(args):
     with open(EXPORTS / "payload_prevention.csv", "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["syntax_type", "payloads", "inert", "reject",
-                    "not_applicable", "prevention_rate"])
+                    "not_applicable", "in_scope_rate"])
         for syn in sorted(tally):
             c = tally[syn]
             n = sum(c.values())
@@ -91,7 +92,7 @@ def run(args):
     prevented = sum(tally[s]["inert"] + tally[s]["reject"] for s in hosted)
     n_hosted = sum(hosted.values())
     print(f"payloads assessed: {total}; matcher-hostable syntaxes: {n_hosted}; "
-          f"prevented: {prevented}"
+          f"in scope: {prevented}"
           + (f" ({prevented / n_hosted:.1%})" if n_hosted else ""))
     resolved = sum(1 for r in gt if r[3] and not r[4])
     print(f"ground truth: {len(gt)} (suite, cwe) pairs, "

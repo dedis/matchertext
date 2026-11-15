@@ -95,7 +95,16 @@
 
 \maketitle
 
+% The abstract is registered and frozen, so it keeps the figures it was
+% registered with. A later pipeline run updates them in the body only.
+\begingroup
+\renewcommand{\dataInjectionCVEs}{91{,}760\xspace}
+\renewcommand{\dataContainedShare}{78\%\xspace}
+\renewcommand{\dataHostableShare}{80\%\xspace}
+\renewcommand{\dataSqliCases}{578{,}776\xspace}
+\renewcommand{\dataSqliPayloads}{6{,}577\xspace}
 \input{abs}
+\endgroup
 
 \input{intro}
 \input{motivation}

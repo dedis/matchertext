@@ -11,9 +11,12 @@
 **
 **   V <hex>   print sqlite3MatchertextVerify(value, length)
 **   E <hex>   print sqlite3MatchertextEnd(value), a zero byte appended
-**   C <hex>   print sqlite3MatchertextEncode(value) as hex
+**   C <hex>   print sqlite3MatchertextEncode(value) as hex, over the value
+**             alphabet, which is the value hole's
 **   D <hex>   print sqlite3MatchertextDecodeInPlace(value) as hex, over the
-**             full escape alphabet, which is the value hole's
+**             value alphabet
+**   N <hex>   as C, over the name alphabet of the [...] hole
+**   M <hex>   as D, over the name alphabet
 **
 ** Each command prints one decimal result.  A malformed command is a harness
 ** bug, not a test failure, so the driver exits non-zero and says so.
@@ -25,7 +28,7 @@
 
 int sqlite3MatchertextVerify(const unsigned char *z, i64 n);
 i64 sqlite3MatchertextEnd(const unsigned char *z);
-char *sqlite3MatchertextEncode(const char *z, i64 n, i64 *pnOut);
+char *sqlite3MatchertextEncode(const char *z, i64 n, i64 *pnOut, int bFull);
 i64 sqlite3MatchertextDecodeInPlace(char *z, i64 n, int bFull);
 
 /* Long enough for the deepest nesting the tests generate, hex encoded. */
@@ -59,7 +62,7 @@ int main(void){
   while( fgets(zLine, sizeof(zLine), stdin) ){
     i64 n;
     char op = zLine[0];
-    if( (op!='V' && op!='E' && op!='C' && op!='D') || zLine[1]!=' ' ){
+    if( op==0 || strchr("VECDNM", op)==0 || zLine[1]!=' ' ){
       fprintf(stderr, "driver: malformed command\n");
       return 1;
     }
@@ -68,24 +71,26 @@ int main(void){
       fprintf(stderr, "driver: malformed hex\n");
       return 1;
     }
-    if( op=='C' || op=='D' ){
+    if( op=='C' || op=='D' || op=='N' || op=='M' ){
       /* Encode or decode, and print the result as hex so that any byte
       ** survives the trip back. */
+      int bFull = op=='C' || op=='D';
+      int bEncode = op=='C' || op=='N';
       i64 nOut = 0, m;
       char *zRes;
-      if( op=='C' ){
-        zRes = sqlite3MatchertextEncode((const char*)aVal, n, &nOut);
+      if( bEncode ){
+        zRes = sqlite3MatchertextEncode((const char*)aVal, n, &nOut, bFull);
         if( zRes==0 ){
           fprintf(stderr, "driver: out of memory\n");
           return 1;
         }
       }else{
         zRes = (char*)aVal;
-        nOut = sqlite3MatchertextDecodeInPlace(zRes, n, 1);
+        nOut = sqlite3MatchertextDecodeInPlace(zRes, n, bFull);
       }
       for(m=0; m<nOut; m++) printf("%02x", (unsigned char)zRes[m]);
       printf("\n");
-      if( op=='C' ) free(zRes);
+      if( bEncode ) free(zRes);
     }else if( op=='V' ){
       printf("%d\n", sqlite3MatchertextVerify(aVal, n));
     }else{

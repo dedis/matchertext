@@ -48,6 +48,6 @@ reach, so the ceiling we report is a property of injection, not this design.
 We measure the reach over a reproducible corpus of \dataInjectionCVEs injection
 CVEs, replaying recorded attack strings under a matchertext-aware host language
 (\cref{sec:corpus,sec:results,sec:prevent}): \dataContainedShare of attacks with a
-usable payload are contained, and at most \dataHostableShare target a delimitable
-syntax. A matchertext-aware SQLite fork we build admits no breakout over the
-recorded SQL payloads.
+usable payload are contained under the threat model, and at most
+\dataHostableShare target a delimitable syntax. A matchertext-aware SQLite fork we
+build admits no breakout over the recorded SQL payloads.

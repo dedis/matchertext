@@ -22,7 +22,7 @@ values are abstracted to nonmatcher placeholders):
 
 Prevention does not apply -- verdict empty -- when the sink executes the
 contained value by design (templates, expression languages, eval, spreadsheet
-formulas, `javascript:` URLs) or the context is delimited by non-matchers with
+formulas, LLM prompts, `javascript:` URLs) or the context is delimited by non-matchers with
 no matcher hosting (shell metacharacters, CR/LF, XML/XXE angle brackets).
 """
 import re
@@ -33,7 +33,8 @@ OPEN = set("([{")
 # Contexts a matchertext host can delimit with a matcher pair (paper 4.7.1-4.7.4).
 HOST = {"sql", "xpath_xquery", "nosql", "html_dom", "ldap"}
 # Sinks that execute the contained value regardless of delimiting.
-SEMANTIC = {"template", "expression_language", "code_eval", "formula_csv"}
+# An LLM acts on the instructions in a prompt however the text is delimited.
+SEMANTIC = {"template", "expression_language", "code_eval", "formula_csv", "llm_prompt"}
 # Contexts whose structural delimiters are non-matchers, with no matcher hosting.
 NONMATCHER = {
     "shell_command": "breakout via shell metacharacters (; | &), which are not matchers",
@@ -43,6 +44,9 @@ NONMATCHER = {
 }
 # javascript: URL lands in an execution context, not a structural slot.
 _JS = re.compile(r"\bJAVASCRIPT\b", re.I)
+# The only syntax whose verdict reads the payload; elsewhere the syntax label
+# alone decides whether a payload is contained.
+PAYLOAD_DEPENDENT = {"html_dom"}
 
 MECHANISM = {
     "inert": "The payload is valid matchertext, so it embeds verbatim in the "
@@ -70,7 +74,7 @@ def verify(skeleton):
 
 def assess(syntax, skeleton):
     """Return (preventable: bool, mechanism: 'inert'|'reject'|'', explanation)."""
-    if syntax in HOST and not (syntax == "html_dom" and _JS.search(skeleton)):
+    if syntax in HOST and not (syntax in PAYLOAD_DEPENDENT and _JS.search(skeleton)):
         mech = "inert" if verify(skeleton) else "reject"
         return True, mech, MECHANISM[mech]
     return False, "", ""

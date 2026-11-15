@@ -14,11 +14,13 @@ cd injection-research
 - Python 3.11 or later
 - Git
 - A C compiler available as `cc`, or set with `CC`
+- `make` and Tcl (`tclsh`), to generate the SQLite amalgamation
 - Internet access for an initial download
 - The GitHub CLI (`gh`) for optional GitHub payload recovery
 
-The SQL replay compiles `test/matchertext/csrc/sqli_driver.c` with the local
-`sqlite/sqlite3.c`. It does not use the Python SQLite driver for the replay.
+The SQL replay generates the MatcherText amalgamation from `sqlite/` in
+`data/build/sqlite/` and compiles `test/matchertext/csrc/sqli_driver.c` with it.
+It does not use the Python SQLite driver for the replay.
 
 ## Reproduce the complete pipeline
 
@@ -109,6 +111,10 @@ python3 pipeline/subclass.py
 python3 pipeline/syntactic_group.py
 ```
 
+`classify.py` also writes `data/exports/anchor_audit.csv`. It lists each
+labelled CWE and whether it has its own anchor or inherits its labels from an
+ancestor. Review the inherited rows when the CWE snapshot changes.
+
 `subclass.py` adds the independent privilege, vector, interaction, technique,
 engine, injection-point, and impact labels. `syntactic_group.py` groups
 payload-backed CVEs by their normalized attack structure.
@@ -119,8 +125,11 @@ payload-backed CVEs by their normalized attack structure.
 python3 pipeline/validate.py
 ```
 
-This stage measures MatcherText prevention over the general payload corpora and
-checks the CWE taxonomy against OWASP Benchmark and NIST SARD data. It writes
+This stage classifies the general payload corpora under the MatcherText threat
+model and checks the CWE taxonomy against OWASP Benchmark and NIST SARD data.
+The syntax label decides whether a payload is in scope, except for the
+`javascript:` sinks of HTML/DOM. The payload decides only whether it embeds
+inert or is rejected. It writes
 `data/exports/payload_prevention.csv` and
 `data/exports/ground_truth_anchors.csv`.
 
@@ -130,8 +139,11 @@ checks the CWE taxonomy against OWASP Benchmark and NIST SARD data. It writes
 python3 pipeline/sqli_experiment.py
 ```
 
-This command builds the normal and strict MatcherText SQLite drivers. It then
-replays every distinct SQL payload through all control and defense arms. It
+This command generates the amalgamation and builds the normal and strict
+MatcherText SQLite drivers. It then replays every distinct SQL payload through
+all control and defense arms. The run stops, and removes its results, when a
+guard fails: a driver exits early, a control never breaks out, a matchertext
+arm breaks out or changes a value, or the strict build admits a legacy path. It
 stores detailed results in `data/cve.db` and writes these principal files:
 
 - `data/exports/sqli_arm_outcomes.csv`

@@ -12,7 +12,8 @@ from collections import defaultdict
 from pathlib import Path
 
 from nbayes import TrigramNB
-from taxonomy import FAMILY_ANCHORS, FAMILY_OF_SYNTAX, OTHER, labels_from_cwes, rule_match
+from taxonomy import (FAMILY_ANCHORS, FAMILY_OF_SYNTAX, OTHER, SYNTAX_ANCHORS,
+                      labels_from_cwes, mask_rules, rule_match)
 
 ROOT = Path(__file__).resolve().parents[1]
 DB = ROOT / "data" / "cve.db"
@@ -36,6 +37,29 @@ def load_hierarchy(con):
                 seen.add(c)
                 stack.append(c)
     return parents, seen | set(FAMILY_ANCHORS)
+
+
+def anchor_audit(con, parents, subtree):
+    """List every CWE the taxonomy labels, and whether it carries its own
+    anchor or inherits its labels from an ancestor. An inherited label is where
+    a CWE added to the catalogue can land in the wrong class, as CWE-1427
+    (LLM prompt injection) did under CWE-77 (command injection)."""
+    n_cve = dict(con.execute(
+        "SELECT cwe_id, COUNT(DISTINCT cve_id) FROM cwe_assignment GROUP BY 1"))
+    rows = []
+    for cwe in subtree:
+        fam, generic, syn = labels_from_cwes([cwe], parents)
+        direct = cwe in FAMILY_ANCHORS or cwe in SYNTAX_ANCHORS
+        rows.append((cwe, n_cve.get(cwe, 0), fam or "", int(bool(generic)),
+                     syn or "", int(direct)))
+    rows.sort(key=lambda r: (r[5], -r[1], r[0]))
+    with open(EXPORTS / "anchor_audit.csv", "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["cwe_id", "cves", "family", "family_generic", "syntax", "own_anchor"])
+        w.writerows(rows)
+    inherited = [r for r in rows if not r[5]]
+    print(f"anchor audit: {len(inherited)} of {len(rows)} labelled CWEs inherit their "
+          f"labels, covering {sum(r[1] for r in inherited)} CWE assignments")
 
 
 def evaluate(model, test, margin):
@@ -64,8 +88,12 @@ def run(args):
     for cve_id, cwe, src in con.execute("SELECT cve_id, cwe_id, source FROM cwe_assignment"):
         cwes[cve_id].append((SOURCE_PRIORITY.get(src, 9), cwe))
 
+    EXPORTS.mkdir(parents=True, exist_ok=True)
+    anchor_audit(con, parents, subtree)
+
     results = {}  # cve_id -> [family, syntax, method, confidence]
     train, pending = [], []
+    overridden = contradicted = 0
     for cve_id, desc in con.execute(
             "SELECT cve_id, COALESCE(description,'') FROM cve WHERE state='PUBLISHED'"):
         ids = [c for _, c in sorted(set(cwes.get(cve_id, ())))]
@@ -81,8 +109,15 @@ def run(args):
         if rm and (fam is None or (fam == OTHER and generic)):
             fam, generic = rm[0], False
         if method:
+            # The syntax is the more specific label, so it decides the family
+            # where the two come from different CWEs or methods.
+            if FAMILY_OF_SYNTAX[syn] != fam:
+                fam, generic = FAMILY_OF_SYNTAX[syn], False
+                overridden += 1
             if desc:
-                train.append((cve_id, desc, syn))
+                # The rule phrases are blanked: the classifier only sees
+                # descriptions without them, so it must not learn from them.
+                train.append((cve_id, mask_rules(desc), syn))
         elif desc:
             pending.append((cve_id, desc, fam is None or generic))
         results[cve_id] = [fam or OTHER, syn or "unknown", method or "unknown", conf]
@@ -91,7 +126,6 @@ def run(args):
         tr = [(t, y) for cid, t, y in train if bucket(cid) != 0]
         te = [(t, y) for cid, t, y in train if bucket(cid) == 0]
         stats, covered = evaluate(TrigramNB().fit(*zip(*tr)), te, margin)
-        EXPORTS.mkdir(parents=True, exist_ok=True)
         with open(EXPORTS / "nb_holdout.csv", "w", newline="") as f:
             w = csv.writer(f)
             w.writerow(["class", "test_n", "precision", "recall", "coverage"])
@@ -108,9 +142,12 @@ def run(args):
             y, m = model.predict(desc)
             if m >= margin:
                 r = results[cve_id]
-                r[1], r[2], r[3] = y, "nb", round(m, 2)
                 if refinable:
                     r[0] = FAMILY_OF_SYNTAX[y]
+                elif FAMILY_OF_SYNTAX[y] != r[0]:
+                    contradicted += 1     # a specific CWE family outranks the classifier
+                    continue
+                r[1], r[2], r[3] = y, "nb", round(m, 2)
 
     con.executescript("""
         DROP TABLE IF EXISTS classification;
@@ -125,6 +162,8 @@ def run(args):
         "SELECT method, COUNT(*) FROM classification GROUP BY method"))
     total = con.execute("SELECT COUNT(*) FROM cve WHERE state='PUBLISHED'").fetchone()[0]
     print(f"injection-related: {len(results)} of {total} published CVEs; by method: {counts}")
+    print(f"family set by syntax: {overridden}; classifier labels refused for "
+          f"contradicting the CWE family: {contradicted}")
     con.close()
 
 

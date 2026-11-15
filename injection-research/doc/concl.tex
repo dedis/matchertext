@@ -7,7 +7,7 @@ it reaches. The guarantee is \emph{inertness}: a host language's parse does not 
 its holes contain, a property strictly stronger than closure and discharged by a
 machine-checked boundary proof (\cref{sec:appendix:lean}). Where a format already
 delimits with matchers, as LDAP filters and PDF strings do, the discipline costs
-nothing. Measured against \dataInjectionCVEs injection vulnerabilities,
-\dataContainedShare of attacks with a recoverable payload are contained by a
-matcher-delimited slot and at most \dataHostableShare target a matcher-delimitable
-syntax.
+nothing. Across \dataInjectionCVEs injection vulnerabilities, the threat model
+contains \dataContainedShare of attacks with a recoverable payload in a
+matcher-delimited slot, and at most \dataHostableShare target a
+matcher-delimitable syntax.

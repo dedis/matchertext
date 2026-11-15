@@ -87,26 +87,29 @@ CVEs (\textbf{\dataHostableShare}) target a matcher-delimitable syntax.
 This is an upper bound, since some HTML/DOM cases are \verb|javascript:| semantic
 sinks represent \textbf{\dataJsSinkRate} (\dataHtmlDomJsSinks) of payloads.
 
-Projecting the rate needs care, because payload-backed CVEs are not a random
-sample. A SQL payload is a literal string a write-up can quote, whereas code-eval
-and argument payloads are built at run time and rarely appear verbatim, so the
-syntaxes matchertext can delimit are over-represented among CVEs that carry a
-payload. Naively applying the pooled contained rate of \dataContainedShare to the whole corpus would
-therefore overcount, yielding \dataNaiveEstimate contained CVEs
-(\dataSkewCost above the stratified result).
-To correct for this bias we post-stratify: compute the contained rate
-separately within each syntax, then weight each rate by that syntax's
-corpus share (\cref{tab:strata}).
-The resulting central estimate is
-\textbf{\dataCentralEstimate} (\textbf{\dataCentralShare}), below the
-\dataHostableShare ceiling.
+Within one syntax the simulation leaves little to project: the threat model of
+\cref{sec:threat} contains every payload of a matcher-delimitable syntax and none
+outside, so the syntax label fixes each per-syntax rate, and only HTML/DOM, through
+its \verb|javascript:| sinks, depends on the payloads.
+What a projection must correct is the syntax mix, because payload-backed CVEs
+are not a random sample. A SQL payload is a literal string a write-up can quote,
+whereas code-eval and argument payloads are built at run time and rarely appear
+verbatim, so the syntaxes matchertext can delimit are over-represented among CVEs
+that carry a payload. Applying the pooled contained rate of \dataContainedShare to
+the whole corpus would overcount, yielding \dataNaiveEstimate contained CVEs
+(\dataSkewCost above the reweighted result).
+Weighting each syntax's rate by its corpus share instead (\cref{tab:strata})
+gives \textbf{\dataCentralEstimate} (\textbf{\dataCentralShare}): the
+\dataHostableShare ceiling less the HTML/DOM \verb|javascript:| sinks.
+This is reach under the threat model, not a measured containment rate;
+\cref{sec:prevent:exec} measures containment for SQL on a live parser.
 
 \begin{table}[t]
 \centering
-\caption{Post-stratification strata: per-syntax rates from the payload-backed
-subset, weighted by each syntax's corpus share. A dagger would mark a syntax
-with no payload-backed CVE, falling back to the structural rule of
-\cref{sec:threat}.}
+\caption{Strata: per-syntax rates from the payload-backed subset, weighted by
+each syntax's corpus share. A dagger marks a rate that the rule of
+\cref{sec:threat} fixes from the syntax label; only the HTML/DOM rate depends
+on the payloads.}
 \label{tab:strata}
 \small
 \setlength{\tabcolsep}{5pt}

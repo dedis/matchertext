@@ -36,7 +36,7 @@ DISPLAY = {
     "code_eval": "Code / eval", "crlf_header": "CRLF / header",
     "formula_csv": "Formula (CSV)", "template": "Template", "xml": "XML",
     "argument": "Argument", "expression_language": "Expression language",
-    "unknown": "Unknown",
+    "llm_prompt": "LLM prompt", "unknown": "Unknown",
 }
 
 
@@ -73,7 +73,7 @@ def containment(con):
 
 
 def post_stratify(con, inert, reject, outside):
-    """Reweight the measured containment rate by the corpus syntax mix.
+    """Reweight the per-syntax containment rate by the corpus syntax mix.
 
     Payload-backed CVEs are not a random sample of the corpus. SQL is 1.7x
     over-represented, because a SQL injection payload is a literal string a
@@ -82,13 +82,15 @@ def post_stratify(con, inert, reject, outside):
     correlates with syntax, and specifically with matcher-hostable syntax: 85%
     of the payload-backed subset is hostable against 80% of the corpus.
 
-    Multiplying the pooled containment rate by the corpus inherits that skew and
-    overstates the result by roughly five thousand CVEs. Estimating a rate per
-    syntax and weighting by the corpus counts removes it, which is the standard
-    post-stratification correction.
+    Multiplying the pooled containment rate by the corpus inherits that skew.
+    Weighting a rate per syntax by the corpus counts removes it.
 
-    A syntax with no payload-backed CVE has no measured rate and falls back to
-    the structural rule the model asserts: contained inside HOST, not outside.
+    The rates themselves are not measured, except for HTML/DOM: the threat
+    model contains every payload of a HOST syntax and none outside, so the
+    syntax label fixes the rate ("label"), and a syntax with no payload-backed
+    CVE gets the same rule ("structural"). Only a PAYLOAD_DEPENDENT syntax has
+    a rate the payloads decide ("measured"). The estimate is therefore the
+    hostable count less the HTML/DOM javascript: sinks.
 
     Returns (estimate, [(syntax, corpus_n, backed_n, rate, basis)]).
     """
@@ -98,7 +100,8 @@ def post_stratify(con, inert, reject, outside):
     for syn, n in sorted(corpus.items(), key=lambda kv: -kv[1]):
         backed = inert[syn] + reject[syn] + outside[syn]
         if backed:
-            rate, basis = (inert[syn] + reject[syn]) / backed, "measured"
+            rate = (inert[syn] + reject[syn]) / backed
+            basis = "measured" if syn in matchertext.PAYLOAD_DEPENDENT else "label"
         else:
             rate, basis = (1.0 if syn in matchertext.HOST else 0.0), "structural"
         est += n * rate
@@ -111,8 +114,8 @@ def tbl_strata(rows, top=8):
              "Syntax & CVEs & Payload-backed & Contained \\\\", "\\midrule"]
     for syn, n, backed, rate, basis in rows[:top]:
         mark = "" if basis == "measured" else "$^{\\dagger}$"
-        lines.append(f"{DISPLAY.get(syn, syn):<19} & {num(n):>9} & {num(backed):>7}{mark} "
-                     f"& {rate * 100:.1f}\\% \\\\")
+        lines.append(f"{DISPLAY.get(syn, syn):<19} & {num(n):>9} & {num(backed):>7} "
+                     f"& {rate * 100:.1f}\\%{mark} \\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
     return "\n".join(lines) + "\n"
 
