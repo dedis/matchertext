@@ -48,6 +48,24 @@ FAMILY_OF_SYNTAX = {
     "xml": OTHER, "formula_csv": OTHER, "llm_prompt": OTHER,
 }
 
+# CWEs without their own anchor, with the (family, family_is_generic, syntax)
+# they inherit, as reviewed against CWE v5.0. classify.py stops when a CWE with
+# CVEs inherits labels not listed here, so a CWE that is new or moved in the
+# catalogue is reviewed before it is counted.
+REVIEWED_INHERITED = {
+    # CWE-79 children: XSS variants.
+    **dict.fromkeys((80, 81, 82, 83, 84, 85, 86, 87), (RENDERING, False, "html_dom")),
+    # CWE-96 child: server-side include directives that the server evaluates.
+    97: (CODE, False, "code_eval"),
+    # CWE-75 child: no embedded language is named.
+    76: (OTHER, True, None),
+}
+
+# CWE-99 descendants that are not injection: duplicate identifiers, file names,
+# and dynamically chosen variables. No untrusted value enters an embedded
+# language. They carry no labels and do not admit a CVE to the corpus.
+NOT_INJECTION = {102, 462, 621, 627, 641, 694, 914}
+
 # CWE-74 itself and CWE-75 carry no syntax information; a family derived only
 # from these may be refined by phrase rules or the NB classifier.
 GENERIC_ANCHORS = {74, 75}
@@ -106,6 +124,8 @@ def labels_from_cwes(cwes, parents):
     """Map a CVE's CWE ids (in priority order) to (family, family_is_generic, syntax)."""
     fam, generic, syn = None, False, None
     for cwe in cwes:
+        if cwe in NOT_INJECTION:
+            continue
         if fam is None or (fam == OTHER and generic):
             hits = nearest_anchors(cwe, parents, FAMILY_ANCHORS)
             specific = [h for h in hits if FAMILY_ANCHORS[h] != OTHER]

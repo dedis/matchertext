@@ -120,9 +120,16 @@ python3 pipeline/subclass.py
 python3 pipeline/syntactic_group.py
 ```
 
+A CVE enters the corpus when it has a CWE in the CWE-74 subtree or its
+description matches a phrase rule. `NOT_INJECTION` in `pipeline/taxonomy.py`
+removes seven CWE-99 descendants from the subtree: no untrusted value in them
+enters an embedded language.
+
 `classify.py` also writes `data/exports/anchor_audit.csv`. It lists each
 labelled CWE and whether it has its own anchor or inherits its labels from an
-ancestor. Review the inherited rows when the CWE snapshot changes.
+ancestor. The stage stops when a CWE with CVEs inherits labels that
+`REVIEWED_INHERITED` in `pipeline/taxonomy.py` does not list. Review such a CWE
+in the CSV, then give it an anchor or add its labels to that list.
 
 `subclass.py` adds the independent privilege, vector, interaction, technique,
 engine, injection-point, and impact labels. `syntactic_group.py` groups

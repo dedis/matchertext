@@ -13,6 +13,9 @@ A CVE is treated as injection-related if it carries any CWE in the
 \mbox{CWE-74} (``Injection'') subtree (computed from the CWE ChildOf
 hierarchy across all enrichment sources) or if its description matches a
 phrase rule for a known injection class.
+The subtree excludes seven descendants of \mbox{CWE-99} (``Resource
+Injection''): duplicate identifiers, file names, and dynamically chosen
+variables, where no untrusted value enters an embedded language.
 This yields \textbf{\dataInjectionCVEs} injection CVEs, \textbf{\dataInjectionSharePrecise} of published
 records, spanning \dataInjectionCWEs distinct CWEs.
 

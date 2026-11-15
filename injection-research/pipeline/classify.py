@@ -12,8 +12,9 @@ from collections import defaultdict
 from pathlib import Path
 
 from nbayes import TrigramNB
-from taxonomy import (FAMILY_ANCHORS, FAMILY_OF_SYNTAX, OTHER, SYNTAX_ANCHORS,
-                      labels_from_cwes, mask_rules, rule_match)
+from taxonomy import (FAMILY_ANCHORS, FAMILY_OF_SYNTAX, NOT_INJECTION, OTHER,
+                      REVIEWED_INHERITED, SYNTAX_ANCHORS, labels_from_cwes,
+                      mask_rules, rule_match)
 
 ROOT = Path(__file__).resolve().parents[1]
 DB = ROOT / "data" / "cve.db"
@@ -30,26 +31,32 @@ def load_hierarchy(con):
     for c, p in con.execute("SELECT child_id, parent_id FROM cwe_hierarchy"):
         parents[c].append(p)
         children[p].append(c)
+    # The walk passes through NOT_INJECTION, so a CWE added below one of them
+    # still meets the anchor audit.
     seen, stack = {74}, [74]
     while stack:
         for c in children.get(stack.pop(), ()):
             if c not in seen:
                 seen.add(c)
                 stack.append(c)
-    return parents, seen | set(FAMILY_ANCHORS)
+    return parents, (seen - NOT_INJECTION) | set(FAMILY_ANCHORS)
 
 
 def anchor_audit(con, parents, subtree):
     """List every CWE the taxonomy labels, and whether it carries its own
     anchor or inherits its labels from an ancestor. An inherited label is where
     a CWE added to the catalogue can land in the wrong class, as CWE-1427
-    (LLM prompt injection) did under CWE-77 (command injection)."""
+    (LLM prompt injection) did under CWE-77 (command injection). Stops when a
+    CWE with CVEs inherits labels that REVIEWED_INHERITED does not list."""
     n_cve = dict(con.execute(
         "SELECT cwe_id, COUNT(DISTINCT cve_id) FROM cwe_assignment GROUP BY 1"))
-    rows = []
+    rows, unreviewed = [], []
     for cwe in subtree:
         fam, generic, syn = labels_from_cwes([cwe], parents)
         direct = cwe in FAMILY_ANCHORS or cwe in SYNTAX_ANCHORS
+        if (not direct and n_cve.get(cwe)
+                and REVIEWED_INHERITED.get(cwe) != (fam, generic, syn)):
+            unreviewed.append(cwe)
         rows.append((cwe, n_cve.get(cwe, 0), fam or "", int(bool(generic)),
                      syn or "", int(direct)))
     rows.sort(key=lambda r: (r[5], -r[1], r[0]))
@@ -60,6 +67,12 @@ def anchor_audit(con, parents, subtree):
     inherited = [r for r in rows if not r[5]]
     print(f"anchor audit: {len(inherited)} of {len(rows)} labelled CWEs inherit their "
           f"labels, covering {sum(r[1] for r in inherited)} CWE assignments")
+    if unreviewed:
+        raise SystemExit(
+            f"anchor audit: no review accepts the inherited labels of CWE "
+            f"{', '.join(map(str, sorted(unreviewed)))}; check them in "
+            f"{EXPORTS / 'anchor_audit.csv'}, then anchor them or list them in "
+            f"taxonomy.REVIEWED_INHERITED")
 
 
 def evaluate(model, test, margin):
