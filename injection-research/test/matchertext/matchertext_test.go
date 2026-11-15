@@ -97,6 +97,13 @@ func buildDriver(dir, name string, cflags ...string) (string, string, error) {
 // run feeds cmds to the driver and returns one result line per command.
 func run(t *testing.T, cmds []string) []string {
 	t.Helper()
+	return runProgram(t, exec.Command(driverPath), cmds)
+}
+
+// runProgram feeds cmds to the driver that cmd starts and returns one result
+// line per command.
+func runProgram(t *testing.T, cmd *exec.Cmd, cmds []string) []string {
+	t.Helper()
 	if len(cmds) == 0 {
 		return nil
 	}
@@ -107,7 +114,6 @@ func run(t *testing.T, cmds []string) []string {
 		in.WriteByte('\n')
 	}
 
-	cmd := exec.Command(driverPath)
 	cmd.Stdin = &in
 	var out, errb bytes.Buffer
 	cmd.Stdout = &out
@@ -619,6 +625,102 @@ func TestEncodeNameGoldenCases(t *testing.T) {
 	for i, c := range cases {
 		if g := string(unhex(t, got[i])); g != c.want {
 			t.Errorf("%s: encode_name(%q) = %q, want %q", c.name, c.in, g, c.want)
+		}
+	}
+}
+
+// parse5Path is the built parse5 fork that jssrc/driver.mjs tests.
+// MATCHERTEXT_PARSE5 points it elsewhere, as MATCHERTEXT_SRC does for C.
+var parse5Path = func() string {
+	if p := os.Getenv("MATCHERTEXT_PARSE5"); p != "" {
+		return p
+	}
+	return filepath.Join("..", "..", "parse5", "packages", "parse5", "dist", "index.js")
+}()
+
+// runJS feeds cmds to the JavaScript driver. The fork must be built: the
+// test fails rather than skips, so that a missing build is not a pass.
+func runJS(t *testing.T, cmds []string) []string {
+	t.Helper()
+	if _, err := os.Stat(parse5Path); err != nil {
+		t.Fatalf("the parse5 fork is not built (%v); run npm ci and npm run build in injection-research/parse5", err)
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Fatalf("node is required for the parse5 driver: %v", err)
+	}
+	return runProgram(t, exec.Command(node, filepath.Join("jssrc", "driver.mjs"), parse5Path), cmds)
+}
+
+// TestJSAgainstOracle is the differential run for the parse5 fork. Its
+// scanner and its tokenizer share no code with the Go implementation, so
+// VERIFY, an element hole <div [m]> and an attribute hole title=[m] must each
+// accept exactly the values that the oracle says are matchertext: a hole
+// that holds an unbalanced value whole would be a breakout.
+func TestJSAgainstOracle(t *testing.T) {
+	rng := rand.New(rand.NewSource(2))
+	n := fuzzCount(2000, 50000)
+
+	inputs := make([][]byte, n)
+	var cmds []string
+	for i := range inputs {
+		inputs[i] = randCase(rng, verifyAlphabet, 12)
+		h := hex.EncodeToString(inputs[i])
+		cmds = append(cmds, "V "+h, "H "+h, "A "+h)
+	}
+	got := runJS(t, cmds)
+
+	nValid, nBad := 0, 0
+	for i, in := range inputs {
+		want := "0"
+		if oracleVerify(in) {
+			want = "1"
+			nValid++
+		}
+		for j, what := range []string{"verifyMatchertext", "element hole", "attribute hole"} {
+			if got[3*i+j] != want {
+				nBad++
+				if nBad <= 10 {
+					t.Errorf("%s(%q) = %s, oracle says %s", what, in, got[3*i+j], want)
+				}
+			}
+		}
+	}
+	if nBad > 10 {
+		t.Errorf("%d disagreements in total", nBad)
+	}
+	if nValid == 0 || nValid == n {
+		t.Fatalf("degenerate sample: %d of %d valid", nValid, n)
+	}
+	t.Logf("%d cases, %d valid matchertext, %d rejected", n, nValid, n-nValid)
+}
+
+// TestDepthLimitAgrees checks that C and JavaScript share the nesting limit,
+// which the oracle does not have: a value that one accepts the other must
+// accept too.
+func TestDepthLimitAgrees(t *testing.T) {
+	var inputs [][]byte
+	for _, depth := range []int{999, 1000, 1001} {
+		inputs = append(inputs, []byte(strings.Repeat("(", depth)+strings.Repeat(")", depth)))
+	}
+
+	var cCmds, jsCmds []string
+	for _, in := range inputs {
+		cCmds = append(cCmds, verifyCmd(in))
+		h := hex.EncodeToString(in)
+		jsCmds = append(jsCmds, "V "+h, "H "+h, "A "+h)
+	}
+	c := run(t, cCmds)
+	js := runJS(t, jsCmds)
+
+	for i, want := range []string{"1", "1", "0"} {
+		if c[i] != want {
+			t.Errorf("C Verify at depth %d = %s, want %s", 999+i, c[i], want)
+		}
+		for j := 0; j < 3; j++ {
+			if js[3*i+j] != want {
+				t.Errorf("JavaScript command %d at depth %d = %s, want %s", j, 999+i, js[3*i+j], want)
+			}
 		}
 	}
 }

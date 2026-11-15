@@ -8,6 +8,7 @@ doc/generated/, which main.tex pulls in:
   tbl-payload-corpus.tex   VERIFY over the fuzzdb/PaTT/SecLists payloads
   tbl-poc-sources.tex  PoC linkage per source
   tbl-anchors.tex      ground-truth CWEs that resolve to an injection label
+  tbl-html-arms.tex    HTML replay verdicts per delivery path
 
 Macros end in \\xspace so they can be written inline without a trailing {}.
 Counts are formatted 13{,}691 and percentages 82\\%, matching the prose style.
@@ -396,6 +397,85 @@ def sqli_macros(con):
     return vals
 
 
+HTML_ARMS = [
+    ("concat",      "Concatenated into host HTML", "control"),
+    ("escape",      "Entity escaping",             "legacy"),
+    ("dom_stock",   "DOM, fragment serializer",    "legacy"),
+    ("dom_guarded", "DOM, guarded serializer",     "legacy"),
+    ("mt_verify",   "\\textsc{Verify} then \\texttt{[\\ldots]} hole", "mt"),
+    ("mt_section",  "\\textsc{Verify} then MDATA section", "mt"),
+    ("mt_encode",   "Matchertext encoding",        "mt"),
+    ("compose",     "\\texttt{composeHtml}",       "mt"),
+]
+HTML_MT_ARMS = ("mt_verify", "mt_section", "mt_encode", "compose")
+
+
+def has_table(con, name):
+    return con.execute("""SELECT COUNT(*) FROM sqlite_master
+                          WHERE type='table' AND name=?""", (name,)).fetchone()[0]
+
+
+def tbl_html_arms(con):
+    """Verdict counts per delivery path over the HTML hosts. Refused joins the
+    arm's own VERIFY refusals and the guarded serializer's refusals."""
+    rows = {a: r for a, *r in con.execute(
+        """SELECT arm, SUM(n_inert), SUM(n_altered), SUM(n_breakout),
+                  SUM(n_rejected) + SUM(n_refused), SUM(n_malformed), SUM(n_eff_breakout)
+           FROM mt_html_combo GROUP BY arm""")}
+    lines = ["\\begin{tabular}{l rrrrr r}", "\\toprule",
+             "Delivery & Inert & Altered & Broke out & Refused & Not HTML"
+             " & Effective broke out \\\\"]
+    last = None
+    for arm, label, group in HTML_ARMS:
+        if arm not in rows:
+            continue
+        if group != last:
+            lines.append("\\midrule")
+            last = group
+        lines.append(f"{label:34} & " + " & ".join(num(v) for v in rows[arm]) + " \\\\")
+    lines += ["\\bottomrule", "\\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
+def html_macros(con):
+    """Scalars of the HTML replay. Absent tables mean the stage has not run."""
+    if not has_table(con, "mt_html_combo"):
+        return []
+    q = lambda sql: con.execute(sql).fetchone()[0]
+    def col(c):
+        return {a: n for a, n in con.execute(
+            f"SELECT arm, SUM({c}) FROM mt_html_combo GROUP BY arm")}
+    brk, effb, rej = col("n_breakout"), col("n_eff_breakout"), col("n_rejected")
+    vals = [
+        ("HtmlPayloads", num(q("SELECT COUNT(*) FROM mt_html_value"))),
+        ("HtmlHosts", num(q("SELECT COUNT(*) FROM mt_html_host"))),
+        ("HtmlSemanticHosts", num(q("SELECT COUNT(*) FROM mt_html_host WHERE semantic=1"))),
+        ("HtmlArms", num(q("SELECT COUNT(*) FROM mt_html_arm"))),
+        ("HtmlCases", num(q("SELECT COUNT(*) FROM mt_html_case"))),
+        ("HtmlEffective", num(q("""SELECT COUNT(*) FROM (SELECT DISTINCT value_id, host_id
+                                   FROM mt_html_case WHERE effective=1)"""))),
+        ("HtmlMatchertextPayloads", num(q("SELECT COUNT(*) FROM mt_html_value WHERE is_mt=1"))),
+        # the matchertext arms and the guarded serializer: zero breakouts
+        ("HtmlMtBreakout", num(sum(brk.get(a, 0) for a in HTML_MT_ARMS))),
+        ("HtmlGuardedBreakout", num(brk.get("dom_guarded", 0))),
+        ("HtmlGuardedRefused", num(q("""SELECT SUM(n_refused) FROM mt_html_combo
+                                        WHERE arm='dom_guarded'""") or 0)),
+        ("HtmlMtVerifyRejected", num(rej.get("mt_verify", 0))),
+        # the control and the legacy paths, over the effective set
+        ("HtmlConcatBreakout", num(effb.get("concat", 0))),
+        ("HtmlEscapeBreakout", num(effb.get("escape", 0))),
+        ("HtmlDomStockBreakout", num(effb.get("dom_stock", 0))),
+    ]
+    sab = EXPORTS / "html_sabotage.csv"
+    if sab.exists():
+        with open(sab, newline="") as f:
+            rows = list(csv.DictReader(f))
+        vals += [("HtmlSabotages", num(len(rows))),
+                 ("HtmlSabotageDetected",
+                  num(sum(r["detection"] != "unnoticed" for r in rows)))]
+    return vals
+
+
 def run(args):
     con = sqlite3.connect(DB)
     q = lambda sql: con.execute(sql).fetchone()[0]
@@ -563,21 +643,25 @@ def run(args):
         ("GroundTruthResolved", num(len(resolved))),
     ]
     vals += sqli_macros(con)
+    vals += html_macros(con)
     (OUT / "numbers.tex").write_text(
         HEADER + "".join(macro(k, v) for k, v in vals))
-    (OUT / "tbl-mech.tex").write_text(HEADER + tbl_mech(inert, reject, outside))
-    (OUT / "fig-tree.tex").write_text(HEADER + fig_tree(
-        grouped, contained, sum(inert.values()), sum(reject.values()),
-        sum(outside.values()), semantic, nonmatcher))
-    (OUT / "tbl-syntax.tex").write_text(HEADER + tbl_syntax(con))
-    (OUT / "tbl-strata.tex").write_text(HEADER + tbl_strata(strata))
-    (OUT / "tbl-payload-corpus.tex").write_text(HEADER + tbl_payload_corpus(con))
-    (OUT / "tbl-poc-sources.tex").write_text(HEADER + tbl_poc_sources(con))
-    (OUT / "tbl-anchors.tex").write_text(HEADER + tbl_anchors(resolved))
-    if con.execute("""SELECT COUNT(*) FROM sqlite_master
-                      WHERE type='table' AND name='mt_sqli_combo'""").fetchone()[0]:
-        (OUT / "tbl-sqli-arms.tex").write_text(HEADER + tbl_sqli_arms(con))
-    print(f"wrote {len(vals)} macros and 6 tables to {OUT.relative_to(ROOT)}")
+    tables = {"tbl-mech": tbl_mech(inert, reject, outside),
+              "fig-tree": fig_tree(grouped, contained, sum(inert.values()),
+                                   sum(reject.values()), sum(outside.values()),
+                                   semantic, nonmatcher),
+              "tbl-syntax": tbl_syntax(con),
+              "tbl-strata": tbl_strata(strata),
+              "tbl-payload-corpus": tbl_payload_corpus(con),
+              "tbl-poc-sources": tbl_poc_sources(con),
+              "tbl-anchors": tbl_anchors(resolved)}
+    if has_table(con, "mt_sqli_combo"):
+        tables["tbl-sqli-arms"] = tbl_sqli_arms(con)
+    if has_table(con, "mt_html_combo"):
+        tables["tbl-html-arms"] = tbl_html_arms(con)
+    for name, body in tables.items():
+        (OUT / f"{name}.tex").write_text(HEADER + body)
+    print(f"wrote {len(vals)} macros and {len(tables)} tables and figures to {OUT.relative_to(ROOT)}")
     con.close()
 
 

@@ -68,12 +68,14 @@ SOURCE_METADATA = {
 REDHAT_URL = "https://access.redhat.com/hydra/rest/securitydata/cve.json"
 DEBIAN_URL = "https://security-tracker.debian.org/tracker/data/json"
 # NIST SARD Juliet suites: synthetic cases whose paths encode the CWE, giving a
-# CWE-labeled corpus independent of the CVE record.
+# CWE-labeled corpus independent of the CVE record. The C suite is over the
+# GitHub file limit of the snapshot archive, so it comes from an immutable
+# Zenodo record of the same bytes.
 SARD_SUITES = {
     "juliet-java": "https://samate.nist.gov/SARD/downloads/test-suites/"
                    "2017-10-01-juliet-test-suite-for-java-v1-3.zip",
-    "juliet-c": "https://samate.nist.gov/SARD/downloads/test-suites/"
-                "2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+    "juliet-c": "https://zenodo.org/records/4701387/files/"
+                "Juliet_Test_Suite_v1.3_for_C_Cpp.zip?download=1",
 }
 REFRESH = False
 
@@ -182,7 +184,8 @@ def run(args):
 
     pin(manifest, "kev", KEV_URL, RAW / "kev.json", today)
 
-    date = getattr(args, "epss_date", None) or manifest.get("epss", {}).get("date") \
+    date = getattr(args, "epss_date", None) \
+        or (not REFRESH and manifest.get("epss", {}).get("date")) \
         or str(today - datetime.timedelta(days=1))
     pin(manifest, "epss", EPSS_URL.format(date=date),
         RAW / "epss" / f"epss_scores-{date}.csv.gz", today, date=date)

@@ -76,3 +76,6 @@
 [submodule "injection-research/sqlite"]
 	path = injection-research/sqlite
 	url = https://github.com/AntoineBastide47/sqlite.git
+[submodule "injection-research/parse5"]
+	path = injection-research/parse5
+	url = https://github.com/dedis/matchertex-parse5
