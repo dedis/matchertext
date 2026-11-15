@@ -4,9 +4,10 @@
 \Cref{sec:resist} argued that matchertext \emph{can} contain injection; this
 section asks \emph{how much} of real injection it reaches, with two measurements
 over the corpus of \cref{sec:corpus}: a simulation replaying every recorded payload
-against a matchertext-aware host language, and one executed such host
-language: a modified SQLite, running the SQL payloads through a live parser
-(\cref{sec:prevent:exec}).
+against a matchertext-aware host language, and executed such host
+languages: a modified SQLite, running the SQL payloads through a live parser
+(\cref{sec:prevent:exec}), and a modified HTML parser, running the HTML payloads
+(\cref{sec:prevent:html}).
 
 Every payload falls into one of three outcomes, and matchertext helps in two by
 different routes. Under \emph{inert embedding} the value is valid matchertext and
@@ -246,3 +247,98 @@ every payload, and the run is deterministic.
 In sum, the simulated SQL containment of \cref{tab:mech} survives a live parser and
 strict mode makes A2 an invariant the engine enforces; the experiment discharges L2
 and L3 for SQL alone, and each further host language needs its own executed check.
+
+\subsection{A matchertext-aware HTML parser}
+\label{sec:prevent:html}
+
+HTML is the next host language to check. HTML/DOM accounts for \dataHtmlDomCVEs of
+the injection CVEs, and it is where L2 is known to fail: mutation XSS
+(\cref{sec:motivation}) is a reparse breakout. We repeat the experiment on
+parse5~\cite{parse5}, a WHATWG-conformant HTML parser and serializer, with the
+method of \cref{sec:prevent:exec}.
+
+\paragraph{The modified parser}
+An additive parser option, as in SQLite, adds the three hole forms of
+\cref{sec:resist:xss}: the element hole \verb|<|\emph{tag}\verb| [|$v$\verb|]>|,
+which holds $v$ as the element's only text without an end tag; the attribute hole
+\verb|name=[|$v$\verb|]|; and the \verb|<![MDATA[|$v$\verb|]]>| section.
+The tokenizer reads each hole to matcher balance (A1) and does not interpret it: it
+decodes no character reference, and \verb|<|, \verb|&|, quotes, and
+\verb|</script>| are text.
+HTML recovers from every other syntax error, but a malformed hole stops the parse,
+so a hole ends only at its matched closer.
+The counterpart of the typed parameters is \texttt{composeHtml}, which runs \textsc{Verify} on each value, puts it in its hole
+without tokenizing it, and refuses a value outside a hole (A2).
+The fork also changes the serializer, the other half of the mutation-XSS round
+trip: by default it refuses a tree that a parser would read back differently, such
+as script text that contains \verb|</script>|. This guard uses no hole. With
+matchertext output, the serializer writes such text as an element hole instead, if
+the text is matchertext.
+
+\paragraph{Hosts and arms}
+We put each of the \dataHtmlPayloads distinct HTML payloads in \dataHtmlHosts
+hosts: element text, a table cell, SVG text, \texttt{textarea}, \texttt{title},
+\texttt{style}, a JavaScript string in \texttt{script}, a comment, and
+double-quoted, single-quoted, and unquoted attributes, with \texttt{href} and
+\texttt{onclick} as semantic sinks (A4).
+Each host takes the \dataHtmlArms arms of \cref{tab:html} where they apply. A
+writer arm sets the value in a tree and parses the serializer's output again; the
+encoding arm never refuses (balanced runs in MDATA sections, other matchers as
+character references). This gives \dataHtmlCases cases.
+The oracle is the parsed tree, its elements, attributes, and comments with the hole
+marked, and the value in the hole, against the same host and arm with a benign
+value. It checks HTML only: in the script host, \verb|";alert(1)//| ends the
+JavaScript string but keeps the tree, so every arm counts it inert. The effective set, where concatenation breaks out, is \dataHtmlEffective
+(value, host) pairs.
+
+\begin{table}[t]
+\centering
+\caption{Parsed outcome by delivery path over the \dataHtmlPayloads HTML payloads
+(\dataHtmlCases cases). Without matchertext, the stock paths admit breakouts and
+the guard of the fork serializer only refuses; with matchertext (lower block), no
+path admits a breakout. Counts are of HTML structure; the JavaScript and CSS in
+script and style text are not checked. \textulc{\emph{Altered}}: the structure is kept but
+the hole holds another value; \textulc{\emph{Refused}}: \textsc{Verify} or the
+serializer refuses the value; \textulc{\emph{Not HTML}}: the parser refuses the
+composed document.}
+\label{tab:html}
+\small
+\setlength{\tabcolsep}{3pt}
+\input{generated/tbl-html-arms}
+\end{table}
+
+\paragraph{Results}
+Matchertext contains every payload (\cref{tab:html}, lower block). Concatenation
+breaks out on \dataHtmlEffective (value, host) pairs; in the fork, no arm admits a
+breakout on any of them (\dataHtmlMtBreakout). Each payload is inert text in its hole,
+or it is refused: the \dataHtmlNonMtPayloads payloads that are not matchertext, once
+per host. The encoding arm holds those too, so it contains the whole corpus and
+refuses nothing. The few \textulc{\emph{Altered}} cases are a zero byte, which every HTML parser
+reads as U+FFFD.
+The guard, which uses no hole, admits no breakout either
+(\dataHtmlGuardedBreakout), but only because it refuses the \dataHtmlGuardedRefused
+trees that a parser would read back differently. Matchertext output delivers
+\dataHtmlGuardedRefusedMtInert of them as holes; the others are comments, which have
+no hole form, or are not matchertext.
+Without matchertext, the defenses of stock parse5 fail where
+\cref{sec:resist:xss} predicts: entity escaping in single-quoted and unquoted
+attributes (\dataHtmlEscapeUncoveredBreakout breakouts), and the stock serializer in
+script, style, and comment text, which it writes unescaped
+(\dataHtmlDomStockUncoveredBreakout), the L2 violation of mutation XSS.
+
+\paragraph{Legacy readers}
+The hole forms are not backward compatible. A parser without the option reads \verb|[| as an
+attribute name, and in \dataHtmlLegacyElements of the \dataHtmlLegacyCases
+verified-hole cases (\dataHtmlLegacyElementsShare) it builds elements that the
+payload names. A1 must therefore hold at the reader. An application that serves a
+stock browser parses with the option and sends the guarded serialization, from
+which every matchertext tree of the sweep parses back unchanged.
+
+\paragraph{Falsifiability}
+Broken builds, in which \textsc{Verify} always accepts, the hole ends at the first
+closer, or the parser ignores the option, are each detected
+(\dataHtmlSabotageDetected of \dataHtmlSabotages) by changed verdicts or a failed
+benign baseline. The fork's \textsc{Verify} and holes agree with an independent
+implementation on random inputs and at the depth limit.
+The experiment discharges L2 for an HTML parser and its serializer, not for the
+JavaScript or CSS in its text, which are further host languages.

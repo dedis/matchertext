@@ -9,6 +9,8 @@ the same host and arm holding a benign value. Arms:
   dom_stock              the value set in a tree, written by the HTML fragment
                          serialization algorithm and parsed back.
   dom_guarded            the same, written by the default (guarded) serializer.
+  dom_mt                 the same, written by the serializer with matchertext
+                         output, and parsed again with the option.
   mt_verify              VERIFY, then the element hole <tag [v]> or the
                          attribute hole name=[v].
   mt_section             VERIFY, then <![MDATA[v]]> in normal element content.
@@ -45,7 +47,7 @@ DRIVER = ROOT / "test" / "matchertext" / "jssrc" / "html_driver.mjs"
 STAMP = BUILD / "parse5.stamp"
 
 VERDICTS = ("INERT", "ALTERED", "BREAKOUT", "REJECTED", "REFUSED", "MALFORMED")
-MT_ARMS = ("mt_verify", "mt_section", "mt_encode", "compose")
+MT_ARMS = ("dom_mt", "mt_verify", "mt_section", "mt_encode", "compose")
 # The arms that must never let a value change the structure of the host.
 CONTAINED_ARMS = MT_ARMS + ("dom_guarded",)
 CONTROL_HOSTS = ("text", "attr_dq")
@@ -55,6 +57,8 @@ SELFCHECK = {
     "compose_inert": "INERT",
     "dom_stock_breakout": "BREAKOUT",
     "dom_guarded_refuses": "REFUSED",
+    "dom_mt_inert": "INERT",
+    "dom_mt_refuses": "REFUSED",
     "encode_inert": "INERT",
 }
 MAX_MATCHER_DEPTH = 1000

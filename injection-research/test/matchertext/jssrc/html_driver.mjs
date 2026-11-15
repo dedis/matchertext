@@ -21,7 +21,7 @@
 //          ALTERED    the host's structure, but the hole holds another value
 //          BREAKOUT   another structure
 //          REJECTED   the arm refused the value (VERIFY or composeHtml)
-//          REFUSED    the guarded serializer refused the tree
+//          REFUSED    a serializer of the fork refused the tree
 //          MALFORMED  the parser refused the document that the arm wrote
 // reader   for a matchertext arm, how a parser without the option reads the
 //          same document, against the benign document: SAME, ATTRIBUTES (other
@@ -70,12 +70,24 @@ const HOSTS = [
     { name: 'comment', kind: 'comment' },
 ].map((host) => ({ pre: '', post: '', wrap: ['', ''], ...host }));
 
-const ARMS = ['concat', 'escape', 'dom_stock', 'dom_guarded', 'mt_verify', 'mt_section', 'mt_encode', 'compose'];
-const MT_ARMS = new Set(['mt_verify', 'mt_section', 'mt_encode', 'compose']);
+const ARMS = [
+    'concat',
+    'escape',
+    'dom_stock',
+    'dom_guarded',
+    'dom_mt',
+    'mt_verify',
+    'mt_section',
+    'mt_encode',
+    'compose',
+];
+const MT_ARMS = new Set(['dom_mt', 'mt_verify', 'mt_section', 'mt_encode', 'compose']);
+// The serializer writes raw text that the guard refuses as a matchertext element when the text is matchertext.
+const MT_OUTPUT = { matchertextOutput: true };
 
 function legal(host, arm) {
     if (host.kind === 'comment') {
-        return arm === 'concat' || arm === 'dom_stock' || arm === 'dom_guarded';
+        return arm === 'concat' || arm.startsWith('dom_');
     }
     if (arm === 'mt_section' || arm === 'mt_encode') {
         // MDATA sections and character references are read only in normal element content.
@@ -184,6 +196,9 @@ function write(host, arm, v) {
             case 'dom_stock':
             case 'dom_guarded': {
                 return parse(serialize(build(host, v), arm === 'dom_stock' ? STOCK : {}), STOCK);
+            }
+            case 'dom_mt': {
+                return parse(serialize(build(host, v), MT_OUTPUT), MT);
             }
             case 'mt_verify':
             case 'mt_section':
@@ -310,6 +325,14 @@ function matchertextDocument(host, arm, v) {
         case 'mt_encode': {
             return documentOf(host, element(host, encodeCooked(v)));
         }
+        case 'dom_mt': {
+            try {
+                return serialize(build(host, v), MT_OUTPUT);
+            } catch (error) {
+                if (error instanceof MatchertextError) return null;
+                throw error;
+            }
+        }
         case 'compose': {
             // composeHtml writes no document; the equivalent document is the one mt_verify writes.
             return matchertextDocument(host, 'mt_verify', v);
@@ -411,6 +434,8 @@ out({
         compose_inert: check('text', 'compose', '<b>x</b>'),
         dom_stock_breakout: check('script_string', 'dom_stock', '</script><b>x</b>'),
         dom_guarded_refuses: check('script_string', 'dom_guarded', '</script><b>x</b>'),
+        dom_mt_inert: check('script_string', 'dom_mt', '</script><b>x</b>'),
+        dom_mt_refuses: check('script_string', 'dom_mt', '</script>]'),
         encode_inert: check('text', 'mt_encode', 'x]> (y'),
     },
 });

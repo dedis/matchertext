@@ -397,17 +397,22 @@ def sqli_macros(con):
     return vals
 
 
+# Each block opens with a row that names it, so the reader sees which rows use matchertext.
 HTML_ARMS = [
-    ("concat",      "Concatenated into host HTML", "control"),
-    ("escape",      "Entity escaping",             "legacy"),
-    ("dom_stock",   "DOM, fragment serializer",    "legacy"),
-    ("dom_guarded", "DOM, guarded serializer",     "legacy"),
-    ("mt_verify",   "\\textsc{Verify} then \\texttt{[\\ldots]} hole", "mt"),
-    ("mt_section",  "\\textsc{Verify} then MDATA section", "mt"),
-    ("mt_encode",   "Matchertext encoding",        "mt"),
-    ("compose",     "\\texttt{composeHtml}",       "mt"),
+    ("concat",      "Concatenation",                     "stock"),
+    ("escape",      "Entity escaping",                   "stock"),
+    ("dom_stock",   "Stock writer",                      "stock"),
+    ("dom_guarded", "Guarded writer",                    "guard"),
+    ("dom_mt",      "Matchertext writer",                "fork"),
+    ("mt_verify",   "\\textsc{Verify}, hole",             "fork"),
+    ("mt_section",  "\\textsc{Verify}, MDATA",            "fork"),
+    ("mt_encode",   "Encoding",                          "fork"),
+    ("compose",     "\\texttt{composeHtml}",             "fork"),
 ]
-HTML_MT_ARMS = ("mt_verify", "mt_section", "mt_encode", "compose")
+HTML_GROUPS = {"stock": "Without matchertext: stock parse5",
+               "guard": "Without matchertext: fork serializer",
+               "fork": "With matchertext: parse5 fork"}
+HTML_MT_ARMS = ("dom_mt", "mt_verify", "mt_section", "mt_encode", "compose")
 
 
 def has_table(con, name):
@@ -420,17 +425,16 @@ def tbl_html_arms(con):
     arm's own VERIFY refusals and the guarded serializer's refusals."""
     rows = {a: r for a, *r in con.execute(
         """SELECT arm, SUM(n_inert), SUM(n_altered), SUM(n_breakout),
-                  SUM(n_rejected) + SUM(n_refused), SUM(n_malformed), SUM(n_eff_breakout)
+                  SUM(n_rejected) + SUM(n_refused), SUM(n_malformed)
            FROM mt_html_combo GROUP BY arm""")}
-    lines = ["\\begin{tabular}{l rrrrr r}", "\\toprule",
-             "Delivery & Inert & Altered & Broke out & Refused & Not HTML"
-             " & Effective broke out \\\\"]
+    lines = ["\\begin{tabular}{@{}l rrrrr@{}}", "\\toprule",
+             "& & & Broke & & Not \\\\", "Delivery & Inert & Altered & out & Refused & HTML \\\\"]
     last = None
     for arm, label, group in HTML_ARMS:
         if arm not in rows:
             continue
         if group != last:
-            lines.append("\\midrule")
+            lines += ["\\midrule", f"\\multicolumn{{6}}{{@{{}}l}}{{\\emph{{{HTML_GROUPS[group]}}}}} \\\\"]
             last = group
         lines.append(f"{label:34} & " + " & ".join(num(v) for v in rows[arm]) + " \\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
@@ -455,6 +459,10 @@ def html_macros(con):
         ("HtmlEffective", num(q("""SELECT COUNT(*) FROM (SELECT DISTINCT value_id, host_id
                                    FROM mt_html_case WHERE effective=1)"""))),
         ("HtmlMatchertextPayloads", num(q("SELECT COUNT(*) FROM mt_html_value WHERE is_mt=1"))),
+        ("HtmlNonMtPayloads", num(q("SELECT COUNT(*) FROM mt_html_value WHERE is_mt=0"))),
+        # A zero byte reads as U+FFFD in every HTML parser, so the hole holds an altered value.
+        ("HtmlNulPayloads", num(q(
+            "SELECT COUNT(*) FROM mt_html_value WHERE instr(value, char(0))>0"))),
         # the matchertext arms and the guarded serializer: zero breakouts
         ("HtmlMtBreakout", num(sum(brk.get(a, 0) for a in HTML_MT_ARMS))),
         ("HtmlGuardedBreakout", num(brk.get("dom_guarded", 0))),
@@ -466,6 +474,27 @@ def html_macros(con):
         ("HtmlEscapeBreakout", num(effb.get("escape", 0))),
         ("HtmlDomStockBreakout", num(effb.get("dom_stock", 0))),
     ]
+    # The legacy defenses break out in the contexts they do not cover.
+    for name, arm, hosts in (("Escape", "escape", ("attr_sq", "attr_unquoted")),
+                             ("DomStock", "dom_stock", ("script_string", "style", "comment"))):
+        vals.append((f"Html{name}UncoveredBreakout", num(q(
+            f"""SELECT COALESCE(SUM(n_eff_breakout), 0) FROM mt_html_combo
+                WHERE arm='{arm}' AND host IN {hosts}"""))))
+    # The trees that the guard refuses and the matchertext writer delivers as holes.
+    vals.append(("HtmlGuardedRefusedMtInert", num(q(
+        """SELECT COUNT(*) FROM mt_html_case g JOIN mt_html_case m USING(value_id, host_id)
+           WHERE g.arm_id=(SELECT arm_id FROM mt_html_arm WHERE name='dom_guarded')
+             AND m.arm_id=(SELECT arm_id FROM mt_html_arm WHERE name='dom_mt')
+             AND g.verdict='REFUSED' AND m.verdict='INERT'"""))))
+    # How a parser without the option reads the documents of the verified element and attribute holes.
+    legacy = {r: n for r, n in con.execute(
+        """SELECT reader, COUNT(*) FROM mt_html_case
+           WHERE arm_id=(SELECT arm_id FROM mt_html_arm WHERE name='mt_verify')
+             AND reader != '-' GROUP BY reader""")}
+    vals += [("HtmlLegacyCases", num(sum(legacy.values()))),
+             ("HtmlLegacyElements", num(legacy.get("ELEMENTS", 0))),
+             ("HtmlLegacyElementsShare",
+              pct(legacy.get("ELEMENTS", 0) / max(sum(legacy.values()), 1), 1))]
     sab = EXPORTS / "html_sabotage.csv"
     if sab.exists():
         with open(sab, newline="") as f:

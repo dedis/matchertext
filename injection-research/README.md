@@ -183,9 +183,9 @@ python3 pipeline/html_experiment.py
 
 This command builds the MatcherText parse5 fork in `parse5/` when its sources
 changed, and runs `test/matchertext/jssrc/html_driver.mjs`. It replays every
-distinct HTML payload through 13 host contexts and 8 arms: the raw control,
+distinct HTML payload through 13 host contexts and 9 arms: the raw control,
 entity escaping, a tree written by the stock and by the guarded serializer,
-and four matchertext arms. It also records how a parser without the
+and five matchertext arms, one of them a tree written with matchertext output. It also records how a parser without the
 matchertext option reads each matchertext document. The run stops, and
 removes its results, when a guard fails: the driver exits early, a control
 never breaks out, a matchertext arm or the guarded serializer breaks out, a
