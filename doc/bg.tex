@@ -18,6 +18,9 @@ include regular expressions (REs),
 uniform resource identifiers (URIs),
 JavaScript Object Notation (JSON),
 and Structured Query Language (SQL).
+We use REs as the running example here;
+\cref{sec:bg:security} returns to SQL,
+and supplementary \cref{app:uri,app:regex} say more about URIs and REs.
 
 Perhaps the most classic ``little language'' is regular expression (RE) syntax,
 commonly used for pattern-based searches and replacements in freeform text.
@@ -35,10 +38,10 @@ A C string literal containing the latter RE above
 is written \verb|"\\.\\*"|,
 for example.
 To match the double-backslash \verb|\\| that begins
-a \href{https://en.wikipedia.org/wiki/Path_(computing)#Universal_Naming_Convention}{UNC name} (as in \verb|\\host\path\file|),
+a UNC name (as in \verb|\\host\path\file|),
 the backslashes must be doubled to become \verb|\\\\| as an RE,
-then doubled again to become \verb|"\\\\\\\\"| as a C sring literal
-containing that RE.
+then doubled again to become \verb|"\\\\\\\\"| as a C string literal
+containing that RE (\href{https://en.wikipedia.org/wiki/Path_(computing)#Universal_Naming_Convention}{UNC}).
 This confusing multi-level explosion of backslash escapes
 has been aptly dubbed
 \href{https://en.wikipedia.org/wiki/Leaning_toothpick_syndrome}{\emph{leaning toothpick syndrome}}.
@@ -50,16 +53,17 @@ each additional level of embedding in traditional syntax
 adds a set of escaping requirements that the writer (or reader) of code
 must carefully consider and apply correctly --
 \emph{in the correct order} --
-in order to ``guide'' the embedded text
+to ``guide'' the embedded text
 through the levels of host syntax that the text is embedded in.
 REs and C string literals each require
 a \emph{different} set of punctuation characters to be backslash-escaped,
 further increasing the cognitive load when embedding.
-\href{https://www.pcre.org/original/doc/html/pcrepattern.html}{PCRE syntax}
+PCRE syntax
 helpfully promises that a backslash followed by any non-letter
 always ``takes away any special meaning that character may have'',
 so one may fall back on just \emph{escaping all punctuation}
-instead of remembering which characters must actually be escaped.
+instead of remembering which characters must actually be escaped
+(\href{https://www.pcre.org/original/doc/html/pcrepattern.html}{PCRE}).
 But this practice feels like a band-aid at best,
 and yields even more ``leaning toothpicks.''
 
@@ -105,16 +109,18 @@ Some languages such as Python allow triple-quoted multiline strings
 to make it less likely that the terminating sequence is needed in the literal:
 \eg \verb|'''|$\dots$\verb|'''| or \verb|"""|$\dots$\verb|"""|.
 But such a sequence may still need to appear, of course --
-especially in written examples of exactly this syntax for example.
+especially in written examples of exactly this syntax.
 
 Some languages further mitigate this problem
 by offering an effectively-unlimited number of delimiter pairs.
-\href{https://docs.swift.org/swift-book/LanguageGuide/StringsAndCharacters.html#ID286}{Extended string literals in Swift}, for example,
+Extended string literals in Swift, for example,
 surround a quoted sequence with a balanced number of \verb|#| signs:
-\eg \verb|#"|$\dots$\verb|"#|, \verb|##"|$\dots$\verb|"##|, etc.
-\href{https://www.lua.org/manual/5.1/manual.html}{Lua}
+\eg \verb|#"|$\dots$\verb|"#|, \verb|##"|$\dots$\verb|"##|, etc.\
+(\href{https://docs.swift.org/swift-book/LanguageGuide/StringsAndCharacters.html#ID286}{Swift}).
+Lua
 similarly offers \emph{long bracket} quotations
-like \verb|[=[|$\dots$\verb|]=]|, \verb|[==[|$\dots$\verb|]==]|, etc.
+like \verb|[=[|$\dots$\verb|]=]|, \verb|[==[|$\dots$\verb|]==]|, etc.\
+(\href{https://www.lua.org/manual/5.1/manual.html}{Lua}).
 C++ supports raw-string literals of the form
 \verb|R"|$d$\verb|(|$\dots$\verb|)|$d$\verb|"|,
 where $d$ is a nearly-arbitrary \emph{delimiter string}
@@ -140,10 +146,11 @@ required \emph{no} expansion with increased depth.
 See for example \href{http://www.zedwood.com/article/how-to-properly-escape-inline-javascript}{How to properly escape inline javascript} }
 
 \subsection{When security goes wrong}
+\label{sec:bg:security}
 
-The syntactic complexity of correctly embedding strings into code
-has created several broad classes of security vulnerabilities,
-where untrusted (typically user-entered) strings intended to be embedded
+The complexity of correctly embedding strings into code
+has created broad classes of security vulnerabilities,
+where untrusted (typically user-entered) strings intended for embedding
 can maliciously ``trick'' an application into interpreting parts of the string
 in the host language context.
 
@@ -202,7 +209,7 @@ to escape all characters or sequences that might be ``sensitive''
 in the host language.
 Further, this security-critical check
 could also be more uniform across host languages --
-\ie checking only that the three ASCII matcher pairs are matched corrrectly
+\ie checking only that the three ASCII matcher pairs are matched correctly
 throughout the untrusted content,
 rather than deeply verifying and/or transforming
 based on the complex syntax of a particular host language.

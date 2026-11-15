@@ -8,9 +8,10 @@ paths:
   - include)";
 const auto kHex = "4d5a90000300000004000000ffff0000";
 const auto kBinary = "\x89PNG\x0d\x0a\x1a\x0a\x00\x00\x00\x0dIHDR";
+const auto kAnsi = "\x1b[1mBold\x1b[0m \x1b[31mred\x1b[0m";
 const auto kPlain = "This subsystem schedules jobs and retries transient failures automatically.";
 
 int UseStringBucketMix() {
   return kPath[0] + kFormat[0] + kShell[0] + kYaml[0] + kHex[0] + kBinary[0] +
-         kPlain[0];
+         kAnsi[0] + kPlain[0];
 }

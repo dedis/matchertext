@@ -20,16 +20,6 @@
 	note = {\url{https://docs.swift.org/swift-book/}},
 }
 
-@article{chomsky59algebraic,
-	author = {Noam Chomsky},
-	title = {On Certain Formal Properties of Grammars},
-	journal = {Information and Control},
-	volume = {2},
-	number = {2},
-	pages = {137--167},
-	year = {1959},
-}
-
 % GUESS -- web note on CDATA; verify author/title/year/URL.
 @misc{english97cdata,
 	author = {Joe English},
@@ -56,12 +46,10 @@
 	month = jan,
 }
 
-% GUESS -- MinML write-up; verify exact title and venue/URL.
 @misc{ford22minml,
 	author = {Bryan Ford},
-	title = {{MinML}: A Minimalist Markup Syntax for Matchertext},
+	title = {\href{https://bford.info/draft/minml/}{{MinML}: Concise but General Markup Syntax}},
 	year = {2022},
-	howpublished = {\url{https://github.com/dedis/matchertext}},
 }
 
 @book{friedl06mastering,
@@ -93,21 +81,23 @@
 	year = {2012},
 }
 
-% GUESS -- verify authors and exact venue.
 @inproceedings{grigorev14string,
-	author = {Semyon Grigorev and Iakov Kirilenko},
-	title = {String-Embedded Language Support in Integrated Development Environment},
-	booktitle = {Proceedings of the 10th Central and Eastern European Software
-		Engineering Conference in Russia (CEE-SECR)},
+	author = {Semen Grigorev and Ekaterina Verbitskaia and Andrei Ivanov and
+		Marina Polubelova and Ekaterina Mavchun},
+	title = {\href{https://dl.acm.org/doi/abs/10.1145/2687233.2687247}{String-Embedded Language Support in Integrated Development Environment}},
+	booktitle = {\bibconf[10th]{CEE-SECR}{Central and Eastern European Software Engineering Conference in Russia}},
+	month = oct,
 	year = {2014},
+	location = {Moscow, Russia},
+	pages = {1--11},
 }
 
-% GUESS -- modern bc/dc implementation; verify title/year/URL.
 @misc{howard21dc,
-	author = {Gavin Howard},
-	title = {{bc} and {dc}: An Arbitrary Precision Numeric Processing Language},
+	author = {Gavin D. Howard},
+	title = {\href{https://www.freebsd.org/cgi/man.cgi?query=dc}{dc -- Arbitrary-Precision Decimal Reverse-{Polish} Notation Calculator}},
+	month = jun,
 	year = {2021},
-	howpublished = {\url{https://git.gavinhoward.com/gavin/bc}},
+	note = {FreeBSD Manual Pages},
 }
 
 @inproceedings{hudak98modular,
@@ -154,20 +144,21 @@
 	year = {1988},
 }
 
-% GUESS -- verify authors, exact title and venue.
 @inproceedings{khabibullin15development,
-	author = {Marat Khabibullin and Iakov Kirilenko and Semyon Grigorev},
-	title = {Development of a Tool for Static Analysis of String-Embedded Languages},
-	booktitle = {Proceedings of the 11th Central and Eastern European Software
-		Engineering Conference in Russia (CEE-SECR)},
+	author = {Marat Khabibullin and Andrei Ivanov and Semyon Grigorev},
+	title = {\href{https://dl.acm.org/doi/10.1145/2855667.2855672}{On Development of Static Analysis Tools for String-Embedded Languages}},
+	booktitle = {\bibconf[11th]{CEE-SECR}{Central and Eastern European Software Engineering Conference in Russia}},
+	month = oct,
 	year = {2015},
+	location = {Moscow, Russia},
+	pages = {1--10},
 }
 
 @misc{macfarlane19commonmark,
 	author = {John MacFarlane},
-	title = {{CommonMark} Spec, Version 0.29},
-	year = {2019},
-	howpublished = {\url{https://spec.commonmark.org/0.29/}},
+	title = {\href{https://spec.commonmark.org/0.30/}{{CommonMark} Spec, Version 0.30}},
+	month = jun,
+	year = {2021},
 }
 
 @inproceedings{verbitskaia15relaxed,
@@ -230,4 +221,211 @@
     pages = {118--161},
     publisher = {North-Holland},
     year = {1963},
+}
+@inproceedings{omar14safely,
+	author = {Cyrus Omar and Darya Kurilova and Ligia Nistor and Benjamin Chung
+		and Alex Potanin and Jonathan Aldrich},
+	title = {Safely Composable Type-Specific Languages},
+	booktitle = {Proceedings of the 28th European Conference on
+		Object-Oriented Programming (ECOOP)},
+	series = {Lecture Notes in Computer Science},
+	volume = {8586},
+	pages = {105--130},
+	publisher = {Springer},
+	year = {2014},
+	doi = {10.1007/978-3-662-44202-9_5},
+}
+
+@inproceedings{alur04visibly,
+	author = {Rajeev Alur and P. Madhusudan},
+	title = {Visibly Pushdown Languages},
+	booktitle = {36th ACM Symposium on Theory of Computing (STOC)},
+	pages = {202--211},
+	year = {2004},
+	doi = {10.1145/1007352.1007390},
+}
+
+@inproceedings{mehlhorn80pebbling,
+	author = {Kurt Mehlhorn},
+	title = {Pebbling Mountain Ranges and its Application to {DCFL}-Recognition},
+	booktitle = {Automata, Languages and Programming (ICALP)},
+	series = {Lecture Notes in Computer Science},
+	volume = {85},
+	pages = {422--435},
+	publisher = {Springer},
+	year = {1980},
+	doi = {10.1007/3-540-10003-2_89},
+}
+
+@misc{w3c99html401,
+	author = {{World Wide Web Consortium (W3C)}},
+	title = {{HTML} 4.01 Specification},
+	year = {1999},
+	month = dec,
+	howpublished = {W3C Recommendation, \url{https://www.w3.org/TR/html401/}},
+}
+
+@misc{chicken26scheme,
+	author = {{The CHICKEN Team}},
+	title = {{CHICKEN Scheme}: A Practical and Portable {Scheme} System},
+	year = {2026},
+	note = {Version 6.1},
+	howpublished = {\url{https://call-cc.org/}},
+}
+
+@misc{ibarra26matchertext,
+	author = {Hern{\'a}n Ibarra Mejia},
+	title = {matchertext: Matchertext String Literals for {CHICKEN} {Scheme}},
+	year = {2026},
+	note = {Version 2.0},
+	howpublished = {\url{https://wiki.call-cc.org/eggref/6/matchertext}},
+}
+
+@misc{brunsfeld26treesitter,
+	author = {Max Brunsfeld and others},
+	title = {Tree-sitter: An Incremental Parsing System for Programming Tools},
+	year = {2026},
+	note = {Version 0.26},
+	doi = {10.5281/zenodo.21005449},
+	howpublished = {\url{https://tree-sitter.github.io/}},
+}
+ 
+@inproceedings{lattner04llvm,
+	author = {Chris Lattner and Vikram Adve},
+	title = {{LLVM}: A Compilation Framework for Lifelong Program Analysis
+		\& Transformation},
+	booktitle = {Proceedings of the International Symposium on
+		Code Generation and Optimization (CGO)},
+	pages = {75--86},
+	year = {2004},
+	doi = {10.1109/CGO.2004.1281665},
+}
+
+@misc{llvm26clang,
+	author = {{The LLVM Project}},
+	title = {Clang: A {C} Language Family Frontend for {LLVM}},
+	year = {2026},
+	howpublished = {\url{https://clang.llvm.org/}},
+}
+
+
+@book{knuth84texbook,
+	author = {Donald E. Knuth},
+	title = {The {\TeX}book},
+	publisher = {Addison-Wesley},
+	address = {Reading, MA},
+	year = {1984},
+}
+
+@inproceedings{flatt09scribble,
+	author = {Matthew Flatt and Eli Barzilay and Robert Bruce Findler},
+	title = {Scribble: Closing the Book on Ad Hoc Documentation Tools},
+	booktitle = {14th ACM SIGPLAN International Conference on Functional Programming (ICFP)},
+	pages = {109--120},
+	year = {2009},
+	doi = {10.1145/1596550.1596569},
+}
+
+@inproceedings{rafkind12honu,
+	author = {Jon Rafkind and Matthew Flatt},
+	title = {Honu: Syntactic Extension for Algebraic Notation through Enforestation},
+	booktitle = {11th International Conference on Generative Programming and Component Engineering (GPCE)},
+	pages = {122--131},
+	year = {2012},
+	doi = {10.1145/2371401.2371420},
+}
+
+@inproceedings{vanwyk07context,
+	author = {Eric R. Van Wyk and August C. Schwerdfeger},
+	title = {Context-Aware Scanning for Parsing Extensible Languages},
+	booktitle = {6th International Conference on Generative Programming and Component Engineering (GPCE)},
+	pages = {63--72},
+	year = {2007},
+	doi = {10.1145/1289971.1289983},
+}
+
+@inproceedings{diekmann14eco,
+	author = {Lukas Diekmann and Laurence Tratt},
+	title = {Eco: A Language Composition Editor},
+	booktitle = {Software Language Engineering (SLE)},
+	series = {Lecture Notes in Computer Science},
+	pages = {82--101},
+	publisher = {Springer},
+	year = {2014},
+	doi = {10.1007/978-3-319-11245-9_5},
+}
+
+@article{heering89sdf,
+	author = {J. Heering and P. R. H. Hendriks and P. Klint and J. Rekers},
+	title = {The Syntax Definition Formalism {SDF}---Reference Manual},
+	journal = {ACM SIGPLAN Notices},
+	volume = {24},
+	number = {11},
+	pages = {43--75},
+	year = {1989},
+	doi = {10.1145/71605.71607},
+}
+
+@inproceedings{mainland07quoted,
+	author = {Geoffrey Mainland},
+	title = {Why It's Nice to Be Quoted: Quasiquoting for {Haskell}},
+	booktitle = {ACM SIGPLAN Workshop on Haskell},
+	pages = {73--82},
+	year = {2007},
+	doi = {10.1145/1291201.1291211},
+}
+
+@inproceedings{demoura21lean4,
+	author = {Leonardo de Moura and Sebastian Ullrich},
+	title = {The {Lean}~4 Theorem Prover and Programming Language},
+	booktitle = {Automated Deduction -- {CADE} 28},
+	series = {Lecture Notes in Computer Science},
+	volume = {12699},
+	pages = {625--635},
+	publisher = {Springer},
+	year = {2021},
+	doi = {10.1007/978-3-030-79876-5_37},
+}
+
+@inproceedings{mathlib20,
+	author = {{The mathlib Community}},
+	title = {The {Lean} Mathematical Library},
+	booktitle = {Proceedings of the 9th ACM SIGPLAN International Conference
+		on Certified Programs and Proofs (CPP)},
+	pages = {367--381},
+	publisher = {ACM},
+	year = {2020},
+	doi = {10.1145/3372885.3373824},
+}
+
+@manual{python26reference,
+	author = {{Python Software Foundation}},
+	title = {The {Python} Language Reference},
+	year = {2026},
+	note = {Section 2.5.4, ``Escape sequences''},
+	url = {https://docs.python.org/3/reference/lexical_analysis.html},
+}
+
+@manual{ecma26ecmascript,
+	author = {{Ecma International}},
+	title = {{ECMAScript} 2026 Language Specification},
+	edition = {17th},
+	number = {ECMA-262},
+	year = {2026},
+	url = {https://ecma-international.org/publications-and-standards/standards/ecma-262/},
+}
+
+@manual{king17ceylon,
+	author = {Gavin King},
+	title = {The {Ceylon} Language, Version 1.3},
+	year = {2017},
+	url = {https://web.archive.org/web/20220811232934/https://ceylon-lang.org/documentation/1.3/spec/html_single/},
+}
+
+@inproceedings{eghbali20strings,
+	author = {Aryaz Eghbali and Michael Pradel},
+	title = {No Strings Attached: An Empirical Study of String-related Software Bugs},
+	booktitle = {35th IEEE/ACM International Conference on Automated Software Engineering (ASE)},
+	year = {2020},
+	doi = {10.1145/3324884.3416576},
 }

@@ -1,0 +1,61 @@
+\section{Matchertext literals in Go: experiment details}
+\label{app:go}
+
+The patch of \cref{sec:impl:go} adds \verb|M"(|$\dots$\verb|)"|,
+\verb|M"[|$\dots$\verb|]"|, and \verb|M"{|$\dots$\verb|}"|
+to \texttt{cmd/compile/internal/syntax}, \texttt{go/scanner}, and \texttt{go/constant}.
+The content of such a literal is its value verbatim:
+it has no escapes, and unlike in Go's backquoted raw strings
+its carriage returns are kept.
+The scanner rejects a literal whose content is not matchertext,
+or whose closing matcher no quote follows.
+
+The rewriting tool converts an interpreted literal \verb|"|$\dots$\verb|"|
+only if the literal has a backslash,
+its source text and its value are matchertext,
+and its value is valid UTF-8 with no NUL, byte-order mark,
+or control character other than line feed and tab.
+It leaves import paths and struct tags unchanged, which the compiler unquotes itself,
+and skips \texttt{testdata} and \texttt{vendor} directories
+and files that use cgo.
+Unlike the corpus rewriting of \cref{sec:eval:methodology},
+which normalizes control characters,
+it therefore preserves every value exactly
+and leaves literals of control characters or binary data as they are.
+
+\Cref{tab:app:go} lists the four repositories,
+pinned to the commits tested.
+Each was tested with \verb|go test -short ./...| three times:
+with stock Go, with the patched toolchain on the unchanged code,
+and with the patched toolchain after rewriting the repository's own code.
+Dependencies came unchanged from the module cache,
+so the patched toolchain also compiled them unmodified.
+The pass, fail, and skip outcome of every package
+was identical across the three runs.
+The 88 toothpicks left in the rewritten literals
+are backslashes of the value itself, written by \verb|\\| or another escape
+that decodes to a backslash.
+The artifact includes the patch, the tool, the script, and these results.
+
+\begin{table}[h]
+\begin{center}
+\begin{footnotesize}
+\begin{tabular}{lrrrrr}
+\hline
+Repository (commit)	& Packages	& With tests	& Files changed	& Literals rewritten	& Toothpicks	\\
+\hline
+cockroachdb/uniseg (\texttt{f77ce19})	& 1	& 1	& 8	& 7{,}739	& 24{,}831 $\to$ 6	\\
+golang/text (\texttt{6070ac3})	& 63	& 48	& 132	& 3{,}042	& 6{,}470 $\to$ 40	\\
+golang/net (\texttt{3de643d})	& 41	& 36	& 87	& 924	& 1{,}630 $\to$ 9	\\
+golang/tools (\texttt{588ada3})	& 217	& 157	& 446	& 2{,}692	& 4{,}731 $\to$ 33	\\
+\hline
+Total	& 322	& 242	& 673	& 14{,}397	& 37{,}662 $\to$ 88	\\
+\hline
+\end{tabular}
+\end{footnotesize}
+\end{center}
+\caption{Go test outcomes before and after rewriting:
+	packages, packages with tests (all passing in all three runs),
+	files changed, literals rewritten, and their toothpicks before and after.}
+\label{tab:app:go}
+\end{table}

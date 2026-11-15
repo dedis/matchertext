@@ -1,0 +1,194 @@
+diff --git a/src/cmd/compile/internal/syntax/scanner.go b/src/cmd/compile/internal/syntax/scanner.go
+index 700908f6..b34e89c3 100644
+--- a/src/cmd/compile/internal/syntax/scanner.go
++++ b/src/cmd/compile/internal/syntax/scanner.go
+@@ -378,6 +378,14 @@ func (s *scanner) ident() {
+ 		}
+ 	}
+ 
++	// A matchertext literal M"(...)", M"[...]", or M"{...}". Valid Go has M directly
++	// before a quote only in an import alias (import M"path"), and gc rejects import
++	// paths that start with (, [, or {, so this form changes no valid program.
++	if s.ch == '"' && isMatcherOpener(s.peek()) && string(s.segment()) == "M" {
++		s.mtString()
++		return
++	}
++
+ 	// possibly a keyword
+ 	lit := s.segment()
+ 	if len(lit) >= 2 {
+@@ -879,3 +887,52 @@ func (s *scanner) escape(quote rune) bool {
+ 
+ 	return true
+ }
++
++// mtString scans a matchertext literal M"(...)", M"[...]", or M"{...}" after its M;
++// the caller checked that an opener follows the quote. The content is any text
++// whose matchers (), [], {} match; the literal ends at the closer of its opening
++// matcher, which a quote must follow. The content is the literal's value verbatim:
++// no escapes, and the CRs it contains are kept.
++func (s *scanner) mtString() {
++	ok := true
++	s.nextch() // the quote
++	stack := []rune{s.ch}
++	s.nextch()
++	for ok && len(stack) > 0 {
++		switch s.ch {
++		case -1:
++			s.errorAtf(0, "matchertext literal not terminated")
++			ok = false
++			continue
++		case '(', '[', '{':
++			stack = append(stack, s.ch)
++		case ')', ']', '}':
++			if !closesMatcher(stack[len(stack)-1], s.ch) {
++				s.errorf("unmatched %c in matchertext literal", s.ch)
++				ok = false
++				continue
++			}
++			stack = stack[:len(stack)-1]
++		}
++		s.nextch()
++	}
++	if ok {
++		if s.ch == '"' {
++			s.nextch()
++		} else {
++			s.errorf("matchertext literal must end with a quote")
++			ok = false
++		}
++	}
++	s.setLit(StringLit, ok)
++}
++
++// isMatcherOpener reports whether c opens a matcher pair.
++func isMatcherOpener(c byte) bool {
++	return c == '(' || c == '[' || c == '{'
++}
++
++// closesMatcher reports whether the closer c matches the opener open.
++func closesMatcher(open, c rune) bool {
++	return open == '(' && c == ')' || open == '[' && c == ']' || open == '{' && c == '}'
++}
+diff --git a/src/cmd/compile/internal/syntax/source.go b/src/cmd/compile/internal/syntax/source.go
+index 01b59215..3eaa6719 100644
+--- a/src/cmd/compile/internal/syntax/source.go
++++ b/src/cmd/compile/internal/syntax/source.go
+@@ -164,6 +164,18 @@ redo:
+ 	}
+ }
+ 
++// peek returns the byte after ch, reading more input if needed, or 0 at EOF.
++// It may move the buffer, so callers must take segments after it.
++func (s *source) peek() byte {
++	for s.r == s.e && s.ioerr == nil {
++		s.fill()
++	}
++	if s.r < s.e {
++		return s.buf[s.r]
++	}
++	return 0
++}
++
+ // fill reads more source bytes into s.buf.
+ // It returns with at least one more byte in the buffer, or with s.ioerr != nil.
+ func (s *source) fill() {
+diff --git a/src/go/constant/value.go b/src/go/constant/value.go
+index eb6d4cf3..6042b26c 100644
+--- a/src/go/constant/value.go
++++ b/src/go/constant/value.go
+@@ -456,6 +456,9 @@ func MakeFromLiteral(lit string, tok token.Token, zero uint) Value {
+ 		}
+ 
+ 	case token.STRING:
++		if s, ok := matchertextContent(lit); ok {
++			return MakeString(s)
++		}
+ 		if s, err := strconv.Unquote(lit); err == nil {
+ 			return MakeString(s)
+ 		}
+@@ -1433,3 +1436,18 @@ func Compare(x_ Value, op token.Token, y_ Value) bool {
+ 
+ 	panic(fmt.Sprintf("invalid comparison %v %s %v", x_, op, y_))
+ }
++
++// matchertextContent returns the content of a matchertext literal M"(...)",
++// M"[...]", or M"{...}". The scanners accept such a literal only if the matchers
++// in its content match, so the content is the value verbatim.
++func matchertextContent(lit string) (string, bool) {
++	n := len(lit)
++	if n < 5 || lit[0] != 'M' || lit[1] != '"' || lit[n-1] != '"' {
++		return "", false
++	}
++	switch open, c := lit[2], lit[n-2]; {
++	case open == '(' && c == ')', open == '[' && c == ']', open == '{' && c == '}':
++		return lit[3 : n-2], true
++	}
++	return "", false
++}
+diff --git a/src/go/scanner/scanner.go b/src/go/scanner/scanner.go
+index 9ace3353..12797099 100644
+--- a/src/go/scanner/scanner.go
++++ b/src/go/scanner/scanner.go
+@@ -842,7 +842,12 @@ scanAgain:
+ 	switch ch := s.ch; {
+ 	case isLetter(ch):
+ 		lit = s.scanIdentifier()
+-		if len(lit) > 1 {
++		if lit == "M" && s.ch == '"' && isMatcherOpener(s.peek()) {
++			// A matchertext literal M"(...)"; see scanMatchertext.
++			insertSemi = true
++			tok = token.STRING
++			lit = s.scanMatchertext()
++		} else if len(lit) > 1 {
+ 			// keywords are longer than one letter - avoid lookup otherwise
+ 			tok = token.Lookup(lit)
+ 			switch tok {
+@@ -997,3 +1002,47 @@ scanAgain:
+ 
+ 	return
+ }
++
++// scanMatchertext scans a matchertext literal M"(...)", M"[...]", or M"{...}"
++// whose M was just scanned and whose quote an opener follows. The content is any
++// text whose matchers (), [], {} match; the literal ends at the closer of its
++// opening matcher, which a quote must follow. Like the compiler, it keeps CRs in
++// the content.
++func (s *Scanner) scanMatchertext() string {
++	offs := s.offset - 1 // the M
++	s.next()             // the quote
++	stack := []rune{s.ch}
++	s.next()
++	for len(stack) > 0 {
++		switch s.ch {
++		case eof:
++			s.error(offs, "matchertext literal not terminated")
++			return string(s.src[offs:s.offset])
++		case '(', '[', '{':
++			stack = append(stack, s.ch)
++		case ')', ']', '}':
++			if !closesMatcher(stack[len(stack)-1], s.ch) {
++				s.errorf(s.offset, "unmatched %c in matchertext literal", s.ch)
++				return string(s.src[offs:s.offset])
++			}
++			stack = stack[:len(stack)-1]
++		}
++		s.next()
++	}
++	if s.ch == '"' {
++		s.next()
++	} else {
++		s.error(s.offset, "matchertext literal must end with a quote")
++	}
++	return string(s.src[offs:s.offset])
++}
++
++// isMatcherOpener reports whether c opens a matcher pair.
++func isMatcherOpener(c byte) bool {
++	return c == '(' || c == '[' || c == '{'
++}
++
++// closesMatcher reports whether the closer c matches the opener open.
++func closesMatcher(open, c rune) bool {
++	return open == '(' && c == ')' || open == '[' && c == ']' || open == '{' && c == '}'
++}

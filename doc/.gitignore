@@ -8,3 +8,4 @@
 *.out
 *.pdf
 !fig/appendix3_nesting.pdf
+build

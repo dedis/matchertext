@@ -1,0 +1,4 @@
+# command-line-arguments
+./x.go:3:13: unmatched ] in matchertext literal
+./x.go:3:13: syntax error: unexpected ] after top level declaration
+./x.go:3:15: newline in string

@@ -48,7 +48,7 @@ int main(const int argc, char *argv[]) {
   }
 
   Parser::ConfigureDebugLanguages({inputPath}, outputRoot.string());
-  if (Serde::JSON result; Parser::ParseC_CPP(fixturePath.string(), result))
+  if (Serde::JSON result; Parser::ParseC_CPP(fixturePath.string(), LanguageEnum::CPP, result))
     Parser::GatherStatistics(std::move(result), fixturePath.string(), inputPath);
   Parser::FlushDebugLanguageLogs();
 

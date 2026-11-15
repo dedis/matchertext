@@ -157,6 +157,56 @@ namespace classifier_internal {
         return false;
       return words >= 2 && alphaWords >= 1;
     }
+
+    /// A short phrase of a few words (Not run, TEST PASSED, 300 values): mostly
+    /// words of letters, any script, with no code symbols. Hyphenated and dotted
+    /// tokens count against it, so class lists (grid gap-2) and selectors stay out.
+    bool LooksLikeShortPhrase(const std::string_view s) {
+      if (s.find_first_of("{}[]<>=;$|&`\\\"#*~^%") != std::string_view::npos)
+        return false;
+
+      int words = 0;
+      int others = 0;
+      int tokens = 0;
+      bool keywordsOnly = true;
+      size_t pos = 0;
+      while (pos < s.size()) {
+        const size_t end = std::min(s.find_first_of(" \t\n\r", pos), s.size());
+        auto token = s.substr(pos, end - pos);
+        pos = end + 1;
+        while (!token.empty() && (token.front() == '(' || token.front() == '\''))
+          token.remove_prefix(1);
+        while (!token.empty() && (IsLabelPunctuation(token.back()) || token.back() == '\''))
+          token.remove_suffix(1);
+        if (token.empty())
+          continue;
+        tokens++;
+
+        int letters = 0;
+        int digits = 0;
+        int rest = 0;
+        for (size_t i = 0; i < token.size();) {
+          const char c = token[i];
+          const uint32_t cp = DecodeCodePoint(token, i);
+          if (IsLetterCodePoint(cp))
+            letters++;
+          else if (cp < 0x80 && std::isdigit(static_cast<unsigned char>(c)))
+            digits++;
+          else if (!(cp < 0x80 && (c == '\'' || c == '.' || c == ',')))
+            rest++;
+        }
+        if (letters > 0 && digits == 0 && rest == 0) {
+          words++;
+          if (!IsCodeKeywordToken(token))
+            keywordsOnly = false;
+        } else if (letters == 0 && rest == 0) {
+          // a number: neutral
+        } else {
+          others++;
+        }
+      }
+      return tokens >= 2 && tokens <= 8 && words > others && !keywordsOnly;
+    }
   } // namespace
 
   bool LooksLikeShortPlainTextLabel(const std::string_view s) {
@@ -267,53 +317,74 @@ namespace classifier_internal {
 
   ClassificationResult DetectPlainText(const std::string_view s) {
     const auto trimmed = Trim(s);
-    if (trimmed.size() < 12 || trimmed.find('@') != std::string_view::npos)
+    if (trimmed.find('@') != std::string_view::npos)
+      return {LanguageEnum::Unknown, 0.0f};
+
+    if (LooksLikeShortPhrase(trimmed))
+      return {LanguageEnum::PlainText, 0.80f};
+    if (trimmed.size() < 12)
       return {LanguageEnum::Unknown, 0.0f};
 
     if (LooksLikeDecoratedPlainText(trimmed))
       return {LanguageEnum::PlainText, 0.82f};
 
+    /// Counted per code point, so letters of any script count as letters.
     int letters = 0;
     int digits = 0;
     int spaces = 0;
     int words = 0;
     int sentenceMarks = 0;
     int codeSymbols = 0;
+    int codePoints = 0;
     bool inWord = false;
+    char previous = '\0';
 
-    for (const char c: trimmed) {
-      const auto uc = static_cast<unsigned char>(c);
-      if (std::isalpha(uc))
+    for (size_t pos = 0; pos < trimmed.size();) {
+      const char c = trimmed[pos];
+      const uint32_t cp = DecodeCodePoint(trimmed, pos);
+      codePoints++;
+      const bool letter = IsLetterCodePoint(cp);
+      const bool ascii = cp < 0x80;
+      if (letter)
         letters++;
-      if (std::isdigit(uc))
+      if (ascii && std::isdigit(static_cast<unsigned char>(c)))
         digits++;
-      if (std::isspace(uc))
+      if (ascii && std::isspace(static_cast<unsigned char>(c)))
         spaces++;
 
-      const bool isWord = std::isalnum(uc) || c == '\'' || c == '-' || c == '_';
+      const bool isWord = letter || (ascii && (std::isalnum(static_cast<unsigned char>(c)) || c == '\'' || c == '-' || c == '_'));
       if (isWord && !inWord)
         words++;
       inWord = isWord;
 
+      if (!ascii) {
+        previous = '\0';
+        continue;
+      }
       if (c == '.' || c == '!' || c == '?' || c == ':')
         sentenceMarks++;
+      /// A backtick run (``code``) counts once.
       if (c == '{' || c == '}' || c == '[' || c == ']' || c == '<' || c == '>' ||
           c == ';' || c == '=' || c == '$' || c == '|' || c == '&' || c == '@' ||
-          c == '`')
+          (c == '`' && previous != '`'))
         codeSymbols++;
+      previous = c;
     }
 
-    if (trimmed.find("::") != std::string_view::npos ||
-        trimmed.find("->") != std::string_view::npos ||
-        trimmed.find("=>") != std::string_view::npos ||
-        trimmed.find(":=") != std::string_view::npos ||
-        trimmed.find("==") != std::string_view::npos)
+    /// Code markers reject short text outright; long prose such as a docstring
+    /// may quote a little code (``x``, :class:`Y`, a -> b), so there they only
+    /// count against its symbol budget.
+    int codeMarkers = 0;
+    for (const auto marker: {"::", "->", "=>", ":=", "=="})
+      for (size_t at = trimmed.find(marker); at != std::string_view::npos; at = trimmed.find(marker, at + 2))
+        codeMarkers++;
+    const bool prose = words >= 12;
+    if (codeMarkers > 0 && !prose)
+      return {LanguageEnum::Unknown, 0.0f};
+    if (prose ? (codeSymbols + 2 * codeMarkers) * 6 > words : codeSymbols > 2)
       return {LanguageEnum::Unknown, 0.0f};
 
-    if (codeSymbols > 2)
-      return {LanguageEnum::Unknown, 0.0f};
-
-    const int nonSpace = static_cast<int>(trimmed.size()) - spaces;
+    const int nonSpace = codePoints - spaces;
     if (nonSpace <= 0)
       return {LanguageEnum::Unknown, 0.0f};
 

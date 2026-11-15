@@ -6,6 +6,7 @@
 
 #include "../include/Stats.hpp"
 #include "../include/LanguageClassifier.hpp"
+#include "../include/RawRewrite.hpp"
 
 #include <cstdio>
 #include <ostream>
@@ -147,15 +148,62 @@ void PrintLanguageStatsTable(
     if (snap.entries.empty())
       continue;
 
-    out << "| " << category << " Language | Count | % | Violations | Toothpicks |\n";
-    out << "|---|---|---|---|---|\n";
+    out << "| " << category << " Language | Count | % | Violations | Toothpicks | Converted Toothpicks | Reduction |\n";
+    out << "|---|---|---|---|---|---|---|\n";
 
     for (const auto &e: snap.entries) {
       char pctBuf[16];
       std::snprintf(pctBuf, sizeof(pctBuf), "%.2f%%", e.percentage);
+      /// Binary data is out of matchertext's scope, so it has no reduction.
+      char reductionBuf[16] = "-";
+      if (InMatchertextScope(e.language) && e.toothpicks > 0)
+        std::snprintf(reductionBuf, sizeof(reductionBuf), "%.2f%%",
+                      100.0 * static_cast<double>(e.toothpicks - e.converted) / static_cast<double>(e.toothpicks));
       out << "| " << LanguageName(e.language) << " | " << e.count << " | "
-          << pctBuf << " | " << e.violations << " | " << e.toothpicks << " |\n";
+          << pctBuf << " | " << e.violations << " | " << e.toothpicks << " | " << e.converted << " | "
+          << reductionBuf << " |\n";
     }
     out << '\n';
   }
+}
+
+namespace {
+  /// Markdown table cell text: escapes the characters Markdown would interpret.
+  std::string MarkdownCell(const std::string_view text) {
+    std::string out;
+    for (const char c: text) {
+      if (c == '\\' || c == '`' || c == '|' || c == '*' || c == '_')
+        out += '\\';
+      out += c;
+    }
+    return out;
+  }
+}
+
+void PrintRawFormStatsTable(const RawFormStats &stats, std::ostream &out) {
+  const auto row = [&](const std::string_view language, const std::string_view form,
+                       const std::string_view measure, const auto field) {
+    out << "| " << MarkdownCell(language) << " | " << MarkdownCell(form) << " | " << MarkdownCell(measure) << " | "
+        << field(stats.all) << " | " << field(stats.inScope) << " | " << field(stats.matchertext) << " |\n";
+  };
+  const auto load = [](const std::atomic<uint64_t> &n) { return n.load(std::memory_order_relaxed); };
+
+  out << "| Language | Raw Form | Measure | All Strings | In-Scope Strings | Matchertext Strings |\n";
+  out << "|---|---|---|---|---|---|\n";
+  row("-", "-", "String literals", [&](const RawFormStats::Counts &c) { return load(c.strings); });
+  row("-", "-", "Contain control characters", [&](const RawFormStats::Counts &c) { return load(c.control); });
+  row("Own language", "Any form", "Holds", [&](const RawFormStats::Counts &c) { return load(c.ownForm); });
+  row("Any language", "Any form", "Holds", [&](const RawFormStats::Counts &c) { return load(c.anyForm); });
+
+  size_t check = 0, form = 0;
+  for (const auto &family: RawRewrite::RawFormFamilies())
+    for (size_t i = 0; i < family.checks.size() && form < RawFormStats::kMaxForms; ++form) {
+      const std::string_view name = family.checks[i].form;
+      row(family.name, name, "Holds", [&](const RawFormStats::Counts &c) { return load(c.forms[form]); });
+      for (; i < family.checks.size() && family.checks[i].form == name; ++i, ++check)
+        if (check < RawFormStats::kMaxChecks)
+          row(family.name, name, family.checks[i].constraint,
+              [&](const RawFormStats::Counts &c) { return load(c.checks[check]); });
+    }
+  out << '\n';
 }

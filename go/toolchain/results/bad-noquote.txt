@@ -1,0 +1,2 @@
+# command-line-arguments
+./x.go:3:14: matchertext literal must end with a quote
