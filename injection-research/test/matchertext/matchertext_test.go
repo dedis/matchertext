@@ -97,6 +97,13 @@ func buildDriver(dir, name string, cflags ...string) (string, string, error) {
 // run feeds cmds to the driver and returns one result line per command.
 func run(t *testing.T, cmds []string) []string {
 	t.Helper()
+	return runProgram(t, exec.Command(driverPath), cmds)
+}
+
+// runProgram feeds cmds to the driver that cmd starts and returns one result
+// line per command.
+func runProgram(t *testing.T, cmd *exec.Cmd, cmds []string) []string {
+	t.Helper()
 	if len(cmds) == 0 {
 		return nil
 	}
@@ -107,7 +114,6 @@ func run(t *testing.T, cmds []string) []string {
 		in.WriteByte('\n')
 	}
 
-	cmd := exec.Command(driverPath)
 	cmd.Stdin = &in
 	var out, errb bytes.Buffer
 	cmd.Stdout = &out
@@ -160,7 +166,8 @@ func closerOf(o byte) (byte, bool) {
 
 // oracleEnd computes the end of an embedding by brute force from the oracle:
 // the least i at which the enclosed value z[1:i] is matchertext and z[i]
-// closes z[0]. Returns 0 when no such position exists.
+// closes z[0]. Returns 0 when z[0] is not an opener, and -1 when it is one but
+// no such position exists.
 //
 // This is the definition FINDEMBEDEND is an efficient implementation of, so
 // agreement between the two is the property worth testing. It costs a scan per
@@ -178,7 +185,7 @@ func oracleEnd(z []byte) int64 {
 			return int64(i + 1)
 		}
 	}
-	return 0
+	return -1
 }
 
 // The hand-written golden cases that used to sit here now live beside the code
@@ -377,8 +384,10 @@ func TestBuildsWithoutTheFlag(t *testing.T) {
 	}
 }
 
-func encodeCmd(b []byte) string { return "C " + hex.EncodeToString(b) }
-func decodeCmd(b []byte) string { return "D " + hex.EncodeToString(b) }
+func encodeCmd(b []byte) string     { return "C " + hex.EncodeToString(b) }
+func decodeCmd(b []byte) string     { return "D " + hex.EncodeToString(b) }
+func encodeNameCmd(b []byte) string { return "N " + hex.EncodeToString(b) }
+func decodeNameCmd(b []byte) string { return "M " + hex.EncodeToString(b) }
 
 func unhex(t *testing.T, s string) []byte {
 	t.Helper()
@@ -533,6 +542,185 @@ func TestEncodeRespectsDepthLimit(t *testing.T) {
 		}
 		if tc.d >= limit && bytes.Equal(enc, in) {
 			t.Errorf("%s: input at or past the cap passed through", tc.name)
+		}
+	}
+}
+
+// hasEscapeShape reports whether b holds a run that the name decoder reads as
+// an escape: a backslash, 'o' or 'c', and an adjacent matched pair.
+func hasEscapeShape(b []byte) bool {
+	for i := 0; i+3 < len(b); i++ {
+		c, ok := closerOf(b[i+2])
+		if b[i] == '\\' && (b[i+1] == 'o' || b[i+1] == 'c') && ok && b[i+3] == c {
+			return true
+		}
+	}
+	return false
+}
+
+// TestEncodeNameIsTotal is TestEncodeIsTotal for the name alphabet of the
+// [...] hole, whose decoder keeps every backslash. The output is matchertext,
+// the name decoder returns the input, and only a name that is already
+// matchertext with no run that reads as an escape is left alone.
+func TestEncodeNameIsTotal(t *testing.T) {
+	rng := rand.New(rand.NewSource(4))
+	n := fuzzCount(5000, 100000)
+	// Escape-shaped runs need the backslash and the two letters often, and
+	// whole runs as tokens, which random bytes would rarely assemble.
+	alphabet := append([][]byte{[]byte("\\"), []byte("o"), []byte("c"),
+		[]byte(`\o()`), []byte(`\c[]`), []byte(`\o{}`)}, verifyAlphabet...)
+
+	inputs := make([][]byte, n)
+	cmds := make([]string, n)
+	for i := range inputs {
+		inputs[i] = randCase(rng, alphabet, 12)
+		cmds[i] = encodeNameCmd(inputs[i])
+	}
+	enc := run(t, cmds)
+	back := make([]string, n)
+	for i := range enc {
+		back[i] = decodeNameCmd(unhex(t, enc[i]))
+	}
+	dec := run(t, back)
+
+	nUntouched, nShaped := 0, 0
+	for i, in := range inputs {
+		e := unhex(t, enc[i])
+		if !oracleVerify(e) {
+			t.Fatalf("encode_name(%q) = %q, which the oracle says is not matchertext", in, e)
+		}
+		if d := unhex(t, dec[i]); !bytes.Equal(d, in) {
+			t.Fatalf("round trip lost data: encode_name(%q) = %q, decode = %q", in, e, d)
+		}
+		if hasEscapeShape(in) {
+			nShaped++
+		}
+		if bytes.Equal(e, in) {
+			nUntouched++
+			if !oracleVerify(in) || hasEscapeShape(in) {
+				t.Fatalf("encode_name(%q) left it alone but it needed escaping", in)
+			}
+		}
+	}
+	if nUntouched == 0 || nShaped == 0 {
+		t.Fatalf("degenerate sample: %d untouched, %d escape-shaped", nUntouched, nShaped)
+	}
+	t.Logf("%d cases, %d left alone, %d escape-shaped", n, nUntouched, nShaped)
+}
+
+// TestEncodeNameGoldenCases pins the name alphabet.
+func TestEncodeNameGoldenCases(t *testing.T) {
+	cases := []struct{ name, in, want string }{
+		{"backslash stays", `a\b`, `a\b`},
+		{"lone close bracket", "]", `\c[]`},
+		{"reads as an escape", `\o()`, `\o\o()\c()`},
+		{"close escape shape", `\c{}`, `\c\o{}\c{}`},
+		{"not a pair", `\o(x)`, `\o(x)`},
+	}
+	cmds := make([]string, len(cases))
+	for i, c := range cases {
+		cmds[i] = encodeNameCmd([]byte(c.in))
+	}
+	got := run(t, cmds)
+	for i, c := range cases {
+		if g := string(unhex(t, got[i])); g != c.want {
+			t.Errorf("%s: encode_name(%q) = %q, want %q", c.name, c.in, g, c.want)
+		}
+	}
+}
+
+// parse5Path is the built parse5 fork that jssrc/driver.mjs tests.
+// MATCHERTEXT_PARSE5 points it elsewhere, as MATCHERTEXT_SRC does for C.
+var parse5Path = func() string {
+	if p := os.Getenv("MATCHERTEXT_PARSE5"); p != "" {
+		return p
+	}
+	return filepath.Join("..", "..", "parse5", "packages", "parse5", "dist", "index.js")
+}()
+
+// runJS feeds cmds to the JavaScript driver. The fork must be built: the
+// test fails rather than skips, so that a missing build is not a pass.
+func runJS(t *testing.T, cmds []string) []string {
+	t.Helper()
+	if _, err := os.Stat(parse5Path); err != nil {
+		t.Fatalf("the parse5 fork is not built (%v); run npm ci and npm run build in injection-research/parse5", err)
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Fatalf("node is required for the parse5 driver: %v", err)
+	}
+	return runProgram(t, exec.Command(node, filepath.Join("jssrc", "driver.mjs"), parse5Path), cmds)
+}
+
+// TestJSAgainstOracle is the differential run for the parse5 fork. Its
+// scanner and its tokenizer share no code with the Go implementation, so
+// VERIFY, an element hole <div [m]> and an attribute hole title=[m] must each
+// accept exactly the values that the oracle says are matchertext: a hole
+// that holds an unbalanced value whole would be a breakout.
+func TestJSAgainstOracle(t *testing.T) {
+	rng := rand.New(rand.NewSource(2))
+	n := fuzzCount(2000, 50000)
+
+	inputs := make([][]byte, n)
+	var cmds []string
+	for i := range inputs {
+		inputs[i] = randCase(rng, verifyAlphabet, 12)
+		h := hex.EncodeToString(inputs[i])
+		cmds = append(cmds, "V "+h, "H "+h, "A "+h)
+	}
+	got := runJS(t, cmds)
+
+	nValid, nBad := 0, 0
+	for i, in := range inputs {
+		want := "0"
+		if oracleVerify(in) {
+			want = "1"
+			nValid++
+		}
+		for j, what := range []string{"verifyMatchertext", "element hole", "attribute hole"} {
+			if got[3*i+j] != want {
+				nBad++
+				if nBad <= 10 {
+					t.Errorf("%s(%q) = %s, oracle says %s", what, in, got[3*i+j], want)
+				}
+			}
+		}
+	}
+	if nBad > 10 {
+		t.Errorf("%d disagreements in total", nBad)
+	}
+	if nValid == 0 || nValid == n {
+		t.Fatalf("degenerate sample: %d of %d valid", nValid, n)
+	}
+	t.Logf("%d cases, %d valid matchertext, %d rejected", n, nValid, n-nValid)
+}
+
+// TestDepthLimitAgrees checks that C and JavaScript share the nesting limit,
+// which the oracle does not have: a value that one accepts the other must
+// accept too.
+func TestDepthLimitAgrees(t *testing.T) {
+	var inputs [][]byte
+	for _, depth := range []int{999, 1000, 1001} {
+		inputs = append(inputs, []byte(strings.Repeat("(", depth)+strings.Repeat(")", depth)))
+	}
+
+	var cCmds, jsCmds []string
+	for _, in := range inputs {
+		cCmds = append(cCmds, verifyCmd(in))
+		h := hex.EncodeToString(in)
+		jsCmds = append(jsCmds, "V "+h, "H "+h, "A "+h)
+	}
+	c := run(t, cCmds)
+	js := runJS(t, jsCmds)
+
+	for i, want := range []string{"1", "1", "0"} {
+		if c[i] != want {
+			t.Errorf("C Verify at depth %d = %s, want %s", 999+i, c[i], want)
+		}
+		for j := 0; j < 3; j++ {
+			if js[3*i+j] != want {
+				t.Errorf("JavaScript command %d at depth %d = %s, want %s", j, 999+i, js[3*i+j], want)
+			}
 		}
 	}
 }

@@ -24,7 +24,7 @@
 **   R          run every legal pair for the current value
 **   C <h> <a>  run one pair
 **
-** Result fields: outcome rc skel ro tail nrow name err
+** Result fields: outcome rc skel ro tail nrow name err fid
 **   outcome  ok | rejected (VERIFY or ?V/?I refused the value) | parse (prepare failed)
 **   skel     16 hex digits, FNV-1a of the EXPLAIN listing sans p4, or "-"
 **   ro       sqlite3_stmt_readonly, or "-"
@@ -32,6 +32,10 @@
 **   nrow     rows the non-EXPLAIN run returned, or "-"
 **   name     identifier the parser settled on (from "no such column: X"), or "-"
 **   err      error text, hex, truncated, or "-"
+**   fid      for an echo fixture, 1 if the value SQLite returns is exactly
+**            the bytes the arm handed to it, else 0; "-" elsewhere.  A text
+**            arm hands over the C string, which ends at a zero byte; a bound
+**            or typed arm hands over the whole value.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -85,9 +89,9 @@ static const Arm aArm[] = {
   {"escape",       HOLE_VALUE, C_ESCAPE,       0, 0},  /* '%q'   escaping baseline */
   {"bind",         HOLE_VALUE, C_BIND,         1, 0},  /* ?      prepared statement */
   {"mt",           HOLE_VALUE, C_MT,           0, 0},  /* %m  -> M'(...)' value hole */
-  {"mt_strict",    HOLE_VALUE, C_MTSTRICT,      0, 0},  /* VERIFY then M'(...)' */
+  {"mt_strict",    HOLE_VALUE, C_MTSTRICT,     0, 0},  /* VERIFY then %m */
   {"ident_concat", HOLE_IDENT, C_IDENT_CONCAT, 0, 0},  /* <v>    naive, control */
-  {"ident_mt",     HOLE_IDENT, C_IDENT_MT,     0, 0},  /* [<enc>] matchertext name hole */
+  {"ident_mt",     HOLE_IDENT, C_IDENT_MT,     0, 0},  /* [<name enc>] name hole */
   /* The strict-mode typed API: the only value and identifier paths a strict
   ** build admits, exercised through sqlite3_matchertext_prepare_v3(). */
   {"mt_v",         HOLE_VALUE, C_MT_V,         0, 1},  /* ?V  verified, bound */
@@ -146,11 +150,13 @@ static char *renderHole(int eConv, int eConcat, const char *z){
     case C_BIND:         return sqlite3_mprintf("?");
     case C_MT:           return sqlite3_mprintf("%m", z);
     case C_MTSTRICT:
-      if( !sqlite3_matchertext_verify(z, gnVal) ) return 0;
-      return sqlite3_mprintf("M'(%s)'", z);
+      /* VERIFY the C string that %m embeds.  For a balanced value %m only
+      ** doubles backslashes, so the value SQLite reads is the value. */
+      if( !sqlite3_matchertext_verify(z, -1) ) return 0;
+      return sqlite3_mprintf("%m", z);
     case C_IDENT_CONCAT: return sqlite3_mprintf("%s", z);
     case C_IDENT_MT: {
-      char *zEnc = sqlite3_matchertext_encode(z, gnVal, 0);
+      char *zEnc = sqlite3_matchertext_encode_name(z, gnVal, 0);
       char *zOut;
       if( zEnc==0 ) return 0;
       zOut = sqlite3_mprintf("[%s]", zEnc);
@@ -189,7 +195,7 @@ static void execPlain(const char *zSql){
 
 typedef struct Result {
   const char *zOutcome;
-  int rc, ro, tail, nrow;
+  int rc, ro, tail, nrow, fid;
   u64 skel;
   int hasSkel;
   char zErr[200];
@@ -210,7 +216,7 @@ static void emit(const Result *p){
   if( p->nrow>=0 ) printf("%d ", p->nrow); else printf("- ");
   printHex(p->zName, (int)sizeof(p->zName)); printf(" ");
   printHex(p->zErr, 120);
-  printf("\n");
+  if( p->fid>=0 ) printf(" %d\n", p->fid); else printf(" -\n");
 }
 
 /* Hash EXPLAIN <sql>, skipping p4 (redacted against the value) and comment. */
@@ -314,7 +320,7 @@ static void runCase(int iHost, int iArm, const char *zValue, i64 nValue,
   int rc;
 
   memset(pOut, 0, sizeof(*pOut));
-  pOut->ro = pOut->tail = pOut->nrow = -1;
+  pOut->ro = pOut->tail = pOut->nrow = pOut->fid = -1;
   gName[0] = 0;
   gnVal = nValue;               /* renderHole/explainHash use the true length */
 
@@ -376,7 +382,15 @@ static void runCase(int iHost, int iArm, const char *zValue, i64 nValue,
   execPlain("SAVEPOINT s");
   if( pA->bBind ) sqlite3_bind_text(pStmt, 1, zValue, (int)nValue, SQLITE_STATIC);
   pOut->nrow = 0;
-  while( sqlite3_step(pStmt)==SQLITE_ROW ) pOut->nrow++;
+  while( sqlite3_step(pStmt)==SQLITE_ROW ){
+    if( pOut->nrow==0 && pH->bEcho ){
+      i64 nGiven = pA->bBind || pA->bTyped ? nValue : (i64)strlen(zValue);
+      const void *zGot = sqlite3_column_blob(pStmt, 0);
+      pOut->fid = sqlite3_column_bytes(pStmt, 0)==nGiven
+               && (nGiven==0 || memcmp(zGot, zValue, (size_t)nGiven)==0);
+    }
+    pOut->nrow++;
+  }
   sqlite3_snprintf(sizeof(pOut->zName), pOut->zName, "%s", gName);
   sqlite3_finalize(pStmt);
   execPlain("ROLLBACK TO s");

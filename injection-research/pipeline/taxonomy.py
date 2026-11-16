@@ -15,7 +15,7 @@ FAMILIES = (QUERY, COMMAND, RENDERING, CODE, OTHER)
 
 SYNTAXES = ("sql", "nosql", "ldap", "xpath_xquery", "shell_command", "argument",
             "html_dom", "crlf_header", "template", "expression_language",
-            "code_eval", "xml", "formula_csv", "unknown")
+            "code_eval", "xml", "formula_csv", "llm_prompt", "unknown")
 
 # Nearest labeled ancestor in the CWE-1000 ChildOf hierarchy decides the label.
 FAMILY_ANCHORS = {
@@ -23,6 +23,10 @@ FAMILY_ANCHORS = {
     77: COMMAND, 78: COMMAND, 88: COMMAND,
     79: RENDERING, 93: RENDERING, 113: RENDERING,
     94: CODE, 95: CODE, 96: CODE, 917: CODE, 1336: CODE,
+    # Both are children of CWE-77 that are not command injection: an
+    # executable regular expression is code evaluation, and LLM prompt
+    # injection has its own syntax. Without these anchors both resolve to 77.
+    624: CODE, 1427: OTHER,
     74: OTHER, 75: OTHER, 91: OTHER, 99: OTHER, 1236: OTHER,
 }
 
@@ -32,8 +36,8 @@ SYNTAX_ANCHORS = {
     77: "shell_command", 78: "shell_command", 88: "argument",
     79: "html_dom", 93: "crlf_header", 113: "crlf_header",
     917: "expression_language", 1336: "template",
-    94: "code_eval", 95: "code_eval", 96: "code_eval",
-    91: "xml", 1236: "formula_csv",
+    94: "code_eval", 95: "code_eval", 96: "code_eval", 624: "code_eval",
+    91: "xml", 1236: "formula_csv", 1427: "llm_prompt",
 }
 
 FAMILY_OF_SYNTAX = {
@@ -41,8 +45,26 @@ FAMILY_OF_SYNTAX = {
     "shell_command": COMMAND, "argument": COMMAND,
     "html_dom": RENDERING, "crlf_header": RENDERING,
     "template": CODE, "expression_language": CODE, "code_eval": CODE,
-    "xml": OTHER, "formula_csv": OTHER,
+    "xml": OTHER, "formula_csv": OTHER, "llm_prompt": OTHER,
 }
+
+# CWEs without their own anchor, with the (family, family_is_generic, syntax)
+# they inherit, as reviewed against CWE v5.0. classify.py stops when a CWE with
+# CVEs inherits labels not listed here, so a CWE that is new or moved in the
+# catalogue is reviewed before it is counted.
+REVIEWED_INHERITED = {
+    # CWE-79 children: XSS variants.
+    **dict.fromkeys((80, 81, 82, 83, 84, 85, 86, 87), (RENDERING, False, "html_dom")),
+    # CWE-96 child: server-side include directives that the server evaluates.
+    97: (CODE, False, "code_eval"),
+    # CWE-75 child: no embedded language is named.
+    76: (OTHER, True, None),
+}
+
+# CWE-99 descendants that are not injection: duplicate identifiers, file names,
+# and dynamically chosen variables. No untrusted value enters an embedded
+# language. They carry no labels and do not admit a CVE to the corpus.
+NOT_INJECTION = {102, 462, 621, 627, 641, 694, 914}
 
 # CWE-74 itself and CWE-75 carry no syntax information; a family derived only
 # from these may be refined by phrase rules or the NB classifier.
@@ -54,6 +76,7 @@ _RULES = [
     (r"\bnosql injection\b|\bmongo(?:db)? injection\b", QUERY, "nosql"),
     (r"\bldap injection\b", QUERY, "ldap"),
     (r"\bxpath injection\b|\bxquery injection\b", QUERY, "xpath_xquery"),
+    (r"\bprompt injection\b", OTHER, "llm_prompt"),
     (r"\bcross[- ]site scripting\b|\bxss\b", RENDERING, "html_dom"),
     (r"\bhtml injection\b", RENDERING, "html_dom"),
     (r"\b(?:os |shell |operating[- ]system )?command injection\b", COMMAND, "shell_command"),
@@ -75,6 +98,14 @@ def rule_match(text):
     return None
 
 
+def mask_rules(text):
+    """Blank every phrase a rule matches. The classifier is applied only to
+    descriptions that no rule matches, so it must learn without them."""
+    for rx, _, _ in RULES:
+        text = rx.sub(" ", text)
+    return text
+
+
 def nearest_anchors(cwe, parents, anchors, max_depth=10):
     """CWE ids of the closest anchors reachable by walking up ChildOf edges."""
     frontier, seen = [cwe], {cwe}
@@ -93,6 +124,8 @@ def labels_from_cwes(cwes, parents):
     """Map a CVE's CWE ids (in priority order) to (family, family_is_generic, syntax)."""
     fam, generic, syn = None, False, None
     for cwe in cwes:
+        if cwe in NOT_INJECTION:
+            continue
         if fam is None or (fam == OTHER and generic):
             hits = nearest_anchors(cwe, parents, FAMILY_ANCHORS)
             specific = [h for h in hits if FAMILY_ANCHORS[h] != OTHER]

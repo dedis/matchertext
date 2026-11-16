@@ -14,11 +14,14 @@ cd injection-research
 - Python 3.11 or later
 - Git
 - A C compiler available as `cc`, or set with `CC`
+- `make` and Tcl (`tclsh`), to generate the SQLite amalgamation
 - Internet access for an initial download
 - The GitHub CLI (`gh`) for optional GitHub payload recovery
+- Node.js and npm, for the HTML replay through the `parse5/` submodule
 
-The SQL replay compiles `test/matchertext/csrc/sqli_driver.c` with the local
-`sqlite/sqlite3.c`. It does not use the Python SQLite driver for the replay.
+The SQL replay generates the MatcherText amalgamation from `sqlite/` in
+`data/build/sqlite/` and compiles `test/matchertext/csrc/sqli_driver.c` with it.
+It does not use the Python SQLite driver for the replay.
 
 ## Reproduce the complete pipeline
 
@@ -62,16 +65,20 @@ Git repositories are checked out at the exact commits in `manifest.json`.
 HTTP files are checked against their SHA-256 values. Missing HTTP files are
 restored from `snapshot-archive/sha256/`.
 
-To use another local archive or an HTTP mirror, export the setting before any
-pipeline command that reads snapshots:
+Upstream servers do not keep old versions of these files. On a new machine,
+use the published archive
+[dedis/matchertext-archive](https://github.com/dedis/matchertext-archive).
+Export the setting before any pipeline command that reads snapshots:
 
 ```sh
-export MATCHERTEXT_SNAPSHOT_ARCHIVE=/path/to/archive
-python3 pipeline/run_all.py
-
-export MATCHERTEXT_SNAPSHOT_ARCHIVE=https://example.org/archive
+export MATCHERTEXT_SNAPSHOT_ARCHIVE=https://raw.githubusercontent.com/dedis/matchertext-archive/main
 python3 pipeline/run_all.py
 ```
+
+The setting also accepts another local archive or HTTP mirror with the same
+`sha256/<digest>` layout. `juliet-c` is not in the published archive, because
+it is larger than the GitHub file limit. `fetch.py` downloads the same bytes
+from Zenodo record 4701387.
 
 Do not use `--refresh` for a reproduction run. It replaces the manifest pins
 with current upstream data. Use it only to create a new corpus snapshot:
@@ -79,6 +86,10 @@ with current upstream data. Use it only to create a new corpus snapshot:
 ```sh
 python3 pipeline/fetch.py --refresh
 ```
+
+A new snapshot needs a local archive. Push its new `sha256/` objects, except
+`juliet-c`, to the published archive before you publish the new
+`manifest.json`.
 
 ### 2. Build the database
 
@@ -109,6 +120,17 @@ python3 pipeline/subclass.py
 python3 pipeline/syntactic_group.py
 ```
 
+A CVE enters the corpus when it has a CWE in the CWE-74 subtree or its
+description matches a phrase rule. `NOT_INJECTION` in `pipeline/taxonomy.py`
+removes seven CWE-99 descendants from the subtree: no untrusted value in them
+enters an embedded language.
+
+`classify.py` also writes `data/exports/anchor_audit.csv`. It lists each
+labelled CWE and whether it has its own anchor or inherits its labels from an
+ancestor. The stage stops when a CWE with CVEs inherits labels that
+`REVIEWED_INHERITED` in `pipeline/taxonomy.py` does not list. Review such a CWE
+in the CSV, then give it an anchor or add its labels to that list.
+
 `subclass.py` adds the independent privilege, vector, interaction, technique,
 engine, injection-point, and impact labels. `syntactic_group.py` groups
 payload-backed CVEs by their normalized attack structure.
@@ -119,8 +141,11 @@ payload-backed CVEs by their normalized attack structure.
 python3 pipeline/validate.py
 ```
 
-This stage measures MatcherText prevention over the general payload corpora and
-checks the CWE taxonomy against OWASP Benchmark and NIST SARD data. It writes
+This stage classifies the general payload corpora under the MatcherText threat
+model and checks the CWE taxonomy against OWASP Benchmark and NIST SARD data.
+The syntax label decides whether a payload is in scope, except for the
+`javascript:` sinks of HTML/DOM. The payload decides only whether it embeds
+inert or is rejected. It writes
 `data/exports/payload_prevention.csv` and
 `data/exports/ground_truth_anchors.csv`.
 
@@ -130,8 +155,11 @@ checks the CWE taxonomy against OWASP Benchmark and NIST SARD data. It writes
 python3 pipeline/sqli_experiment.py
 ```
 
-This command builds the normal and strict MatcherText SQLite drivers. It then
-replays every distinct SQL payload through all control and defense arms. It
+This command generates the amalgamation and builds the normal and strict
+MatcherText SQLite drivers. It then replays every distinct SQL payload through
+all control and defense arms. The run stops, and removes its results, when a
+guard fails: a driver exits early, a control never breaks out, a matchertext
+arm breaks out or changes a value, or the strict build admits a legacy path. It
 stores detailed results in `data/cve.db` and writes these principal files:
 
 - `data/exports/sqli_arm_outcomes.csv`
@@ -147,6 +175,32 @@ python3 pipeline/sqli_experiment.py --skip-sabotage
 python3 pipeline/sqli_experiment.py --sabotage-n 1000
 ```
 
+### 5b. Replay HTML payloads
+
+```sh
+python3 pipeline/html_experiment.py
+```
+
+This command builds the MatcherText parse5 fork in `parse5/` when its sources
+changed, and runs `test/matchertext/jssrc/html_driver.mjs`. It replays every
+distinct HTML payload through 13 host contexts and 9 arms: the raw control,
+entity escaping, a tree written by the stock and by the guarded serializer,
+and five matchertext arms, one of them a tree written with matchertext output. It also records how a parser without the
+matchertext option reads each matchertext document. The run stops, and
+removes its results, when a guard fails: the driver exits early, a control
+never breaks out, a matchertext arm or the guarded serializer breaks out, a
+matchertext document fails to parse or to serialize back, or a deliberately
+broken fork goes unnoticed. It writes:
+
+- `data/exports/html_arm_outcomes.csv`
+- `data/exports/html_by_arm.csv`
+- `data/exports/html_reader.csv`
+- `data/exports/html_exemplars.csv`
+- `data/exports/html_sabotage.csv`
+
+`run_all.py` runs this stage after the SQL replay. `latex.py` writes its
+macros and `doc/generated/tbl-html-arms.tex`.
+
 ### 6. Generate exports and paper data
 
 Run these commands after classification and replay:
@@ -158,12 +212,16 @@ python3 pipeline/latex.py
 ```
 
 They write the analysis CSV files and `report.html` under `data/exports/`.
-They also write 147 macros and six tables under `doc/generated/` for the paper.
+They also write 165 macros, eight tables and one figure under `doc/generated/`
+for the paper.
 
 ## Update the remote payload corpus
 
 This step is optional. A normal reproduction imports the pinned sidecar and
 does not contact GitHub or advisory sites.
+
+`build_db.py` imports the pinned sidecar. If the archive does not have that
+object, delete the `remote-payloads` entry from `manifest.json` first.
 
 First build and classify the database. Authenticate `gh` if it is available:
 
@@ -171,6 +229,8 @@ First build and classify the database. Authenticate `gh` if it is available:
 gh auth login
 python3 pipeline/build_db.py
 python3 pipeline/classify.py
+python3 pipeline/subclass.py
+python3 pipeline/syntactic_group.py
 ```
 
 Run the GitHub recovery passes as required:

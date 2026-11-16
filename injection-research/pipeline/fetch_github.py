@@ -467,7 +467,8 @@ def run_fanout(con, args):
     for cve, syn, repo, sha in con.execute("""
             SELECT r.cve_id, c.syntax_type, r.repo, r.sha
             FROM remote_payload r JOIN classification c USING(cve_id)
-            WHERE r.status IN ('no_payload','fanout_api_error') AND r.sha IS NOT NULL
+            WHERE r.status IN ('no_payload','deep_no_payload','fanout_api_error')
+              AND r.sha IS NOT NULL
             ORDER BY r.repo, r.cve_id"""):
         parts = repo.split("/", 1)
         if len(parts) == 2:

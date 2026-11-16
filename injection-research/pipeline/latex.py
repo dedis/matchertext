@@ -8,6 +8,7 @@ doc/generated/, which main.tex pulls in:
   tbl-payload-corpus.tex   VERIFY over the fuzzdb/PaTT/SecLists payloads
   tbl-poc-sources.tex  PoC linkage per source
   tbl-anchors.tex      ground-truth CWEs that resolve to an injection label
+  tbl-html-arms.tex    HTML replay verdicts per delivery path
 
 Macros end in \\xspace so they can be written inline without a trailing {}.
 Counts are formatted 13{,}691 and percentages 82\\%, matching the prose style.
@@ -36,7 +37,7 @@ DISPLAY = {
     "code_eval": "Code / eval", "crlf_header": "CRLF / header",
     "formula_csv": "Formula (CSV)", "template": "Template", "xml": "XML",
     "argument": "Argument", "expression_language": "Expression language",
-    "unknown": "Unknown",
+    "llm_prompt": "LLM prompt", "unknown": "Unknown",
 }
 
 
@@ -73,7 +74,7 @@ def containment(con):
 
 
 def post_stratify(con, inert, reject, outside):
-    """Reweight the measured containment rate by the corpus syntax mix.
+    """Reweight the per-syntax containment rate by the corpus syntax mix.
 
     Payload-backed CVEs are not a random sample of the corpus. SQL is 1.7x
     over-represented, because a SQL injection payload is a literal string a
@@ -82,13 +83,15 @@ def post_stratify(con, inert, reject, outside):
     correlates with syntax, and specifically with matcher-hostable syntax: 85%
     of the payload-backed subset is hostable against 80% of the corpus.
 
-    Multiplying the pooled containment rate by the corpus inherits that skew and
-    overstates the result by roughly five thousand CVEs. Estimating a rate per
-    syntax and weighting by the corpus counts removes it, which is the standard
-    post-stratification correction.
+    Multiplying the pooled containment rate by the corpus inherits that skew.
+    Weighting a rate per syntax by the corpus counts removes it.
 
-    A syntax with no payload-backed CVE has no measured rate and falls back to
-    the structural rule the model asserts: contained inside HOST, not outside.
+    The rates themselves are not measured, except for HTML/DOM: the threat
+    model contains every payload of a HOST syntax and none outside, so the
+    syntax label fixes the rate ("label"), and a syntax with no payload-backed
+    CVE gets the same rule ("structural"). Only a PAYLOAD_DEPENDENT syntax has
+    a rate the payloads decide ("measured"). The estimate is therefore the
+    hostable count less the HTML/DOM javascript: sinks.
 
     Returns (estimate, [(syntax, corpus_n, backed_n, rate, basis)]).
     """
@@ -98,7 +101,8 @@ def post_stratify(con, inert, reject, outside):
     for syn, n in sorted(corpus.items(), key=lambda kv: -kv[1]):
         backed = inert[syn] + reject[syn] + outside[syn]
         if backed:
-            rate, basis = (inert[syn] + reject[syn]) / backed, "measured"
+            rate = (inert[syn] + reject[syn]) / backed
+            basis = "measured" if syn in matchertext.PAYLOAD_DEPENDENT else "label"
         else:
             rate, basis = (1.0 if syn in matchertext.HOST else 0.0), "structural"
         est += n * rate
@@ -111,8 +115,8 @@ def tbl_strata(rows, top=8):
              "Syntax & CVEs & Payload-backed & Contained \\\\", "\\midrule"]
     for syn, n, backed, rate, basis in rows[:top]:
         mark = "" if basis == "measured" else "$^{\\dagger}$"
-        lines.append(f"{DISPLAY.get(syn, syn):<19} & {num(n):>9} & {num(backed):>7}{mark} "
-                     f"& {rate * 100:.1f}\\% \\\\")
+        lines.append(f"{DISPLAY.get(syn, syn):<19} & {num(n):>9} & {num(backed):>7} "
+                     f"& {rate * 100:.1f}\\%{mark} \\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
     return "\n".join(lines) + "\n"
 
@@ -393,6 +397,114 @@ def sqli_macros(con):
     return vals
 
 
+# Each block opens with a row that names it, so the reader sees which rows use matchertext.
+HTML_ARMS = [
+    ("concat",      "Concatenation",                     "stock"),
+    ("escape",      "Entity escaping",                   "stock"),
+    ("dom_stock",   "Stock writer",                      "stock"),
+    ("dom_guarded", "Guarded writer",                    "guard"),
+    ("dom_mt",      "Matchertext writer",                "fork"),
+    ("mt_verify",   "\\textsc{Verify}, hole",             "fork"),
+    ("mt_section",  "\\textsc{Verify}, MDATA",            "fork"),
+    ("mt_encode",   "Encoding",                          "fork"),
+    ("compose",     "\\texttt{composeHtml}",             "fork"),
+]
+HTML_GROUPS = {"stock": "Without matchertext: stock parse5",
+               "guard": "Without matchertext: fork serializer",
+               "fork": "With matchertext: parse5 fork"}
+HTML_MT_ARMS = ("dom_mt", "mt_verify", "mt_section", "mt_encode", "compose")
+
+
+def has_table(con, name):
+    return con.execute("""SELECT COUNT(*) FROM sqlite_master
+                          WHERE type='table' AND name=?""", (name,)).fetchone()[0]
+
+
+def tbl_html_arms(con):
+    """Verdict counts per delivery path over the HTML hosts. Refused joins the
+    arm's own VERIFY refusals and the guarded serializer's refusals."""
+    rows = {a: r for a, *r in con.execute(
+        """SELECT arm, SUM(n_inert), SUM(n_altered), SUM(n_breakout),
+                  SUM(n_rejected) + SUM(n_refused), SUM(n_malformed)
+           FROM mt_html_combo GROUP BY arm""")}
+    lines = ["\\begin{tabular}{@{}l rrrrr@{}}", "\\toprule",
+             "& & & Broke & & Not \\\\", "Delivery & Inert & Altered & out & Refused & HTML \\\\"]
+    last = None
+    for arm, label, group in HTML_ARMS:
+        if arm not in rows:
+            continue
+        if group != last:
+            lines += ["\\midrule", f"\\multicolumn{{6}}{{@{{}}l}}{{\\emph{{{HTML_GROUPS[group]}}}}} \\\\"]
+            last = group
+        lines.append(f"{label:34} & " + " & ".join(num(v) for v in rows[arm]) + " \\\\")
+    lines += ["\\bottomrule", "\\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
+def html_macros(con):
+    """Scalars of the HTML replay. Absent tables mean the stage has not run."""
+    if not has_table(con, "mt_html_combo"):
+        return []
+    q = lambda sql: con.execute(sql).fetchone()[0]
+    def col(c):
+        return {a: n for a, n in con.execute(
+            f"SELECT arm, SUM({c}) FROM mt_html_combo GROUP BY arm")}
+    brk, effb, rej = col("n_breakout"), col("n_eff_breakout"), col("n_rejected")
+    vals = [
+        ("HtmlPayloads", num(q("SELECT COUNT(*) FROM mt_html_value"))),
+        ("HtmlHosts", num(q("SELECT COUNT(*) FROM mt_html_host"))),
+        ("HtmlSemanticHosts", num(q("SELECT COUNT(*) FROM mt_html_host WHERE semantic=1"))),
+        ("HtmlArms", num(q("SELECT COUNT(*) FROM mt_html_arm"))),
+        ("HtmlCases", num(q("SELECT COUNT(*) FROM mt_html_case"))),
+        ("HtmlEffective", num(q("""SELECT COUNT(*) FROM (SELECT DISTINCT value_id, host_id
+                                   FROM mt_html_case WHERE effective=1)"""))),
+        ("HtmlMatchertextPayloads", num(q("SELECT COUNT(*) FROM mt_html_value WHERE is_mt=1"))),
+        ("HtmlNonMtPayloads", num(q("SELECT COUNT(*) FROM mt_html_value WHERE is_mt=0"))),
+        # A zero byte reads as U+FFFD in every HTML parser, so the hole holds an altered value.
+        ("HtmlNulPayloads", num(q(
+            "SELECT COUNT(*) FROM mt_html_value WHERE instr(value, char(0))>0"))),
+        # the matchertext arms and the guarded serializer: zero breakouts
+        ("HtmlMtBreakout", num(sum(brk.get(a, 0) for a in HTML_MT_ARMS))),
+        ("HtmlGuardedBreakout", num(brk.get("dom_guarded", 0))),
+        ("HtmlGuardedRefused", num(q("""SELECT SUM(n_refused) FROM mt_html_combo
+                                        WHERE arm='dom_guarded'""") or 0)),
+        ("HtmlMtVerifyRejected", num(rej.get("mt_verify", 0))),
+        # the control and the legacy paths, over the effective set
+        ("HtmlConcatBreakout", num(effb.get("concat", 0))),
+        ("HtmlEscapeBreakout", num(effb.get("escape", 0))),
+        ("HtmlDomStockBreakout", num(effb.get("dom_stock", 0))),
+    ]
+    # The legacy defenses break out in the contexts they do not cover.
+    for name, arm, hosts in (("Escape", "escape", ("attr_sq", "attr_unquoted")),
+                             ("DomStock", "dom_stock", ("script_string", "style", "comment"))):
+        vals.append((f"Html{name}UncoveredBreakout", num(q(
+            f"""SELECT COALESCE(SUM(n_eff_breakout), 0) FROM mt_html_combo
+                WHERE arm='{arm}' AND host IN {hosts}"""))))
+    # The trees that the guard refuses and the matchertext writer delivers as holes.
+    vals.append(("HtmlGuardedRefusedMtInert", num(q(
+        """SELECT COUNT(*) FROM mt_html_case g JOIN mt_html_case m USING(value_id, host_id)
+           WHERE g.arm_id=(SELECT arm_id FROM mt_html_arm WHERE name='dom_guarded')
+             AND m.arm_id=(SELECT arm_id FROM mt_html_arm WHERE name='dom_mt')
+             AND g.verdict='REFUSED' AND m.verdict='INERT'"""))))
+    # How a parser without the option reads the documents of the verified element and attribute holes.
+    legacy = {r: n for r, n in con.execute(
+        """SELECT reader, COUNT(*) FROM mt_html_case
+           WHERE arm_id=(SELECT arm_id FROM mt_html_arm WHERE name='mt_verify')
+             AND reader != '-' GROUP BY reader""")}
+    vals += [("HtmlLegacyCases", num(sum(legacy.values()))),
+             ("HtmlLegacyElements", num(legacy.get("ELEMENTS", 0))),
+             ("HtmlLegacyElementsShare",
+              pct(legacy.get("ELEMENTS", 0) / max(sum(legacy.values()), 1), 1))]
+    sab = EXPORTS / "html_sabotage.csv"
+    if sab.exists():
+        with open(sab, newline="") as f:
+            rows = list(csv.DictReader(f))
+        vals += [("HtmlSabotages", num(len(rows))),
+                 ("HtmlSabotageDetected",
+                  num(sum(r["detection"] != "unnoticed" for r in rows)))]
+    return vals
+
+
 def run(args):
     con = sqlite3.connect(DB)
     q = lambda sql: con.execute(sql).fetchone()[0]
@@ -560,21 +672,25 @@ def run(args):
         ("GroundTruthResolved", num(len(resolved))),
     ]
     vals += sqli_macros(con)
+    vals += html_macros(con)
     (OUT / "numbers.tex").write_text(
         HEADER + "".join(macro(k, v) for k, v in vals))
-    (OUT / "tbl-mech.tex").write_text(HEADER + tbl_mech(inert, reject, outside))
-    (OUT / "fig-tree.tex").write_text(HEADER + fig_tree(
-        grouped, contained, sum(inert.values()), sum(reject.values()),
-        sum(outside.values()), semantic, nonmatcher))
-    (OUT / "tbl-syntax.tex").write_text(HEADER + tbl_syntax(con))
-    (OUT / "tbl-strata.tex").write_text(HEADER + tbl_strata(strata))
-    (OUT / "tbl-payload-corpus.tex").write_text(HEADER + tbl_payload_corpus(con))
-    (OUT / "tbl-poc-sources.tex").write_text(HEADER + tbl_poc_sources(con))
-    (OUT / "tbl-anchors.tex").write_text(HEADER + tbl_anchors(resolved))
-    if con.execute("""SELECT COUNT(*) FROM sqlite_master
-                      WHERE type='table' AND name='mt_sqli_combo'""").fetchone()[0]:
-        (OUT / "tbl-sqli-arms.tex").write_text(HEADER + tbl_sqli_arms(con))
-    print(f"wrote {len(vals)} macros and 6 tables to {OUT.relative_to(ROOT)}")
+    tables = {"tbl-mech": tbl_mech(inert, reject, outside),
+              "fig-tree": fig_tree(grouped, contained, sum(inert.values()),
+                                   sum(reject.values()), sum(outside.values()),
+                                   semantic, nonmatcher),
+              "tbl-syntax": tbl_syntax(con),
+              "tbl-strata": tbl_strata(strata),
+              "tbl-payload-corpus": tbl_payload_corpus(con),
+              "tbl-poc-sources": tbl_poc_sources(con),
+              "tbl-anchors": tbl_anchors(resolved)}
+    if has_table(con, "mt_sqli_combo"):
+        tables["tbl-sqli-arms"] = tbl_sqli_arms(con)
+    if has_table(con, "mt_html_combo"):
+        tables["tbl-html-arms"] = tbl_html_arms(con)
+    for name, body in tables.items():
+        (OUT / f"{name}.tex").write_text(HEADER + body)
+    print(f"wrote {len(vals)} macros and {len(tables)} tables and figures to {OUT.relative_to(ROOT)}")
     con.close()
 
 

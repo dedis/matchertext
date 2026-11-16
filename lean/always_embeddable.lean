@@ -56,7 +56,7 @@ theorem mt_wrap {m : List α} (hm : MT Pi m) {o c : α} (hp : (o, c) ∈ Pi) :
 --   1) List("Hello".tochars(), '[', "World".tochars(),'{') and List('}','!',']') describe valide matcher pairs
 --   2) List('(') and List(']') describe invalid matcher pairs
 inductive AllMatch (Pi : Set (α × α)) : List α → List α → Prop where
-  | nil : AllMatch Pi [] []
+  | pair (o c : α) (hp : (o, c) ∈ Pi) : AllMatch Pi [o] [c]
   | cons (o c : α) (s_o' s_c' : List α) (hp : (o, c) ∈ Pi) (rest : AllMatch Pi s_o' s_c') :
     AllMatch Pi (o :: s_o') (s_c' ++ [c])
   | nonmatch_o (x : α) (s_o' s_c' : List α) (hx : Nonmatcher Pi x) (rest : AllMatch Pi s_o' s_c') :
@@ -81,10 +81,8 @@ theorem embedding_closed_under_context
   have _h_open_close_disjoint : ∀ x, ¬ (Opener Pi x ∧ Closer Pi x) :=
     fun x => disjoint Pi hdisj x
   induction hs with
-  | nil =>
-    have h: ([] ++ m ++ []) = (m) := by simp
-    rw [h]
-    apply hm
+  | pair o c hp =>
+    exact mt_wrap Pi hm hp
   | cons o c s_o' s_c' hp rest ih =>
     have ho : Opener Pi o := ⟨c, hp⟩
     have hc : Closer Pi c := ⟨o, hp⟩

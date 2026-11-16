@@ -15,6 +15,7 @@ import random
 import re
 import sqlite3
 import warnings
+from collections import Counter
 from pathlib import Path
 
 import matchertext
@@ -31,7 +32,10 @@ _SIGNS = {
             # \)? catches the paren-breakout form `admin') OR '1'='1`, which is
             # precisely the unmatched-closer case the containment split turns on.
             r"'\)?\s*(?:OR|AND)\s*'?\d+'?\s*=\s*'?\d+[^\n]*",
-            r"'\)?\s*(?:OR|AND)\b[^\n]*--", r"\bAND\s+\d+=\d+[^\n]*", r"';?\s*WAITFOR\s+DELAY[^\n]*",
+            r"'\)?\s*(?:OR|AND)\b[^\n]*--",
+            # The paren breakout against both sides, `') OR ('1'='1`.
+            r"'\)\s*(?:OR|AND)\s*\(\s*'?\w+'?\s*=\s*'?\w+'?[^\n]*",
+            r"\bAND\s+\d+=\d+[^\n]*", r"';?\s*WAITFOR\s+DELAY[^\n]*",
             r"\bextractvalue\s*\([^\n]*",
             # Stops at the closing paren: running to end of line dragged in the
             # enclosing query's closers, as in `SLEEP(5)))vltp)`, whose stray
@@ -155,6 +159,11 @@ def urlform_decode(frag, rounds=2):
 _PAIR = {")": "(", "]": "[", "}": "{"}
 
 
+# Fragments dropped as cut by their signature, per syntax: the selection the
+# truncation guard makes, reported by syntactic_group.py.
+TRUNCATED = Counter()
+
+
 def is_truncated(frag):
     """Did the signature cut the payload mid-expression?
 
@@ -185,6 +194,41 @@ _SHELL_WHOLE = re.compile(
 _SOURCEISH = re.compile(r"\b(?:snprintf|sprintf|system)\s*\(|%[a-z](?:\W|$)", re.I)
 # `&id=62` is a URL parameter named id, not the id command.
 _URL_PARAM = re.compile(r"^[&;|]\w+=")
+
+
+def literal_end(text, start):
+    """If text[start] lies inside a string literal of exploit code on its
+    line, return the index of the literal's closing quote, else None.
+
+    A signature that runs to the end of the line otherwise takes the code after
+    the literal too, as in `"1 UNION SELECT user()"})`, whose `})` makes a
+    balanced payload look rejected. Only `"` and backtick literals count, and
+    only where code opens them, after `=`, `(`, `[`, `{`, `,`, `:` or `+`: a
+    quote after a value, as in `1"`, is the breakout of a raw payload."""
+    i = text.rfind("\n", 0, start) + 1
+    quote, prev = None, ""
+    while i < start:
+        c = text[i]
+        if quote:
+            if c == "\\":
+                i += 1
+            elif c == quote:
+                quote = None
+        elif c in "\"`" and prev in tuple("=([{,:+"):
+            quote = c
+        if not c.isspace():
+            prev = c
+        i += 1
+    if quote is None:
+        return None
+    j = start
+    while j < len(text) and text[j] != "\n":
+        if text[j] == "\\":
+            j += 1
+        elif text[j] == quote:
+            return j
+        j += 1
+    return None
 
 
 def _accept(frag, truncation_check=True):
@@ -228,6 +272,7 @@ _LABELLED = [
 # Trusting a label still needs the value to look like an attack rather than a
 # bare path or a separator line: it must carry a delimiter, metacharacter or
 # escape, and it must not be only structure.
+_REQUEST = _LABELLED[2]
 _ATTACKISH = re.compile(r"""['"<>;|`]|\$\(|%[0-9A-Fa-f]{2}|&&|\|\||[(){}\[\]]""")
 _ONLY_PUNCT = re.compile(r"^[\W_]+$")
 
@@ -382,6 +427,15 @@ def extract_labelled(text, syn):
     for rx in _LABELLED:
         for m in rx.finditer(text):
             raw = " ".join(m.group(1).split())
+            if rx is _REQUEST:
+                # A request line carries the payload in transport encoding, in
+                # a parameter of a path: decode it, prefer a signature match,
+                # and otherwise judge the parameters rather than the path.
+                raw = urlform_decode(raw)
+                inner = extract_payload(raw, syn, labelled=False)
+                if inner:
+                    return inner
+                raw = raw.partition("?")[2]
             if syn == "shell_command":
                 raw = re.split(r"&(?:quot|gt|lt);", raw, 1, re.I)[0].rstrip()
             # The whole labelled value is preferred over a signature match inside
@@ -422,7 +476,14 @@ def extract_payload(text, syn, labelled=True, constructed=True, prefer_construct
             if (syn == "shell_command"
                     and re.search(r"<(?:COMMAND|CMD)>", text[max(0, m.start() - 100):m.end()], re.I)):
                 continue
-            frag = " ".join(extend_balance(text, m.end(), m.group(0)).split())
+            end = m.end()
+            lit = literal_end(text, m.start())
+            if lit is not None and lit < end:
+                end = lit
+            frag = " ".join(extend_balance(text, end, text[m.start():end]).split())
+            # A fragment that runs to the end of its line or literal is the
+            # whole payload, so an unmatched opener in it is real.
+            whole = end == lit or end >= len(text) or text[end] == "\n"
             if syn == "shell_command" and _SOURCEISH.search(frag):
                 continue
             if syn == "html_dom":
@@ -439,13 +500,17 @@ def extract_payload(text, syn, labelled=True, constructed=True, prefer_construct
                 frag = re.split(r"\s+HTTP/\d|,\s+then\b", frag, 1, re.I)[0].rstrip()
                 if _PCT.search(frag):
                     frag = urlform_decode(frag)
-            if _accept(frag):
+            if _accept(frag, truncation_check=not whole):
                 return frag
+            TRUNCATED[syn] += _accept(frag, truncation_check=False)
     # Literal forms first, so an unencoded payload is never routed through the
     # decoder; only fall back to the URL forms when nothing else matched.
     for rx in URL_SIGNS.get(syn, ()):
         for m in rx.finditer(text):
             frag = " ".join(urlform_decode(m.group(0)).split())
+            # The URL tail stops at a quote, an angle bracket or the line end
+            # where the URL itself ends; a space may fall inside the payload.
+            whole = m.end() >= len(text) or text[m.end()] in "\n\"'<>"
             if syn == "html_dom":
                 close = re.search(r"&gt;", frag, re.I)
                 if close and re.match(r"(?:&lt;|&#(?:0*60|x0*3c);)(?:img|svg)\b",
@@ -455,8 +520,9 @@ def extract_payload(text, syn, labelled=True, constructed=True, prefer_construct
                     close = re.search(r"&lt;/script&gt;", frag, re.I)
                     if close:
                         frag = frag[:close.end()]
-            if _accept(frag):
+            if _accept(frag, truncation_check=not whole):
                 return frag
+            TRUNCATED[syn] += _accept(frag, truncation_check=False)
     if constructed and not prefer_constructed and _BUILD_HINT.search(text):
         return built_payload()
     return None

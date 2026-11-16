@@ -77,7 +77,8 @@ _HOST = re.compile(r"https?://(?:www\.)?([^/]+)", re.I)
 # like a finding.
 _BLOCKED = re.compile(
     r"velocity rate limiting|detected misuse|\bbanned\b|access denied"
-    r"|rate limit exceeded|too many requests|temporarily blocked", re.I)
+    r"|rate limit exceeded|too many requests|temporarily blocked"
+    r"|locked out \| packet storm", re.I)
 # Consecutive blocks after which a site is abandoned for the rest of the run.
 BLOCK_LIMIT = 3
 GHSL_SITEMAP = "https://securitylab.github.com/sitemap.xml"
@@ -254,7 +255,8 @@ def run(args):
         run_ghsl(con, args)
         finish(con)
         return
-    done = {c for (c,) in con.execute("SELECT cve_id FROM web_payload")}
+    done = {c for (c,) in con.execute("SELECT cve_id FROM web_payload "
+                                      "WHERE status NOT IN ('blocked','skipped_blocked')")}
     todo = candidates(con, done)
     if args.n:
         todo = todo[:args.n]

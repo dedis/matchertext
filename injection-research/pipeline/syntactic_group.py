@@ -17,7 +17,7 @@ import sqlite3
 from collections import defaultdict
 from pathlib import Path
 
-from report import extract_payload
+from report import TRUNCATED, extract_payload
 
 ROOT = Path(__file__).resolve().parents[1]
 DB = ROOT / "data" / "cve.db"
@@ -49,8 +49,10 @@ _TOKEN = re.compile(r"""
     <\s*/\s* | < | > | -- | \#
   | [()\[\]{}] | ['"`]
   | [;&|=*/+~^%!?,.:@$\\-]
-  | \d+ | [A-Za-z_][\w-]* | \s+
+  | \d+ | [A-Za-z_]\w*(?:-\w+)* | \s+
 """, re.X)
+# A hyphen joins word characters only, so the "--" of `name--` stays a comment.
+_WORD = re.compile(r"[A-Za-z_]\w*(?:-\w+)*")
 
 
 def skeleton(payload):
@@ -61,13 +63,13 @@ def skeleton(payload):
             continue
         if t.startswith("<"):  # '<' or '</'
             mapped = "</" if "/" in t else "<"
-        elif prev in ("<", "</") and re.fullmatch(r"[A-Za-z_][\w-]*", t):
+        elif prev in ("<", "</") and _WORD.fullmatch(t):
             mapped = "TAG"
         elif t in "'\"`":
             mapped = "<q>"
         elif t.isdigit():
             mapped = "<n>"
-        elif re.fullmatch(r"[A-Za-z_][\w-]*", t):
+        elif _WORD.fullmatch(t):
             mapped = t.upper() if t.lower() in KEYWORDS else "<id>"
         else:
             mapped = t
@@ -155,6 +157,8 @@ def run(args):
 
     groups = con.execute("SELECT COUNT(DISTINCT group_id) FROM syntactic_group").fetchone()[0]
     print(f"syntactic groups: {len(rows)} CVEs -> {groups} distinct skeletons")
+    print("fragments dropped as cut mid-expression: "
+          + (", ".join(f"{s} {n}" for s, n in TRUNCATED.most_common()) or "none"))
     for sk, n in con.execute("""SELECT skeleton, COUNT(*) c FROM syntactic_group
                                 GROUP BY skeleton ORDER BY c DESC LIMIT 8"""):
         print(f"  {n:>5}  {sk[:70]}")

@@ -131,6 +131,8 @@ POC_TEXT_EXT = {".c", ".cpp", ".go", ".html", ".java", ".js", ".json", ".md",
                 ".php", ".pl", ".py", ".rb", ".rst", ".sh", ".txt", ".xml",
                 ".yaml", ".yml"}
 POC_MAX_FILE = 1 << 20
+# A file or index line that names more CVEs than this is a catalogue.
+POC_CATALOGUE_IDS = 10
 
 CVSS_KEYS = ("cvssV4_0", "cvssV3_1", "cvssV3_0", "cvssV2_0")
 
@@ -548,7 +550,7 @@ def load_poc_collections(con):
                 continue
             ids = path_ids or _cve_ids(text)
             # A file that names many CVEs is a catalogue, not one CVE's PoC.
-            if not ids or (not path_ids and len(ids) > 10):
+            if not ids or (not path_ids and len(ids) > POC_CATALOGUE_IDS):
                 continue
             kind = "writeup" if f.suffix.lower() in {".md", ".rst", ".txt"} else "exploit"
             local = str(f.relative_to(RAW))
@@ -572,7 +574,7 @@ def load_poc_indexes(con):
                 continue
             for line in text.splitlines():
                 ids = _cve_ids(line)
-                if not ids:
+                if not ids or len(ids) > POC_CATALOGUE_IDS:
                     continue
                 for url in URL_RE.findall(line):
                     rows.extend((cid, source, url.rstrip(".,;"), None, "repo") for cid in ids)

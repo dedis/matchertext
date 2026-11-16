@@ -12,6 +12,7 @@ import build_db
 import classify
 import export
 import fetch
+import html_experiment
 import latex
 import report
 import sqli_experiment
@@ -31,7 +32,7 @@ def main():
     ap.add_argument("--nb-margin", type=float, default=3.0,
                     help="minimum NB log-odds margin to accept a label")
     ap.add_argument("--skip-sabotage", action="store_true",
-                    help="skip the driver experiment's power measurement")
+                    help="skip the driver experiments' power measurement")
     ap.add_argument("--sabotage-n", type=int, default=4000)
     args = ap.parse_args()
     if not args.skip_fetch:
@@ -42,6 +43,7 @@ def main():
     syntactic_group.run(args)
     validate.run(args)
     sqli_experiment.run(args)
+    html_experiment.run(args)
     export.run(args)
     report.run(argparse.Namespace(samples=5, seed=42))
     latex.run(args)
