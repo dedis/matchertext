@@ -600,7 +600,7 @@ def label_attribution(q, related):
 def poc_sources(q):
     rows = [(pill(s), f"{n:,}", f"{d:,}", f"{i:,}") for s, n, d, i in q(
         """SELECT p.source, COUNT(*), COUNT(DISTINCT p.cve_id), COUNT(DISTINCT c.cve_id)
-           FROM poc p LEFT JOIN classification c USING(cve_id) GROUP BY 1 ORDER BY 2 DESC""")]
+           FROM poc_evidence p LEFT JOIN classification c USING(cve_id) GROUP BY 1 ORDER BY 2 DESC""")]
     return section("poc-sources", "Proof-of-concept sources",
                    p("PoC references linked to injection CVEs, by source database."),
                    tbl(["source", "PoC rows", "distinct CVEs", "injection CVEs"], rows,
@@ -622,7 +622,7 @@ def syntax_types(q, related):
         """SELECT c.syntax_type, COUNT(DISTINCT c.cve_id), COUNT(DISTINCT k.cve_id),
                   COUNT(DISTINCT e.cve_id)
            FROM classification c LEFT JOIN kev k USING(cve_id)
-           LEFT JOIN poc e USING(cve_id) GROUP BY 1 ORDER BY 2 DESC""")]
+           LEFT JOIN poc_evidence e USING(cve_id) GROUP BY 1 ORDER BY 2 DESC""")]
     return section("syntax", "Syntax types",
                    p("The embedded language each injection targets — the primary axis."),
                    tbl(["syntax", "count", "KEV", "with PoC", "share", ""], rows,
@@ -784,7 +784,7 @@ def run(args):
 
     total = q("SELECT COUNT(*) FROM cve WHERE state='PUBLISHED'")[0][0]
     related = q("SELECT COUNT(*) FROM classification")[0][0]
-    with_poc = q("""SELECT COUNT(DISTINCT cve_id) FROM poc
+    with_poc = q("""SELECT COUNT(DISTINCT cve_id) FROM poc_evidence
                     WHERE cve_id IN (SELECT cve_id FROM classification)""")[0][0]
     groups = q("""SELECT syntax_type, skeleton, MIN(example), COUNT(*) c
                   FROM syntactic_group GROUP BY group_id ORDER BY c DESC""")

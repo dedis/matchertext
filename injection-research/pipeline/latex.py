@@ -19,6 +19,7 @@ import sqlite3
 from collections import defaultdict
 from pathlib import Path
 
+import audit
 import export
 import matchertext
 
@@ -212,7 +213,7 @@ def tbl_syntax(con, top=6):
             SELECT c.syntax_type, COUNT(*) n,
                    COUNT(DISTINCT CASE WHEN p.cve_id IS NOT NULL THEN c.cve_id END) w
             FROM classification c
-            LEFT JOIN (SELECT DISTINCT cve_id FROM poc) p USING(cve_id)
+            LEFT JOIN (SELECT DISTINCT cve_id FROM poc_evidence) p USING(cve_id)
             GROUP BY 1 ORDER BY n DESC""").fetchall()
     lines = ["\\begin{tabular}{lrr}", "\\toprule",
              "Injection syntax & CVEs & with PoC \\\\", "\\midrule"]
@@ -236,7 +237,7 @@ def tbl_poc_sources(con):
     for src, rows, cves, inj in con.execute("""
             SELECT p.source, COUNT(*), COUNT(DISTINCT p.cve_id),
                    COUNT(DISTINCT CASE WHEN c.cve_id IS NOT NULL THEN p.cve_id END)
-            FROM poc p LEFT JOIN classification c USING(cve_id)
+            FROM poc_evidence p LEFT JOIN classification c USING(cve_id)
             GROUP BY 1 ORDER BY 2 DESC"""):
         lines.append(f"\\texttt{{{src}}} & {num(rows)} & {num(cves)} & {num(inj)} \\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
@@ -268,18 +269,13 @@ SQLI_ARMS = [
 ]
 
 
-# The strict build has no in-band holes: the value hole's strict form is the
-# typed ?V parameter (mt_v) and the name hole's is ?I (ident_i). Every other
-# delivery path splices text through the refused legacy prepare.
-STRICT_OF = {"mt": "mt_v", "mt_strict": "mt_v", "ident_mt": "ident_i"}
-
-
 def tbl_sqli_arms(con):
     """Verdict counts per delivery path, additive build beside strict. In the
     additive default the matcher-delimited holes contain every payload and the
-    controls break out. Under strict the legacy prepare is refused, so the typed
-    ?V and ?I API is the only path; it contains every payload the same way, and
-    every text-splicing path is refused wholesale."""
+    controls break out. Under strict every text-splicing path, in-band holes
+    included, is refused; the typed ?V and ?I parameters, which the prose
+    reports, are the admitted paths. Refused counts both Verify rejections and
+    refused prepares."""
     add = {a: r for a, *r in con.execute(
         """SELECT arm, SUM(n_inert), SUM(n_breakout), SUM(n_rejected),
                   SUM(n_malformed) FROM mt_sqli_combo GROUP BY arm""")}
@@ -301,16 +297,31 @@ def tbl_sqli_arms(con):
         if group != last:
             lines.append("\\midrule")
             last = group
-        src = STRICT_OF.get(arm)
-        if src and src in strict:
-            si, sb, sr, _, sm = strict[src]      # ?V / ?I: inert, breakout, rejected, malformed
-            scells = [si, sb, sr, sm]
-        else:                                    # legacy path: refused before the parser
-            scells = [0, 0, strict.get(arm, [0, 0, 0, 0, 0])[3], 0]
-        cells = list(add[arm]) + scells
-        lines.append(f"{label:34} & " + " & ".join(num(v) for v in cells) + " \\\\")
+        acells = [num(v) for v in add[arm]]
+        if arm in strict:
+            si, sb, sr, sf, sm = strict[arm]
+            scells = [num(v) for v in (si, sb, sr + sf, sm)]
+        else:
+            scells = ["--"] * 4
+        lines.append(f"{label:34} & " + " & ".join(acells + scells) + " \\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
     return "\n".join(lines) + "\n"
+
+
+def audit_macros(con):
+    """Quoted once the label audit's gold.csv is complete; absent before."""
+    m = audit.metrics(con)
+    if m is None:
+        return []
+    ci = lambda r: f"{pct(r[0], 1)} ({pct(r[1], 1)}--{pct(r[2], 1)})"
+    rows = [("AuditGraded", num(m["graded"])),
+            ("AuditHostableShare",
+             ci((m["hostable_share"], m["hostable_low"], m["hostable_high"])))]
+    if m["kappa"] is not None:
+        rows.append(("AuditKappa", f"{m['kappa']:.2f}"))
+    for layer in ("cwe", "rule", "nb"):
+        rows.append((f"AuditPrecision{layer.title()}", ci(m["layers"][layer]["precision"])))
+    return rows
 
 
 def sqli_macros(con):
@@ -516,7 +527,7 @@ def run(args):
 
     published = q("SELECT COUNT(*) FROM cve WHERE state='PUBLISHED'")
     injection = q("SELECT COUNT(*) FROM classification")
-    with_poc = q("""SELECT COUNT(DISTINCT cve_id) FROM poc
+    with_poc = q("""SELECT COUNT(DISTINCT cve_id) FROM poc_evidence
                     WHERE cve_id IN (SELECT cve_id FROM classification)""")
 
     # Projection: the context condition is readable from the syntax label alone,
@@ -524,6 +535,13 @@ def run(args):
     # measured on the payload-backed HTML/DOM subset discounts the ceiling.
     hosts = "','".join(sorted(matchertext.HOST))
     hostable = q(f"SELECT COUNT(*) FROM classification WHERE syntax_type IN ('{hosts}')")
+    # The ceiling is a design choice: the share if every non-matcher context got
+    # a hole form as SQL does, and the share among known-exploited CVEs.
+    with_nm = "','".join(sorted(matchertext.HOST | set(matchertext.NONMATCHER)))
+    hostable_nm = q(f"SELECT COUNT(*) FROM classification WHERE syntax_type IN ('{with_nm}')")
+    kev_inj = q("SELECT COUNT(*) FROM classification JOIN kev USING(cve_id)")
+    kev_host = q(f"""SELECT COUNT(*) FROM classification JOIN kev USING(cve_id)
+                     WHERE syntax_type IN ('{hosts}')""")
     htmldom = q("SELECT COUNT(*) FROM classification WHERE syntax_type='html_dom'")
     hd_backed = inert["html_dom"] + reject["html_dom"] + outside["html_dom"]
     js_rate = outside["html_dom"] / hd_backed if hd_backed else 0
@@ -552,6 +570,29 @@ def run(args):
         if fam and not generic:
             resolved.append((suite, cwe, n, fam, syn or ""))
     resolved.sort(key=lambda r: (r[0], -r[2]))
+
+    # Label sensitivity: a CWE-labeled CVE whose CWEs map to syntaxes on both
+    # sides of the hostable boundary keeps the first by source priority.
+    # Resolving every such conflict away from HOST gives the lowest ceiling the
+    # CWE layer supports.
+    cve_cwes = defaultdict(set)
+    for cid, cwe in con.execute("""SELECT a.cve_id, a.cwe_id FROM cwe_assignment a
+                                   JOIN classification c USING(cve_id)
+                                   WHERE c.method='cwe'"""):
+        cve_cwes[cid].add(cwe)
+    cwe_label = dict(con.execute(
+        "SELECT cve_id, syntax_type FROM classification WHERE method='cwe'"))
+    syn_of = {}
+    label_conflicts = 0
+    for cid, cwes in cve_cwes.items():
+        syns = set()
+        for cwe in cwes:
+            if cwe not in syn_of:
+                syn_of[cwe] = labels_from_cwes([cwe], parents)[2]
+            if syn_of[cwe]:
+                syns.add(syn_of[cwe])
+        if cwe_label[cid] in matchertext.HOST and syns - matchertext.HOST:
+            label_conflicts += 1
 
     # Naive-Bayes holdout scores, weighted by class support, from the CSV
     # classify.py writes. Blank precision/recall mean the class never scored.
@@ -599,12 +640,13 @@ def run(args):
         ("MethodDeterministicShare",
          pct((methods.get("cwe", 0) + methods.get("rule", 0)) / injection, 1)),
         ("AuditPerMethod", num(export.AUDIT_PER_METHOD)),
+        *audit_macros(con),
         ("InjectionWithPoc", num(with_poc)),
         ("InjectionWithPocShare", pct(with_poc / injection)),
-        ("PocRows", num(q("SELECT COUNT(*) FROM poc"))),
+        ("PocRows", num(q("SELECT COUNT(*) FROM poc_evidence"))),
         # per-source PoC reach over the whole corpus, for \cref{sec:data}
         *[(f"Poc{''.join(c for c in s.title() if c.isalpha())}CVEs", num(n)) for s, n in con.execute(
-            "SELECT source, COUNT(DISTINCT cve_id) FROM poc GROUP BY 1 ORDER BY 2 DESC")],
+            "SELECT source, COUNT(DISTINCT cve_id) FROM poc_evidence GROUP BY 1 ORDER BY 2 DESC")],
         ("KevRows", num(q("SELECT COUNT(*) FROM kev"))),
         ("VedasScored", num(q("""SELECT COUNT(*) FROM cve v JOIN exploit_score USING(cve_id)
                                  WHERE v.state='PUBLISHED'"""))),
@@ -649,6 +691,12 @@ def run(args):
         # projection onto the full corpus
         ("HostableCVEs", num(hostable)),
         ("HostableShare", pct(hostable / injection)),
+        ("HostableWithNonmatcherShare", pct(hostable_nm / injection)),
+        ("HostableShareExact", pct(hostable / injection, 1)),
+        ("LabelConflictCVEs", num(label_conflicts)),
+        ("HostableLowShare", pct((hostable - label_conflicts) / injection, 1)),
+        ("KevInjectionCVEs", num(kev_inj)),
+        ("KevHostableShare", pct(kev_host / kev_inj)),
         ("HtmlDomCVEs", num(htmldom)),
         ("HtmlDomBacked", num(hd_backed)),
         ("HtmlDomJsSinks", num(outside["html_dom"])),

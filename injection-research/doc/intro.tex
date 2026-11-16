@@ -40,10 +40,10 @@ a security property, we state the guarantee as \emph{inertness}, that a host
 language's parse does not depend on what its holes contain and
 discharge its boundary premise with a machine-checked Lean proof
 (\cref{sec:threat}). Because the convention must be retrofitted, we show it
-resisting SQL, HTML, LDAP, and PDF injection, free where a format already delimits
-with matchers and a bounded parser change elsewhere (\cref{sec:resist}). Because
-no rule reaches every context, execution sinks and non-matcher syntax stay out of
-reach, so the ceiling we report is a property of injection, not this design.
+resisting SQL, HTML, LDAP, and PDF injection, free where a format already reads to
+matcher balance and a bounded parser change elsewhere (\cref{sec:resist}). Because
+no rule reaches every context, execution sinks stay out of reach, and the ceiling
+we report depends on which syntaxes we give a hole form.
 
 We measure the reach over a reproducible corpus of \dataInjectionCVEs injection
 CVEs, replaying recorded attack strings under a matchertext-aware host language

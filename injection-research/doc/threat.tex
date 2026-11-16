@@ -58,20 +58,18 @@ The attacker does not control the host-language source, the configuration $(\Sig
 or the trusted components above.
 
 \paragraph{Security property (inertness)}
-Let $\textsc{Verify}(v)\Leftrightarrow v\in L$: for every host-language program
-$P[\cdot]$ and every $v$ with $\textsc{Verify}(v)$, the host-language parse of $P[v]$
-places the content of $v$ at a single terminal. That terminal's bytes do not
-contribute to the parse structure of $P$. Equivalently, the structural
-skeleton of the parse of $P[v]$ is independent of $v$. This inertness is strictly
-stronger than the closure property $s_o\|v\|s_c\in L$ that \cref{sec:resist}
-inherits from the always-embeddability theorem~\cite{matchertext}. Closure
-states that the \emph{delimited string remains valid matchertext}, whereas
-inertness states that the \emph{host-language parser treats the delimited content as
-data}. Closure is a lemma toward inertness, not inertness itself: it
-constrains the \emph{string}, not the host language's \emph{parser}.
+We model the aware host as a deterministic lexer emitting the located content as
+one $\mathit{hole}$ token, and a parser over token types; $\mathrm{skel}(t)$ erases
+a tree's hole lexemes.
+\textbf{Definition 1 (Inertness).} A host language is inert for $P[\cdot]$ if, for
+all $v,v'\in L$, $P[v]$ parses exactly when $P[v']$ does, and then
+$\mathrm{skel}(P[v])=\mathrm{skel}(P[v'])$.
+The attacker wins if a value \textsc{Verify} accepts changes the skeleton; rejection
+is a loss. Closure~\cite{matchertext} constrains the
+\emph{string}, inertness the \emph{parser}.
 
 \paragraph{Deployment premises}
-Inertness holds under four premises, each necessary:
+Inertness holds under four premises:
 \begin{itemize}
 \item[\textbf{A1}] \emph{Aware host language.} The host language that interprets the composed text
 	is matchertext-aware: it ends the value by matcher balance rather
@@ -79,11 +77,13 @@ Inertness holds under four premises, each necessary:
 \item[\textbf{A2}] \emph{Delimited context.} Every untrusted value is routed
 	into a matcher-delimited hole. A value concatenated into host-language syntax
 	outside a hole is unprotected, exactly as with any point-of-use defense.
+	An API can enforce A2 by accepting only constant templates (C string
+	literals, JavaScript tagged templates), which we leave to future work.
 \item[\textbf{A3}] \emph{Canonicalize, then verify.} \textsc{Verify} runs on the
 	\emph{fully decoded and normalized} value, at the last transform boundary
 	before it enters the hole. The host language reads that same representation to
 	matcher balance, performing no further decoding, normalization, or
-	reparsing of the hole contents.
+	reparsing of the hole contents (PDF's \verb|\(| is such decoding).
 	Writing $\mathrm{canon}(v)$ for the composition of every decode and
 	normalization the pipeline applies, the obligation is
 	$\textsc{Verify}(\mathrm{canon}(v))$ with the host language parsing
@@ -127,23 +127,21 @@ Inertness then rests on three premises, each separately dischargeable:
 	terminal as a data value and never re-lexes, reparses, or executes its
 	bytes.
 \end{itemize}
-The chain is then immediate. Closure~\cite{matchertext} keeps $P[v]$ balanced,
-so the locator operates on valid input. L1 fixes the hole's extent; L2 makes the
-parse skeleton independent of $v$; and L3 carries that independence through to
-execution. Thus
-$\mathrm{closure}\wedge\mathrm{L1}\wedge\mathrm{L2}\wedge\mathrm{L3}\Rightarrow$
-inertness.
+\textbf{Lemma 1.} If the lexer ends each hole by a locator satisfying L1 and
+resumes after $s_c$ in a state independent of the lexeme, the token-type sequence
+of $P[v]$ is the same for every $v\in L$ (\cref{sec:appendix:lemma}); with L2 the
+skeletons agree (Definition~1), and L3 carries this to execution.
 Closure is machine-checked in the formalism of~\cite{matchertext},
 which gives the correctness of \textsc{Verify} a paper proof sketch. This paper discharges L1 once for all host languages
-(\cref{sec:appendix:lean}), and the per-host-language L2 and L3 for a matchertext-aware
-SQLite in \cref{sec:prevent:exec}.
+(\cref{sec:appendix:lean}), L2 and L3 for SQLite (\cref{sec:prevent:exec}), and
+L2 for HTML (\cref{sec:prevent:html}).
 
 \paragraph{Scope}
 In scope is \emph{structural} injection: an attacker-controlled value that
 alters the host-language parse by escaping its region.
 Out of scope, and excluded from the containment claims throughout, are execution
-and semantic sinks (A4); contexts delimited by non-matchers that no matcher pair
-bounds (shell separators, CR/LF header breaks, XML/XXE angle brackets);
+and semantic sinks (A4); contexts delimited by non-matchers for which this paper
+builds no hole form (shell separators, CR/LF header breaks, XML/XXE angle brackets);
 \emph{semantic} abuse in which a well-formed value is merely unauthorized;
 algorithmic denial of service, which is not a breakout; and second-order
 injection in which stored input is reinterpreted in a different context later,

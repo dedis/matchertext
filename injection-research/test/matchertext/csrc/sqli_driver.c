@@ -151,12 +151,13 @@ static char *renderHole(int eConv, int eConcat, const char *z){
     case C_MT:           return sqlite3_mprintf("%m", z);
     case C_MTSTRICT:
       /* VERIFY the C string that %m embeds.  For a balanced value %m only
-      ** doubles backslashes, so the value SQLite reads is the value. */
+      ** escapes the pair of a run that reads as an escape, so the value
+      ** SQLite reads is the value. */
       if( !sqlite3_matchertext_verify(z, -1) ) return 0;
       return sqlite3_mprintf("%m", z);
     case C_IDENT_CONCAT: return sqlite3_mprintf("%s", z);
     case C_IDENT_MT: {
-      char *zEnc = sqlite3_matchertext_encode_name(z, gnVal, 0);
+      char *zEnc = sqlite3_matchertext_encode(z, gnVal, 0);
       char *zOut;
       if( zEnc==0 ) return 0;
       zOut = sqlite3_mprintf("[%s]", zEnc);

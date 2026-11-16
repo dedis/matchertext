@@ -15,7 +15,7 @@ simulation. Arms:
   quote / escape / bind   the legacy value defences (%Q, %q, a bound ?).
   mt                      the value hole, %m -> M'(...)'.
   mt_strict               the verify-or-refuse route, VERIFY then %m.
-  ident_mt                the name hole, [...] over the name-encoded identifier.
+  ident_mt                the name hole, [...] over the encoded identifier.
 
 A payload counts against a defence only where the control actually breaks out
 (the effective set); a fragment that never parses is not an attack.
@@ -84,8 +84,8 @@ def verify(s):
 
 
 def name_decode(s):
-    """A [...] identifier is read with the name alphabet: matcher escapes decode,
-    every other byte (backslash included) is verbatim."""
+    """A [...] identifier is read with the escape alphabet: matcher escapes
+    decode, every other byte (backslash included) is verbatim."""
     out, i = [], 0
     while i < len(s):
         if s[i] == "\\" and s[i + 1:i + 4] in UNESCAPE:
@@ -285,8 +285,8 @@ def verdict(arm, res, base, payload, is_ident, raw=False):
         return "REJECTED"
     if outcome == "parse":
         # A name hole that resolves nowhere is contained when the whole payload
-        # became that one name. The name encoder and ?I give back the payload
-        # exactly; raw concatenation is read with the name alphabet.
+        # became that one name. The encoder and ?I give back the payload
+        # exactly; raw concatenation is read with the escape alphabet.
         if is_ident and res[IDX["name"]] != "-":
             got = unhex(res[IDX["name"]])
             if got == payload or (arm == "ident_concat" and got == name_decode(payload)):

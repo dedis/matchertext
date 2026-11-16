@@ -66,9 +66,8 @@ HTTP files are checked against their SHA-256 values. Missing HTTP files are
 restored from `snapshot-archive/sha256/`.
 
 Upstream servers do not keep old versions of these files. On a new machine,
-use the published archive
-[dedis/matchertext-archive](https://github.com/dedis/matchertext-archive).
-Export the setting before any pipeline command that reads snapshots:
+use the published archive. Export the setting before any pipeline command that
+reads snapshots:
 
 ```sh
 export MATCHERTEXT_SNAPSHOT_ARCHIVE=https://anonymous.4open.science/api/repo/matchertext-security-D2DC/file/archive
@@ -212,8 +211,22 @@ python3 pipeline/latex.py
 ```
 
 They write the analysis CSV files and `report.html` under `data/exports/`.
-They also write 173 macros, eight tables and one figure under `doc/generated/`
+They also write the macros, eight tables and one figure under `doc/generated/`
 for the paper.
+
+### 7. Audit the syntax labels
+
+Two raters check a frozen sample of 300 labels, 75 per labeling layer. The
+labeling rules are in `audit/README.md`.
+
+```sh
+python3 pipeline/audit.py sheets   # once: audit/sample.csv and two blinded sheets
+python3 pipeline/audit.py gold     # after both raters finish
+python3 pipeline/audit.py report
+```
+
+Once `audit/gold.csv` is complete, `latex.py` adds the agreement, per-layer
+precision, and label-adjusted ceiling as `\dataAudit*` macros.
 
 ## Update the remote payload corpus
 

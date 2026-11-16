@@ -50,7 +50,7 @@ injection.
 Free-form fields -- a name, a comment, a search box -- may legitimately contain
 unmatched matchers (\eg a fragment \verb|f(x| or \verb|smile :]|).
 Rather than reject them, we pass them through a total encoder
-\textsc{ToMatchertext}$(v)$ that escapes only the \emph{unmatched} matchers in
+\textsc{ToMatchertext}$(v)$ that escapes the \emph{unmatched} matchers in
 $v$~\cite{matchertext}, and decode on read.
 Defined on every input, it never rejects. Because its escapes are themselves
 balanced, its output is always valid matchertext, its sole and language-independent
@@ -60,9 +60,9 @@ The failure mode is therefore benign: an encoder bug yields mis-encoded
 \emph{data}, never a breakout, where in conventional escaping one missed case
 \emph{is} the injection.
 
-Reading inverts the encoder; assume \textsc{esc} is uniquely decodable:
-injective, with a reserved introducer so that its outputs are recognizable in
-the surrounding text, as any backslash-style escape is. Then
+Reading inverts the encoder. An escape \textsc{esc}$(c)$ is a backslash, a tag,
+and a matched pair; the encoder also escapes the pair of any input run that
+already has that shape, and leaves every other backslash alone. Then
 \textsc{FromMatchertext} scans the balance-delimited region once, mapping each
 \textsc{esc}$(c)$ back to its matcher $c$ and copying every other character,
 so that $\forall v, \textsc{FromMatchertext}(\textsc{ToMatchertext}(v)) = v$:
@@ -86,7 +86,7 @@ Under a matchertext-aware host language that ends each value by matcher balance,
 matchertext offers a \emph{structural} property: no valid-matchertext value,
 in any position, can escape its delimiters or alter the surrounding query
 structure, closing off the sub-class of injection that depends on breaking out
-of a delimiter. This guarantee is a syntactic-closure property. It does not by itself
+of a delimiter. This guarantee is the inertness of \cref{sec:threat}. It does not by itself
 establish that later decoding, reparsing, or execution of the contained value
 is safe. It does not adjudicate whether a well-formed value is
 \emph{authorized}, which remains a matter of access control, and it
@@ -149,11 +149,11 @@ In the bind check
 classic attack~\cite{alonso08ldap} is a \verb|userName| such as \verb|*)(uid=*|
 that closes its assertion early, so the password clause no longer constrains the
 bind.
-Ending the value by matcher balance rather than at the first \verb|)| defeats it
-exactly as for SQL: the payload carries an unmatched \verb|)|, is not matchertext,
-and cannot embed at all.
-RFC~4515 value-encoding already escapes unbalanced parentheses~\cite{rfc4515}, so
-conformant emitters are nearly compliant today.
+A filter parser that ends the value by matcher balance rather than at the first
+\verb|)| defeats it exactly as for SQL: the payload carries an unmatched \verb|)|,
+is not matchertext, and cannot embed at all. That reading rule is a parser change:
+stock parsers stop at the first \verb|)|, and RFC~4515 escapes every
+parenthesis~\cite{rfc4515}.
 
 \subsection{Preventing PDF object injection}
 \label{sec:resist:pdf}
@@ -165,10 +165,12 @@ Yet a generator that concatenates untrusted input into a
 \verb|(|$\dots$\verb|)| string or a \verb|/URI| or \verb|/JS| action lets the
 attacker close the string and append objects the viewer parses and runs.
 This is the ``XSS for PDFs'' class~\cite{heyes20pdf}.
-Emitting the value through \textsc{ToMatchertext} closes this by construction.
-The canonical breakout \verb|)>>/AA<<|$\dots$\verb|(| begins with an unmatched
-\verb|)| and is escaped to inert data, and a balanced \verb|f(x)| embeds
-unchanged.
+Emitting the value through \textsc{ToMatchertext} escapes the canonical breakout
+\verb|)>>/AA<<|$\dots$\verb|(|, which begins with an unmatched \verb|)|, to inert
+data, and a balanced \verb|f(x)| embeds unchanged.
+PDF alone breaks A3: its reader skips an escaped \verb|\(| when counting, so a
+value balanced for \textsc{Verify} can still close the string; PDF's own
+backslash escaping, a host-specific step, closes this.
 As before, data an application deliberately routes into a \verb|/JS| action still
 runs but can no longer escape its string to \emph{introduce} one.
 
@@ -188,7 +190,8 @@ template's structure independent of $v$ at composition time).}
 \hline
 A1 route & Example & Changes & New syntax & Compatibility & Trusted delta \\
 \hline
-Reuse native matchers & \verb|(uid=|$v$\verb|)|, \verb|/URI (|$v$\verb|)| & nothing & none & full & none \\
+Reuse native matchers & \verb|/URI (|$v$\verb|)| & nothing & none & full & none \\
+Change the reading rule & \verb|(uid=|$v$\verb|)| & host parser & none & per host lang.\ & boundary reader \\
 Extend the host-lang.\ grammar & \verb|WHERE name = [|$v$\verb|]| & host parser & hole form & per host lang.\ & boundary reader \\
 Replace the host language & MinML for markup & host parser & wholly new & none & whole parser \\
 \hline
@@ -218,11 +221,10 @@ and are worth separating.
 
 \paragraph{Making the host language aware (A1)}
 \Cref{tab:resist:a1} compares the routes.
-Reusing a construct the format \emph{already} delimits with matchers is free:
-LDAP search filters and PDF literal strings
-(\cref{sec:resist:ldap,sec:resist:pdf}) are parenthesis-delimited by definition.
-The discipline coincides with the format, and A1 costs no new syntax and no
-new trusted code.
+Reusing a construct the format \emph{already} reads to matcher balance is free:
+PDF literal strings (\cref{sec:resist:pdf}) cost no new syntax, though A3 needs
+PDF's own backslash escaping; LDAP filters (\cref{sec:resist:ldap}) keep their syntax but need a
+balance-reading parser.
 It also reaches only the formats built that way.
 Extending a host language's grammar with a hole form reaches the syntaxes where injection
 actually concentrates, at the price of a change inside the host language's parser.
@@ -296,8 +298,8 @@ transformation, a bug in it rejects data instead of admitting a breakout.
 The cost is where the obligation lands.
 The baselines ask for a library; matchertext asks the host language to read to matcher
 balance, which \cref{tab:resist:a1} shows is free where the format already
-delimits with matchers, as in LDAP and PDF, and a parser change where it does
-not.
+reads to matcher balance, as PDF does, and a parser change elsewhere, LDAP
+included.
 Matchertext and parameterized queries also compose: nothing in \cref{sec:threat} prevents a parameterized query
 from carrying a matcher-delimited identifier, which is the combination neither
 mechanism reaches alone.

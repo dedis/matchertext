@@ -70,8 +70,8 @@ split by the premise of \cref{sec:threat} they fail. \dataOutsideSemantic target
 execution/semantic sinks (server-side templates, expression languages, code
 evaluation, spreadsheet formulas, \verb|javascript:| URLs) that the host language
 runs by design: the template payload \verb|{{7*7}}| is already valid matchertext
-yet still executes. The other \dataOutsideNonmatcher target non-matcher contexts no
-matcher pair bounds: shell separators (\verb|;|~\verb-|-~\verb|&|), CR/LF header
+yet still executes. The other \dataOutsideNonmatcher target non-matcher contexts we
+give no hole form: shell separators (\verb|;|~\verb-|-~\verb|&|), CR/LF header
 breaks, and XML/XXE angle brackets.
 
 \paragraph{From the measured subset to the whole corpus}
@@ -85,8 +85,11 @@ condition, whether a syntax is matcher-delimitable at all, reads from the syntax
 label alone, so it projects directly.
 At most \textbf{\dataHostableCVEs} of the \textbf{\dataInjectionCVEs} injection
 CVEs (\textbf{\dataHostableShare}) target a matcher-delimitable syntax.
-This is an upper bound, since some HTML/DOM cases are \verb|javascript:| semantic
-sinks represent \textbf{\dataJsSinkRate} (\dataHtmlDomJsSinks) of payloads.
+This is an upper bound, since \verb|javascript:| semantic sinks are
+\textbf{\dataJsSinkRate} (\dataHtmlDomJsSinks) of the HTML/DOM payloads.
+With hole forms for the non-matcher contexts it would be
+\dataHostableWithNonmatcherShare; among the \dataKevInjectionCVEs known-exploited
+CVEs it is \dataKevHostableShare.
 
 Within one syntax the simulation leaves little to project: the threat model of
 \cref{sec:threat} contains every payload of a matcher-delimitable syntax and none
@@ -130,9 +133,9 @@ replayable payload. That gap is
 payload availability, a property of the disclosure ecosystem, not a containment
 failure: Mandiant finds \textbf{51\%} of 2021--2022 vulnerabilities eventually
 acquired public exploit or PoC code~\cite{mandiant23tte} and VulnCheck reports
-\textbf{26\%} for 2025 identifiers~\cite{vulncheck26exploit}, while our corpus is
-stricter still, \dataInjectionWithPoc (\dataInjectionWithPocShare) carrying any PoC
-reference at all. The measurable population is therefore roughly half the corpus,
+\textbf{26\%} for 2025 identifiers~\cite{vulncheck26exploit}, and
+\dataInjectionWithPoc (\dataInjectionWithPocShare) of our injection CVEs link to a
+PoC. The measurable population is therefore \dataInjectionWithPocShare of the corpus,
 and the fragment-level bound should be read against it, not against
 \dataInjectionCVEs.
 
@@ -161,8 +164,8 @@ The fork offers this hole beside legacy composition rather than replacing it, so
 existing SQL keeps working and adoption is incremental. That additive design is the
 point-of-use character of A2: a value still concatenated into surrounding SQL,
 outside a hole, is unprotected. An opt-in strict mode refuses the legacy prepare
-entry points, turning A2 into an invariant the engine enforces; the measurement
-reports the additive default and strict build side by side.
+entry points; the measurement reports the additive default and strict build side
+by side.
 
 \paragraph{Fixtures and oracle}
 We place each of the \dataSqliPayloads distinct SQL payloads (\dataSqliFamilies
@@ -218,14 +221,11 @@ same payloads.
 That breakout is available only because the additive build leaves legacy
 composition open. Recompiled in strict mode, every text-splicing prepare, the
 concatenation and the in-band \verb|M'(...)'| alike, is refused before the parser
-(\cref{tab:sqli}, right), so the \dataSqliEffective effective-set attacks have no
-path at all and A2 holds by construction.
-The only admitted paths are then the typed \texttt{?V} value and \texttt{?I}
-identifier parameters of \texttt{sqlite3\_matchertext\_prepare\_v3()}, which
-contain the corpus as the additive holes do: \dataSqliStrictValueBreakout value and
-\dataSqliStrictIdentBreakout identifier breakouts. The \texttt{?V} route binds each
-valid value and refuses the \dataSqliStrictValueRejected that are not matchertext;
-\texttt{?I} holds each as a single name.
+(\cref{tab:sqli}, right), though the strict entry point still accepts any balanced
+template. The admitted paths are the typed \texttt{?V} and
+\texttt{?I} parameters (\dataSqliStrictValueBreakout and
+\dataSqliStrictIdentBreakout breakouts); \texttt{?V} verifies, then binds an
+ordinary parameter, refusing the \dataSqliStrictValueRejected non-matchertext values.
 Short of strict mode, an application closes the gap itself with the discipline's
 two \textsc{Verify} checks, valid input and a valid assembled statement, which are
 exactly the value-hole and name-hole rows; the concatenation control is their
@@ -244,9 +244,9 @@ matcher balance and the verified route that calls \textsc{Verify}. So the honest
 zero is read against demonstrated detection power rather than a blind harness.
 The C scanner and an independent implementation agree on \textsc{Verify} for
 every payload, and the run is deterministic.
-In sum, the simulated SQL containment of \cref{tab:mech} survives a live parser and
-strict mode makes A2 an invariant the engine enforces; the experiment discharges L2
-and L3 for SQL alone, and each further host language needs its own executed check.
+In sum, the simulated SQL containment of \cref{tab:mech} survives a live parser;
+the experiment discharges L2 and L3 for SQL, \cref{sec:prevent:html} L2 for HTML,
+and each further host language needs its own executed check.
 
 \subsection{A matchertext-aware HTML parser}
 \label{sec:prevent:html}
@@ -268,7 +268,8 @@ decodes no character reference, and \verb|<|, \verb|&|, quotes, and
 HTML recovers from every other syntax error, but a malformed hole stops the parse,
 so a hole ends only at its matched closer.
 The counterpart of the typed parameters is \texttt{composeHtml}, which runs \textsc{Verify} on each value, puts it in its hole
-without tokenizing it, and refuses a value outside a hole (A2).
+without tokenizing it, and refuses a value outside a hole; like strict SQLite, it
+leaves A2 to the caller.
 The fork also changes the serializer, the other half of the mutation-XSS round
 trip: by default it refuses a tree that a parser would read back differently, such
 as script text that contains \verb|</script>|. This guard uses no hole. With
