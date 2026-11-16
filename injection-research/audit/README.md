@@ -18,6 +18,8 @@ pipeline labels; do not open it before you finish labeling.
 
 Label each row alone, from `description`. Open
 `https://nvd.nist.gov/vuln/detail/<cve_id>` only if the description is too vague.
+A CWE alone never decides a label: the pipeline labels mostly from CWEs, so a
+label taken from one would agree with the pipeline by construction.
 Do not discuss rows with the other rater until both sheets are complete.
 
 **`injection`**: `yes` if attacker-controlled text is parsed or run as syntax by

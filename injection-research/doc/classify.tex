@@ -38,16 +38,15 @@ layers.
 \paragraph{Label accuracy}
 Only the naive-Bayes layer is statistical, and it labels \dataMethodNbShare of
 CVEs, so it moves no share by more than that.
-On \dataNbTestDocs held-out labeled CVEs mixed with rejects it reaches a weighted
-precision of \dataNbPrecision and recall of \dataNbRecall (HTML/DOM
-\dataNbPrecisionHtmlDom/\dataNbRecallHtmlDom, SQL \dataNbPrecisionSql/\dataNbRecallSql);
-these CVEs resemble its training set more than the generic-CWE CVEs it labels, so
-the scores are an upper bound.
-The deterministic layers carry the remaining \dataMethodDeterministicShare of labels and rest on the
-CWE-to-syntax map, whose accuracy we do not independently validate.
-Label error thus limits the shares of \cref{sec:prevent}; resolving the
-\dataLabelConflictCVEs CVEs whose CWEs span the boundary away from it lowers the
-ceiling from \dataHostableShareExact to \dataHostableLowShare.
+Two raters labeled a blind sample of \dataAuditPerMethod CVEs per layer from the
+description alone (Cohen's $\kappa=\dataAuditKappa$, \dataAuditGraded graded).
+The exact syntax is right for \dataAuditPrecisionCwe of CWE-map labels,
+\dataAuditPrecisionRule of rule labels, and \dataAuditPrecisionNb of naive-Bayes
+labels (95\% intervals).
+Weighted to the corpus, \dataAuditHostableShare of truly injection CVEs target a
+matcher-delimitable syntax, so the ceiling of \cref{sec:prevent} is conservative;
+resolving the \dataLabelConflictCVEs CVEs whose CWEs span the boundary away from
+it lowers that ceiling from \dataHostableShareExact to \dataHostableLowShare.
 
 \paragraph{Weakness families}
 Aggregated to families, the corpus is dominated by rendering injection

@@ -20,7 +20,6 @@ from collections import defaultdict
 from pathlib import Path
 
 import audit
-import classify
 import export
 import matchertext
 
@@ -595,14 +594,6 @@ def run(args):
         if cwe_label[cid] in matchertext.HOST and syns - matchertext.HOST:
             label_conflicts += 1
 
-    # Naive-Bayes holdout scores of the syntax classes, weighted by class
-    # support, from the CSV classify.py writes. Blank precision/recall mean the
-    # class never scored.
-    nb = [r for r in csv.DictReader(open(ROOT / "data" / "exports" / "nb_holdout.csv"))
-          if r["class"] != classify.NOT_INJECTION_CLASS]
-    nb_n = sum(int(r["test_n"]) for r in nb) or 1
-    wmean = lambda k: sum(float(r[k] or 0) * int(r["test_n"]) for r in nb) / nb_n
-    per = {r["class"]: r for r in nb}
     methods = dict(con.execute("SELECT method, COUNT(*) FROM classification GROUP BY 1"))
     n_groups = q("SELECT COUNT(DISTINCT group_id) FROM syntactic_group")
     singletons = q("""SELECT COUNT(*) FROM
@@ -630,16 +621,6 @@ def run(args):
         ("MethodNb", num(methods.get("nb", 0))),
         ("MethodNbShare", pct(methods.get("nb", 0) / injection, 1)),
         ("MethodUnknown", num(methods.get("unknown", 0))),
-        ("NbTestDocs", num(nb_n)),
-        ("NbPrecision", f"{wmean('precision'):.3f}"),
-        ("NbRecall", f"{wmean('recall'):.3f}"),
-        ("NbCoverage", pct(float(nb[0]["coverage"]) if nb else 0)),
-        ("NbPrecisionHtmlDom", f"{float(per['html_dom']['precision']):.2f}"),
-        ("NbRecallHtmlDom", f"{float(per['html_dom']['recall']):.2f}"),
-        ("NbPrecisionSql", f"{float(per['sql']['precision']):.2f}"),
-        ("NbRecallSql", f"{float(per['sql']['recall']):.2f}"),
-        ("NbPrecisionCodeEval", f"{float(per['code_eval']['precision']):.2f}"),
-        ("NbRecallCodeEval", f"{float(per['code_eval']['recall']):.2f}"),
         ("MethodDeterministicShare",
          pct((methods.get("cwe", 0) + methods.get("rule", 0)) / injection, 1)),
         ("AuditPerMethod", num(export.AUDIT_PER_METHOD)),
