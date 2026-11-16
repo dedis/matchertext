@@ -212,7 +212,7 @@ python3 pipeline/latex.py
 ```
 
 They write the analysis CSV files and `report.html` under `data/exports/`.
-They also write 165 macros, eight tables and one figure under `doc/generated/`
+They also write 173 macros, eight tables and one figure under `doc/generated/`
 for the paper.
 
 ## Update the remote payload corpus
