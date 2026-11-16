@@ -20,6 +20,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import audit
+import classify
 import export
 import matchertext
 
@@ -319,8 +320,8 @@ def audit_macros(con):
              ci((m["hostable_share"], m["hostable_low"], m["hostable_high"])))]
     if m["kappa"] is not None:
         rows.append(("AuditKappa", f"{m['kappa']:.2f}"))
-    for layer in ("cwe", "rule", "nb"):
-        rows.append((f"AuditPrecision{layer.title()}", ci(m["layers"][layer]["precision"])))
+    for layer, p in m["precision"].items():
+        rows.append((f"AuditPrecision{layer.title()}", ci(p)))
     return rows
 
 
@@ -594,9 +595,11 @@ def run(args):
         if cwe_label[cid] in matchertext.HOST and syns - matchertext.HOST:
             label_conflicts += 1
 
-    # Naive-Bayes holdout scores, weighted by class support, from the CSV
-    # classify.py writes. Blank precision/recall mean the class never scored.
-    nb = list(csv.DictReader(open(ROOT / "data" / "exports" / "nb_holdout.csv")))
+    # Naive-Bayes holdout scores of the syntax classes, weighted by class
+    # support, from the CSV classify.py writes. Blank precision/recall mean the
+    # class never scored.
+    nb = [r for r in csv.DictReader(open(ROOT / "data" / "exports" / "nb_holdout.csv"))
+          if r["class"] != classify.NOT_INJECTION_CLASS]
     nb_n = sum(int(r["test_n"]) for r in nb) or 1
     wmean = lambda k: sum(float(r[k] or 0) * int(r["test_n"]) for r in nb) / nb_n
     per = {r["class"]: r for r in nb}

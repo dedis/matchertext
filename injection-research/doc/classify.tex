@@ -27,9 +27,8 @@ study~\cite{matchertext}.
 First, a deterministic map from specific CWEs (\eg \mbox{CWE-89}$\rightarrow$SQL,
 \mbox{CWE-79}$\rightarrow$HTML).
 Second, phrase rules over the CNA description (``SQL injection'', \dots).
-Third, a character-trigram naive-Bayes classifier, trained on the CWE- and
-rule-labeled set and applied to the still-unlabeled remainder above a confidence
-margin.
+Third, a word naive-Bayes classifier, trained on the labeled set and on the
+gate's rejects as a not-injection class, labels the rest above a margin.
 Fourth, an explicit \texttt{unknown} bucket.
 Of the injection CVEs, \dataMethodCwe (\dataMethodCweShare) are labeled deterministically from CWEs,
 \dataMethodRule from phrase rules, \dataMethodNb from naive Bayes, and only \dataMethodUnknown remain
@@ -40,7 +39,8 @@ layers.
 Only the naive-Bayes layer is statistical.
 It is both the smallest (\dataMethodNbShare of labels) and the only one we can
 score directly.
-On a held-out set of \dataNbTestDocs CVEs it reaches a weighted precision of
+On \dataNbTestDocs held-out labeled CVEs mixed with rejects, it reaches a
+weighted precision of
 \textbf{\dataNbPrecision} and recall of \textbf{\dataNbRecall} at \dataNbCoverage coverage.
 It is strongest exactly where the containment analysis is most sensitive
 (HTML/DOM \dataNbPrecisionHtmlDom/\dataNbRecallHtmlDom, SQL \dataNbPrecisionSql/\dataNbRecallSql).

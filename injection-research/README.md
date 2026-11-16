@@ -105,8 +105,10 @@ recreates the source tables in `data/cve.db`.
 python3 pipeline/classify.py
 ```
 
-The classifier uses CWE anchors, phrase rules, and a deterministic trigram
-Naive Bayes fallback. The default acceptance margin is `3.0`. To change it:
+The classifier uses CWE anchors, phrase rules, and a deterministic word
+unigram and bigram Naive Bayes fallback. The fallback also learns a
+not-injection class from the CVEs the gate rejects; a CVE in that class stays
+`unknown`. The default acceptance margin is `3.0`. To change it:
 
 ```sh
 python3 pipeline/classify.py --nb-margin 4.0
