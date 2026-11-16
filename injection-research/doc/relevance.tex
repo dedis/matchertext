@@ -62,9 +62,9 @@ Two consequences make this a security question rather than a syntactic one.
 The check is \emph{language-independent}: \textsc{Verify} inspects only the six
 matcher characters and knows nothing about SQL, HTML, or LDAP, so the same
 recognizer serves every host language, which is exactly what a sanitizer cannot do.
-And the check is a \emph{verification} rather than a transformation, so its
-failure mode is benign: a rejected value is data that does not embed, whereas a
-missed case in an escaping routine \emph{is} the injection.
+And the check is a \emph{verification} rather than a transformation, so a
+rejected value is data that does not embed, whereas a missed case in an escaping
+routine \emph{is} the injection.
 Together these are the narrow waist applied to security: one uniform obligation
 on the value, in place of one bespoke transformation per host language and context.
 

@@ -77,8 +77,8 @@ Inertness holds under four premises:
 \item[\textbf{A2}] \emph{Delimited context.} Every untrusted value is routed
 	into a matcher-delimited hole. A value concatenated into host-language syntax
 	outside a hole is unprotected, exactly as with any point-of-use defense.
-	An API can enforce A2 by accepting only constant templates (C string
-	literals, JavaScript tagged templates), which we leave to future work.
+	Constant-template APIs (C literals, tagged templates) could enforce A2
+	(future work).
 \item[\textbf{A3}] \emph{Canonicalize, then verify.} \textsc{Verify} runs on the
 	\emph{fully decoded and normalized} value, at the last transform boundary
 	before it enters the hole. The host language reads that same representation to
@@ -132,8 +132,8 @@ resumes after $s_c$ in a state independent of the lexeme, the token-type sequenc
 of $P[v]$ is the same for every $v\in L$ (\cref{sec:appendix:lemma}); with L2 the
 skeletons agree (Definition~1), and L3 carries this to execution.
 Closure is machine-checked in the formalism of~\cite{matchertext},
-which gives the correctness of \textsc{Verify} a paper proof sketch. This paper discharges L1 once for all host languages
-(\cref{sec:appendix:lean}), L2 and L3 for SQLite (\cref{sec:prevent:exec}), and
+which gives the correctness of \textsc{Verify} a paper proof sketch. This paper proves L1 once for all host languages
+(\cref{sec:appendix:lean}) and tests L2 and L3 for SQLite (\cref{sec:prevent:exec}) and
 L2 for HTML (\cref{sec:prevent:html}).
 
 \paragraph{Scope}

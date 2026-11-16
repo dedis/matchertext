@@ -11,6 +11,12 @@ matchertext. It reuses the base definitions of \cref{sec:appendix:lean}
 of~\cite{matchertext}.
 Definition bodies are shown in full; tactic proof bodies are elided and given in
 the source file.
+The encoder escapes the unmatched matchers and, by two decisions, may escape more:
+an opener past a depth limit, and a matched pair. Any choice of the two keeps the
+output in $L$, and 	exttt{toMatchertextC} fixes them as the C encoder does: the
+host's depth limit, and the pair after an introducer and tag, so that input
+already shaped like an escape decodes to itself. The model is of the algorithm,
+not of the C code, and does not cover 	extsc{Verify}.
 
 \begin{lstlisting}
 import core
@@ -31,21 +37,38 @@ noncomputable def unwind (esc : α → List α) : List (Ctx α) → List α → 
 
 -- One left-to-right pass. `st` holds the pending openers, `out` the output at the current
 -- level. A closer is matched only if it pairs with the top; else it is unmatched and escaped.
-noncomputable def encAux (esc : α → List α) :
+-- Two decisions may escape more: `cap st` escapes an opener instead of nesting it (a depth
+-- limit), and `split b out` escapes both members of a matched pair, given the output `b`
+-- before its opener and its body `out`. Any choice of either keeps the output matchertext.
+noncomputable def encAux (esc : α → List α) (cap : List (Ctx α) → Bool)
+    (split : List α → List α → Bool) :
     List (Ctx α) → List α → List α → List α
   | st, out, [] => unwind esc st out
   | st, out, x :: xs =>
-      if Opener Pi x then encAux esc ((x, out) :: st) [] xs
+      if Opener Pi x then
+        if cap st then encAux esc cap split st (out ++ esc x) xs
+        else encAux esc cap split ((x, out) :: st) [] xs
       else if Closer Pi x then
         match st with
         | (o, b) :: st' =>
-            if (o, x) ∈ Pi then encAux esc st' (b ++ [o] ++ out ++ [x]) xs
-            else encAux esc st (out ++ esc x) xs
-        | [] => encAux esc st (out ++ esc x) xs
-      else encAux esc st (out ++ [x]) xs
+            if (o, x) ∈ Pi then
+              if split b out then encAux esc cap split st' (b ++ esc o ++ out ++ esc x) xs
+              else encAux esc cap split st' (b ++ [o] ++ out ++ [x]) xs
+            else encAux esc cap split st (out ++ esc x) xs
+        | [] => encAux esc cap split st (out ++ esc x) xs
+      else encAux esc cap split st (out ++ [x]) xs
 
+-- The minimal encoder: only unmatched matchers are escaped.
 noncomputable def toMatchertext (esc : α → List α) (v : List α) : List α :=
-  encAux Pi esc [] [] v
+  encAux Pi esc (fun _ => false) (fun _ _ => false) [] [] v
+
+-- The C encoder (sqlite/src/matchertext.c): nesting stops one level below the host's
+-- limit `n`, and a matched pair right after an introducer `bs` and a tag `t` with
+-- `tag t` is escaped, so that input already shaped like an escape decodes to itself.
+noncomputable def toMatchertextC (esc : α → List α) (n : Nat) (bs : α) (tag : α → Prop)
+    (v : List α) : List α :=
+  encAux Pi esc (fun st => decide (n ≤ st.length + 1))
+    (fun b out => decide (out = [] ∧ ∃ p t, b = p ++ [bs, t] ∧ tag t)) [] [] v
 
 -- Neither conjunct of the hypothesis below implies the other. Depth 0 does not
 -- give MT: ")(" balances to zero yet dips below it at the first character.
@@ -75,17 +98,25 @@ theorem unwind_mt (esc : α → List α)
     (out : List α) (hout : MT Pi out) :
     MT Pi (unwind esc st out) := by ...
 
--- Invariant (the crux): every accumulated segment stays matchertext.
+-- Invariant (the crux): every accumulated segment stays matchertext, whatever the
+-- decisions `cap` and `split` choose.
 theorem encAux_mt (esc : α → List α)
     (hesc : ∀ c, MT Pi (esc c) ∧ depth Pi (esc c) = 0)
+    (cap : List (Ctx α) → Bool) (split : List α → List α → Bool)
     (st : List (Ctx α)) (hst : ∀ p ∈ st, MT Pi p.2)
     (out : List α) (hout : MT Pi out) (v : List α) :
-    MT Pi (encAux Pi esc st out v) := by ...
+    MT Pi (encAux Pi esc cap split st out v) := by ...
 
 -- Theorem (output ∈ L): any string at all, once encoded, is matchertext.
 theorem toMatchertext_mt (esc : α → List α)
     (hesc : ∀ c, MT Pi (esc c) ∧ depth Pi (esc c) = 0) (v : List α) :
     MT Pi (toMatchertext Pi esc v) := ...
+
+-- Theorem: the same for the C encoder's decisions.
+theorem toMatchertextC_mt (esc : α → List α)
+    (hesc : ∀ c, MT Pi (esc c) ∧ depth Pi (esc c) = 0)
+    (n : Nat) (bs : α) (tag : α → Prop) (v : List α) :
+    MT Pi (toMatchertextC Pi esc n bs tag v) := ...
 
 -- Corollary (write-path payoff): reading to matcher balance recovers exactly the encoded
 -- value, for a freely chosen v. embed_boundary assumes MT Pi m, which toMatchertext_mt supplies.

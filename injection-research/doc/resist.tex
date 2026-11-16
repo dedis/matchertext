@@ -56,9 +56,9 @@ Defined on every input, it never rejects. Because its escapes are themselves
 balanced, its output is always valid matchertext, its sole and language-independent
 obligation (\cref{sec:appendix:tomatchertext}), checkable in isolation by the
 \textsc{Verify} scan and saying nothing about SQL.
-The failure mode is therefore benign: an encoder bug yields mis-encoded
-\emph{data}, never a breakout, where in conventional escaping one missed case
-\emph{is} the injection.
+An encoder bug whose output is still matchertext yields mis-encoded \emph{data},
+not a breakout, where in conventional escaping one missed case \emph{is} the
+injection; a bug in \textsc{Verify} or the host's locator is a breakout.
 
 Reading inverts the encoder. An escape \textsc{esc}$(c)$ is a backslash, a tag,
 and a matched pair; the encoder also escapes the pair of any input run that
@@ -248,9 +248,8 @@ explicit and its structure fixed, so an interpolated value cannot alter the
 surrounding query no matter what it contains.
 This is an application of the discipline that~\cite{matchertext} identifies as its
 security-relevant use of interpolation.
-The literal form is a conservative extension for mainstream C-like languages,
-since a marker abutting a quote is input their grammars already reject, so it can
-ship behind a flag without endangering existing code.
+In C-like languages a marker abutting a quote is a syntax error outside
+macros, so the literal form keeps existing code; SQL already reads it as an alias.
 
 
 Together the two premises replace an obligation on the programmer at every use
@@ -293,7 +292,7 @@ distinctive claim.
 Two consequences follow: correctness stops depending on a per-context choice,
 removing the failure mode that defeated every participant in the study of
 \cref{sec:bg:prevalence}; and because the obligation is a check rather than a
-transformation, a bug in it rejects data instead of admitting a breakout.
+transformation, a value it rejects is refused data, not a breakout.
 
 The cost is where the obligation lands.
 The baselines ask for a library; matchertext asks the host language to read to matcher

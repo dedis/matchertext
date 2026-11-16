@@ -36,16 +36,13 @@ unknown, so the classification rests overwhelmingly on the deterministic
 layers.
 
 \paragraph{Label accuracy}
-Only the naive-Bayes layer is statistical.
-It is both the smallest (\dataMethodNbShare of labels) and the only one we can
-score directly.
-On \dataNbTestDocs held-out labeled CVEs mixed with rejects, it reaches a
-weighted precision of
-\textbf{\dataNbPrecision} and recall of \textbf{\dataNbRecall} at \dataNbCoverage coverage.
-It is strongest exactly where the containment analysis is most sensitive
-(HTML/DOM \dataNbPrecisionHtmlDom/\dataNbRecallHtmlDom, SQL \dataNbPrecisionSql/\dataNbRecallSql).
-It is weakest on the small execution-sink classes it labels least often
-(code/eval \dataNbPrecisionCodeEval/\dataNbRecallCodeEval).
+Only the naive-Bayes layer is statistical, and it labels \dataMethodNbShare of
+CVEs, so it moves no share by more than that.
+On \dataNbTestDocs held-out labeled CVEs mixed with rejects it reaches a weighted
+precision of \dataNbPrecision and recall of \dataNbRecall (HTML/DOM
+\dataNbPrecisionHtmlDom/\dataNbRecallHtmlDom, SQL \dataNbPrecisionSql/\dataNbRecallSql);
+these CVEs resemble its training set more than the generic-CWE CVEs it labels, so
+the scores are an upper bound.
 The deterministic layers carry the remaining \dataMethodDeterministicShare of labels and rest on the
 CWE-to-syntax map, whose accuracy we do not independently validate.
 Label error thus limits the shares of \cref{sec:prevent}; resolving the

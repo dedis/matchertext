@@ -94,7 +94,8 @@ CVEs it is \dataKevHostableShare.
 Within one syntax the simulation leaves little to project: the threat model of
 \cref{sec:threat} contains every payload of a matcher-delimitable syntax and none
 outside, so the syntax label fixes each per-syntax rate, and only HTML/DOM, through
-its \verb|javascript:| sinks, depends on the payloads.
+its \verb|javascript:| sinks, depends on the payloads; the forks below replay the
+SQL and HTML/DOM rates.
 What a projection must correct is the syntax mix, because payload-backed CVEs
 are not a random sample. A SQL payload is a literal string a write-up can quote,
 whereas code-eval and argument payloads are built at run time and rarely appear
@@ -161,7 +162,7 @@ value in the SQL text inside an \verb|M'(...)'| literal, wraps an identifier in
 \verb|[|$\dots$\verb|]| that the engine reads to matcher balance (A1), and
 prepares the statement through the ordinary interface.
 The fork offers this hole beside legacy composition rather than replacing it, so
-existing SQL keeps working and adoption is incremental. That additive design is the
+existing SQL keeps working, bar names with an unmatched bracket. That additive design is the
 point-of-use character of A2: a value still concatenated into surrounding SQL,
 outside a hole, is unprotected. An opt-in strict mode refuses the legacy prepare
 entry points; the measurement reports the additive default and strict build side
@@ -245,7 +246,7 @@ zero is read against demonstrated detection power rather than a blind harness.
 The C scanner and an independent implementation agree on \textsc{Verify} for
 every payload, and the run is deterministic.
 In sum, the simulated SQL containment of \cref{tab:mech} survives a live parser;
-the experiment discharges L2 and L3 for SQL, \cref{sec:prevent:html} L2 for HTML,
+the experiment tests L2 and L3 for SQL, \cref{sec:prevent:html} L2 for HTML,
 and each further host language needs its own executed check.
 
 \subsection{A matchertext-aware HTML parser}
@@ -341,5 +342,5 @@ closer, or the parser ignores the option, are each detected
 (\dataHtmlSabotageDetected of \dataHtmlSabotages) by changed verdicts or a failed
 benign baseline. The fork's \textsc{Verify} and holes agree with an independent
 implementation on random inputs and at the depth limit.
-The experiment discharges L2 for an HTML parser and its serializer, not for the
+The experiment tests L2 for an HTML parser and its serializer, not for the
 JavaScript or CSS in its text, which are further host languages.

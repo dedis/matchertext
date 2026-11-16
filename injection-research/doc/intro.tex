@@ -32,8 +32,8 @@ value in a matcher pair and ends it by matcher balance. Hosted as
 \verb|WHERE name = [|\emph{value}\verb|]|, the payload \verb|' OR '1'='1| cannot
 break out, since escaping would need an unmatched \verb|]| that is not valid
 matchertext. One recognizer inspects only the six matcher characters and serves
-every host language. The rule was built for verbatim embedding~\cite{matchertext}. Using
-it for security is where this paper begins.
+every host language. The rule was built for verbatim embedding~\cite{matchertext}, which
+names injection as a use; this paper states and measures that use.
 
 Each question becomes one part of the design. Because an embedding rule is not yet
 a security property, we state the guarantee as \emph{inertness}, that a host
