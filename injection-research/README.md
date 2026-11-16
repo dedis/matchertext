@@ -71,7 +71,7 @@ use the published archive
 Export the setting before any pipeline command that reads snapshots:
 
 ```sh
-export MATCHERTEXT_SNAPSHOT_ARCHIVE=https://raw.githubusercontent.com/dedis/matchertext-archive/main
+export MATCHERTEXT_SNAPSHOT_ARCHIVE=https://anonymous.4open.science/api/repo/matchertext-security-D2DC/file/archive
 python3 pipeline/run_all.py
 ```
 
