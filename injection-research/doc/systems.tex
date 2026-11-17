@@ -1,0 +1,74 @@
+\section{Hole-targeted values, stock readers, and cost}
+\label{sec:appendix:systems}
+
+\paragraph{Hole-targeted set}
+\path{pipeline/adaptive.py} builds, per host language, values aimed at the
+hole rather than at a native closer. A grammar puts one to three hole-boundary
+atoms before a breakout core and up to two after it: matchers, quotes, the
+matchertext escapes, comments, a zero byte, and URL-encoded and fullwidth
+matchers; for SQL also the overlong UTF-8 forms of \verb|)| and \verb|]|, and
+for HTML also \verb|]>|, end tags, comment delimiters, and a character whose
+last UTF-8 byte Shift\_JIS reads as a lead byte. Each grammar value enters as
+built and made matchertext by added matchers, which \textsc{Verify} accepts. An
+even sample of up to 500 effective payloads enters with eleven variants each:
+made matchertext; led or trailed by each lone closer; and made matchertext, then
+wrapped in \verb|()| or \verb|[]|, with each matcher backslash-escaped, or with a
+trailing zero byte. Two cores enter nested at the depth limit and one past it.
+Each value is canonicalized (A3), and values of the recorded corpus are left
+out. For SQL, \dataSqliTargetedValues values break out of the controls in
+\dataSqliTargetedEffective (value, fixture) pairs and of the holes in none of
+\dataSqliTargetedHoleCases cases. For HTML, \dataHtmlTargetedValues values break
+out of concatenation in \dataHtmlTargetedEffective (value, host) pairs and of no
+matchertext arm or guarded writer.
+
+\paragraph{Charset}
+Two more HTML arms send the verified-hole document of each host as UTF-8 bytes.
+Decoded by the WHATWG UTF-8 decoder, all \dataHtmlUtfEightRead such documents of
+the hole-targeted set parse as the string does. Decoded as Shift\_JIS,
+\dataHtmlSjisBreakout break out. In the value \={a}\verb|[x]><img src=x onerror=alert(1)>|,
+the last UTF-8 byte of \={a} (U+0101) is a Shift\_JIS lead byte, which takes the
+\verb|[| as its second byte, so the reader ends the hole at the \verb|]| that
+\textsc{Verify} matched with it. The decoding of A3 thus starts at the bytes: the
+writer declares the charset it verified under.
+
+\paragraph{Stock readers}
+\path{test/matchertext/csrc/stock_reader.c} is SQLite built from the same tree
+without matchertext. It reads the statements that the text holes compose for the
+corpus and the hole-targeted set. It refuses all \dataSqliDowngradeValueCases
+value-hole statements, since it reads \verb|M'(| as a name before a string. Of
+\dataSqliDowngradeNameCases name-hole statements, \dataSqliDowngradeNameBreakout
+break out: the encoder writes the value \verb|]AND 0/*M'()| as
+\verb|[\c[]AND 0/*M'()]|, and stock SQLite ends the name at the \verb|]| of
+\verb|\c[]|.
+
+\paragraph{Stock SQL}
+The additive build passes every case of SQLite's full Tcl test suite
+(\dataSqliteSuiteTests cases) that the stock build passes; the stock build
+itself fails \dataSqliteSuiteStockErrors cases on our test host. Three forms that
+the suite lacks read differently. A bracketed name with an unmatched matcher is
+an error (\verb|[a(b]|), a bracketed name with a matchertext escape is decoded
+(\verb|[a\c()b]| names \verb|a)b|), and an \verb|m| directly before a string that
+opens with a matcher is a value hole (\verb|SELECT m'(x)'| returns \texttt{x},
+not column \texttt{m} named \texttt{(x)}).
+
+\paragraph{Stock HTML}
+With both matchertext options off, the parse5 fork passes parse5's test suite
+unchanged. The serializer guard, on by default, changes two html5lib serializer
+tests, both trees whose stock output parses back as another tree: it refuses
+\texttt{plaintext}, which no end tag closes, and it writes back the line feed
+that a parser drops at the start of \texttt{pre}, \texttt{textarea}, and
+\texttt{listing}. With the parser option on, the html5lib tokenizer and tree
+construction tests pass unchanged, and Angular's \verb|[prop]="x"| attributes
+parse as in stock parse5. One stock form reads differently: an attribute name
+in brackets placed last with no value (\verb|<div [x]>|) is an element hole.
+
+\paragraph{Cost}
+\path{pipeline/perf.py} reports medians on one machine. The additive build
+runs \texttt{speedtest1} (main test set, in memory) in \dataPerfSpeedtestRatio of
+the stock time. A typed \texttt{?V} prepare costs \dataPerfTypedShortExtraNs\,ns
+more than a prepare and bind of a \dataPerfTypedShortLength-byte value, and
+\dataPerfTypedNsPerByte\,ns more per byte of a longer value; the in-band
+\verb|M'(|$\dots$\verb|)'| hole costs \dataPerfMtNsPerByte\,ns per byte. The
+parse5 fork parses its benchmark page in \dataPerfParseRatio of the time of its
+upstream base, with the option off or on, and serializes it in
+\dataPerfSerializeRatio with the guard on.

@@ -1,12 +1,12 @@
 \section{Limitations}
 \label{sec:limits}
 
-The attacker is not adaptive: the recorded payloads target quote- and
-tag-delimited host languages, and only the sabotage probes target a hole.
+The attacker that targets the hole is a generated set
+(\cref{sec:prevent:exec}), not a search that learns from the parser.
 The HTML evidence is one parser, parse5, not a browser, and its oracle reads the
 tree, not the JavaScript, URL, or CSS inside it.
 Syntax labels are audited on a sample (\cref{sec:classify}).
 The projection assumes that the payload-backed CVEs of a syntax represent its
 other CVEs.
-A stock reader misreads the hole forms (\cref{sec:prevent:html}), and we did
-not measure the run-time cost of the forks.
+A stock reader misreads the HTML holes and the SQL name hole
+(\cref{sec:prevent:html,sec:appendix:systems}), and the timings are from one machine.

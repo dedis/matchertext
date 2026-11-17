@@ -4,10 +4,15 @@
 // judgement of the corpus lives in pipeline/html_experiment.py: this prints
 // measurements.
 //
-// Usage: node html_driver.mjs <path to packages/parse5/dist/index.js>
+// Usage: node html_driver.mjs <path to packages/parse5/dist/index.js> [--bytes]
 //
-// A parser without the matchertext option is stock parse5: with the option off
-// the fork passes the whole stock test suite unchanged.
+// With the matchertext options off in the parser and the serializer, the fork
+// passes the whole stock test suite unchanged.
+//
+// --bytes adds two arms that write the document of the element or attribute
+// hole as UTF-8 bytes and decode them as a reader does (A3 at the byte level):
+// mt_utf8 with the WHATWG UTF-8 decoder, and mt_sjis with the Shift_JIS
+// decoder, a charset that the writer did not declare.
 //
 // Input: one JSON object per line, {"i": index, "v": value}.
 // Output: one JSON object per line:
@@ -44,9 +49,7 @@ const {
     verifyMatchertext,
     MatchertextError,
     defaultTreeAdapter: adapter,
-} = await import(
-    pathToFileURL(distPath).href
-);
+} = await import(pathToFileURL(distPath).href);
 // The escaping that parse5 itself uses, from the fork's own dependencies.
 const { escapeText, escapeAttribute } = createRequire(distPath)('entities/escape');
 
@@ -95,6 +98,7 @@ const COMPOSE = {
     onclick: (v) => htmlTemplate`<a id=h onclick=[${v}]></a>`,
 };
 
+const BYTE_ARMS = { mt_utf8: 'utf-8', mt_sjis: 'shift_jis' };
 const ARMS = [
     'concat',
     'escape',
@@ -105,8 +109,9 @@ const ARMS = [
     'mt_section',
     'mt_encode',
     'compose',
+    ...(process.argv[3] === '--bytes' ? Object.keys(BYTE_ARMS) : []),
 ];
-const MT_ARMS = new Set(['dom_mt', 'mt_verify', 'mt_section', 'mt_encode', 'compose']);
+const MT_ARMS = new Set(['dom_mt', 'mt_verify', 'mt_section', 'mt_encode', 'compose', 'mt_utf8']);
 // The serializer writes raw text that the guard refuses as a matchertext element when the text is matchertext.
 const MT_OUTPUT = { matchertextOutput: true };
 
@@ -234,6 +239,12 @@ function write(host, arm, v) {
             case 'compose': {
                 return composeHtml(COMPOSE[host.name](v));
             }
+            case 'mt_utf8':
+            case 'mt_sjis': {
+                const html = matchertextDocument(host, 'mt_verify', v);
+                if (html === null) return 'REJECTED';
+                return parse(new TextDecoder(BYTE_ARMS[arm]).decode(new TextEncoder().encode(html)), MT);
+            }
         }
     } catch (error) {
         if (!(error instanceof MatchertextError)) throw error;
@@ -301,7 +312,9 @@ function shape(host, document) {
 
         const isHole = value === null && node.attrs?.some(({ name, value: v }) => name === 'id' && v === 'h');
         const attrs = (node.attrs ?? [])
-            .map(({ name, value: v }) => (isHole && host.kind === 'attr' && name === host.attr ? `${name}=HOLE` : `${name}=${JSON.stringify(v)}`))
+            .map(({ name, value: v }) =>
+                isHole && host.kind === 'attr' && name === host.attr ? `${name}=HOLE` : `${name}=${JSON.stringify(v)}`,
+            )
             .join(' ');
         const kids = children(node);
 
@@ -354,8 +367,10 @@ function matchertextDocument(host, arm, v) {
                 throw error;
             }
         }
-        case 'compose': {
-            // composeHtml writes no document; the equivalent document is the one mt_verify writes.
+        case 'compose':
+        case 'mt_utf8': {
+            // composeHtml writes no document; the equivalent document is the one mt_verify writes. mt_utf8 sends
+            // that document as bytes.
             return matchertextDocument(host, 'mt_verify', v);
         }
     }

@@ -30,6 +30,7 @@ import threading
 from collections import Counter, defaultdict
 from pathlib import Path
 
+import adaptive
 from export import write
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,6 +39,8 @@ EXPORTS = ROOT / "data" / "exports"
 BUILD = ROOT / "data" / "build"
 SQLITE_TREE = ROOT / "sqlite"
 AMALG = BUILD / "sqlite" / "sqlite3.c"
+STOCK_AMALG = BUILD / "sqlite-stock" / "sqlite3.c"   # the same tree without matchertext
+STOCK_READER = BUILD / "stock_reader"
 # Lemon reads this flag too, so the amalgamation is generated with it.
 AMALG_OPTIONS = "-DSQLITE_ENABLE_MATCHERTEXT"
 SRC = ROOT / "test" / "matchertext" / "csrc" / "sqli_driver.c"
@@ -116,15 +119,23 @@ def build_amalgamation():
          "the matchertext amalgamation", AMALG.parent)
 
 
-def _compile(binary, extra):
+def build_stock_amalgamation():
+    """The amalgamation of the same tree without matchertext: stock SQLite."""
+    STOCK_AMALG.parent.mkdir(parents=True, exist_ok=True)
+    if not (STOCK_AMALG.parent / "Makefile").exists():
+        _run([str(SQLITE_TREE / "configure")], "the stock SQLite build tree", STOCK_AMALG.parent)
+    _run(["make", "sqlite3.c", "sqlite3.h"], "the stock amalgamation", STOCK_AMALG.parent)
+
+
+def _compile(binary, extra, src=SRC, amalg=AMALG):
     """Build one driver, unless it is newer than its sources and was built
     with the same command."""
     cc = os.environ.get("CC", "cc")
-    cmd = [cc, "-O2", "-o", str(binary), str(SRC), str(AMALG), "-I", str(AMALG.parent),
-           "-DSQLITE_ENABLE_MATCHERTEXT", *extra, "-DSQLITE_THREADSAFE=1",
+    cmd = [cc, "-O2", "-o", str(binary), str(src), str(amalg), "-I", str(amalg.parent),
+           *extra, "-DSQLITE_THREADSAFE=1",
            "-DHAVE_USLEEP=1", "-DSQLITE_OMIT_LOAD_EXTENSION", "-lm", "-lpthread"]
     stamp = binary.with_suffix(".cmd")
-    fresh = max(SRC.stat().st_mtime, AMALG.stat().st_mtime)
+    fresh = max(src.stat().st_mtime, amalg.stat().st_mtime)
     if (binary.exists() and binary.stat().st_mtime > fresh and stamp.exists()
             and stamp.read_text() == "\0".join(cmd)):
         return
@@ -162,8 +173,10 @@ def build_driver():
     latter to measure that the same delivery paths are refused wholesale."""
     build_amalgamation()
     check_constant_sql()
-    _compile(BIN, [])
-    _compile(BIN_STRICT, ["-DSQLITE_MATCHERTEXT_STRICT"])
+    _compile(BIN, ["-DSQLITE_ENABLE_MATCHERTEXT"])
+    _compile(BIN_STRICT, ["-DSQLITE_ENABLE_MATCHERTEXT", "-DSQLITE_MATCHERTEXT_STRICT"])
+    build_stock_amalgamation()
+    _compile(STOCK_READER, [], SRC.parent / "stock_reader.c", STOCK_AMALG)
 
 
 # Deliberately broken scanners, to prove the oracle can see a defect at all.
@@ -287,6 +300,23 @@ class Driver:
             else:
                 self.fail("stopped in the name skeletons")
         return out
+
+    def compose(self, values):
+        """Yield (value index, host, arm, SQL) for the statement each text hole
+        arm composes, SQL None where the arm refuses the value."""
+        w = self.p.stdin
+        for i, v in enumerate(values):
+            w.write(f"S {v.encode('utf-8', 'surrogateescape').hex()}\nQ\n")
+            w.flush()
+            if self.p.stdout.readline().split() != ["ok"]:
+                self.fail("did not take a value")
+            for line in self.p.stdout:
+                f = line.split()
+                if f[0] == "end":
+                    break
+                yield i, int(f[0]), int(f[1]), None if f[2] == "-" else unhex(f[2])
+            else:
+                self.fail("stopped in a composition")
 
     def sweep(self, values):
         """Yield (value index, host, arm, fields). Every value must end with its
@@ -585,7 +615,7 @@ VMAP = {"INERT": 0, "BREAKOUT": 1, "REJECTED": 2, "MALFORMED": 3}
 RESULT_TABLES = ("mt_sqli_host", "mt_sqli_arm", "mt_sqli_value", "mt_sqli_case",
                  "mt_sqli_combo", "mt_sqli_strict")
 OUTPUTS = ("sqli_arm_outcomes.csv", "sqli_by_arm.csv", "sqli_exemplars.csv",
-           "sqli_benign_rejection.csv",
+           "sqli_benign_rejection.csv", "sqli_adaptive.csv", "sqli_downgrade.csv",
            "sqli_sabotage.csv")
 
 
@@ -666,6 +696,11 @@ def run(args):
     fail = report(guard, eff_pairs, payloads, len(cases))
     fail += strict_sweep(con, payloads)
     benign_rejection(con)
+    values = [("adaptive", v) for v in adaptive.values(
+        "sql", {o for _, o in eff_pairs}, {p for _, p in payloads}, 3000, 500)]
+    targeted, targeted_fail = run_adaptive(values)
+    fail += targeted_fail
+    downgrade = run_downgrade(payloads + values)
     sabotage = []
     if not getattr(args, "skip_sabotage", False):
         sabotage, sabotage_fail = run_sabotage(payloads[:getattr(args, "sabotage_n", None)])
@@ -677,6 +712,10 @@ def run(args):
             (EXPORTS / name).unlink(missing_ok=True)
         sys.exit(f"\n{len(fail)} guard failure(s): the run is not usable")
     export(con)
+    write("sqli_downgrade.csv", ["arm", "n", "refused", "inert", "breakout"], downgrade)
+    write("sqli_adaptive.csv",
+          ["arm", "values", "n", "inert", "breakout", "rejected", "malformed", "effective",
+           "eff_breakout"], targeted)
     if sabotage:
         write("sqli_sabotage.csv",
               ["sabotage", "arm", "cases", "detected", "to_breakout", "to_breakout_probe",
@@ -709,7 +748,7 @@ def export(con):
                          ORDER BY a.name, c.verdict, v.value LIMIT 4000"""))
 
 
-def verdicts_for(payloads, binary=None, selfcheck=True):
+def verdicts_for(payloads, binary=None, selfcheck=True, arms=SCORE_ARMS):
     drv = Driver(binary, selfcheck)
     base = drv.baselines()
     ident_hosts = {h for h, (_, hole, _) in drv.hosts.items() if hole == 2}
@@ -720,7 +759,7 @@ def verdicts_for(payloads, binary=None, selfcheck=True):
         o = payloads[idx][1]
         for (h, a), r in rows.items():
             arm = drv.arms[a][0]
-            if arm in SCORE_ARMS:
+            if arm in arms:
                 out[(idx, h, arm)] = (
                     verdict(arm, r, base[(h, a)], o, h in ident_hosts,
                             drv.hosts[h][0] in RAW_HOSTS, names[(h, a)]),
@@ -735,6 +774,89 @@ def verdicts_for(payloads, binary=None, selfcheck=True):
     if cur >= 0:
         score(cur, pending)
     return out
+
+
+def run_adaptive(values):
+    """The hole-targeted set (adaptive.py) through every arm of the additive
+    build, reported apart from the recorded corpus. As for the corpus, the
+    hole arms must not break out where the control does."""
+    out = verdicts_for(values, arms=MT_ARMS + TYPED_ARMS + LEGACY_ARMS)
+    eff = {(i, h) for (i, h, arm), (v, _) in out.items()
+           if arm in CONTROL_ARMS and v == "BREAKOUT"}
+    per_arm = defaultdict(lambda: [0] * 7)   # n, the four verdicts, effective, eff breakout
+    lost = Counter()
+    for (i, h, arm), (v, unf) in out.items():
+        c = per_arm[arm]
+        c[0] += 1
+        c[1 + VMAP[v]] += 1
+        c[5] += (i, h) in eff
+        c[6] += (i, h) in eff and v == "BREAKOUT"
+        lost[arm] += unf
+    rows = [(arm, len(values), *per_arm[arm]) for arm in LEGACY_ARMS + MT_ARMS + TYPED_ARMS]
+    print(f"\nhole-targeted set: {len(values):,} values, {len(eff):,} effective (value, fixture) pairs")
+    print(f"{'arm':13} {'inert':>8} {'breakout':>9} {'rejected':>9} {'malformed':>10}")
+    for arm, _, n, *c, e, eb in rows:
+        print(f"{arm:13} " + "".join(f"{x:>{w},}" for x, w in zip(c, (8, 10, 10, 11))))
+    fail = [f"hole-targeted: the {a} control never broke out" for a in CONTROL_ARMS
+            if not per_arm[a][2]]
+    fail += [f"hole-targeted: {a} produced {per_arm[a][2]:,} breakouts" for a in SCORE_ARMS
+             if per_arm[a][2]]
+    fail += [f"hole-targeted: {a} changed {lost[a]:,} values" for a in SCORE_ARMS if lost[a]]
+    for f in fail:
+        print("  GUARD: " + f)
+    return rows, fail
+
+
+# The benign values of the fixtures and the fixture names: a stock reading
+# that compiles as one of these does is inert.
+DOWNGRADE_BENIGN = ("alice", "1", "999999") + FIXTURE_NAMES
+
+
+def run_downgrade(payloads):
+    """An aware writer with a stock reader: the statements the text hole arms
+    compose for the corpus and the hole-targeted set, read by stock SQLite
+    (stock_reader.c, the same tree without matchertext). A case is refused
+    where the reader does not prepare it, inert where it compiles as a benign
+    value or a fixture name does and returns no more rows, else a breakout."""
+    reader = subprocess.Popen([str(STOCK_READER)], stdin=subprocess.PIPE,
+                              stdout=subprocess.PIPE, text=True)
+
+    def read(sql):
+        reader.stdin.write(sql.encode("utf-8", "surrogateescape").hex() + "\n")
+        reader.stdin.flush()
+        f = reader.stdout.readline().split()
+        if not f:
+            sys.exit(f"stock_reader stopped (exit {reader.wait()})")
+        return f[0] if len(f) == 1 else (f[0], int(f[1]))
+
+    drv = Driver()
+    benign = defaultdict(set)     # (host, arm) -> skeletons of the benign readings
+    most = defaultdict(int)       # (host, arm) -> most rows of a benign reading
+    for _, h, a, sql in drv.compose(DOWNGRADE_BENIGN):
+        r = read(sql) if sql is not None else "refused"
+        if isinstance(r, tuple):
+            benign[(h, a)].add(r[0])
+            most[(h, a)] = max(most[(h, a)], r[1])
+    counts = defaultdict(Counter)
+    for _, h, a, sql in drv.compose([p for _, p in payloads]):
+        if sql is None:
+            continue              # the arm refused the value: nothing reaches the reader
+        r = read(sql)
+        if isinstance(r, tuple):
+            v = "inert" if r[0] in benign[(h, a)] and r[1] <= most[(h, a)] else "breakout"
+        else:
+            v = "refused" if r == "refused" else "breakout"
+        counts[drv.arms[a][0]][v] += 1
+    for p in (drv.p, reader):
+        p.stdin.close()
+        if p.wait():
+            sys.exit("a driver failed in the downgrade test")
+    rows = [(arm, sum(c.values()), c["refused"], c["inert"], c["breakout"])
+            for arm, c in sorted(counts.items())]
+    print("\ndowngrade: the text holes read by stock SQLite")
+    for row in rows:
+        print("  {:10} n={:>8,} refused={:>8,} inert={:>8,} breakout={:>8,}".format(*row))
+    return rows
 
 
 # Values the corpus lacks. Identifiers whose [...] boundary is decided by

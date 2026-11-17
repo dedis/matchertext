@@ -60,6 +60,8 @@ Inertness holds under four premises:
 	before it enters the hole. The host language reads that same representation to
 	matcher balance, performing no further decoding, normalization, or
 	reparsing of the hole contents (PDF's \verb|\(| is such decoding).
+	Decoding starts at the bytes, in the charset the writer declared and verified
+	under: Shift\_JIS can hide a matcher (\cref{sec:appendix:systems}).
 	Writing $\mathrm{canon}(v)$ for the composition of every decode and
 	normalization the pipeline applies, the obligation is
 	$\textsc{Verify}(\mathrm{canon}(v))$ with the host language parsing
@@ -72,7 +74,7 @@ Inertness holds under four premises:
 	(percent, entity, backslash, \dots) is not viable: those compose to
 	unbounded depth and vary by pipeline, reintroducing the parser-shadowing
 	burden matchertext avoids (\cref{sec:bg:sanitizer}).
-	Unicode normalization has a finite preimage: exactly 20 code points
+	Unicode normalization (NFKC, Unicode~16.0) has a finite preimage: exactly 20 code points
 	normalize to a \emph{lone} matcher (\eg \texttt{U+FF3B}$\rightarrow$\texttt{[})
 	and the rest to balanced pairs, so canonicalization eliminates the set
 	outright rather than asking \textsc{Verify} to model it.

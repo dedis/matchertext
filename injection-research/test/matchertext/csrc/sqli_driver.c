@@ -23,6 +23,10 @@
 **   S <hex>    set the current value
 **   R          run every legal pair for the current value
 **   C <h> <a>  run one pair
+**   Q          for every legal pair of a text hole arm (mt, mt_strict,
+**              ident_mt), print "<h> <a> <hex SQL>" for the statement the arm
+**              composes for the current value, "-" if it refuses it; then
+**              "end".  A stock SQLite replays these (pipeline downgrade test).
 **
 ** Result fields: outcome rc skel ro tail nrow name err fid
 **   outcome  ok | rejected (VERIFY or ?V/?I refused the value) | parse (prepare failed)
@@ -538,6 +542,26 @@ int main(void){
           printf("%d %d ", h, a);
           runCase(h, a, zVal, gnVal, &res);
           emit(&res);
+        }
+        printf("end\n");
+        break;
+      case 'Q':
+        for(h=0; h<NHOST; h++) for(a=0; a<NARM; a++){
+          int e = aArm[a].eConv;
+          char *zHole;
+          if( !legal(h, a) || (e!=C_MT && e!=C_MTSTRICT && e!=C_IDENT_MT) ) continue;
+          printf("%d %d ", h, a);
+          zHole = renderHole(e, aHost[h].eConcat, zVal);
+          if( zHole ){
+            char *zSql = sqlite3_mprintf("%s%s%s", aHost[h].zPre, zHole, aHost[h].zPost);
+            if( zSql==0 ) die("oom");
+            printHex(zSql, (int)strlen(zSql));
+            sqlite3_free(zSql);
+            sqlite3_free(zHole);
+          }else{
+            printf("-");
+          }
+          printf("\n");
         }
         printf("end\n");
         break;

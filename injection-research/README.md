@@ -25,7 +25,18 @@ It does not use the Python SQLite driver for the replay.
 
 ## Reproduce the complete pipeline
 
-Use the manifest pins and the immutable snapshot archive:
+> **Run `perf.py` and `compat.py` first.** `run_all.py` does not run these two
+> scripts, but its last stage, `latex.py`, needs their output files
+> (`data/exports/perf.csv` and `data/exports/compat.csv`) for the cost and
+> SQLite test-suite numbers of the paper. Without these files the paper
+> does not build. The two scripts take about 3 and 30 minutes.
+>
+> ```sh
+> python3 pipeline/perf.py
+> LDFLAGS=-L/opt/homebrew/lib python3 pipeline/compat.py   # macOS with Homebrew Tcl
+> ```
+
+Then run the pipeline with the manifest pins and the immutable snapshot archive:
 
 ```sh
 python3 pipeline/run_all.py
@@ -45,7 +56,9 @@ The full run executes these stages in order:
 4. Build syntactic payload groups.
 5. Validate the general payload corpus.
 6. Replay SQL payloads through the MatcherText SQLite drivers.
-7. Generate CSV, HTML, and LaTeX results.
+7. Replay HTML payloads through the MatcherText parse5 fork.
+8. Generate CSV, HTML, and LaTeX results, with the files of `perf.py` and
+   `compat.py`.
 
 Use `--years` only for a reduced CVE-year run:
 
@@ -167,15 +180,24 @@ This command generates the amalgamation and builds the normal and strict
 MatcherText SQLite drivers. It then replays every distinct SQL payload through
 all control and defense arms, `%Q`, `%q`, `"%w"`, and bound parameters among
 them. It also measures how often strict `?V` refuses benign text, the CVE
-descriptions outside the corpus. The run stops, and removes its results, when a
+descriptions outside the corpus. A hole-targeted set from
+`pipeline/adaptive.py` stands in for an adaptive attacker and runs apart from
+the recorded corpus: boundary atoms around breakout cores, mutations of the
+effective payloads made matchertext so that Verify accepts them, and nesting at
+the depth limit. Stock SQLite (`test/matchertext/csrc/stock_reader.c`, built
+from the same tree without MatcherText) then reads the statements that the
+text holes compose for both sets, as a reader that was not upgraded would. The run stops, and removes its results, when a
 guard fails: a driver exits early, a control never breaks out, a matchertext
-arm breaks out or changes a value, the strict build admits a legacy path, or
-the matchertext API compiles SQL that is not a string literal. It
+arm breaks out or changes a value on either set, the strict build admits a
+legacy path, or the matchertext API compiles SQL that is not a string literal.
+It
 stores detailed results in `data/cve.db` and writes these principal files:
 
 - `data/exports/sqli_arm_outcomes.csv`
 - `data/exports/sqli_by_arm.csv`
 - `data/exports/sqli_exemplars.csv`
+- `data/exports/sqli_adaptive.csv`
+- `data/exports/sqli_downgrade.csv`
 - `data/exports/sqli_sabotage.csv`
 
 Useful reduced runs are:
@@ -203,22 +225,51 @@ changed, and runs `test/matchertext/jssrc/html_driver.mjs`. It replays every
 distinct HTML payload through 13 host contexts and 9 arms: the raw control,
 entity escaping, a tree written by the stock and by the guarded serializer,
 and five matchertext arms, one of them a tree written with matchertext output. It also records how a parser without the
-matchertext option reads each matchertext document. The run stops, and
+matchertext option reads each matchertext document. With both MatcherText
+options off, the fork passes parse5's test suite unchanged; the serializer
+guard, on by default, changes html5lib serializer tests 18 (`plaintext`) and 27
+(a leading line feed in `pre`, `textarea`, `listing`), whose stock output
+parses back as another tree. The hole-targeted set runs
+apart with two more arms that send the verified-hole document as UTF-8 bytes
+and decode it as a reader does: `mt_utf8` with the WHATWG UTF-8 decoder, and
+`mt_sjis` with Shift_JIS, a charset the writer did not declare. The run stops, and
 removes its results, when a guard fails: the driver exits early, a control
 never breaks out, a matchertext arm or the guarded serializer breaks out, a
 matchertext document fails to parse or to serialize back, `composeHtml`
 accepts markup that is not a template literal, a deliberately broken fork goes
 unnoticed, or a fork whose hole ends at the first closer or whose serializer
-guard is off produces no breakout. It writes:
+guard is off produces no breakout, or the Shift_JIS reader never breaks out.
+It writes:
 
 - `data/exports/html_arm_outcomes.csv`
 - `data/exports/html_by_arm.csv`
 - `data/exports/html_reader.csv`
 - `data/exports/html_exemplars.csv`
+- `data/exports/html_adaptive.csv`
 - `data/exports/html_sabotage.csv`
 
 `run_all.py` runs this stage after the SQL replay. `latex.py` writes its
 macros and `doc/generated/tbl-html-arms.tex`.
+
+### 5c. Measure cost and compatibility
+
+These two commands run apart from `run_all.py`, since their results depend on
+the machine and take minutes. Run them before `latex.py`, which quotes their
+files.
+
+```sh
+python3 pipeline/perf.py
+LDFLAGS=-L/opt/homebrew/lib python3 pipeline/compat.py   # macOS with Homebrew Tcl
+```
+
+`perf.py` times SQLite's `speedtest1` on the stock and the additive build of
+the fork's tree, one value into a prepared statement by bind, by the `%m`
+hole, and by the typed `?V` path (`test/matchertext/csrc/prepare_bench.c`), and
+parse5's benchmark page on the upstream parse5 under the fork and on the fork
+(`test/matchertext/jssrc/perf.mjs`). It writes `data/exports/perf.csv`.
+
+`compat.py` runs SQLite's full Tcl test suite on the stock and the additive
+build and writes `data/exports/compat.csv`.
 
 ### 6. Generate exports and paper data
 

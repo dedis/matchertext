@@ -165,7 +165,10 @@ matcher balance, wraps an identifier in
 \verb|[|$\dots$\verb|]| that the engine reads to matcher balance (A1), and
 prepares the statement through the ordinary interface.
 The fork offers this hole beside legacy composition rather than replacing it, so
-existing SQL keeps working, bar names with an unmatched bracket. That additive design is the
+existing SQL keeps working: the additive build passes every SQLite test that
+stock passes, and runs its benchmark in \dataPerfSpeedtestRatio of the stock time
+(\cref{sec:appendix:systems}).
+That additive design is the
 point-of-use character of A2: a value still concatenated into surrounding SQL,
 outside a hole, is unprotected. An opt-in strict mode refuses the legacy prepare
 entry points; the measurement reports the additive default and strict build side
@@ -244,10 +247,13 @@ position a bound parameter cannot fill.
 A zero is evidence only if the oracle could have reported a one.
 A broken locator, \textsc{Verify}, encoder, or decoder changes an outcome or
 value of the holes resting on it (up to \dataSqliSabotageDetect); the locator
-breaks out \dataSqliSabotageBreakouts recorded cases. No recorded payload has an
-unmatched closer then SQL, so two constructed probes show the broken locator and
-encoder let one out (\dataSqliSabotageProbeBreakouts breakouts). So the honest
+breaks out \dataSqliSabotageBreakouts recorded cases, and two constructed probes
+show the broken locator and encoder let a value out
+(\dataSqliSabotageProbeBreakouts breakouts). So the honest
 zero is read against demonstrated detection power rather than a blind harness.
+A hole-targeted set stands in for an adaptive attacker
+(\cref{sec:appendix:systems}): its \dataSqliTargetedValues values break out of the
+controls in \dataSqliTargetedEffective pairs and of the holes in none.
 The C scanner and an independent implementation agree on \textsc{Verify} for
 every payload, and the run is deterministic.
 In sum, the simulated SQL containment of \cref{tab:mech} survives a live parser;
@@ -271,8 +277,10 @@ which holds $v$ as the element's only text without an end tag; the attribute hol
 The tokenizer reads each hole to matcher balance (A1) and does not interpret it: it
 decodes no character reference, and \verb|<|, \verb|&|, quotes, and
 \verb|</script>| are text.
-HTML recovers from every other syntax error, but a malformed hole stops the parse,
-so a hole ends only at its matched closer.
+A \verb|[| opens an element hole only if its matched \verb|]| is followed by
+\verb|>|; otherwise it starts an attribute name, as in stock HTML (Angular's
+\verb|[prop]="x"|). A malformed attribute hole or section stops the parse, so a
+hole ends only at its matched closer.
 The counterpart of the typed parameters is \texttt{composeHtml}, which runs \textsc{Verify} on each value, puts it in its hole
 without tokenizing it, and refuses a value outside a hole; like strict SQLite, it
 enforces A2.
@@ -322,6 +330,8 @@ or it is refused: the \dataHtmlNonMtPayloads payloads that are not matchertext, 
 per host. The encoding arm holds those too, so it contains the whole corpus and
 refuses nothing. The few \textulc{\emph{Altered}} cases are a zero byte, which every HTML parser
 reads as U+FFFD.
+The hole-targeted set (\dataHtmlTargetedValues values) breaks out of no hole or
+guarded writer.
 The guard, which uses no hole, admits no breakout either
 (\dataHtmlGuardedBreakout), but only because it refuses the \dataHtmlGuardedRefused
 trees that a parser would read back differently. Matchertext output delivers

@@ -321,6 +321,72 @@ def extraction_macros():
             ("BalanceCompleted", num(sum(int(r["completed"]) for r in rows)))]
 
 
+def targeted_macros():
+    """The hole-targeted sets (adaptive.py), reported apart from the recorded
+    corpus, the byte arms of the HTML set, and the SQL holes read by a stock
+    SQLite."""
+    def rows(name):
+        with open(EXPORTS / name, newline="") as f:
+            return {r["arm"]: {k: int(v) for k, v in r.items() if k != "arm"}
+                    for r in csv.DictReader(f)}
+    sql, html = rows("sqli_adaptive.csv"), rows("html_adaptive.csv")
+    down = rows("sqli_downgrade.csv")
+    sql_holes = ("mt", "mt_strict", "ident_mt", "mt_v", "ident_i")
+    # The paper says a stock SQLite refuses every value-hole statement.
+    for a in ("mt", "mt_strict"):
+        assert down[a]["refused"] == down[a]["n"], f"stock SQLite read a {a} statement"
+    return [
+        ("SqliTargetedValues", num(sql["concat"]["values"])),
+        ("SqliTargetedEffective",
+         num(sql["concat"]["eff_breakout"] + sql["ident_concat"]["eff_breakout"])),
+        ("SqliTargetedHoleCases", num(sum(sql[a]["n"] for a in sql_holes))),
+        ("HtmlTargetedValues", num(html["concat"]["values"])),
+        ("HtmlTargetedEffective", num(html["concat"]["eff_breakout"])),
+        ("HtmlUtfEightRead", num(html["mt_utf8"]["n"] - html["mt_utf8"]["rejected"])),
+        ("HtmlSjisBreakout", num(html["mt_sjis"]["breakout"])),
+        ("SqliDowngradeValueCases", num(sum(down[a]["n"] for a in ("mt", "mt_strict")))),
+        ("SqliDowngradeNameCases", num(down["ident_mt"]["n"])),
+        ("SqliDowngradeNameBreakout", num(down["ident_mt"]["breakout"])),
+    ]
+
+
+def compat_macros():
+    """SQLite's test suite on the additive build (compat.py), quoted when
+    compat.csv exists: it runs apart from the pipeline."""
+    path = EXPORTS / "compat.csv"
+    if not path.exists():
+        return []
+    with open(path, newline="") as f:
+        r = {row["build"]: row for row in csv.DictReader(f)}
+    return [("SqliteSuiteTests", num(int(r["additive"]["tests"]))),
+            ("SqliteSuiteStockErrors", num(int(r["stock"]["errors"])))]
+
+
+def perf_macros():
+    """Timings of the forks (perf.py), quoted when perf.csv exists: it runs
+    apart from the pipeline."""
+    path = EXPORTS / "perf.csv"
+    if not path.exists():
+        return []
+    with open(path, newline="") as f:
+        r = {row["case"]: (float(row["baseline"]), float(row["fork"])) for row in csv.DictReader(f)}
+    lengths = sorted(int(c.rsplit("_", 1)[1]) for c in r if c.startswith("prepare_typed_"))
+    lo, hi = lengths[0], lengths[-1]
+
+    def per_byte(path):
+        return (r[f"prepare_{path}_{hi}"][1] - r[f"prepare_{path}_{lo}"][1]) / (hi - lo)
+    ratio = lambda case: r[case][1] / r[case][0]
+    return [
+        ("PerfSpeedtestRatio", f"{ratio('speedtest1'):.2f}"),
+        ("PerfTypedShortExtraNs", num(round(r[f"prepare_typed_{lo}"][1] - r[f"prepare_typed_{lo}"][0]))),
+        ("PerfTypedShortLength", num(lo)),
+        ("PerfTypedNsPerByte", f"{per_byte('typed'):.1f}"),
+        ("PerfMtNsPerByte", f"{per_byte('mt'):.1f}"),
+        ("PerfParseRatio", f"{max(ratio('parse5_parse'), ratio('parse5_parse_matchertext')):.2f}"),
+        ("PerfSerializeRatio", f"{ratio('parse5_serialize'):.2f}"),
+    ]
+
+
 def audit_macros(con):
     """Quoted once the label audit's gold.csv is complete; absent before."""
     m = audit.metrics(con)
@@ -707,6 +773,9 @@ def run(args):
         ("LdapCorpusInert", num(q("""SELECT COUNT(*) FROM payload_assessment
                                      WHERE syntax_type='ldap' AND mechanism='inert'"""))),
         *extraction_macros(),
+        *targeted_macros(),
+        *perf_macros(),
+        *compat_macros(),
         # projection onto the full corpus
         ("HostableCVEs", num(hostable)),
         ("HostableShare", pct(hostable / injection)),

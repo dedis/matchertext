@@ -18,6 +18,11 @@ the same host and arm holding a benign value. Arms:
                          matchers as character references; never refuses.
   compose                composeHtml, which verifies and inserts the value.
 
+The hole-targeted set (adaptive.py) runs apart, with two more arms that send
+the mt_verify document as UTF-8 bytes (A3 at the byte level): mt_utf8 decodes
+them with the WHATWG UTF-8 decoder, mt_sjis with Shift_JIS, a charset the
+writer did not declare.
+
 A payload counts against an arm only where the control breaks out on the same
 host (the effective set). Hosts that execute their value by design (href,
 onclick) are reported as semantic: containment there does not prevent the
@@ -35,6 +40,7 @@ import threading
 from collections import Counter, defaultdict
 from pathlib import Path
 
+import adaptive
 from export import write
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -47,7 +53,7 @@ DRIVER = ROOT / "test" / "matchertext" / "jssrc" / "html_driver.mjs"
 STAMP = BUILD / "parse5.stamp"
 
 VERDICTS = ("INERT", "ALTERED", "BREAKOUT", "REJECTED", "REFUSED", "MALFORMED")
-MT_ARMS = ("dom_mt", "mt_verify", "mt_section", "mt_encode", "compose")
+MT_ARMS = ("dom_mt", "mt_verify", "mt_section", "mt_encode", "compose", "mt_utf8")
 # The arms that must never let a value change the structure of the host.
 CONTAINED_ARMS = MT_ARMS + ("dom_guarded",)
 CONTROL_HOSTS = ("text", "attr_dq")
@@ -136,8 +142,8 @@ def build_fork():
 class Driver:
     """One html_driver.mjs process for one dist directory."""
 
-    def __init__(self, dist=DIST, selfcheck=True):
-        self.p = subprocess.Popen(["node", str(DRIVER), str(dist / "index.js")], stdin=subprocess.PIPE,
+    def __init__(self, dist=DIST, selfcheck=True, args=()):
+        self.p = subprocess.Popen(["node", str(DRIVER), str(dist / "index.js"), *args], stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE, text=True, bufsize=1 << 20)
         meta = self._read("its tables")
         self.hosts = meta["hosts"]
@@ -219,7 +225,7 @@ CREATE TABLE mt_html_combo(host TEXT, arm TEXT, source TEXT, n INTEGER, n_inert 
 """
 RESULT_TABLES = ("mt_html_host", "mt_html_arm", "mt_html_value", "mt_html_case", "mt_html_combo")
 OUTPUTS = ("html_arm_outcomes.csv", "html_by_arm.csv", "html_reader.csv", "html_exemplars.csv",
-           "html_sabotage.csv")
+           "html_adaptive.csv", "html_sabotage.csv")
 
 
 def run(args):
@@ -257,6 +263,9 @@ def run(args):
             guard["verify_mismatch"] += 1
 
     fail = guards(guard, raw, hosts, concat)
+    targeted, targeted_fail = run_adaptive({payloads[i][1] for i, _ in effective},
+                                           {p for _, p in payloads})
+    fail += targeted_fail
     sabotage = []
     if not fail and not getattr(args, "skip_sabotage", False):
         sabotage, sabotage_fail = run_sabotage(payloads[:getattr(args, "sabotage_n", None)])
@@ -281,6 +290,9 @@ def run(args):
                     [(host, arm, src, *c) for (host, arm, src), c in sorted(combo.items())])
     con.commit()
     export(con)
+    write("html_adaptive.csv",
+          ["arm", "values", "n", "inert", "altered", "breakout", "rejected", "refused", "malformed",
+           "effective", "eff_breakout"], targeted)
     if sabotage:
         write("html_sabotage.csv",
               ["sabotage", "cases", "changed_verdict", "to_breakout", "detection"], sabotage)
@@ -309,6 +321,38 @@ def guards(guard, raw, hosts, concat):
     for f in fail:
         print("  GUARD: " + f)
     return fail
+
+
+def run_adaptive(seeds, known):
+    """The hole-targeted set through every arm and the two byte arms, under the guards of the corpus. The
+    Shift_JIS reader must break out: otherwise the byte arms cannot see a charset the writer did not declare."""
+    values = adaptive.values("html", seeds, known, 2000, 500)
+    drv = Driver(args=("--bytes",))
+    hosts = [h["name"] for h in drv.hosts]
+    arms = [a["name"] for a in drv.arms]
+    raw, guard = [], Counter()
+    for i, h, a, o in drv.sweep(values):
+        raw.append((i, h, a, o["verdict"], o["reader"], o["trip"]))
+        guard[(arms[a], o["verdict"])] += 1
+        guard[(arms[a], "trip", o["trip"])] += 1
+        if arms[a] == "mt_verify" and (o["verdict"] == "REJECTED") == verify(values[i]):
+            guard["verify_mismatch"] += 1
+    concat = arms.index("concat")
+    effective = {(i, h) for i, h, a, v, _, _ in raw if a == concat and v == "BREAKOUT"}
+    per_arm = defaultdict(lambda: [0] * 9)   # n, the six verdicts, effective, effective breakout
+    for i, h, a, v, _, _ in raw:
+        c = per_arm[arms[a]]
+        c[0] += 1
+        c[1 + VERDICTS.index(v)] += 1
+        c[7] += (i, h) in effective
+        c[8] += (i, h) in effective and v == "BREAKOUT"
+    print("\nhole-targeted set (adaptive.py), with the byte arms:")
+    report(guard, arms, len(values), len(effective))
+    fail = guards(guard, raw, hosts, concat)
+    if not guard[("mt_sjis", "BREAKOUT")]:
+        fail.append("the Shift_JIS reader never broke out; the byte arms are blind")
+        print("  GUARD: " + fail[-1])
+    return [(arm, len(values), *per_arm[arm]) for arm in arms], fail
 
 
 def export(con):
