@@ -36,7 +36,15 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
 const distPath = process.argv[2];
-const { parse, serialize, composeHtml, verifyMatchertext, MatchertextError, defaultTreeAdapter: adapter } = await import(
+const {
+    parse,
+    serialize,
+    composeHtml,
+    htmlTemplate,
+    verifyMatchertext,
+    MatchertextError,
+    defaultTreeAdapter: adapter,
+} = await import(
     pathToFileURL(distPath).href
 );
 // The escaping that parse5 itself uses, from the fork's own dependencies.
@@ -69,6 +77,23 @@ const HOSTS = [
     { name: 'onclick', kind: 'attr', tag: 'a', attr: 'onclick', quote: '"', semantic: true },
     { name: 'comment', kind: 'comment' },
 ].map((host) => ({ pre: '', post: '', wrap: ['', ''], ...host }));
+
+// The compose arm writes each host as a template literal, since composeHtml takes no markup built at run time. The
+// startup check below holds each to the document of its host.
+const COMPOSE = {
+    text: (v) => htmlTemplate`<div id=h [${v}]>`,
+    table_cell: (v) => htmlTemplate`<table><tr><td id=h [${v}]></tr></table>`,
+    svg_text: (v) => htmlTemplate`<svg><text id=h [${v}]></svg>`,
+    textarea: (v) => htmlTemplate`<textarea id=h [${v}]>`,
+    title: (v) => htmlTemplate`<title id=h [${v}]>`,
+    style: (v) => htmlTemplate`<style id=h [${v}]>`,
+    script_string: (v) => htmlTemplate`<script id=h [var x = "${v}";]>`,
+    attr_dq: (v) => htmlTemplate`<div id=h title=[${v}]></div>`,
+    attr_sq: (v) => htmlTemplate`<div id=h title=[${v}]></div>`,
+    attr_unquoted: (v) => htmlTemplate`<div id=h title=[${v}]></div>`,
+    href: (v) => htmlTemplate`<a id=h href=[${v}]></a>`,
+    onclick: (v) => htmlTemplate`<a id=h onclick=[${v}]></a>`,
+};
 
 const ARMS = [
     'concat',
@@ -207,11 +232,7 @@ function write(host, arm, v) {
                 return html === null ? 'REJECTED' : parse(html, MT);
             }
             case 'compose': {
-                const strings =
-                    host.kind === 'text'
-                        ? [`${host.pre}<${host.tag} id=h [${w0}`, `${w1}]>${host.post}`]
-                        : [`${host.pre}<${host.tag} id=h ${host.attr}=[`, `]></${host.tag}>${host.post}`];
-                return composeHtml(strings, [v]);
+                return composeHtml(COMPOSE[host.name](v));
             }
         }
     } catch (error) {
@@ -390,6 +411,27 @@ for (const [h, host] of HOSTS.entries()) {
     for (const [a, arm] of ARMS.entries()) {
         if (legal(host, arm)) pairs.push([h, a]);
     }
+}
+
+// A2: composeHtml must refuse markup that is not a template literal.
+for (const forged of [
+    () => htmlTemplate(['<p [', ']>'], 'x'),
+    () => composeHtml({ strings: ['<p [', ']>'], values: ['x'] }),
+]) {
+    try {
+        forged();
+    } catch (error) {
+        if (error instanceof TypeError) continue;
+        throw error;
+    }
+    fail('composeHtml accepted markup that is not a template literal');
+}
+
+// Each compose template must write the document that mt_verify writes for its host.
+for (const host of HOSTS) {
+    if (!legal(host, 'compose')) continue;
+    const want = serialize(parse(matchertextDocument(host, 'mt_verify', BENIGN), MT));
+    if (serialize(composeHtml(COMPOSE[host.name](BENIGN))) !== want) fail(`compose template of ${host.name} differs`);
 }
 
 // The benign value gives the structure every arm must keep. A baseline that is not inert means a broken host.

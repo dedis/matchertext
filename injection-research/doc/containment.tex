@@ -222,8 +222,8 @@ same payloads.
 That breakout is available only because the additive build leaves legacy
 composition open. Recompiled in strict mode, every text-splicing prepare, the
 concatenation and the in-band \verb|M'(...)'| alike, is refused before the parser
-(\cref{tab:sqli}, right), though the strict entry point still accepts any balanced
-template. The admitted paths are the typed \texttt{?V} and
+(\cref{tab:sqli}, right); its API takes SQL only as literals (A2).
+The admitted paths are the typed \texttt{?V} and
 \texttt{?I} parameters (\dataSqliStrictValueBreakout and
 \dataSqliStrictIdentBreakout breakouts); \texttt{?V} verifies, then binds an
 ordinary parameter, refusing the \dataSqliStrictValueRejected non-matchertext values.
@@ -270,7 +270,7 @@ HTML recovers from every other syntax error, but a malformed hole stops the pars
 so a hole ends only at its matched closer.
 The counterpart of the typed parameters is \texttt{composeHtml}, which runs \textsc{Verify} on each value, puts it in its hole
 without tokenizing it, and refuses a value outside a hole; like strict SQLite, it
-leaves A2 to the caller.
+enforces A2.
 The fork also changes the serializer, the other half of the mutation-XSS round
 trip: by default it refuses a tree that a parser would read back differently, such
 as script text that contains \verb|</script>|. This guard uses no hole. With

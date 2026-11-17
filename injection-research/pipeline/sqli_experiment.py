@@ -130,10 +130,35 @@ def _compile(binary, extra):
     stamp.write_text("\0".join(cmd))
 
 
+# A2: each matchertext entry point that takes SQL must compile a literal and
+# refuse a run-time string.
+A2_PROBES = {
+    "prepare_v3": "sqlite3_matchertext_prepare_v3(db, {t}, -1, 0, 0, 0, pp)",
+    "sql_append": "sqlite3_matchertext_sql_append(sqlite3_matchertext_sql_new(), {t})",
+}
+
+
+def check_constant_sql():
+    cc = os.environ.get("CC", "cc")
+    probe = BUILD / "a2_probe.c"
+    for name, call in A2_PROBES.items():
+        for template, compiles in (('"SELECT 1"', True), ("z", False)):
+            probe.write_text('#include "sqlite3.h"\n'
+                             "void f(sqlite3 *db, const char *z, sqlite3_stmt **pp){\n"
+                             f"  (void)z; (void)pp; (void)db; {call.format(t=template)};\n}}\n")
+            r = subprocess.run([cc, "-fsyntax-only", "-DSQLITE_ENABLE_MATCHERTEXT",
+                                "-I", str(AMALG.parent), str(probe)],
+                               capture_output=True, text=True)
+            if (r.returncode == 0) != compiles:
+                sys.exit(f"A2 guard: {name} with {template} "
+                         f"{'does not compile' if compiles else 'compiles'}:\n{r.stderr[-2000:]}")
+
+
 def build_driver():
     """Build both the additive (default) driver and the strict driver, the
     latter to measure that the same delivery paths are refused wholesale."""
     build_amalgamation()
+    check_constant_sql()
     _compile(BIN, [])
     _compile(BIN_STRICT, ["-DSQLITE_MATCHERTEXT_STRICT"])
 

@@ -77,8 +77,8 @@ Inertness holds under four premises:
 \item[\textbf{A2}] \emph{Delimited context.} Every untrusted value is routed
 	into a matcher-delimited hole. A value concatenated into host-language syntax
 	outside a hole is unprotected, exactly as with any point-of-use defense.
-	Constant-template APIs (C literals, tagged templates) could enforce A2
-	(future work).
+	An API enforces A2 by taking host syntax only from source literals, which it
+	may still compose at run time; only an explicit opt-out bypasses it.
 \item[\textbf{A3}] \emph{Canonicalize, then verify.} \textsc{Verify} runs on the
 	\emph{fully decoded and normalized} value, at the last transform boundary
 	before it enters the hole. The host language reads that same representation to

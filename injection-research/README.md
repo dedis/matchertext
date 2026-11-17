@@ -160,7 +160,8 @@ This command generates the amalgamation and builds the normal and strict
 MatcherText SQLite drivers. It then replays every distinct SQL payload through
 all control and defense arms. The run stops, and removes its results, when a
 guard fails: a driver exits early, a control never breaks out, a matchertext
-arm breaks out or changes a value, or the strict build admits a legacy path. It
+arm breaks out or changes a value, the strict build admits a legacy path, or
+the matchertext API compiles SQL that is not a string literal. It
 stores detailed results in `data/cve.db` and writes these principal files:
 
 - `data/exports/sqli_arm_outcomes.csv`
@@ -190,8 +191,9 @@ and five matchertext arms, one of them a tree written with matchertext output. I
 matchertext option reads each matchertext document. The run stops, and
 removes its results, when a guard fails: the driver exits early, a control
 never breaks out, a matchertext arm or the guarded serializer breaks out, a
-matchertext document fails to parse or to serialize back, or a deliberately
-broken fork goes unnoticed. It writes:
+matchertext document fails to parse or to serialize back, `composeHtml`
+accepts markup that is not a template literal, or a deliberately broken fork
+goes unnoticed. It writes:
 
 - `data/exports/html_arm_outcomes.csv`
 - `data/exports/html_by_arm.csv`
