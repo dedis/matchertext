@@ -19,7 +19,7 @@ and Mathlib, which `lake` fetches from `lakefile.toml`.
 | `core.lean`              | The alphabet, the matcher pair set `Pi`, and the inductive language `MT`                                                  |
 | `always_embeddable.lean` | Closure: a matchertext string wrapped in a matched delimiter pair is still matchertext, at any depth and with no escaping |
 | `embed_boundary.lean`    | The boundary result: reading to matcher balance ends an embedded value at exactly its last byte                           |
-| `to_matchertext.lean`    | The total encoder: any string at all, once encoded, is matchertext                                                        |
+| `to_matchertext.lean`    | The total encoder: any string at all, once encoded, is matchertext, also with the C encoder's depth cap and escaped pairs  |
 
 The three results compose. Closure says a delimited value stays in the language.
 `embed_boundary` says a reader counting balance stops in the right place.

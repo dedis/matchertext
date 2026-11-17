@@ -1,8 +1,13 @@
 """Stage 3: label published CVEs with injection relevance, weakness family, syntax type.
 
-Fallback chain per record: CWE anchors -> phrase rules -> trigram naive Bayes
+Fallback chain per record: CWE anchors -> phrase rules -> word naive Bayes
 (margin-thresholded) -> unknown. The method column records which stage
 determined the syntax type.
+
+The classifier also learns a NOT_INJECTION class from the published CVEs that
+the corpus gate rejects. Many CVEs reach it through a generic CWE such as
+CWE-74 without being injection; when that class wins, the CVE stays unknown
+rather than receive a syntax it does not have.
 """
 import argparse
 import csv
@@ -11,15 +16,19 @@ import sqlite3
 from collections import defaultdict
 from pathlib import Path
 
-from nbayes import TrigramNB
-from taxonomy import (FAMILY_ANCHORS, FAMILY_OF_SYNTAX, NOT_INJECTION, OTHER,
-                      REVIEWED_INHERITED, SYNTAX_ANCHORS, labels_from_cwes,
-                      mask_rules, rule_match)
+from nbayes import WordNB
+from taxonomy import (FAMILY_ANCHORS, FAMILY_OF_SYNTAX, MEMORY_CORRUPTION,
+                      NOT_INJECTION, OTHER, REVIEWED_INHERITED, SYNTAX_ANCHORS,
+                      labels_from_cwes, mask_rules, rule_match)
 
 ROOT = Path(__file__).resolve().parents[1]
 DB = ROOT / "data" / "cve.db"
 EXPORTS = ROOT / "data" / "exports"
 SOURCE_PRIORITY = {"cna": 0, "adp_cisa": 1, "nvd": 2, "ghsa": 3, "redhat": 4, "nuclei": 5}
+# The CVE record and NVD. The other sources count only for a CVE that these
+# give no CWE, so a secondary source cannot overrule them.
+PRIMARY_SOURCES = {"cna", "adp_cisa", "nvd"}
+NOT_INJECTION_CLASS = "none"
 
 
 def bucket(cve_id):
@@ -97,23 +106,31 @@ def run(args):
     con = sqlite3.connect(DB)
     parents, subtree = load_hierarchy(con)
 
-    cwes = defaultdict(list)
+    primary, secondary = defaultdict(set), defaultdict(set)
     for cve_id, cwe, src in con.execute("SELECT cve_id, cwe_id, source FROM cwe_assignment"):
-        cwes[cve_id].append((SOURCE_PRIORITY.get(src, 9), cwe))
+        (primary if src in PRIMARY_SOURCES else secondary)[cve_id].add(
+            (SOURCE_PRIORITY.get(src, 9), cwe))
 
     EXPORTS.mkdir(parents=True, exist_ok=True)
     anchor_audit(con, parents, subtree)
 
     results = {}  # cve_id -> [family, syntax, method, confidence]
     train, pending = [], []
-    overridden = contradicted = 0
+    overridden = contradicted = abstained = memory = 0
     for cve_id, desc in con.execute(
             "SELECT cve_id, COALESCE(description,'') FROM cve WHERE state='PUBLISHED'"):
-        ids = [c for _, c in sorted(set(cwes.get(cve_id, ())))]
+        ids = [c for _, c in sorted(primary.get(cve_id) or secondary.get(cve_id, ()))]
         rm = rule_match(desc) if desc else None
-        if not (rm or any(c in subtree for c in ids)):
+        admitted = rm or any(c in subtree for c in ids)
+        if admitted:
+            fam, generic, syn = labels_from_cwes(ids, parents)
+            if not rm and syn == "code_eval" and MEMORY_CORRUPTION.search(desc):
+                memory += 1
+                admitted = False
+        if not admitted:
+            if desc:
+                train.append((cve_id, desc, NOT_INJECTION_CLASS))
             continue
-        fam, generic, syn = labels_from_cwes(ids, parents)
         method = conf = None
         if syn is not None:
             method = "cwe"
@@ -138,7 +155,7 @@ def run(args):
     if pending and train:
         tr = [(t, y) for cid, t, y in train if bucket(cid) != 0]
         te = [(t, y) for cid, t, y in train if bucket(cid) == 0]
-        stats, covered = evaluate(TrigramNB().fit(*zip(*tr)), te, margin)
+        stats, covered = evaluate(WordNB().fit(*zip(*tr)), te, margin)
         with open(EXPORTS / "nb_holdout.csv", "w", newline="") as f:
             w = csv.writer(f)
             w.writerow(["class", "test_n", "precision", "recall", "coverage"])
@@ -150,10 +167,12 @@ def run(args):
                             round(covered / len(te), 3)])
         print(f"nb holdout: {len(te)} test docs, {covered} above margin {margin}")
 
-        model = TrigramNB().fit([t for _, t, _ in train], [y for _, _, y in train])
+        model = WordNB().fit([t for _, t, _ in train], [y for _, _, y in train])
         for cve_id, desc, refinable in pending:
             y, m = model.predict(desc)
-            if m >= margin:
+            if y == NOT_INJECTION_CLASS:
+                abstained += 1
+            elif m >= margin:
                 r = results[cve_id]
                 if refinable:
                     r[0] = FAMILY_OF_SYNTAX[y]
@@ -176,7 +195,8 @@ def run(args):
     total = con.execute("SELECT COUNT(*) FROM cve WHERE state='PUBLISHED'").fetchone()[0]
     print(f"injection-related: {len(results)} of {total} published CVEs; by method: {counts}")
     print(f"family set by syntax: {overridden}; classifier labels refused for "
-          f"contradicting the CWE family: {contradicted}")
+          f"contradicting the CWE family: {contradicted}; left unknown as not "
+          f"injection: {abstained}; code-eval CWE on memory corruption, dropped: {memory}")
     con.close()
 
 

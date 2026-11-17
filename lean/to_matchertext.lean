@@ -17,21 +17,38 @@ noncomputable def unwind (esc : α → List α) : List (Ctx α) → List α → 
 
 -- One left-to-right pass. `st` holds the pending openers, `out` the output at the current
 -- level. A closer is matched only if it pairs with the top; else it is unmatched and escaped.
-noncomputable def encAux (esc : α → List α) :
+-- Two decisions may escape more: `cap st` escapes an opener instead of nesting it (a depth
+-- limit), and `split b out` escapes both members of a matched pair, given the output `b`
+-- before its opener and its body `out`. Any choice of either keeps the output matchertext.
+noncomputable def encAux (esc : α → List α) (cap : List (Ctx α) → Bool)
+    (split : List α → List α → Bool) :
     List (Ctx α) → List α → List α → List α
   | st, out, [] => unwind esc st out
   | st, out, x :: xs =>
-      if Opener Pi x then encAux esc ((x, out) :: st) [] xs
+      if Opener Pi x then
+        if cap st then encAux esc cap split st (out ++ esc x) xs
+        else encAux esc cap split ((x, out) :: st) [] xs
       else if Closer Pi x then
         match st with
         | (o, b) :: st' =>
-            if (o, x) ∈ Pi then encAux esc st' (b ++ [o] ++ out ++ [x]) xs
-            else encAux esc st (out ++ esc x) xs
-        | [] => encAux esc st (out ++ esc x) xs
-      else encAux esc st (out ++ [x]) xs
+            if (o, x) ∈ Pi then
+              if split b out then encAux esc cap split st' (b ++ esc o ++ out ++ esc x) xs
+              else encAux esc cap split st' (b ++ [o] ++ out ++ [x]) xs
+            else encAux esc cap split st (out ++ esc x) xs
+        | [] => encAux esc cap split st (out ++ esc x) xs
+      else encAux esc cap split st (out ++ [x]) xs
 
+-- The minimal encoder: only unmatched matchers are escaped.
 noncomputable def toMatchertext (esc : α → List α) (v : List α) : List α :=
-  encAux Pi esc [] [] v
+  encAux Pi esc (fun _ => false) (fun _ _ => false) [] [] v
+
+-- The C encoder (sqlite/src/matchertext.c): nesting stops one level below the host's
+-- limit `n`, and a matched pair right after an introducer `bs` and a tag `t` with
+-- `tag t` is escaped, so that input already shaped like an escape decodes to itself.
+noncomputable def toMatchertextC (esc : α → List α) (n : Nat) (bs : α) (tag : α → Prop)
+    (v : List α) : List α :=
+  encAux Pi esc (fun st => decide (n ≤ st.length + 1))
+    (fun b out => decide (out = [] ∧ ∃ p t, b = p ++ [bs, t] ∧ tag t)) [] [] v
 
 -- Neither conjunct of the hypothesis below implies the other. Depth 0 does not
 -- give MT: ")(" balances to zero yet dips below it at the first character.
@@ -99,13 +116,15 @@ theorem unwind_mt (esc : α → List α)
     · exact htail
     · exact mt_append Pi (mt_append Pi hb (hesc o).1) hout
 
--- Invariant (the crux): every accumulated segment stays matchertext.
+-- Invariant (the crux): every accumulated segment stays matchertext, whatever the
+-- decisions `cap` and `split` choose.
 theorem encAux_mt (esc : α → List α)
     (hesc : ∀ c, MT Pi (esc c) ∧ depth Pi (esc c) = 0)
+    (cap : List (Ctx α) → Bool) (split : List α → List α → Bool)
     (st : List (Ctx α)) (hst : ∀ p ∈ st, MT Pi p.2)
     (out : List α) (hout : MT Pi out)
     (v : List α) :
-    MT Pi (encAux Pi esc st out v) := by
+    MT Pi (encAux Pi esc cap split st out v) := by
   induction v generalizing st out with
   | nil =>
     rw [encAux]
@@ -113,33 +132,47 @@ theorem encAux_mt (esc : α → List α)
   | cons x xs ih =>
     simp only [encAux]
     by_cases hox : Opener Pi x
-    · -- opener: push `(x, out)`, start a fresh accumulator
-      rw [if_pos hox]
-      apply ih
-      · intro p hp
-        rcases List.mem_cons.mp hp with rfl | hmem
-        · exact hout
-        · exact hst p hmem
-      · exact mt_nil Pi
+    · rw [if_pos hox]
+      by_cases hcap : cap st
+      · -- opener at the limit: escape it in place
+        rw [if_pos hcap]
+        exact ih st hst _ (mt_append Pi hout (hesc x).1)
+      · -- opener: push `(x, out)`, start a fresh accumulator
+        rw [if_neg hcap]
+        apply ih
+        · intro p hp
+          rcases List.mem_cons.mp hp with rfl | hmem
+          · exact hout
+          · exact hst p hmem
+        · exact mt_nil Pi
     · rw [if_neg hox]
       by_cases hcx : Closer Pi x
       · rw [if_pos hcx]
         rcases st with _ | ⟨⟨o, b⟩, st'⟩
         · -- empty stack: the closer is unmatched, escape it
-          show MT Pi (encAux Pi esc [] (out ++ esc x) xs)
+          show MT Pi (encAux Pi esc cap split [] (out ++ esc x) xs)
           apply ih
           · simp
           · exact mt_append Pi hout (hesc x).1
-        · show MT Pi (if (o, x) ∈ Pi then encAux Pi esc st' (b ++ [o] ++ out ++ [x]) xs
-                      else encAux Pi esc ((o, b) :: st') (out ++ esc x) xs)
+        · show MT Pi (if (o, x) ∈ Pi then
+                        (if split b out then
+                          encAux Pi esc cap split st' (b ++ esc o ++ out ++ esc x) xs
+                        else encAux Pi esc cap split st' (b ++ [o] ++ out ++ [x]) xs)
+                      else encAux Pi esc cap split ((o, b) :: st') (out ++ esc x) xs)
           by_cases hp' : (o, x) ∈ Pi
-          · -- matched: commit `[o] ++ body ++ [x]` into the parent level
-            rw [if_pos hp']
+          · rw [if_pos hp']
             have hb : MT Pi b := hst (o, b) (by simp)
-            apply ih
-            · intro p hp
-              exact hst p (List.mem_cons_of_mem _ hp)
-            · simpa using mt_append Pi hb (mt_wrap Pi hout hp')
+            have htail : ∀ p ∈ st', MT Pi p.2 := fun p hp => hst p (List.mem_cons_of_mem _ hp)
+            by_cases hsp : split b out
+            · -- matched but split: escape both members around the body
+              rw [if_pos hsp]
+              exact ih st' htail _ (mt_append Pi (mt_append Pi (mt_append Pi hb (hesc o).1)
+                hout) (hesc x).1)
+            · -- matched: commit `[o] ++ body ++ [x]` into the parent level
+              rw [if_neg hsp]
+              apply ih
+              · exact htail
+              · simpa using mt_append Pi hb (mt_wrap Pi hout hp')
           · -- kind mismatch: unmatched closer, escape it, stack untouched
             rw [if_neg hp']
             apply ih
@@ -158,7 +191,14 @@ theorem encAux_mt (esc : α → List α)
 theorem toMatchertext_mt (esc : α → List α)
     (hesc : ∀ c, MT Pi (esc c) ∧ depth Pi (esc c) = 0) (v : List α) :
     MT Pi (toMatchertext Pi esc v) :=
-  encAux_mt Pi esc hesc [] (by simp) [] (mt_nil Pi) v
+  encAux_mt Pi esc hesc _ _ [] (by simp) [] (mt_nil Pi) v
+
+-- Theorem: the same for the C encoder's decisions.
+theorem toMatchertextC_mt (esc : α → List α)
+    (hesc : ∀ c, MT Pi (esc c) ∧ depth Pi (esc c) = 0)
+    (n : Nat) (bs : α) (tag : α → Prop) (v : List α) :
+    MT Pi (toMatchertextC Pi esc n bs tag v) :=
+  encAux_mt Pi esc hesc _ _ [] (by simp) [] (mt_nil Pi) v
 
 -- Corollary (write-path payoff): reading to matcher balance recovers exactly the encoded
 -- value, for a freely chosen v. embed_boundary assumes MT Pi m, which toMatchertext_mt supplies.

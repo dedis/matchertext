@@ -384,10 +384,8 @@ func TestBuildsWithoutTheFlag(t *testing.T) {
 	}
 }
 
-func encodeCmd(b []byte) string     { return "C " + hex.EncodeToString(b) }
-func decodeCmd(b []byte) string     { return "D " + hex.EncodeToString(b) }
-func encodeNameCmd(b []byte) string { return "N " + hex.EncodeToString(b) }
-func decodeNameCmd(b []byte) string { return "M " + hex.EncodeToString(b) }
+func encodeCmd(b []byte) string { return "C " + hex.EncodeToString(b) }
+func decodeCmd(b []byte) string { return "D " + hex.EncodeToString(b) }
 
 func unhex(t *testing.T, s string) []byte {
 	t.Helper()
@@ -405,21 +403,20 @@ func unhex(t *testing.T, s string) []byte {
 // The two further properties are what a caller relies on. Decoding an encoded
 // value returns the original, byte for byte, so nothing is lost by passing a
 // free-form field through the hole. And a value that is already matchertext
-// and holds no backslash is left alone, which is what keeps the ordinary case
-// legible in the SQL text.
+// and holds no run that reads as an escape is left alone, backslashes
+// included, which is what keeps the ordinary case legible in the SQL text.
 func TestEncodeIsTotal(t *testing.T) {
 	rng := rand.New(rand.NewSource(3))
 	n := fuzzCount(5000, 100000)
+	// Escape-shaped runs need the backslash and the two letters often, and
+	// whole runs as tokens, which random bytes would rarely assemble.
+	alphabet := append([][]byte{[]byte("\\"), []byte("o"), []byte("c"),
+		[]byte(`\o()`), []byte(`\c[]`), []byte(`\o{}`)}, verifyAlphabet...)
 
 	inputs := make([][]byte, n)
 	cmds := make([]string, 0, 2*n)
 	for i := range inputs {
-		inputs[i] = randCase(rng, verifyAlphabet, 12)
-		// A backslash has to appear, since escaping it is what makes the
-		// encoding injective.
-		if rng.Intn(4) == 0 {
-			inputs[i] = append(inputs[i], '\\')
-		}
+		inputs[i] = randCase(rng, alphabet, 12)
 		cmds = append(cmds, encodeCmd(inputs[i]))
 	}
 	enc := run(t, cmds)
@@ -431,7 +428,7 @@ func TestEncodeIsTotal(t *testing.T) {
 	}
 	dec := run(t, back)
 
-	nUntouched, nGrew := 0, 0
+	nUntouched, nShaped := 0, 0
 	for i, in := range inputs {
 		e := unhex(t, enc[i])
 		if !oracleVerify(e) {
@@ -440,19 +437,22 @@ func TestEncodeIsTotal(t *testing.T) {
 		if d := unhex(t, dec[i]); !bytes.Equal(d, in) {
 			t.Fatalf("round trip lost data: encode(%q) = %q, decode = %q", in, e, d)
 		}
+		if hasEscapeShape(in) {
+			nShaped++
+		}
 		if bytes.Equal(e, in) {
 			nUntouched++
-			if !oracleVerify(in) || bytes.ContainsRune(in, '\\') {
+			if !oracleVerify(in) || hasEscapeShape(in) {
 				t.Fatalf("encode(%q) left it alone but it needed escaping", in)
 			}
-		} else {
-			nGrew++
+		} else if oracleVerify(in) && !hasEscapeShape(in) {
+			t.Fatalf("encode(%q) = %q rewrote input that needed no escaping", in, e)
 		}
 	}
-	if nUntouched == 0 || nGrew == 0 {
-		t.Fatalf("degenerate sample: %d untouched, %d rewritten", nUntouched, nGrew)
+	if nUntouched == 0 || nShaped == 0 {
+		t.Fatalf("degenerate sample: %d untouched, %d escape-shaped", nUntouched, nShaped)
 	}
-	t.Logf("%d cases, %d already embeddable and left alone, %d escaped", n, nUntouched, nGrew)
+	t.Logf("%d cases, %d already embeddable and left alone, %d escape-shaped", n, nUntouched, nShaped)
 }
 
 // TestEncodeGoldenCases pins the escape alphabet itself. The escapes carry no
@@ -470,7 +470,8 @@ func TestEncodeGoldenCases(t *testing.T) {
 		{"lone close bracket", "]", `\c[]`},
 		{"lone open brace", "{", `\o{}`},
 		{"lone close brace", "}", `\c{}`},
-		{"backslash doubles", `\`, `\\`},
+		{"backslash stays", `\`, `\`},
+		{"backslash in text stays", `a\b`, `a\b`},
 		{"wrong kind escapes both", "(]", `\o()\c[]`},
 		{"only the unmatched one", "(a)b)", `(a)b\c()`},
 		{"emoticon", "smile :]", `smile :\c[]`},
@@ -479,7 +480,9 @@ func TestEncodeGoldenCases(t *testing.T) {
 		// nesting is the rule, not mere counting.
 		{"crossed, so all escape", `printf("[")`, `printf\o()"\o[]"\c()`},
 		{"nested properly, none escape", `printf("(x)")`, `printf("(x)")`},
-		{"looks like an escape", `\o()`, `\\o()`},
+		{"looks like an escape", `\o()`, `\o\o()\c()`},
+		{"close escape shape", `\c{}`, `\c\o{}\c{}`},
+		{"not a pair", `\o(x)`, `\o(x)`},
 	}
 
 	cmds := make([]string, len(cases))
@@ -546,7 +549,7 @@ func TestEncodeRespectsDepthLimit(t *testing.T) {
 	}
 }
 
-// hasEscapeShape reports whether b holds a run that the name decoder reads as
+// hasEscapeShape reports whether b holds a run that the decoder reads as
 // an escape: a backslash, 'o' or 'c', and an adjacent matched pair.
 func hasEscapeShape(b []byte) bool {
 	for i := 0; i+3 < len(b); i++ {
@@ -556,77 +559,6 @@ func hasEscapeShape(b []byte) bool {
 		}
 	}
 	return false
-}
-
-// TestEncodeNameIsTotal is TestEncodeIsTotal for the name alphabet of the
-// [...] hole, whose decoder keeps every backslash. The output is matchertext,
-// the name decoder returns the input, and only a name that is already
-// matchertext with no run that reads as an escape is left alone.
-func TestEncodeNameIsTotal(t *testing.T) {
-	rng := rand.New(rand.NewSource(4))
-	n := fuzzCount(5000, 100000)
-	// Escape-shaped runs need the backslash and the two letters often, and
-	// whole runs as tokens, which random bytes would rarely assemble.
-	alphabet := append([][]byte{[]byte("\\"), []byte("o"), []byte("c"),
-		[]byte(`\o()`), []byte(`\c[]`), []byte(`\o{}`)}, verifyAlphabet...)
-
-	inputs := make([][]byte, n)
-	cmds := make([]string, n)
-	for i := range inputs {
-		inputs[i] = randCase(rng, alphabet, 12)
-		cmds[i] = encodeNameCmd(inputs[i])
-	}
-	enc := run(t, cmds)
-	back := make([]string, n)
-	for i := range enc {
-		back[i] = decodeNameCmd(unhex(t, enc[i]))
-	}
-	dec := run(t, back)
-
-	nUntouched, nShaped := 0, 0
-	for i, in := range inputs {
-		e := unhex(t, enc[i])
-		if !oracleVerify(e) {
-			t.Fatalf("encode_name(%q) = %q, which the oracle says is not matchertext", in, e)
-		}
-		if d := unhex(t, dec[i]); !bytes.Equal(d, in) {
-			t.Fatalf("round trip lost data: encode_name(%q) = %q, decode = %q", in, e, d)
-		}
-		if hasEscapeShape(in) {
-			nShaped++
-		}
-		if bytes.Equal(e, in) {
-			nUntouched++
-			if !oracleVerify(in) || hasEscapeShape(in) {
-				t.Fatalf("encode_name(%q) left it alone but it needed escaping", in)
-			}
-		}
-	}
-	if nUntouched == 0 || nShaped == 0 {
-		t.Fatalf("degenerate sample: %d untouched, %d escape-shaped", nUntouched, nShaped)
-	}
-	t.Logf("%d cases, %d left alone, %d escape-shaped", n, nUntouched, nShaped)
-}
-
-// TestEncodeNameGoldenCases pins the name alphabet.
-func TestEncodeNameGoldenCases(t *testing.T) {
-	cases := []struct{ name, in, want string }{
-		{"backslash stays", `a\b`, `a\b`},
-		{"lone close bracket", "]", `\c[]`},
-		{"reads as an escape", `\o()`, `\o\o()\c()`},
-		{"close escape shape", `\c{}`, `\c\o{}\c{}`},
-		{"not a pair", `\o(x)`, `\o(x)`},
-	}
-	cmds := make([]string, len(cases))
-	for i, c := range cases {
-		cmds[i] = encodeNameCmd([]byte(c.in))
-	}
-	got := run(t, cmds)
-	for i, c := range cases {
-		if g := string(unhex(t, got[i])); g != c.want {
-			t.Errorf("%s: encode_name(%q) = %q, want %q", c.name, c.in, g, c.want)
-		}
-	}
 }
 
 // parse5Path is the built parse5 fork that jssrc/driver.mjs tests.

@@ -33,7 +33,7 @@ def main():
                     help="minimum NB log-odds margin to accept a label")
     ap.add_argument("--skip-sabotage", action="store_true",
                     help="skip the driver experiments' power measurement")
-    ap.add_argument("--sabotage-n", type=int, default=4000)
+    ap.add_argument("--sabotage-n", type=int, help="sabotage only the first N payloads")
     args = ap.parse_args()
     if not args.skip_fetch:
         fetch.run(args)

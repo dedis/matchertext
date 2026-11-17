@@ -14,6 +14,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
+import matchertext
 import remote_sidecar
 
 csv.field_size_limit(1 << 24)
@@ -28,6 +29,7 @@ RAW = ROOT / "data" / "raw"
 DB = ROOT / "data" / "cve.db"
 
 DDL = """
+DROP VIEW IF EXISTS poc_evidence;
 DROP TABLE IF EXISTS cve;
 DROP TABLE IF EXISTS cwe_assignment;
 DROP TABLE IF EXISTS cvss;
@@ -57,6 +59,8 @@ CREATE TABLE cwe_hierarchy(child_id INTEGER, parent_id INTEGER, UNIQUE(child_id,
 -- link-only sources (github).
 CREATE TABLE poc(cve_id TEXT, source TEXT, ref TEXT, local_path TEXT, kind TEXT,
                  UNIQUE(cve_id, source, ref));
+-- What counts as PoC evidence: advisory and write-up links are not exploits.
+CREATE VIEW poc_evidence AS SELECT * FROM poc WHERE kind IS NOT 'reference';
 -- Per-source advisory metadata (severity / fix status) for breadth.
 CREATE TABLE advisory(cve_id TEXT, source TEXT, severity TEXT, status TEXT, ref TEXT,
                       UNIQUE(cve_id, source, ref));
@@ -124,8 +128,12 @@ POC_COLLECTIONS = {
     "xray": "xray",
 }
 POC_INDEXES = {
-    "0xmarcio-cve": "0xmarcio-cve",
     "zulloper-cve-poc": "zulloper-cve-poc",
+}
+# Per-CVE markdown with a "### POC" section split into "Github" and "Reference".
+POC_SECTIONED = {
+    "trickest": "trickest-cve",
+    "0xmarcio-cve": "0xmarcio-cve",
 }
 POC_TEXT_EXT = {".c", ".cpp", ".go", ".html", ".java", ".js", ".json", ".md",
                 ".php", ".pl", ".py", ".rb", ".rst", ".sh", ".txt", ".xml",
@@ -311,8 +319,11 @@ def load_nuclei(con):
         rel = str(f.relative_to(RAW))
         poc_rows.append((cid, "nuclei", str(f.relative_to(base)), rel, "template"))
         text = f.read_text(encoding="utf-8", errors="replace")
-        for n in CWE_RE.findall(text):
-            cwe_rows.add((cid, int(n), "nuclei"))
+        # Only the classification field: CWE ids elsewhere in a template are
+        # references or matcher text, not the template's weakness.
+        for line in re.findall(r"^\s*cwe-id:(.*)$", text, re.M):
+            for n in CWE_RE.findall(line):
+                cwe_rows.add((cid, int(n), "nuclei"))
         cm = re.search(r"cvss-metrics:\s*(\S+)", text)
         cs = re.search(r"cvss-score:\s*([\d.]+)", text)
         if cm or cs:
@@ -469,31 +480,33 @@ def link_exploitdb_ids(con):
 
 
 def load_trickest(con):
-    """trickest/cve: per-CVE markdown whose POC section lists exploit links.
+    """trickest/cve and 0xMarcio/cve: per-CVE markdown whose POC section lists exploit links.
 
     The section has two subsections and they are not equivalent: "Github" holds
     candidate PoC repositories, "Reference" holds advisory and write-up URLs that
     are usually not exploits. Tag them apart so a PoC count can exclude the
-    latter rather than inflating on advisory links.
+    latter rather than inflating on advisory links. Only the POC section is
+    read, so the file header's link to the CVE's own record is not a PoC.
     """
-    base = RAW / "trickest-cve"
-    if not base.exists():
-        print("trickest: not fetched, skipping")
-        return
-    rows = []
-    for f in base.rglob("CVE-*.md"):
-        cid = f.stem
-        _, sep, tail = f.read_text(encoding="utf-8", errors="replace").partition("### POC")
-        if not sep:
+    for source, dirname in POC_SECTIONED.items():
+        base = RAW / dirname
+        if not base.exists():
+            print(f"{source}: not fetched, skipping")
             continue
-        kind = None
-        for line in tail.splitlines():
-            line = line.strip()
-            if line.startswith("####"):
-                kind = line.lstrip("# ").strip().lower()
-            elif line.startswith("- http") and kind:
-                rows.append((cid, "trickest", line[2:].strip(), None, kind))
-    _poc(con, rows)
+        rows = []
+        for f in base.rglob("CVE-*.md"):
+            cid = f.stem
+            _, sep, tail = f.read_text(encoding="utf-8", errors="replace").partition("### POC")
+            if not sep:
+                continue
+            kind = None
+            for line in tail.splitlines():
+                line = line.strip()
+                if line.startswith("####"):
+                    kind = line.lstrip("# ").strip().lower()
+                elif line.startswith("- http") and kind:
+                    rows.append((cid, source, line[2:].strip(), None, kind))
+        _poc(con, rows)
 
 
 def load_vulhub(con):
@@ -621,7 +634,8 @@ def load_payloads(con):
             for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
                 s = line.strip()
                 if PAYLOAD_MIN <= len(s) <= PAYLOAD_MAX and not s.startswith("#"):
-                    rows.add((corpus, path, syn, s))
+                    # Every later measurement reads this value (premise A3).
+                    rows.add((corpus, path, syn, matchertext.canon(s)))
     con.executemany("INSERT OR IGNORE INTO payload VALUES(?,?,?,?)", sorted(rows))
     con.commit()
 

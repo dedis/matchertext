@@ -1,0 +1,1592 @@
+cve_id,description,injection,syntax,notes
+CVE-2025-39415,Cross-Site Request Forgery (CSRF) vulnerability in Jayesh Parejiya Social Media Links social-media-links allows Stored XSS.This issue affects Social Media Links: from n/a through <= 1.0.3.,yes,html_dom,
+CVE-2025-31403,Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection') vulnerability in shiptrack Booking Calendar and Notification booking-calendar-and-notification allows Blind SQL Injection.This issue affects Booking Calendar and Notification: from n/a through <= 4.0.3.,yes,sql,
+CVE-2021-47212,"In the Linux kernel, the following vulnerability has been resolved:
+
+net/mlx5: Update error handler for UCTX and UMEM
+
+In the fast unload flow, the device state is set to internal error,
+which indicates that the driver started the destroy process.
+In this case, when a destroy command is being executed, it should return
+MLX5_CMD_STAT_OK.
+Fix MLX5_CMD_OP_DESTROY_UCTX and MLX5_CMD_OP_DESTROY_UMEM to return OK
+instead of EIO.
+
+This fixes a call trace in the umem release process -
+[ 2633.536695] Call Trace:
+[ 2633.537518]  ib_uverbs_remove_one+0xc3/0x140 [ib_uverbs]
+[ 2633.538596]  remove_client_context+0x8b/0xd0 [ib_core]
+[ 2633.539641]  disable_device+0x8c/0x130 [ib_core]
+[ 2633.540615]  __ib_unregister_device+0x35/0xa0 [ib_core]
+[ 2633.541640]  ib_unregister_device+0x21/0x30 [ib_core]
+[ 2633.542663]  __mlx5_ib_remove+0x38/0x90 [mlx5_ib]
+[ 2633.543640]  auxiliary_bus_remove+0x1e/0x30 [auxiliary]
+[ 2633.544661]  device_release_driver_internal+0x103/0x1f0
+[ 2633.545679]  bus_remove_device+0xf7/0x170
+[ 2633.546640]  device_del+0x181/0x410
+[ 2633.547606]  mlx5_rescan_drivers_locked.part.10+0x63/0x160 [mlx5_core]
+[ 2633.548777]  mlx5_unregister_device+0x27/0x40 [mlx5_core]
+[ 2633.549841]  mlx5_uninit_one+0x21/0xc0 [mlx5_core]
+[ 2633.550864]  remove_one+0x69/0xe0 [mlx5_core]
+[ 2633.551819]  pci_device_remove+0x3b/0xc0
+[ 2633.552731]  device_release_driver_internal+0x103/0x1f0
+[ 2633.553746]  unbind_store+0xf6/0x130
+[ 2633.554657]  kernfs_fop_write+0x116/0x190
+[ 2633.555567]  vfs_write+0xa5/0x1a0
+[ 2633.556407]  ksys_write+0x4f/0xb0
+[ 2633.557233]  do_syscall_64+0x5b/0x1a0
+[ 2633.558071]  entry_SYSCALL_64_after_hwframe+0x65/0xca
+[ 2633.559018] RIP: 0033:0x7f9977132648
+[ 2633.559821] Code: 89 02 48 c7 c0 ff ff ff ff eb b3 0f 1f 80 00 00 00 00 f3 0f 1e fa 48 8d 05 55 6f 2d 00 8b 00 85 c0 75 17 b8 01 00 00 00 0f 05 <48> 3d 00 f0 ff ff 77 58 c3 0f 1f 80 00 00 00 00 41 54 49 89 d4 55
+[ 2633.562332] RSP: 002b:00007fffb1a83888 EFLAGS: 00000246 ORIG_RAX: 0000000000000001
+[ 2633.563472] RAX: ffffffffffffffda RBX: 000000000000000c RCX: 00007f9977132648
+[ 2633.564541] RDX: 000000000000000c RSI: 000055b90546e230 RDI: 0000000000000001
+[ 2633.565596] RBP: 000055b90546e230 R08: 00007f9977406860 R09: 00007f9977a54740
+[ 2633.566653] R10: 0000000000000000 R11: 0000000000000246 R12: 00007f99774056e0
+[ 2633.567692] R13: 000000000000000c R14: 00007f9977400880 R15: 000000000000000c
+[ 2633.568725] ---[ end trace 10b4fe52945e544d ]---",no,,
+CVE-2015-0296,"The pre-install script in texlive 3.1.20140525_r34255.fc21 as packaged in Fedora 21 and rpm, and texlive 6.20131226_r32488.fc20 and rpm allows local users to delete arbitrary files via a crafted file in the user's home directory.",no,,
+CVE-2024-36939,"In the Linux kernel, the following vulnerability has been resolved:
+
+nfs: Handle error of rpc_proc_register() in nfs_net_init().
+
+syzkaller reported a warning [0] triggered while destroying immature
+netns.
+
+rpc_proc_register() was called in init_nfs_fs(), but its error
+has been ignored since at least the initial commit 1da177e4c3f4
+(""Linux-2.6.12-rc2"").
+
+Recently, commit d47151b79e32 (""nfs: expose /proc/net/sunrpc/nfs
+in net namespaces"") converted the procfs to per-netns and made
+the problem more visible.
+
+Even when rpc_proc_register() fails, nfs_net_init() could succeed,
+and thus nfs_net_exit() will be called while destroying the netns.
+
+Then, remove_proc_entry() will be called for non-existing proc
+directory and trigger the warning below.
+
+Let's handle the error of rpc_proc_register() properly in nfs_net_init().
+
+[0]:
+name 'nfs'
+WARNING: CPU: 1 PID: 1710 at fs/proc/generic.c:711 remove_proc_entry+0x1bb/0x2d0 fs/proc/generic.c:711
+Modules linked in:
+CPU: 1 PID: 1710 Comm: syz-executor.2 Not tainted 6.8.0-12822-gcd51db110a7e #12
+Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS rel-1.16.0-0-gd239552ce722-prebuilt.qemu.org 04/01/2014
+RIP: 0010:remove_proc_entry+0x1bb/0x2d0 fs/proc/generic.c:711
+Code: 41 5d 41 5e c3 e8 85 09 b5 ff 48 c7 c7 88 58 64 86 e8 09 0e 71 02 e8 74 09 b5 ff 4c 89 e6 48 c7 c7 de 1b 80 84 e8 c5 ad 97 ff <0f> 0b eb b1 e8 5c 09 b5 ff 48 c7 c7 88 58 64 86 e8 e0 0d 71 02 eb
+RSP: 0018:ffffc9000c6d7ce0 EFLAGS: 00010286
+RAX: 0000000000000000 RBX: ffff8880422b8b00 RCX: ffffffff8110503c
+RDX: ffff888030652f00 RSI: ffffffff81105045 RDI: 0000000000000001
+RBP: 0000000000000000 R08: 0000000000000001 R09: 0000000000000000
+R10: 0000000000000001 R11: ffffffff81bb62cb R12: ffffffff84807ffc
+R13: ffff88804ad6fcc0 R14: ffffffff84807ffc R15: ffffffff85741ff8
+FS:  00007f30cfba8640(0000) GS:ffff88807dd00000(0000) knlGS:0000000000000000
+CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+CR2: 00007ff51afe8000 CR3: 000000005a60a005 CR4: 0000000000770ef0
+DR0: 0000000000000000 DR1: 0000000000000000 DR2: 0000000000000000
+DR3: 0000000000000000 DR6: 00000000fffe0ff0 DR7: 0000000000000400
+PKRU: 55555554
+Call Trace:
+ <TASK>
+ rpc_proc_unregister+0x64/0x70 net/sunrpc/stats.c:310
+ nfs_net_exit+0x1c/0x30 fs/nfs/inode.c:2438
+ ops_exit_list+0x62/0xb0 net/core/net_namespace.c:170
+ setup_net+0x46c/0x660 net/core/net_namespace.c:372
+ copy_net_ns+0x244/0x590 net/core/net_namespace.c:505
+ create_new_namespaces+0x2ed/0x770 kernel/nsproxy.c:110
+ unshare_nsproxy_namespaces+0xae/0x160 kernel/nsproxy.c:228
+ ksys_unshare+0x342/0x760 kernel/fork.c:3322
+ __do_sys_unshare kernel/fork.c:3393 [inline]
+ __se_sys_unshare kernel/fork.c:3391 [inline]
+ __x64_sys_unshare+0x1f/0x30 kernel/fork.c:3391
+ do_syscall_x64 arch/x86/entry/common.c:52 [inline]
+ do_syscall_64+0x4f/0x110 arch/x86/entry/common.c:83
+ entry_SYSCALL_64_after_hwframe+0x46/0x4e
+RIP: 0033:0x7f30d0febe5d
+Code: ff c3 66 2e 0f 1f 84 00 00 00 00 00 90 f3 0f 1e fa 48 89 f8 48 89 f7 48 89 d6 48 89 ca 4d 89 c2 4d 89 c8 4c 8b 4c 24 08 0f 05 <48> 3d 01 f0 ff ff 73 01 c3 48 8b 0d 73 9f 1b 00 f7 d8 64 89 01 48
+RSP: 002b:00007f30cfba7cc8 EFLAGS: 00000246 ORIG_RAX: 0000000000000110
+RAX: ffffffffffffffda RBX: 00000000004bbf80 RCX: 00007f30d0febe5d
+RDX: 0000000000000000 RSI: 0000000000000000 RDI: 000000006c020600
+RBP: 00000000004bbf80 R08: 0000000000000000 R09: 0000000000000000
+R10: 0000000000000000 R11: 0000000000000246 R12: 0000000000000002
+R13: 000000000000000b R14: 00007f30d104c530 R15: 0000000000000000
+ </TASK>",no,,
+CVE-2026-54231,"A content injection vulnerability was found in the ABRT post-create event handler scripts in libreport. The event script queries the systemd journal for log entries matching the crashed process and writes the results to files in the dump directory without sanitizing embedded control characters. A local user can inject arbitrary content into the journal output by embedding newline characters in syslog messages, controlling the content that root writes to dump directory files.",yes,other,newline injection into journal-derived dump files
+CVE-2022-31665,"VMware Workspace ONE Access, Identity Manager and vRealize Automation contain a remote code execution vulnerability. A malicious actor with administrator and network access can trigger a remote code execution.",no,,vague RCE; no injection stated
+CVE-2015-9401,The websimon-tables plugin through 1.3.4 for WordPress has wp-admin/tools.php edit_style id XSS.,yes,html_dom,
+CVE-2021-27493,Philips Vue PACS versions 12.2.x.x and prior does not ensure or incorrectly ensures structured messages or data are well formed and that certain security properties are met before being read from an upstream component or sent to a downstream component.,no,,
+CVE-2022-49124,"In the Linux kernel, the following vulnerability has been resolved:
+
+x86/mce: Work around an erratum on fast string copy instructions
+
+A rare kernel panic scenario can happen when the following conditions
+are met due to an erratum on fast string copy instructions:
+
+1) An uncorrected error.
+2) That error must be in first cache line of a page.
+3) Kernel must execute page_copy from the page immediately before that
+page.
+
+The fast string copy instructions (""REP; MOVS*"") could consume an
+uncorrectable memory error in the cache line _right after_ the desired
+region to copy and raise an MCE.
+
+Bit 0 of MSR_IA32_MISC_ENABLE can be cleared to disable fast string
+copy and will avoid such spurious machine checks. However, that is less
+preferable due to the permanent performance impact. Considering memory
+poison is rare, it's desirable to keep fast string copy enabled until an
+MCE is seen.
+
+Intel has confirmed the following:
+1. The CPU erratum of fast string copy only applies to Skylake,
+Cascade Lake and Cooper Lake generations.
+
+Directly return from the MCE handler:
+2. Will result in complete execution of the ""REP; MOVS*"" with no data
+loss or corruption.
+3. Will not result in another MCE firing on the next poisoned cache line
+due to ""REP; MOVS*"".
+4. Will resume execution from a correct point in code.
+5. Will result in the same instruction that triggered the MCE firing a
+second MCE immediately for any other software recoverable data fetch
+errors.
+6. Is not safe without disabling the fast string copy, as the next fast
+string copy of the same buffer on the same CPU would result in a PANIC
+MCE.
+
+This should mitigate the erratum completely with the only caveat that
+the fast string copy is disabled on the affected hyper thread thus
+performance degradation.
+
+This is still better than the OS crashing on MCEs raised on an
+irrelevant process due to ""REP; MOVS*' accesses in a kernel context,
+e.g., copy_page.
+
+
+Injected errors on 1st cache line of 8 anonymous pages of process
+'proc1' and observed MCE consumption from 'proc2' with no panic
+(directly returned).
+
+Without the fix, the host panicked within a few minutes on a
+random 'proc2' process due to kernel access from copy_page.
+
+  [ bp: Fix comment style + touch ups, zap an unlikely(), improve the
+    quirk function's readability. ]",no,,
+CVE-2004-1441,Cross-site scripting (XSS) vulnerability in icq.cgi in Board Power 2.04PF allows remote attackers to inject arbitrary web script or HTML via the action parameter.,yes,html_dom,
+CVE-2005-3818,"Multiple cross-site scripting (XSS) vulnerabilities in vTiger CRM 4.2 and earlier allow remote attackers to inject arbitrary web script or HTML via (1) various input fields, including the contact, lead, and first or last name fields, (2) the record parameter in a DetailView action in the Leads module for index.php, (3) the $_SERVER['PHP_SELF'] variable, which is used in multiple locations such as index.php, and (4) aggregated RSS feeds in the RSS aggregation module.",yes,html_dom,
+CVE-2017-17532,"examples/framework/news/news3.py in Kiwi 1.9.22 does not validate strings before launching the program specified by the BROWSER environment variable, which might allow remote attackers to conduct argument-injection attacks via a crafted URL.",yes,argument,
+CVE-2022-1842,"The OpenBook Book Data WordPress plugin through 3.5.2 does not have CSRF check in place when updating its settings, which could allow attackers to make a logged in admin change them via a CSRF attack and lead to Stored Cross-Site Scripting due to the lack of sanitisation and escaping as well",yes,html_dom,
+CVE-2025-21988,"In the Linux kernel, the following vulnerability has been resolved:
+
+fs/netfs/read_collect: add to next->prev_donated
+
+If multiple subrequests donate data to the same ""next"" request
+(depending on the subrequest completion order), each of them would
+overwrite the `prev_donated` field, causing data corruption and a
+BUG() crash (""Can't donate prior to front"").",no,,
+CVE-2025-13297,A security vulnerability has been detected in itsourcecode Web-Based Internet Laboratory Management System 1.0. The impacted element is an unknown function of the file /course/controller.php. Such manipulation leads to sql injection. The attack can be executed remotely. The exploit has been disclosed publicly and may be used.,yes,sql,
+CVE-2019-10795,undefsafe before 2.0.3 is vulnerable to Prototype Pollution. The 'a' function could be tricked into adding or modifying properties of Object.prototype using a __proto__ payload.,no,,prototype pollution
+CVE-2016-2980,The Sametime WebPlayer 8.5.2 and 9.0 is vulnerable to a script injection where a malicious site can inject their own script by exploiting a vulnerability in the way that the WebPlayer works. IBM X-Force ID: 113993.,yes,html_dom,script injection in WebPlayer; vector vague
+CVE-2014-8423,Unspecified vulnerability in the management portal in ARRIS VAP2500 before FW08.41 allows remote attackers to execute arbitrary commands via unknown vectors.,no,,command execution via unknown vectors; no injection stated
+CVE-2016-8615,"A flaw was found in curl before version 7.51. If cookie state is written into a cookie jar file that is later read back and used for subsequent requests, a malicious HTTP server can inject new cookies for arbitrary domains into said cookie jar.",yes,other,cookie jar file lines; injected cookie records
+CVE-2025-69330,Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting') vulnerability in Jthemes Prestige prestige allows Reflected XSS.This issue affects Prestige: from n/a through < 1.4.1.,yes,html_dom,
+CVE-2021-47228,"In the Linux kernel, the following vulnerability has been resolved:
+
+x86/ioremap: Map EFI-reserved memory as encrypted for SEV
+
+Some drivers require memory that is marked as EFI boot services
+data. In order for this memory to not be re-used by the kernel
+after ExitBootServices(), efi_mem_reserve() is used to preserve it
+by inserting a new EFI memory descriptor and marking it with the
+EFI_MEMORY_RUNTIME attribute.
+
+Under SEV, memory marked with the EFI_MEMORY_RUNTIME attribute needs to
+be mapped encrypted by Linux, otherwise the kernel might crash at boot
+like below:
+
+  EFI Variables Facility v0.08 2004-May-17
+  general protection fault, probably for non-canonical address 0x3597688770a868b2: 0000 [#1] SMP NOPTI
+  CPU: 13 PID: 1 Comm: swapper/0 Not tainted 5.12.4-2-default #1 openSUSE Tumbleweed
+  Hardware name: QEMU Standard PC (Q35 + ICH9, 2009), BIOS 0.0.0 02/06/2015
+  RIP: 0010:efi_mokvar_entry_next
+  [...]
+  Call Trace:
+   efi_mokvar_sysfs_init
+   ? efi_mokvar_table_init
+   do_one_initcall
+   ? __kmalloc
+   kernel_init_freeable
+   ? rest_init
+   kernel_init
+   ret_from_fork
+
+Expand the __ioremap_check_other() function to additionally check for
+this other type of boot data reserved at runtime and indicate that it
+should be mapped encrypted for an SEV guest.
+
+ [ bp: Massage commit message. ]",no,,
+CVE-2020-12442,"Ivanti Avalanche 6.3 allows a SQL injection that is vaguely associated with the Apache HTTP Server, aka Bug 683250.",yes,sql,
+CVE-2026-32759,"File Browser is a file managing interface for uploading, deleting, previewing, renaming, and editing files within a specified directory. In versions on the 2.x branch prior to 2.33.8, the TUS resumable upload handler parses the Upload-Length header as a signed 64-bit integer without validating that the value is non-negative, allowing an authenticated user to supply a negative value that instantly satisfies the upload completion condition upon the first PATCH request. This causes the server to fire after_upload exec hooks with empty or partial files, enabling an attacker to repeatedly trigger any configured hook with arbitrary filenames and zero bytes written. The impact ranges from DoS through expensive processing hooks, to command injection amplification when combined with malicious filenames, to abuse of upload-driven workflows like S3 ingestion or database inserts. Even without exec hooks enabled, the negative Upload-Length creates inconsistent cache entries where files are marked complete but contain no data. All deployments using the TUS upload endpoint (/api/tus) are affected, with the enableExec flag escalating the impact from cache inconsistency to remote command execution. This feature has been disabled by default for all installations from v2.33.8 onwards, including for existent installations. To exploit this vulnerability, the instance administrator must turn on a feature and ignore all the warnings about known vulnerabilities.",no,,root cause is negative Upload-Length; command injection only when combined
+CVE-2026-62910,Improper control of resource identifiers ('resource injection') in Microsoft Exchange Server allows an authorized attacker to elevate privileges over a network.,no,,resource injection
+CVE-2025-24962,reNgine is an automated reconnaissance framework for web applications. In affected versions a user can inject commands via the nmap_cmd parameters. This issue has been addressed in commit `c28e5c8d` and is expected in the next versioned release. Users are advised to filter user input and monitor the project for a new release.,yes,shell_command,
+CVE-2006-4599,SQL injection vulnerability in aut_verifica.inc.php in Autentificator 2.01 allows remote attackers to execute arbitrary SQL commands via the user parameter.,yes,sql,
+CVE-2019-6800,"In TitanHQ SpamTitan through 7.03, a vulnerability exists in the spam rule update function. Updates are downloaded over HTTP, including scripts which are subsequently executed with root permissions. An attacker with a privileged network position is trivially able to inject arbitrary commands.",no,,unsigned update scripts over HTTP; integrity flaw
+CVE-2022-3643,"Guests can trigger NIC interface reset/abort/crash via netback It is possible for a guest to trigger a NIC interface reset/abort/crash in a Linux based network backend by sending certain kinds of packets. It appears to be an (unwritten?) assumption in the rest of the Linux network stack that packet protocol headers are all contained within the linear section of the SKB and some NICs behave badly if this is not the case. This has been reported to occur with Cisco (enic) and Broadcom NetXtrem II BCM5780 (bnx2x) though it may be an issue with other NICs/drivers as well. In case the frontend is sending requests with split headers, netback will forward those violating above mentioned assumption to the networking core, resulting in said misbehavior.",no,,
+CVE-2017-17531,"gozilla.c in GNU GLOBAL 4.8.6 does not validate strings before launching the program specified by the BROWSER environment variable, which might allow remote attackers to conduct argument-injection attacks via a crafted URL.",yes,argument,
+CVE-2008-2500,Cross-site scripting (XSS) vulnerability in the MOStlyContent Editor (MOStlyCE) component before 3.0 for Mambo allows remote attackers to inject arbitrary web script or HTML via unspecified vectors.,yes,html_dom,
+CVE-2023-38609,An injection issue was addressed with improved input validation. This issue is fixed in macOS Ventura 13.5. An app may be able to bypass certain Privacy preferences.,yes,unclear,Apple wording; vector not stated
+CVE-2006-3397,"Multiple cross-site scripting (XSS) vulnerabilities in Taskjitsu before 2.0.1 allow remote attackers to inject arbitrary web script or HTML via multiple unspecified parameters, including the (1) title and (2) description parameters when creating a task.",yes,html_dom,
+CVE-2005-2215,"Cross-site scripting (XSS) vulnerability in MediaWiki before 1.4.x before 1.4.6 and 1.5 before 1.5beta3 allows remote attackers to inject arbitrary web script or HTML via a parameter in the page move template, a different vulnerability than CVE-2005-1888.",yes,html_dom,
+CVE-2018-6890,"Cross-site scripting (XSS) vulnerability in Wolf CMS 0.8.3.1 via the page editing feature, as demonstrated by /?/admin/page/edit/3.",yes,html_dom,
+CVE-2016-10131,system/libraries/Email.php in CodeIgniter before 3.1.3 allows remote attackers to execute arbitrary code by leveraging control over the email->from field to insert sendmail command-line arguments.,yes,argument,
+CVE-2026-92554,"The ShopLentor – All-in-One WooCommerce Growth & Store Enhancement Plugin plugin for WordPress is vulnerable to Reflected Cross-Site Scripting via Query-String Parameter Name in all versions up to, and including, 3.5.1 due to insufficient input sanitization and output escaping. This makes it possible for unauthenticated attackers to inject arbitrary web scripts in pages that execute if they can successfully trick a user into performing an action such as clicking on a link. The vulnerability is triggered via the WL: Product Horizontal Filter widget, which reflects attacker-supplied query-string parameter names from the current URL into option element value attributes without escaping, allowing payload breakout from the value=""..."" attribute context.",yes,html_dom,
+CVE-2023-29524,"XWiki Platform is a generic wiki platform offering runtime services for applications built on top of it. It's possible to execute anything with the right of the Scheduler Application sheet page. A user without script or programming rights, edit your user profile with the object editor and add a new object of type XWiki.SchedulerJobClass, In ""Job Script"", groovy code can be added and will be executed in the server context on viewing. This has been patched in XWiki 14.10.3 and 15.0 RC1. Users are advised to upgrade. There are no known workarounds for this issue.",yes,code_eval,whole Groovy script; missing script-right check
+CVE-2025-61196,An issue in BusinessNext CRMnext v.10.8.3.0 allows a remote attacker to execute arbitrary code via the comments input parameter.,yes,unclear,arbitrary code via comments; language not stated
+CVE-2024-29896,"Astro-Shield is a library to compute the subresource integrity hashes for your JS scripts and CSS stylesheets. When automated CSP headers generation for SSR content is enabled and the web application serves content that can be partially controlled by external users, then it is possible that the CSP headers generation feature might be ""allow-listing"" malicious injected resources like inlined JS, or references to external malicious scripts. The fix is available in version 1.3.0.",no,,CSP generator allow-lists injected scripts; not itself injection
+CVE-2024-46986,Camaleon CMS is a dynamic and advanced content management system based on Ruby on Rails. An arbitrary file write vulnerability accessible via the upload method of the MediaController allows authenticated users to write arbitrary files to any location on the web server Camaleon CMS is running on (depending on the permissions of the underlying filesystem). E.g. This can lead to a delayed remote code execution in case an attacker is able to write a Ruby file into the config/initializers/ subfolder of the Ruby on Rails application. This issue has been addressed in release version 2.8.2. Users are advised to upgrade. There are no known workarounds for this vulnerability.,no,,
+CVE-2020-25849,"MailGates and MailAudit products contain Command Injection flaw, which can be used to inject and execute system commands from the cgi parameter after attackers obtain the user’s access token.",yes,shell_command,
+CVE-2022-21724,"pgjdbc is the offical PostgreSQL JDBC Driver. A security hole was found in the jdbc driver for postgresql database while doing security research. The system using the postgresql library will be attacked when attacker control the jdbc url or properties. pgjdbc instantiates plugin instances based on class names provided via `authenticationPluginClassName`, `sslhostnameverifier`, `socketFactory`, `sslfactory`, `sslpasswordcallback` connection properties. However, the driver did not verify if the class implements the expected interface before instantiating the class. This can lead to code execution loaded via arbitrary classes. Users using plugins are advised to upgrade. There are no known workarounds for this issue.",no,,unsafe class instantiation from connection properties
+CVE-2024-38637,"In the Linux kernel, the following vulnerability has been resolved:
+
+greybus: lights: check return of get_channel_from_mode
+
+If channel for the given node is not found we return null from
+get_channel_from_mode. Make sure we validate the return pointer
+before using it in two of the missing places.
+
+This was originally reported in [0]:
+Found by Linux Verification Center (linuxtesting.org) with SVACE.
+
+[0] https://lore.kernel.org/all/20240301190425.120605-1-m.lobanov@rosalinux.ru",no,,
+CVE-2022-36302,"File path manipulation vulnerability in BF-OS version 3.00 up to and including 3.83 allows an attacker to modify the file path to access different resources, which may contain sensitive information.",no,,
+CVE-2002-1053,"Cross-site scripting (XSS) vulnerability in W3C Jigsaw Proxy Server before 2.2.1 allows remote attackers to execute arbitrary script via a URL that contains a reference to a nonexistent host followed by the script, which is included in the resulting error message.",yes,html_dom,
+CVE-2024-27437,"In the Linux kernel, the following vulnerability has been resolved:
+
+vfio/pci: Disable auto-enable of exclusive INTx IRQ
+
+Currently for devices requiring masking at the irqchip for INTx, ie.
+devices without DisINTx support, the IRQ is enabled in request_irq()
+and subsequently disabled as necessary to align with the masked status
+flag.  This presents a window where the interrupt could fire between
+these events, resulting in the IRQ incrementing the disable depth twice.
+This would be unrecoverable for a user since the masked flag prevents
+nested enables through vfio.
+
+Instead, invert the logic using IRQF_NO_AUTOEN such that exclusive INTx
+is never auto-enabled, then unmask as required.",no,,
+CVE-2026-71901,"Improper Control of Resource Identifiers ('Resource Injection') vulnerability in Apache OFBiz.
+
+
+
+An authenticate user with access to sfa component can override the service to use on vcard import and access to other service.
+
+
+
+This issue affects Apache OFBiz: before 24.09.08.
+
+
+
+Users are recommended to upgrade to version 24.09.08, which fixes the issue.",no,,resource injection
+CVE-2026-118581,"A BSON encoding component of the MongoDB Java Driver does not verify that an externally supplied raw document's self-declared length agrees with the extent of the byte range it is given before that range is copied into an outgoing database command. An application that wraps untrusted raw bytes in such a document and uses it as part of a command can therefore emit a structurally inconsistent message, causing the database to interpret attacker-supplied trailing content as additional fields of the surrounding command. No authentication to the driver or database is required beyond the ability to influence those bytes through the victim application, and no user interaction is needed. The result is unintended modification of the command actually executed, which can alter the data read or written under the application's credentials.",yes,other,BSON length mismatch; trailing bytes become command fields
+CVE-2022-1946,"The Gallery WordPress plugin before 2.0.0 does not sanitise and escape a parameter before outputting it back in the response of an AJAX action (available to both unauthenticated and authenticated users), leading to a Reflected Cross-Site Scripting issue",yes,html_dom,
+CVE-2026-112308,"crewai-tools through 1.15.28 contains a server-side request forgery vulnerability in SeleniumScrapingTool that allows attackers to fetch internal resources because it never applies the validate_url private-address check. Attackers influencing agent tool input through prompt injection can direct headless Chrome to loopback, RFC1918, or cloud metadata addresses to disclose internal data and cloud credentials.",no,,SSRF; prompt injection only as delivery
+CVE-2023-5512,"An issue has been discovered in GitLab CE/EE affecting all versions from 16.3 before 16.4.4, all versions starting from 16.5 before 16.5.4, all versions starting from 16.6 before 16.6.2. File integrity may be compromised when specific HTML encoding is used for file names leading for incorrect representation in the UI.",yes,html_dom,HTML entity in file name changes UI rendering
+CVE-2024-40940,"In the Linux kernel, the following vulnerability has been resolved:
+
+net/mlx5: Fix tainted pointer delete is case of flow rules creation fail
+
+In case of flow rule creation fail in mlx5_lag_create_port_sel_table(),
+instead of previously created rules, the tainted pointer is deleted
+deveral times.
+Fix this bug by using correct flow rules pointers.
+
+Found by Linux Verification Center (linuxtesting.org) with SVACE.",no,,
+CVE-2025-21842,"In the Linux kernel, the following vulnerability has been resolved:
+
+amdkfd: properly free gang_ctx_bo when failed to init user queue
+
+The destructor of a gtt bo is declared as
+void amdgpu_amdkfd_free_gtt_mem(struct amdgpu_device *adev, void **mem_obj);
+Which takes void** as the second parameter.
+
+GCC allows passing void* to the function because void* can be implicitly
+casted to any other types, so it can pass compiling.
+
+However, passing this void* parameter into the function's
+execution process(which expects void** and dereferencing void**)
+will result in errors.",no,,
+CVE-2021-0551,"In bind of MediaControlPanel.java, there is a possible way to lock up the system UI using a malicious media file due to improper input validation. This could lead to remote denial of service with no additional execution privileges needed. User interaction is needed for exploitation.Product: AndroidVersions: Android-11Android ID: A-180518039",no,,
+CVE-2024-13825,"The Email Keep WordPress plugin through 1.1 does not sanitise and escape a parameter before outputting it back in the page, leading to a Reflected Cross-Site Scripting which could be used against high privilege users such as admin.",yes,html_dom,
+CVE-2002-1070,Cross-site scripting vulnerability in PHPWiki Postnuke wiki module allows remote attackers to execute script as other PHPWiki users via the pagename parameter.,yes,html_dom,
+CVE-2019-8135,"A remote code execution vulnerability exists in Magento 2.2 prior to 2.2.10, Magento 2.3 prior to 2.3.3 or 2.3.2-p1. Dependency injection through Symphony framework allows service identifiers to be derived from user controlled data, which can lead to remote code execution.",no,,service identifier from user data; unsafe reflection
+CVE-2026-87701,Improper neutralization of special elements in output used by a downstream component ('injection') in Azure Cosmos DB allows an authorized attacker to elevate privileges over a network.,yes,unclear,
+CVE-2014-2598,Cross-site request forgery (CSRF) vulnerability in the Quick Page/Post Redirect plugin before 5.0.5 for WordPress allows remote attackers to hijack the authentication of administrators for requests that conduct cross-site scripting (XSS) attacks via the quickppr_redirects[request][] parameter in the redirect-updates page to wp-admin/admin.php.,yes,html_dom,
+CVE-2015-2704,realmd allows remote attackers to inject arbitrary configurations in to sssd.conf and smb.conf via a newline character in an LDAP response.,yes,other,newline into sssd.conf and smb.conf
+CVE-2018-7829,An Improper Neutralization of Special Elements in Query vulnerability exists in the 1st Gen. Pelco Sarix Enhanced Camera and Spectra Enhanced PTZ Camera which allows an attacker to execute arbitrary system commands.,yes,shell_command,
+CVE-2017-17451,The WP Mailster plugin before 1.5.5 for WordPress has XSS in the unsubscribe handler via the mes parameter to view/subscription/unsubscribe2.php.,yes,html_dom,
+CVE-2023-44109,Clone vulnerability in the huks ta module.Successful exploitation of this vulnerability may affect service confidentiality.,no,,
+CVE-2006-5104,SQL injection vulnerability in global.php in Jelsoft vBulletin 2.x allows remote attackers to execute arbitrary SQL commands via the templatesused parameter.,yes,sql,
+CVE-2011-3624,"Various methods in WEBrick::HTTPRequest in Ruby 1.9.2 and 1.8.7 and earlier do not validate the X-Forwarded-For, X-Forwarded-Host and X-Forwarded-Server headers in requests, which might allow remote attackers to inject arbitrary text into log files or bypass intended address parsing via a crafted header.",yes,other,log injection
+CVE-2022-48629,"In the Linux kernel, the following vulnerability has been resolved:
+
+crypto: qcom-rng - ensure buffer for generate is completely filled
+
+The generate function in struct rng_alg expects that the destination
+buffer is completely filled if the function returns 0. qcom_rng_read()
+can run into a situation where the buffer is partially filled with
+randomness and the remaining part of the buffer is zeroed since
+qcom_rng_generate() doesn't check the return value. This issue can
+be reproduced by running the following from libkcapi:
+
+    kcapi-rng -b 9000000 > OUTFILE
+
+The generated OUTFILE will have three huge sections that contain all
+zeros, and this is caused by the code where the test
+'val & PRNG_STATUS_DATA_AVAIL' fails.
+
+Let's fix this issue by ensuring that qcom_rng_read() always returns
+with a full buffer if the function returns success. Let's also have
+qcom_rng_generate() return the correct value.
+
+Here's some statistics from the ent project
+(https://www.fourmilab.ch/random/) that shows information about the
+quality of the generated numbers:
+
+    $ ent -c qcom-random-before
+    Value Char Occurrences Fraction
+      0           606748   0.067416
+      1            33104   0.003678
+      2            33001   0.003667
+    ...
+    253   �        32883   0.003654
+    254   �        33035   0.003671
+    255   �        33239   0.003693
+
+    Total:       9000000   1.000000
+
+    Entropy = 7.811590 bits per byte.
+
+    Optimum compression would reduce the size
+    of this 9000000 byte file by 2 percent.
+
+    Chi square distribution for 9000000 samples is 9329962.81, and
+    randomly would exceed this value less than 0.01 percent of the
+    times.
+
+    Arithmetic mean value of data bytes is 119.3731 (127.5 = random).
+    Monte Carlo value for Pi is 3.197293333 (error 1.77 percent).
+    Serial correlation coefficient is 0.159130 (totally uncorrelated =
+    0.0).
+
+Without this patch, the results of the chi-square test is 0.01%, and
+the numbers are certainly not random according to ent's project page.
+The results improve with this patch:
+
+    $ ent -c qcom-random-after
+    Value Char Occurrences Fraction
+      0            35432   0.003937
+      1            35127   0.003903
+      2            35424   0.003936
+    ...
+    253   �        35201   0.003911
+    254   �        34835   0.003871
+    255   �        35368   0.003930
+
+    Total:       9000000   1.000000
+
+    Entropy = 7.999979 bits per byte.
+
+    Optimum compression would reduce the size
+    of this 9000000 byte file by 0 percent.
+
+    Chi square distribution for 9000000 samples is 258.77, and randomly
+    would exceed this value 42.24 percent of the times.
+
+    Arithmetic mean value of data bytes is 127.5006 (127.5 = random).
+    Monte Carlo value for Pi is 3.141277333 (error 0.01 percent).
+    Serial correlation coefficient is 0.000468 (totally uncorrelated =
+    0.0).
+
+This change was tested on a Nexus 5 phone (msm8974 SoC).",no,,
+CVE-2012-2399,"Cross-site scripting (XSS) vulnerability in swfupload.swf in SWFupload 2.2.0.1 and earlier, as used in WordPress before 3.5.2, TinyMCE Image Manager 1.1 and earlier, and other products allows remote attackers to inject arbitrary web script or HTML via the buttonText parameter, a different vulnerability than CVE-2012-3414.",yes,html_dom,
+CVE-2026-85113,"The GiveWP WordPress plugin before 4.16.9 does not remove shortcode delimiters from donor-supplied values before rendering them on public pages, and the shortcode stripping it applies can be defeated by nesting, allowing unauthenticated users to execute arbitrary shortcodes registered on the site.",yes,template,
+CVE-2024-42317,"In the Linux kernel, the following vulnerability has been resolved:
+
+mm/huge_memory: avoid PMD-size page cache if needed
+
+xarray can't support arbitrary page cache size.  the largest and supported
+page cache size is defined as MAX_PAGECACHE_ORDER by commit 099d90642a71
+(""mm/filemap: make MAX_PAGECACHE_ORDER acceptable to xarray"").  However,
+it's possible to have 512MB page cache in the huge memory's collapsing
+path on ARM64 system whose base page size is 64KB.  512MB page cache is
+breaking the limitation and a warning is raised when the xarray entry is
+split as shown in the following example.
+
+[root@dhcp-10-26-1-207 ~]# cat /proc/1/smaps | grep KernelPageSize
+KernelPageSize:       64 kB
+[root@dhcp-10-26-1-207 ~]# cat /tmp/test.c
+   :
+int main(int argc, char **argv)
+{
+	const char *filename = TEST_XFS_FILENAME;
+	int fd = 0;
+	void *buf = (void *)-1, *p;
+	int pgsize = getpagesize();
+	int ret = 0;
+
+	if (pgsize != 0x10000) {
+		fprintf(stdout, ""System with 64KB base page size is required!\n"");
+		return -EPERM;
+	}
+
+	system(""echo 0 > /sys/devices/virtual/bdi/253:0/read_ahead_kb"");
+	system(""echo 1 > /proc/sys/vm/drop_caches"");
+
+	/* Open the xfs file */
+	fd = open(filename, O_RDONLY);
+	assert(fd > 0);
+
+	/* Create VMA */
+	buf = mmap(NULL, TEST_MEM_SIZE, PROT_READ, MAP_SHARED, fd, 0);
+	assert(buf != (void *)-1);
+	fprintf(stdout, ""mapped buffer at 0x%p\n"", buf);
+
+	/* Populate VMA */
+	ret = madvise(buf, TEST_MEM_SIZE, MADV_NOHUGEPAGE);
+	assert(ret == 0);
+	ret = madvise(buf, TEST_MEM_SIZE, MADV_POPULATE_READ);
+	assert(ret == 0);
+
+	/* Collapse VMA */
+	ret = madvise(buf, TEST_MEM_SIZE, MADV_HUGEPAGE);
+	assert(ret == 0);
+	ret = madvise(buf, TEST_MEM_SIZE, MADV_COLLAPSE);
+	if (ret) {
+		fprintf(stdout, ""Error %d to madvise(MADV_COLLAPSE)\n"", errno);
+		goto out;
+	}
+
+	/* Split xarray entry. Write permission is needed */
+	munmap(buf, TEST_MEM_SIZE);
+	buf = (void *)-1;
+	close(fd);
+	fd = open(filename, O_RDWR);
+	assert(fd > 0);
+	fallocate(fd, FALLOC_FL_KEEP_SIZE | FALLOC_FL_PUNCH_HOLE,
+ 		  TEST_MEM_SIZE - pgsize, pgsize);
+out:
+	if (buf != (void *)-1)
+		munmap(buf, TEST_MEM_SIZE);
+	if (fd > 0)
+		close(fd);
+
+	return ret;
+}
+
+[root@dhcp-10-26-1-207 ~]# gcc /tmp/test.c -o /tmp/test
+[root@dhcp-10-26-1-207 ~]# /tmp/test
+ ------------[ cut here ]------------
+ WARNING: CPU: 25 PID: 7560 at lib/xarray.c:1025 xas_split_alloc+0xf8/0x128
+ Modules linked in: nft_fib_inet nft_fib_ipv4 nft_fib_ipv6 nft_fib    \
+ nft_reject_inet nf_reject_ipv4 nf_reject_ipv6 nft_reject nft_ct      \
+ nft_chain_nat nf_nat nf_conntrack nf_defrag_ipv6 nf_defrag_ipv4      \
+ ip_set rfkill nf_tables nfnetlink vfat fat virtio_balloon drm fuse   \
+ xfs libcrc32c crct10dif_ce ghash_ce sha2_ce sha256_arm64 virtio_net  \
+ sha1_ce net_failover virtio_blk virtio_console failover dimlib virtio_mmio
+ CPU: 25 PID: 7560 Comm: test Kdump: loaded Not tainted 6.10.0-rc7-gavin+ #9
+ Hardware name: QEMU KVM Virtual Machine, BIOS edk2-20240524-1.el9 05/24/2024
+ pstate: 83400005 (Nzcv daif +PAN -UAO +TCO +DIT -SSBS BTYPE=--)
+ pc : xas_split_alloc+0xf8/0x128
+ lr : split_huge_page_to_list_to_order+0x1c4/0x780
+ sp : ffff8000ac32f660
+ x29: ffff8000ac32f660 x28: ffff0000e0969eb0 x27: ffff8000ac32f6c0
+ x26: 0000000000000c40 x25: ffff0000e0969eb0 x24: 000000000000000d
+ x23: ffff8000ac32f6c0 x22: ffffffdfc0700000 x21: 0000000000000000
+ x20: 0000000000000000 x19: ffffffdfc0700000 x18: 0000000000000000
+ x17: 0000000000000000 x16: ffffd5f3708ffc70 x15: 0000000000000000
+ x14: 0000000000000000 x13: 0000000000000000 x12: 0000000000000000
+ x11: ffffffffffffffc0 x10: 0000000000000040 x9 : ffffd5f3708e692c
+ x8 : 0000000000000003 x7 : 0000000000000000 x6 : ffff0000e0969eb8
+ x5 : ffffd5f37289e378 x4 : 0000000000000000 x3 : 0000000000000c40
+ x2 : 000000000000000d x1 : 000000000000000c x0 : 0000000000000000
+ Call trace:
+  xas_split_alloc+0xf8/0x128
+  split_huge_page_to_list_to_order+0x1c4/0x780
+  truncate_inode_partial_folio+0xdc/0x160
+  truncate_inode_pages_range+0x1b4/0x4a8
+  truncate_pagecache_range+0x84/0xa
+---truncated---",no,,
+CVE-2025-15353,A vulnerability was detected in itsourcecode Society Management System 1.0. Impacted is the function edit_admin_query of the file /admin/edit_admin_query.php. Performing manipulation of the argument Username results in sql injection. It is possible to initiate the attack remotely. The exploit is now public and may be used.,yes,sql,
+CVE-2013-2678,Cisco Linksys E4200 1.0.05 Build 7 routers contain a Local File Include Vulnerability which could allow remote attackers to obtain sensitive information or execute arbitrary code by sending a crafted URL request to the apply.cgi script using the submit_type parameter.,no,,local file inclusion
+CVE-2025-9953,"Authorization Bypass Through User-Controlled SQL Primary Key vulnerability in DATABASE Software Training Consulting Ltd. Databank Accreditation Software allows SQL Injection.
+
+This issue affects Databank Accreditation Software: before 2026/04.",yes,sql,
+CVE-2006-3025,Cross-site scripting (XSS) vulnerability in Cal.PHP3 in Chris Lea Lucid Calendar 0.22 allows remote attackers to inject arbitrary web script or HTML via unspecified parameters.  NOTE: the provenance of this information is unknown; the details are obtained from third party information.,yes,html_dom,
+CVE-2020-35609,A denial-of-service vulnerability exists in the asynchronous ioctl functionality of Microsoft Azure Sphere 20.05. A sequence of specially crafted ioctl calls can cause a denial of service. An attacker can write shellcode to trigger this vulnerability.,no,,
+CVE-2014-10394,The rich-counter plugin before 1.2.0 for WordPress has JavaScript injection via a User-Agent header.,yes,html_dom,
+CVE-2026-9366,A vulnerability was found in NousResearch hermes-agent 2026.4.23. The impacted element is the function _scan_context_content of the file agent/prompt_builder.py. The manipulation results in injection. The attack may be performed from remote. The exploit has been made public and could be used. The vendor was contacted early about this disclosure but did not respond in any way.,yes,llm_prompt,prompt builder context injection
+CVE-2026-20272,"As part of Cisco's ongoing commitment to proactive security and product quality, the Cisco IOS XE Software engineering team has conducted a comprehensive internal security review. This review resulted in software hardening releases that address multiple internally discovered vulnerabilities.
+
+The vulnerabilities tracked by CVE-2026-20272 are related to issues with improper neutralization of special elements that are grouped under the Common Weakness Enumeration (CWE) Pillar CWE-74.",yes,unclear,
+CVE-2017-15879,CSV Injection (aka Excel Macro Injection or Formula Injection) exists in admin/server/api/download.js and lib/list/getCSVData.js in KeystoneJS before 4.0.0-beta.7 via a value that is mishandled in a CSV export.,yes,formula_csv,
+CVE-2017-12909,SQL injection vulnerability in modtask.php in NexusPHP 1.5 allows remote attackers to execute arbitrary SQL commands via the userid parameter.,yes,sql,
+CVE-2005-0343,SQL injection vulnerability in PerlDesk 1.x allows remote attackers to inject arbitrary SQL commands via the view parameter.,yes,sql,
+CVE-2026-57350,Unauthenticated Cross Site Scripting (XSS) in WP Debugging <= 2.12.2 versions.,yes,html_dom,
+CVE-2023-30547,"vm2 is a sandbox that can run untrusted code with whitelisted Node's built-in modules. There exists a vulnerability in exception sanitization of vm2 for versions up to 3.9.16, allowing attackers to raise an unsanitized host exception inside `handleException()` which can be used to escape the sandbox and run arbitrary code in host context. This vulnerability was patched in the release of version `3.9.17` of `vm2`. There are no known workarounds for this vulnerability. Users are advised to upgrade.",no,,sandbox escape
+CVE-2017-18583,The post-pay-counter plugin before 2.731 for WordPress has PHP Object Injection.,no,,PHP object injection is deserialization
+CVE-2026-114655,"libmongocrypt builds requests to external key management services (AWS, Azure and GCP) by inserting values from key vault documents, KMS provider configuration and KMS responses into request lines, headers and signed request bodies without validating or encoding them for each context. A user with write access to the key vault collection can alter the structure of these requests, including adding members to request bodies and token claims that the library then signs with the application's credentials. This may result in key management operations being performed with parameters the application did not intend.",yes,other,"HTTP request lines, headers, JSON bodies"
+CVE-2019-4075,IBM Sterling B2B Integrator Standard Edition 6.0.0.0 and 6.0.0.1 is vulnerable to cross-site scripting. This vulnerability allows users to embed arbitrary JavaScript code in the Web UI thus altering the intended functionality potentially leading to credentials disclosure within a trusted session. IBM X-Force ID: 157109.,yes,html_dom,
+CVE-2008-2886,"PHP remote file inclusion vulnerability in include/plugins/jrBrowser/purchase.php in Jamroom 3.3.0 through 3.3.5, when register_globals is enabled, allows remote attackers to execute arbitrary PHP code via a URL in the jamroom[jm_dir] parameter.",no,,remote file inclusion
+CVE-2026-16747,"The Kirki WordPress plugin before 6.2.1 does not properly authorise its front-end form submission REST routes and passes attacker-controlled input through shortcode execution, allowing unauthenticated users to run any shortcode registered on the site, which on a default install leads to disclosure of the site administrator's email address and an arbitrary-recipient mail relay from the victim's domain.",yes,template,
+CVE-2021-47317,"In the Linux kernel, the following vulnerability has been resolved:
+
+powerpc/bpf: Fix detecting BPF atomic instructions
+
+Commit 91c960b0056672 (""bpf: Rename BPF_XADD and prepare to encode other
+atomics in .imm"") converted BPF_XADD to BPF_ATOMIC and added a way to
+distinguish instructions based on the immediate field. Existing JIT
+implementations were updated to check for the immediate field and to
+reject programs utilizing anything more than BPF_ADD (such as BPF_FETCH)
+in the immediate field.
+
+However, the check added to powerpc64 JIT did not look at the correct
+BPF instruction. Due to this, such programs would be accepted and
+incorrectly JIT'ed resulting in soft lockups, as seen with the atomic
+bounds test. Fix this by looking at the correct immediate value.",no,,
+CVE-2020-6257,"SAP Business Objects Business Intelligence Platform (CMC and BI Launchpad) 4.2 does not sufficiently encode user-controlled inputs, resulting in Cross-Site Scripting vulnerability.",yes,html_dom,
+CVE-2024-58258,SugarCRM before 13.0.4 and 14.x before 14.0.1 allows SSRF in the API module because a limited type of code injection can occur.,yes,unclear,code injection; language not stated
+CVE-2020-1960,"A vulnerability in Apache Flink (1.1.0 to 1.1.5, 1.2.0 to 1.2.1, 1.3.0 to 1.3.3, 1.4.0 to 1.4.2, 1.5.0 to 1.5.6, 1.6.0 to 1.6.4, 1.7.0 to 1.7.2, 1.8.0 to 1.8.3, 1.9.0 to 1.9.2, 1.10.0) where, when running a process with an enabled JMXReporter, with a port configured via metrics.reporter.reporter_name>.port, an attacker with local access to the machine and JMX port can execute a man-in-the-middle attack using a specially crafted request to rebind the JMXRMI registry to one under the attacker's control. This compromises any connection established to the process via JMX, allowing extraction of credentials and any other transferred data.",no,,
+CVE-2024-38366,"trunk.cocoapods.org is the authentication server for the CoacoaPods dependency manager. The part of trunk which verifies whether a user has a real email address on signup used a rfc-822 library which executes a shell command to validate the email domain MX records validity. It works via an DNS MX. This lookup could be manipulated to also execute a command on the trunk server, effectively giving root access to the server and the infrastructure. This issue was patched server-side with commit 001cc3a430e75a16307f5fd6cdff1363ad2f40f3 in September 2023. This RCE triggered a full user-session reset, as an attacker could have used this method to write to any Podspec in trunk.",yes,shell_command,
+CVE-2026-25452,Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting') vulnerability in WPDO Remoji remoji allows Stored XSS.This issue affects Remoji: from n/a through <= 2.2.,yes,html_dom,
+CVE-2018-0657,"Cross-site scripting vulnerability in EC-CUBE Payment Module and GMO-PG Payment Module (PG Multi-Payment Service) for EC-CUBE (EC-CUBE Payment Module (2.12) version 3.5.23 and earlier, EC-CUBE Payment Module (2.11) version 2.3.17 and earlier, GMO-PG Payment Module (PG Multi-Payment Service) (2.12) version 3.5.23 and earlier, and GMO-PG Payment Module (PG Multi-Payment Service) (2.11) version 2.3.17 and earlier) allow an attacker with administrator rights to inject arbitrary web script or HTML via unspecified vectors.",yes,html_dom,
+CVE-2007-4482,Cross-site scripting (XSS) vulnerability in index.php in the Pool 1.0.7 theme for WordPress allows remote attackers to inject arbitrary web script or HTML via the PATH_INFO (PHP_SELF).,yes,html_dom,
+CVE-2005-1443,"Multiple cross-site scripting (XSS) vulnerabilities in index.php for Invision Power Board (IPB) 2.0.3 and 2.1 Alpha 2 allows remote attackers to inject arbitrary web script or HTML via the (1) act, (2) Members, (3) calendar, or (4) HID parameters.",yes,html_dom,
+CVE-2026-91937,Flowise before 3.1.4 fails to sanitize the overrideConfig.sessionId parameter before using it in MongoDB queries within the MongoDBMemory node. Unauthenticated attackers can submit MongoDB operator objects through the prediction API to read chat history records belonging to other users from the shared collection.,yes,nosql,
+CVE-2007-1624,"Multiple SQL injection vulnerabilities in realGuestbook 5.01 allow remote attackers to execute arbitrary SQL commands via the (1) name, (2) email, (3) homepage, and (4) text parameters to save_entry.php, as reachable through add_entry.php; and possibly other unspecified parameters and files.  NOTE: the provenance of this information is unknown; the details are obtained solely from third party information.",yes,sql,
+CVE-2025-3855,A vulnerability was found in CodeCanyon RISE Ultimate Project Manager 3.8.2 and classified as problematic. Affected by this issue is some unknown functionality of the file /index.php/team_members/save_profile_image/ of the component Profile Picture Handler. The manipulation of the argument profile_image_file leads to improper control of resource identifiers. The attack may be launched remotely. The exploit has been disclosed to the public and may be used.,no,,resource identifiers
+CVE-2007-2904,"Cross-site scripting (XSS) vulnerability in Sun Java System Messaging Server 6.0 through 6.3, when Internet Explorer is used, allows remote attackers to inject arbitrary web script or HTML via unspecified vectors, possibly a related issue to CVE-2006-5653.",yes,html_dom,
+CVE-2011-4455,"Multiple cross-site scripting vulnerabilities in Tiki 7.2 and earlier allow remote attackers to inject arbitrary web script or HTML via the path info to (1) tiki-admin_system.php, (2) tiki-pagehistory.php, (3) tiki-removepage.php, or (4) tiki-rename_page.php.",yes,html_dom,
+CVE-2025-20265,"A vulnerability in the RADIUS subsystem implementation of Cisco Secure Firewall Management Center (FMC) Software could allow an unauthenticated, remote attacker to inject arbitrary shell commands that are executed by the device.&nbsp;
+
+This vulnerability is due to a lack of proper handling of user input during the authentication phase. An attacker could exploit this vulnerability by sending crafted input when entering credentials that will be authenticated at the configured RADIUS server. A successful exploit could allow the attacker to execute commands at a high&nbsp;privilege level.
+Note: For this vulnerability to be exploited, Cisco Secure FMC Software must be configured for RADIUS authentication for the web-based management interface, SSH management, or both.",yes,shell_command,
+CVE-2021-33040,managers/views/iframe.js in FuturePress EPub.js before 0.3.89 allows XSS.,yes,html_dom,
+CVE-2024-6470,A vulnerability was found in playSMS 1.4.3. It has been rated as problematic. Affected by this issue is some unknown functionality of the file /index.php?app=main&inc=feature_inboxgroup&op=list of the component Template Handler. The manipulation of the argument Receiver Number with the input {{`id`}} leads to injection. The attack may be launched remotely. The exploit has been disclosed to the public and may be used. VDB-270278 is the identifier assigned to this vulnerability. NOTE: The vendor was contacted early about this disclosure but did not respond in any way.,yes,template,
+CVE-2020-12873,"An issue was discovered in Alfresco Enterprise Content Management (ECM) before 6.2.1. A user with privileges to edit a FreeMarker template (e.g., a webscript) may execute arbitrary Java code or run arbitrary system commands with the same privileges as the account running Alfresco.",yes,template,whole template by privileged editor
+CVE-2005-1554,"SQL injection vulnerability in view_user.php in WowBB 1.6, 1.61, and 1.62 allows remote attackers to execute arbitrary SQL commands via the sort_by parameter.",yes,sql,
+CVE-2022-1472,"The Better Find and Replace WordPress plugin before 1.3.6 does not properly sanitise, validate and escape various parameters before using them in an SQL statement, leading to an SQL Injection",yes,sql,
+CVE-2026-125119,"Mongoose is a MongoDB object modeling tool designed to work in an asynchronous environment. From 6.0.0 until 6.13.12, 7.8.13, 8.24.7, and 9.11.4, Mongoose stores the connection-level sanitizeFilter option in Connection.config, but Query.prototype._castConditions() and query casting check other option locations and do not read that configuration. An application that enables sanitizeFilter through mongoose.connect() or createConnection() and passes an attacker-controlled object into a query filter therefore receives a connection that reports the defense as enabled while query selector objects remain unsanitized. A crafted password value using a query operator can match an account record without the expected literal password, while global configuration through mongoose.set('sanitizeFilter') and per-query Model.find().sanitizeFilter() remain unaffected. This issue is fixed in versions 6.13.12, 7.8.13, 8.24.7, and 9.11.4.",yes,nosql,
+CVE-2025-22268,Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting') vulnerability in Uncanny Owl Uncanny Toolkit for LearnDash uncanny-learndash-toolkit allows Stored XSS.This issue affects Uncanny Toolkit for LearnDash: from n/a through <= 3.7.0.1.,yes,html_dom,
+CVE-2025-27500,"OpenZiti is a free and open source project focused on bringing zero trust to any application. An endpoint(/api/upload) on the admin panel can be accessed without any form of authentication. This endpoint accepts an HTTP POST to upload a file which is then stored on the node and is available via URL. This can lead to a stored cross site scripting attack if the file uploaded contains malicious code and is then accessed and executed within the context of the user's browser. This function is no longer necessary as the ziti-console moves from a node server application to a single page application, and has been disabled. The vulnerability is fixed in 3.7.1.",yes,html_dom,whole uploaded file
+CVE-2026-40102,"Plane is an open-source project management tool. In versions 1.3.0 and below, SavedAnalyticEndpoint passes the user-controlled segment query parameter directly to a Django F() expression without validation (unlike the regular AnalyticsEndpoint, which checks against an allowlist), causing ORM Field Reference Injection. An authenticated workspace MEMBER can send GET /api/workspaces/<slug>/saved-analytic-view/<analytic_id>/ with a crafted segment value that is forwarded into build_graph_plot() and traverses foreign-key relationships (e.g. workspace__owner__password) before being projected via .values(""dimension"", ""segment""), returning the referenced field values directly in the JSON response. This exposes sensitive data such as bcrypt password hashes, API tokens, and related users' email addresses, making it a stronger primitive than the related order_by injection where values are only leaked through ordering. This issue has been fixed in version 1.3.1.",yes,other,Django ORM field path
+CVE-2014-3408,"Cross-site scripting (XSS) vulnerability in the web framework in Cisco Prime Optical 10 allows remote attackers to inject arbitrary web script or HTML via an unspecified parameter, aka Bug ID CSCuq80763.",yes,html_dom,
+CVE-2020-5230,"Opencast before 8.1 and 7.6 allows almost arbitrary identifiers for media packages and elements to be used. This can be problematic for operation and security since such identifiers are sometimes used for file system operations which may lead to an attacker being able to escape working directories and write files to other locations. In addition, Opencast's Id.toString(…) vs Id.compact(…) behavior, the latter trying to mitigate some of the file system problems, can cause errors due to identifier mismatch since an identifier may unintentionally change. This issue is fixed in Opencast 7.6 and 8.1.",no,,
+CVE-2024-50101,"In the Linux kernel, the following vulnerability has been resolved:
+
+iommu/vt-d: Fix incorrect pci_for_each_dma_alias() for non-PCI devices
+
+Previously, the domain_context_clear() function incorrectly called
+pci_for_each_dma_alias() to set up context entries for non-PCI devices.
+This could lead to kernel hangs or other unexpected behavior.
+
+Add a check to only call pci_for_each_dma_alias() for PCI devices. For
+non-PCI devices, domain_context_clear_one() is called directly.",no,,
+CVE-2026-20130,"As part of Cisco's ongoing commitment to proactive security and product quality, the Cisco Identity Services Engine (ISE) and Cisco ISE Passive Identity Connector (ISE-PIC), engineering teams have conducted a comprehensive internal security review. This review resulted in a software hardening release that addresses multiple internally discovered vulnerabilities.
+
+The vulnerabilities tracked by CVE-2026-20130 are related to improper neutralization of special elements issues that are grouped under the Common Weakness Enumeration (CWE) Pillar CWE-74.",yes,unclear,
+CVE-2019-3702,A Remote Code Execution issue in the DNS Query Web UI in Lifesize Icon LS_RM3_3.7.0 (2421) allows remote authenticated attackers to execute arbitrary commands via a crafted DNS Query address field in a JSON API request.,yes,shell_command,
+CVE-2026-0504,"Due to insufficient input handling, the SAP Identity Management REST interface allows an authenticated administrator to submit specially crafted malicious REST requests that are processed by JNDI operations without adequate input neutralization. This may lead to limited disclosure or modification of data, resulting in low impact on confidentiality and integrity, with no impact on application availability.",yes,other,JNDI
+CVE-2026-4516,A vulnerability was found in Foundation Agents MetaGPT up to 0.8.1. This vulnerability affects unknown code of the file metagpt/actions/di/write_analysis_code.py of the component DataInterpreter. The manipulation results in injection. It is possible to launch the attack remotely. The exploit has been made public and could be used. The vendor was contacted early about this disclosure but did not respond in any way.,yes,unclear,
+CVE-2026-45688,"Rocket.Chat is an open-source, secure, fully customizable communications platform. Prior to 8.5.0, 8.4.1, 8.3.3, 8.2.3, 8.1.4, 8.0.5, 7.13.7, and 7.10.11, Rocket.Chat's CAS login handler forwards the client-supplied options.cas.credentialToken value straight into a MongoDB findOne({_id: ...}) query without any runtime type check. TypeScript's string parameter annotation is erased at runtime, so an unauthenticated attacker can substitute a MongoDB query operator ({""$gt"": """"}, {""$ne"": null}, etc.) for what the server expects to be an opaque ticket string. The injected operator matches the first unexpired document in the credential_tokens collection, bypassing the CAS ticket check entirely. When any legitimate CAS or SAML SSO login is in flight, the attacker's next DDP login call matches the same credential-token row via the NoSQL operator and is issued a full Meteor auth token (userId + token) bound to the victim. The token is immediately usable against the complete REST and DDP surface as that user. If the victim is an administrator, this escalates to full instance compromise via Apps-Engine app install. This vulnerability is fixed in 8.5.0, 8.4.1, 8.3.3, 8.2.3, 8.1.4, 8.0.5, 7.13.7, and 7.10.11.",yes,nosql,
+CVE-2024-38579,"In the Linux kernel, the following vulnerability has been resolved:
+
+crypto: bcm - Fix pointer arithmetic
+
+In spu2_dump_omd() value of ptr is increased by ciph_key_len
+instead of hash_iv_len which could lead to going beyond the
+buffer boundaries.
+Fix this bug by changing ciph_key_len to hash_iv_len.
+
+Found by Linux Verification Center (linuxtesting.org) with SVACE.",no,,
+CVE-2021-47368,"In the Linux kernel, the following vulnerability has been resolved:
+
+enetc: Fix illegal access when reading affinity_hint
+
+irq_set_affinity_hit() stores a reference to the cpumask_t
+parameter in the irq descriptor, and that reference can be
+accessed later from irq_affinity_hint_proc_show(). Since
+the cpu_mask parameter passed to irq_set_affinity_hit() has
+only temporary storage (it's on the stack memory), later
+accesses to it are illegal. Thus reads from the corresponding
+procfs affinity_hint file can result in paging request oops.
+
+The issue is fixed by the get_cpu_mask() helper, which provides
+a permanent storage for the cpumask_t parameter.",no,,
+CVE-2002-1480,"Cross-site scripting (XSS) vulnerability in phpGB before 1.20 allows remote attackers to inject arbitrary HTML or script into guestbook pages, which is executed when the administrator deletes the entry.",yes,html_dom,
+CVE-2020-36530,A vulnerability classified as critical was found in SevOne Network Management System up to 5.7.2.22. This vulnerability affects the Alert Summary. The manipulation leads to sql injection. The attack can be initiated remotely.,yes,sql,
+CVE-2025-27770,"UpTrain is an open-source platform to evaluate and improve generative AI applications. In version 0.7.1 and prior, the `/create_project` endpoint is vulnerable to remote code execution via the `checks` and `metadata` parameters. Any user that has access to UpTrain and a valid authentication method may be able to execute arbitrary code in the context of the host running UpTrain, which in most cases will be the docker container as suggested by the documentation. As of time of publication, no known patch is available.",yes,unclear,code execution via named parameters; language not stated
+CVE-2023-4849,"A vulnerability, which was classified as critical, has been found in IBOS OA 4.5.5. Affected by this issue is some unknown functionality of the file ?r=file/dashboard/trash&op=del. The manipulation of the argument fids leads to sql injection. The attack may be launched remotely. The exploit has been disclosed to the public and may be used. VDB-239258 is the identifier assigned to this vulnerability.",yes,sql,
+CVE-2026-5707,"Unsanitized input in an OS command in the virtual desktop session name handling in AWS Research and Engineering Studio (RES) version 2025.03 through 2025.12.01 might allow a remote authenticated actor to execute arbitrary commands as root on the virtual desktop host via a crafted session name.
+
+To remediate this issue, users are advised to upgrade to RES version 2026.03 or apply the corresponding mitigation patch to their existing environment.",yes,shell_command,
+CVE-2021-40921,Cross-site scripting (XSS) vulnerability in _contactform.inc.php in Detector 0.8.5 and below version allows remote attackers to inject arbitrary web script or HTML via the cid parameter.,yes,html_dom,
+CVE-2024-35059,An issue in the Pickle Python library of NASA AIT-Core v2.5.2 allows attackers to execute arbitrary commands.,no,,pickle deserialization
+CVE-2013-3214,vtiger CRM 5.4.0 and earlier contain a PHP Code Injection Vulnerability in 'vtigerolservice.php'.,yes,code_eval,
+CVE-2021-47502,"In the Linux kernel, the following vulnerability has been resolved:
+
+ASoC: codecs: wcd934x: handle channel mappping list correctly
+
+Currently each channel is added as list to dai channel list, however
+there is danger of adding same channel to multiple dai channel list
+which endups corrupting the other list where its already added.
+
+This patch ensures that the channel is actually free before adding to
+the dai channel list and also ensures that the channel is on the list
+before deleting it.
+
+This check was missing previously, and we did not hit this issue as
+we were testing very simple usecases with sequence of amixer commands.",no,,
+CVE-2021-29955,"A transient execution vulnerability, named Floating Point Value Injection (FPVI) allowed an attacker to leak arbitrary memory addresses and may have also enabled JIT type confusion attacks. (A related vulnerability, Speculative Code Store Bypass (SCSB), did not affect Firefox.). This vulnerability affects Firefox ESR < 78.9 and Firefox < 87.",no,,
+CVE-2021-21247,"OneDev is an all-in-one devops platform. In OneDev before version 4.0.3, the application's BasePage registers an AJAX event listener (`AbstractPostAjaxBehavior`) in all pages other than the login page. This listener decodes and deserializes the `data` query parameter. We can access this listener by submitting a POST request to any page. This issue may lead to `post-auth RCE` This endpoint is subject to authentication and, therefore, requires a valid user to carry on the attack. This issue was addressed in 4.0.3 by encrypting serialization payload with secrets only known to server.",no,,
+CVE-2017-17533,"default.tcl in Tkabber 1.1 does not validate strings before launching the program specified by the BROWSER environment variable, which might allow remote attackers to conduct argument-injection attacks via a crafted URL. NOTE: a third party has indicated that the attack cannot occur because of the argument-parsing behavior of the Tcl exec function",yes,argument,third party disputes exploitability
+CVE-2011-2855,"Google Chrome before 14.0.835.163 does not properly handle Cascading Style Sheets (CSS) token sequences, which allows remote attackers to cause a denial of service or possibly have unspecified other impact via unknown vectors that lead to a ""stale node.""",no,,
+CVE-2011-4947,Cross-site request forgery (CSRF) vulnerability in e107_admin/users_extended.php in e107 before 0.7.26 allows remote attackers to hijack the authentication of administrators for requests that insert cross-site scripting (XSS) sequences via the user_include parameter.,yes,html_dom,
+CVE-2006-1020,SQL injection vulnerability in forumlib.php in Johnny_Vegas Vegas Forum 1.0 allows remote attackers to execute arbitrary SQL commands via the postid parameter.,yes,sql,
+CVE-2017-17521,"uiutil.c in FontForge through 20170731 does not validate strings before launching the program specified by the BROWSER environment variable, which might allow remote attackers to conduct argument-injection attacks via a crafted URL, a different vulnerability than CVE-2017-17534.",yes,argument,
+CVE-2021-1481,"A vulnerability in the web-based management interface of Cisco&nbsp;SD-WAN vManage Software could allow an authenticated, remote attacker to conduct Cypher query language injection attacks on an affected system.
+This vulnerability is due to insufficient input validation by the web-based management interface. An attacker could exploit this vulnerability by sending crafted HTTP requests to the interface of an affected system. A successful exploit could allow the attacker to obtain sensitive information.Cisco&nbsp;has released software updates that address this vulnerability. There are no workarounds that address this vulnerability.",yes,other,Cypher query
+CVE-2017-10963,"In Knox SDS IAM (Identity Access Management) and EMM (Enterprise Mobility Management) 16.11 on Samsung mobile devices, a man-in-the-middle attacker can install any application into the Knox container (without the user's knowledge) by inspecting network traffic from a Samsung server and injecting content at a certain point in the update sequence. This installed application can further leak information stored inside the Knox container to the outside world.",no,,
+CVE-2005-4475,Cross-site scripting (XSS) vulnerability in OpenCms 6.0.3 and earlier allows remote attackers to inject arbitrary web script or HTML via unspecified search parameters.,yes,html_dom,
+CVE-2026-89435,"The Formidable Forms – WordPress Form Builder for Contact Forms, Calculators, Quizzes & More plugin for WordPress is vulnerable to Arbitrary Plugin Installation in all versions up to, and including, 6.35 via the 'file_url' parameter parameter. This is due to insufficient URL prefix validation in validate_url_is_in_s3_bucket() and a permission callback that relies solely on a shared token obtainable by any user with the delegable frm_view_forms capability, without checking install_plugins or activate_plugins capabilities. This makes it possible for authenticated attackers, with subscriber-level access and above, to install arbitrary plugins on the server. Exploitation additionally requires that the site is free-only (Formidable Pro is NOT installed).",no,,
+CVE-2023-29007,"Git is a revision control system. Prior to versions 2.30.9, 2.31.8, 2.32.7, 2.33.8, 2.34.8, 2.35.8, 2.36.6, 2.37.7, 2.38.5, 2.39.3, and 2.40.1, a specially crafted `.gitmodules` file with submodule URLs that are longer than 1024 characters can used to exploit a bug in `config.c::git_config_copy_or_rename_section_in_file()`. This bug can be used to inject arbitrary configuration into a user's `$GIT_DIR/config` when attempting to remove the configuration section associated with that submodule. When the attacker injects configuration values which specify executables to run (such as `core.pager`, `core.editor`, `core.sshCommand`, etc.) this can lead to a remote code execution. A fix A fix is available in versions 2.30.9, 2.31.8, 2.32.7, 2.33.8, 2.34.8, 2.35.8, 2.36.6, 2.37.7, 2.38.5, 2.39.3, and 2.40.1. As a workaround, avoid running `git submodule deinit` on untrusted repositories or without prior inspection of any submodule sections in `$GIT_DIR/config`.",yes,other,git config file
+CVE-2026-7720,A weakness has been identified in Totolink WA300 5.2cu.7112_B20190227. The impacted element is the function setLanguageCfg of the file /cgi-bin/cstecgi.cgi of the component POST Request Handler. This manipulation of the argument langType causes command injection. Remote exploitation of the attack is possible. The exploit has been made available to the public and could be used for attacks.,yes,shell_command,
+CVE-2008-3124,SQL injection vulnerability in index.php in Mole Group Hotel Script 1.0 allows remote attackers to execute arbitrary SQL commands via the file parameter.,yes,sql,
+CVE-2013-6853,"Cross-site scripting (XSS) vulnerability in clickstream.js in Y! Toolbar plugin for FireFox 3.1.0.20130813024103 for Mac, and 2.5.9.2013418100420 for Windows, allows remote attackers to inject arbitrary web script or HTML via a crafted URL that is stored by the victim.",yes,html_dom,
+CVE-2024-26673,"In the Linux kernel, the following vulnerability has been resolved:
+
+netfilter: nft_ct: sanitize layer 3 and 4 protocol number in custom expectations
+
+- Disallow families other than NFPROTO_{IPV4,IPV6,INET}.
+- Disallow layer 4 protocol with no ports, since destination port is a
+  mandatory attribute for this object.",no,,
+CVE-2024-46717,"In the Linux kernel, the following vulnerability has been resolved:
+
+net/mlx5e: SHAMPO, Fix incorrect page release
+
+Under the following conditions:
+1) No skb created yet
+2) header_size == 0 (no SHAMPO header)
+3) header_index + 1 % MLX5E_SHAMPO_WQ_HEADER_PER_PAGE == 0 (this is the
+   last page fragment of a SHAMPO header page)
+
+a new skb is formed with a page that is NOT a SHAMPO header page (it
+is a regular data page). Further down in the same function
+(mlx5e_handle_rx_cqe_mpwrq_shampo()), a SHAMPO header page from
+header_index is released. This is wrong and it leads to SHAMPO header
+pages being released more than once.",no,,
+CVE-2022-48813,"In the Linux kernel, the following vulnerability has been resolved:
+
+net: dsa: felix: don't use devres for mdiobus
+
+As explained in commits:
+74b6d7d13307 (""net: dsa: realtek: register the MDIO bus under devres"")
+5135e96a3dd2 (""net: dsa: don't allocate the slave_mii_bus using devres"")
+
+mdiobus_free() will panic when called from devm_mdiobus_free() <-
+devres_release_all() <- __device_release_driver(), and that mdiobus was
+not previously unregistered.
+
+The Felix VSC9959 switch is a PCI device, so the initial set of
+constraints that I thought would cause this (I2C or SPI buses which call
+->remove on ->shutdown) do not apply. But there is one more which
+applies here.
+
+If the DSA master itself is on a bus that calls ->remove from ->shutdown
+(like dpaa2-eth, which is on the fsl-mc bus), there is a device link
+between the switch and the DSA master, and device_links_unbind_consumers()
+will unbind the felix switch driver on shutdown.
+
+So the same treatment must be applied to all DSA switch drivers, which
+is: either use devres for both the mdiobus allocation and registration,
+or don't use devres at all.
+
+The felix driver has the code structure in place for orderly mdiobus
+removal, so just replace devm_mdiobus_alloc_size() with the non-devres
+variant, and add manual free where necessary, to ensure that we don't
+let devres free a still-registered bus.",no,,
+CVE-2023-48380,"Softnext Mail SQR Expert is an email management platform, it has insufficient filtering for a special character within a spcific function. A remote attacker authenticated as a localhost can exploit this vulnerability to perform command injection attacks, to execute arbitrary system command, manipulate system or disrupt service.",yes,shell_command,
+CVE-2026-91877,"Dell OpenManage Ansible Modules, versions 2.0.2 through 10.0.3, contains an Improper Neutralization of Special Elements in Data Query Logic vulnerability in the OData filter processing component. A low privileged attacker with remote access could potentially exploit this vulnerability, leading to unauthorized data access, authorization bypass, and denial of service.",yes,other,OData filter
+CVE-2019-1010310,"GLPI GLPI Product 9.3.1 is affected by: Frame and Form tags Injection allowing admins to phish users by putting code in reminder description. The impact is: Admins can phish any user or group of users for credentials / credit cards. The component is: Tools > Reminder > Description .. Set the description to any iframe/form tags and apply. The attack vector is: The attacker puts a login form, the user fills it and clicks on submit .. the request is sent to the attacker domain saving the data. The fixed version is: 9.4.1.",yes,html_dom,iframe and form tag injection
+CVE-2006-1824,"Multiple cross-site scripting (XSS) vulnerabilities in PhpGuestbook.php in PhpGuestbook 1.0 allow remote attackers to inject arbitrary web script or HTML via the (1) Name, (2) Website, and (3) Comment parameter.",yes,html_dom,
+CVE-2025-21994,"In the Linux kernel, the following vulnerability has been resolved:
+
+ksmbd: fix incorrect validation for num_aces field of smb_acl
+
+parse_dcal() validate num_aces to allocate posix_ace_state_array.
+
+if (num_aces > ULONG_MAX / sizeof(struct smb_ace *))
+
+It is an incorrect validation that we can create an array of size ULONG_MAX.
+smb_acl has ->size field to calculate actual number of aces in request buffer
+size. Use this to check invalid num_aces.",no,,
+CVE-2022-49325,"In the Linux kernel, the following vulnerability has been resolved:
+
+tcp: add accessors to read/set tp->snd_cwnd
+
+We had various bugs over the years with code
+breaking the assumption that tp->snd_cwnd is greater
+than zero.
+
+Lately, syzbot reported the WARN_ON_ONCE(!tp->prior_cwnd) added
+in commit 8b8a321ff72c (""tcp: fix zero cwnd in tcp_cwnd_reduction"")
+can trigger, and without a repro we would have to spend
+considerable time finding the bug.
+
+Instead of complaining too late, we want to catch where
+and when tp->snd_cwnd is set to an illegal value.",no,,
+CVE-2025-32645,Cross-Site Request Forgery (CSRF) vulnerability in Hiren Patel Custom Posts Order custom-posts-order allows Stored XSS.This issue affects Custom Posts Order: from n/a through <= 4.4.,yes,html_dom,
+CVE-2017-6002,"Subrion CMS 4.0.5.10 has CSRF in admin/blog/add/. The attacker can add any blog entry, and can optionally insert XSS into that entry via the body parameter.",yes,html_dom,
+CVE-2022-47339,"In cmd services, there is a OS command injection issue due to missing permission check. This could lead to local escalation of privilege with system execution privileges needed.",yes,shell_command,
+CVE-2024-3637,"The Responsive Contact Form Builder & Lead Generation Plugin WordPress plugin through 1.8.9 does not sanitise and escape some of its settings, which could allow high privilege users such as admin to perform Stored Cross-Site Scripting attacks even when the unfiltered_html capability is disallowed (for example in multisite setup)",yes,html_dom,
+CVE-2006-4958,"Multiple cross-site scripting (XSS) vulnerabilities in Sun Secure Global Desktop (SSGD, aka Tarantella) before 4.20.983 allows remote attackers to inject arbitrary web script or HTML via unspecified vectors, possibly involving (1) taarchives.cgi, (2) ttaAuthentication.jsp, (3) ttalicense.cgi, (4) ttawlogin.cgi, (5) ttawebtop.cgi, (6) ttaabout.cgi, or (7) test-cgi.  NOTE: This information is based upon a vague initial disclosure.  Details will be updated as they become available.",yes,html_dom,
+CVE-2022-49613,"In the Linux kernel, the following vulnerability has been resolved:
+
+serial: 8250: Fix PM usage_count for console handover
+
+When console is enabled, univ8250_console_setup() calls
+serial8250_console_setup() before .dev is set to uart_port. Therefore,
+it will not call pm_runtime_get_sync(). Later, when the actual driver
+is going to take over univ8250_console_exit() is called. As .dev is
+already set, serial8250_console_exit() makes pm_runtime_put_sync() call
+with usage count being zero triggering PM usage count warning
+(extra debug for univ8250_console_setup(), univ8250_console_exit(), and
+serial8250_register_ports()):
+
+[    0.068987] univ8250_console_setup ttyS0 nodev
+[    0.499670] printk: console [ttyS0] enabled
+[    0.717955] printk: console [ttyS0] printing thread started
+[    1.960163] serial8250_register_ports assigned dev for ttyS0
+[    1.976830] printk: console [ttyS0] disabled
+[    1.976888] printk: console [ttyS0] printing thread stopped
+[    1.977073] univ8250_console_exit ttyS0 usage:0
+[    1.977075] serial8250 serial8250: Runtime PM usage count underflow!
+[    1.977429] dw-apb-uart.6: ttyS0 at MMIO 0x4010006000 (irq = 33, base_baud = 115200) is a 16550A
+[    1.977812] univ8250_console_setup ttyS0 usage:2
+[    1.978167] printk: console [ttyS0] printing thread started
+[    1.978203] printk: console [ttyS0] enabled
+
+To fix the issue, call pm_runtime_get_sync() in
+serial8250_register_ports() as soon as .dev is set for an uart_port
+if it has console enabled.
+
+This problem became apparent only recently because 82586a721595 (""PM:
+runtime: Avoid device usage count underflows"") added the warning
+printout. I confirmed this problem also occurs with v5.18 (w/o the
+warning printout, obviously).",no,,
+CVE-2006-1369,Cross-site scripting (XSS) vulnerability in Invision Power Board (IPB) 2.1.5 and earlier before 20060308 allows remote attackers to inject arbitrary web script or HTML via a Private Message (PM) in certain circumstances.,yes,html_dom,
+CVE-2006-3303,Multiple cross-site scripting (XSS) vulnerabilities in pm.php in DeluxeBB 1.07 and earlier allow remote attackers to inject arbitrary web script or HTML via the (1) subject or (2) to parameters.,yes,html_dom,
+CVE-2005-2721,Multiple cross-site scripting (XSS) vulnerabilities in (1) index.php or (2) admin.php in Foojan PHP Weblog allow remote attackers to inject arbitrary web script or HTML via the Referer field in the HTTP header.,yes,html_dom,
+CVE-2024-39481,"In the Linux kernel, the following vulnerability has been resolved:
+
+media: mc: Fix graph walk in media_pipeline_start
+
+The graph walk tries to follow all links, even if they are not between
+pads. This causes a crash with, e.g. a MEDIA_LNK_FL_ANCILLARY_LINK link.
+
+Fix this by allowing the walk to proceed only for MEDIA_LNK_FL_DATA_LINK
+links.",no,,
+CVE-2022-0926,File upload filter bypass leading to stored XSS in GitHub repository microweber/microweber prior to 1.2.12.,yes,html_dom,whole uploaded file
+CVE-2022-36323,Affected devices do not properly sanitize an input field.  This could allow an authenticated remote attacker with administrative privileges to inject code or spawn a system root shell.,yes,unclear,
+CVE-2007-1020,Cross-site scripting (XSS) vulnerability in index.php in CedStat 1.31 allows remote attackers to inject arbitrary web script or HTML via the hier parameter.,yes,html_dom,
+CVE-2026-123535,"Tornado before 6.6 does not validate the max_age argument of RequestHandler.set_cookie (also called by set_signed_cookie, set_secure_cookie, and clear_cookie), allowing injection of additional Set-Cookie attributes. When an application passes attacker-influenced input as max_age, an attacker can embed attributes such as Domain, Path, or Secure to widen the cookie's scope to parent paths or other subdomains.",yes,crlf_header,"Set-Cookie attributes via ';', no CR/LF"
+CVE-2024-50080,"In the Linux kernel, the following vulnerability has been resolved:
+
+ublk: don't allow user copy for unprivileged device
+
+UBLK_F_USER_COPY requires userspace to call write() on ublk char
+device for filling request buffer, and unprivileged device can't
+be trusted.
+
+So don't allow user copy for unprivileged device.",no,,
+CVE-2007-1848,"Cross-site scripting (XSS) vulnerability in admin/classes/ui.dta.php in Drake CMS allows remote attackers to inject arbitrary web script or HTML via the desc[][title] field.  NOTE: Drake CMS has only a beta version available, and the vendor has previously stated ""We do not consider security reports valid until the first official release of Drake CMS.""",yes,html_dom,
+CVE-2026-7770,IBM i Access Family 1.1.5.0 through 1.1.9.12 IBM i Access Client Solutions (ACS) is vulnerable to remote code execution when configured to listen for requests from IBM i Navigator.,no,,vague RCE; no injection stated
+CVE-2021-36905,Multiple Auth. (contributor+) Stored Cross-Site Scripting (XSS) vulnerabilities in Quiz And Survey Master plugin <= 7.3.4 on WordPress.,yes,html_dom,
+CVE-2026-81521,The MongoDB Go Driver's client-level bulk write operation may accept a caller-supplied database name containing a reserved separator character without escaping it before the name is used to build the target namespace for the operation. An application that passes untrusted input as a database name could therefore have the write directed at a database and collection other than the ones it intended. Only the Client.BulkWrite API is affected.,yes,other,MongoDB namespace separator
+CVE-2025-53690,"Deserialization of Untrusted Data vulnerability in Sitecore Experience Manager (XM), Sitecore Experience Platform (XP) allows Code Injection.This issue affects Experience Manager (XM): through 9.0; Experience Platform (XP): through 9.0.",no,,deserialization
+CVE-2025-64428,"Dataease is an open source data visualization analysis tool. Versions prior to 2.10.17 are vulnerable to JNDI injection. A blacklist was added in the patch for version 2.10.14. However, JNDI injection remains possible via the iiop, corbaname, and iiopname schemes. The vulnerability has been fixed in version 2.10.17.",yes,other,JNDI
+CVE-2026-116838,A malicious actor who lures an authenticated user to a malicious page could exploit a Cross-Site Request Forgery (CSRF) vulnerability found in airMAX M devices to execute a Command Injection on the device.,yes,shell_command,
+CVE-2024-13213,A vulnerability classified as problematic was found in SingMR HouseRent 1.0. This vulnerability affects unknown code of the file /toAdminUpdateHousePage?hID=30. The manipulation leads to cross site scripting. The attack can be initiated remotely. The exploit has been disclosed to the public and may be used.,yes,html_dom,
+CVE-2023-0302,Failure to Sanitize Special Elements into a Different Plane (Special Element Injection) in GitHub repository radareorg/radare2 prior to 5.8.2.,yes,unclear,
+CVE-2006-1553,"SQL injection vulnerability in functions/final_functions.php in VSNS Lemon 3.2.0, with magic_quotes_gpc disabled, allows remote attackers to execute arbitrary SQL commands via the id parameter.",yes,sql,
+CVE-2004-1668,"Multiple SQL injection vulnerabilities in index.php in Subjects 2.0 Postnuke module allow remote attackers to execute arbitrary SQL commands via the (1) pageid, (2) subid, or (3) catid parameters.",yes,sql,
+CVE-2020-24821,A vulnerability in the dwarf::cursor::skip_form function of Libelfin v0.3 allows attackers to cause a denial of service (DOS) through a segmentation fault via a crafted ELF file.,no,,
+CVE-2025-9264,A vulnerability was found in Xuxueli xxl-job up to 3.1.1. Affected by this issue is the function remove of the file /src/main/java/com/xxl/job/admin/controller/JobInfoController.java of the component Jobs Handler. Performing manipulation of the argument ID results in improper control of resource identifiers. Remote exploitation of the attack is possible. The exploit has been made public and could be used.,no,,resource identifiers
+CVE-2005-4236,Cross-site scripting (XSS) vulnerability in search.php in CKGOLD allows remote attackers to inject arbitrary web script or HTML via the search parameters.,yes,html_dom,
+CVE-2013-4889,"Multiple cross-site request forgery (CSRF) vulnerabilities in index.php in Digital Signage Xibo 1.4.2 allow remote attackers to hijack the authentication of administrators for requests that (1) add a new administrator via the AddUser action or (2) conduct cross-site scripting (XSS) attacks, as demonstrated by CVE-2013-4888.",yes,html_dom,CSRF; XSS is one of two actions
+CVE-2017-17530,"common/help.c in Geomview 1.9.5 does not validate strings before launching the program specified by the BROWSER environment variable, which might allow remote attackers to conduct argument-injection attacks via a crafted URL. NOTE: this is disputed by a third party because no untrusted input can be used for the injection",yes,argument,disputed by third party
+CVE-2021-47178,"In the Linux kernel, the following vulnerability has been resolved:
+
+scsi: target: core: Avoid smp_processor_id() in preemptible code
+
+The BUG message ""BUG: using smp_processor_id() in preemptible [00000000]
+code"" was observed for TCMU devices with kernel config DEBUG_PREEMPT.
+
+The message was observed when blktests block/005 was run on TCMU devices
+with fileio backend or user:zbc backend [1]. The commit 1130b499b4a7
+(""scsi: target: tcm_loop: Use LIO wq cmd submission helper"") triggered the
+symptom. The commit modified work queue to handle commands and changed
+'current->nr_cpu_allowed' at smp_processor_id() call.
+
+The message was also observed at system shutdown when TCMU devices were not
+cleaned up [2]. The function smp_processor_id() was called in SCSI host
+work queue for abort handling, and triggered the BUG message. This symptom
+was observed regardless of the commit 1130b499b4a7 (""scsi: target:
+tcm_loop: Use LIO wq cmd submission helper"").
+
+To avoid the preemptible code check at smp_processor_id(), get CPU ID with
+raw_smp_processor_id() instead. The CPU ID is used for performance
+improvement then thread move to other CPU will not affect the code.
+
+[1]
+
+[   56.468103] run blktests block/005 at 2021-05-12 14:16:38
+[   57.369473] check_preemption_disabled: 85 callbacks suppressed
+[   57.369480] BUG: using smp_processor_id() in preemptible [00000000] code: fio/1511
+[   57.369506] BUG: using smp_processor_id() in preemptible [00000000] code: fio/1510
+[   57.369512] BUG: using smp_processor_id() in preemptible [00000000] code: fio/1506
+[   57.369552] caller is __target_init_cmd+0x157/0x170 [target_core_mod]
+[   57.369606] CPU: 4 PID: 1506 Comm: fio Not tainted 5.13.0-rc1+ #34
+[   57.369613] Hardware name: System manufacturer System Product Name/PRIME Z270-A, BIOS 1302 03/15/2018
+[   57.369617] Call Trace:
+[   57.369621] BUG: using smp_processor_id() in preemptible [00000000] code: fio/1507
+[   57.369628]  dump_stack+0x6d/0x89
+[   57.369642]  check_preemption_disabled+0xc8/0xd0
+[   57.369628] caller is __target_init_cmd+0x157/0x170 [target_core_mod]
+[   57.369655]  __target_init_cmd+0x157/0x170 [target_core_mod]
+[   57.369695]  target_init_cmd+0x76/0x90 [target_core_mod]
+[   57.369732]  tcm_loop_queuecommand+0x109/0x210 [tcm_loop]
+[   57.369744]  scsi_queue_rq+0x38e/0xc40
+[   57.369761]  __blk_mq_try_issue_directly+0x109/0x1c0
+[   57.369779]  blk_mq_try_issue_directly+0x43/0x90
+[   57.369790]  blk_mq_submit_bio+0x4e5/0x5d0
+[   57.369812]  submit_bio_noacct+0x46e/0x4e0
+[   57.369830]  __blkdev_direct_IO_simple+0x1a3/0x2d0
+[   57.369859]  ? set_init_blocksize.isra.0+0x60/0x60
+[   57.369880]  generic_file_read_iter+0x89/0x160
+[   57.369898]  blkdev_read_iter+0x44/0x60
+[   57.369906]  new_sync_read+0x102/0x170
+[   57.369929]  vfs_read+0xd4/0x160
+[   57.369941]  __x64_sys_pread64+0x6e/0xa0
+[   57.369946]  ? lockdep_hardirqs_on+0x79/0x100
+[   57.369958]  do_syscall_64+0x3a/0x70
+[   57.369965]  entry_SYSCALL_64_after_hwframe+0x44/0xae
+[   57.369973] RIP: 0033:0x7f7ed4c1399f
+[   57.369979] Code: 08 89 3c 24 48 89 4c 24 18 e8 7d f3 ff ff 4c 8b 54 24 18 48 8b 54 24 10 41 89 c0 48 8b 74 24 08 8b 3c 24 b8 11 00 00 00 0f 05 <48> 3d 00 f0 ff ff 77 31 44 89 c7 48 89 04 24 e8 cd f3 ff ff 48 8b
+[   57.369983] RSP: 002b:00007ffd7918c580 EFLAGS: 00000293 ORIG_RAX: 0000000000000011
+[   57.369990] RAX: ffffffffffffffda RBX: 00000000015b4540 RCX: 00007f7ed4c1399f
+[   57.369993] RDX: 0000000000001000 RSI: 00000000015de000 RDI: 0000000000000009
+[   57.369996] RBP: 00000000015b4540 R08: 0000000000000000 R09: 0000000000000001
+[   57.369999] R10: 0000000000e5c000 R11: 0000000000000293 R12: 00007f7eb5269a70
+[   57.370002] R13: 0000000000000000 R14: 0000000000001000 R15: 00000000015b4568
+[   57.370031] CPU: 7 PID: 1507 Comm: fio Not tainted 5.13.0-rc1+ #34
+[   57.370036] Hardware name: System manufacturer System Product Name/PRIME Z270-A, BIOS 1302 03/15/2018
+[   57.370039] Call Trace:
+[   57.370045]  dump_stack+0x6d/0x89
+[   57.370056]  ch
+---truncated---",no,,
+CVE-2021-32647,"Emissary is a P2P based data-driven workflow engine. Affected versions of Emissary are vulnerable to post-authentication Remote Code Execution (RCE). The [`CreatePlace`](https://github.com/NationalSecurityAgency/emissary/blob/30c54ef16c6eb6ed09604a929939fb9f66868382/src/main/java/emissary/server/mvc/internal/CreatePlaceAction.java#L36) REST endpoint accepts an `sppClassName` parameter which is used to load an arbitrary class. This class is later instantiated using a constructor with the following signature: `<constructor>(String, String, String)`. An attacker may find a gadget (class) in the application classpath that could be used to achieve Remote Code Execution (RCE) or disrupt the application. Even though the chances to find a gadget (class) that allow arbitrary code execution are low, an attacker can still find gadgets that could potentially crash the application or leak sensitive data. As a work around disable network access to Emissary from untrusted sources.",no,,unsafe class loading
+CVE-2018-3821,Kibana versions after 5.1.1 and before 5.6.7 and 6.1.3 had a cross-site scripting (XSS) vulnerability in the tag cloud visualization that could allow an attacker to obtain sensitive information from or perform destructive actions on behalf of other Kibana users.,yes,html_dom,
+CVE-2024-36888,"In the Linux kernel, the following vulnerability has been resolved:
+
+workqueue: Fix selection of wake_cpu in kick_pool()
+
+With cpu_possible_mask=0-63 and cpu_online_mask=0-7 the following
+kernel oops was observed:
+
+smp: Bringing up secondary CPUs ...
+smp: Brought up 1 node, 8 CPUs
+Unable to handle kernel pointer dereference in virtual kernel address space
+Failing address: 0000000000000000 TEID: 0000000000000803
+[..]
+ Call Trace:
+arch_vcpu_is_preempted+0x12/0x80
+select_idle_sibling+0x42/0x560
+select_task_rq_fair+0x29a/0x3b0
+try_to_wake_up+0x38e/0x6e0
+kick_pool+0xa4/0x198
+__queue_work.part.0+0x2bc/0x3a8
+call_timer_fn+0x36/0x160
+__run_timers+0x1e2/0x328
+__run_timer_base+0x5a/0x88
+run_timer_softirq+0x40/0x78
+__do_softirq+0x118/0x388
+irq_exit_rcu+0xc0/0xd8
+do_ext_irq+0xae/0x168
+ext_int_handler+0xbe/0xf0
+psw_idle_exit+0x0/0xc
+default_idle_call+0x3c/0x110
+do_idle+0xd4/0x158
+cpu_startup_entry+0x40/0x48
+rest_init+0xc6/0xc8
+start_kernel+0x3c4/0x5e0
+startup_continue+0x3c/0x50
+
+The crash is caused by calling arch_vcpu_is_preempted() for an offline
+CPU. To avoid this, select the cpu with cpumask_any_and_distribute()
+to mask __pod_cpumask with cpu_online_mask. In case no cpu is left in
+the pool, skip the assignment.
+
+tj: This doesn't fully fix the bug as CPUs can still go down between picking
+the target CPU and the wake call. Fixing that likely requires adding
+cpu_online() test to either the sched or s390 arch code. However, regardless
+of how that is fixed, workqueue shouldn't be picking a CPU which isn't
+online as that would result in unpredictable and worse behavior.",no,,
+CVE-2012-1495,install/index.php in WebCalendar before 1.2.5 allows remote attackers to execute arbitrary code via the form_single_user_login parameter.,yes,unclear,code execution via named parameter; language not stated
+CVE-2026-93527,Contributor SQL Injection in Live Copy Paste for Elementor <= 1.5.10 versions.,yes,sql,
+CVE-2005-4580,Cross-site scripting (XSS) vulnerability in Day Communique 4 allows remote attackers to inject arbitrary web script or HTML via the query parameter in a search.,yes,html_dom,
+CVE-2019-17501,Centreon 19.04 allows attackers to execute arbitrary OS commands via the Command Line field of main.php?p=60807&type=4 (aka the Configuration > Commands > Discovery screen). CVE-2019-17501 and CVE-2019-16405 are similar to one another and may be the same.,yes,shell_command,
+CVE-2026-61456,"The Grav API plugin (getgrav/grav-plugin-api) before 1.0.3 fails to sanitize SVG files uploaded through the POST /api/v1/media endpoint. The HandlesMediaUploads::processUploadedFile() method validates only the file extension and never invokes Security::sanitizeSVG(), so an authenticated attacker with the api.media.write permission can upload an SVG containing arbitrary JavaScript. The file is stored unmodified and served with Content-Type: image/svg+xml; when an administrator opens it in a browser (directly or via <object>/<iframe>), the embedded script executes in their session context, enabling cookie theft and session hijacking.",yes,html_dom,whole SVG file
+CVE-2023-29526,"XWiki Platform is a generic wiki platform offering runtime services for applications built on top of it. In affected versions it's possible to display or interact with any page a user cannot access through the combination of the async and display macros. A comment with either macro will be executed when viewed providing a code injection vector in the context of the running server. This vulnerability has been patched in XWiki 15.0-rc-1, 14.10.3, 14.4.8, and 13.10.11. Users are advised to upgrade. There are no known workarounds for this issue.",yes,template,XWiki macros in comment
+CVE-2020-5323,Dell EMC OpenManage Enterprise (OME) versions prior to 3.2 and OpenManage Enterprise-Modular (OME-M) versions prior to 1.10.00 contain an injection vulnerability. A remote authenticated malicious user with low privileges could potentially exploit this vulnerability to gain access to sensitive information or cause denial-of-service.,yes,unclear,
+CVE-2024-34060,"IrisEVTXModule is an interface module for Evtx2Splunk and Iris in order to ingest Microsoft EVTX log files. The `iris-evtx-module` is a pipeline plugin of `iris-web` that processes EVTX files through IRIS web application. During the upload of an EVTX through this pipeline, the filename is not safely handled and may cause an Arbitrary File Write. This can lead to a remote code execution (RCE) when combined with a Server Side Template Injection (SSTI). This vulnerability has been patched in version 1.0.0.",no,,arbitrary file write via filename; SSTI only when combined
+CVE-2026-13253,"The Ultimate Post plugin for WordPress is vulnerable to Stored Cross-Site Scripting via the 'moreResultsText' block attribute of the ultimate-post/advanced-search block in versions up to and including 5.0.31. This is due to insufficient input sanitization and output escaping in the Advanced_Search::content() render callback: the attribute value is filtered with wp_kses(), which strips disallowed HTML tags but does NOT escape HTML special characters such as double quotes in plain text, and the result is then concatenated directly into the data-viewmoretext HTML attribute without esc_attr(). This makes it possible for authenticated attackers, with contributor-level access and above, to inject arbitrary web scripts in pages that will execute whenever a user accesses an injected page.",yes,html_dom,
+CVE-2007-5800,"Multiple PHP remote file inclusion vulnerabilities in the BackUpWordPress 0.4.2b and earlier plugin for WordPress allow remote attackers to execute arbitrary PHP code via a URL in the bkpwp_plugin_path parameter to (1) plugins/BackUp/Archive.php; and (2) Predicate.php, (3) Writer.php, (4) Reader.php, and other unspecified scripts under plugins/BackUp/Archive/.",no,,remote file inclusion
+CVE-2006-5450,SQL injection vulnerability in index.asp in Kinesis Interactive Cinema System (KICS) CMS allows remote attackers to execute arbitrary SQL commands via the (1) txtUsername (user) or (2) txtPassword (pass) parameters.,yes,sql,
+CVE-2026-40588,"blueprintUE is a tool to help Unreal Engine developers. Prior to 4.2.0, the password change form at /profile/{slug}/edit/ does not include a current_password field and does not verify the user's existing password before accepting a new one. Any attacker who obtains a valid authenticated session — through XSS exploitation, session sidejacking over HTTP, physical access to a logged-in browser, or a stolen ""remember me"" cookie — can immediately change the account password without knowing the original credential, resulting in permanent account takeover. This vulnerability is fixed in 4.2.0.",no,,
+CVE-2021-34417,"The network proxy page on the web portal for the Zoom On-Premise Meeting Connector Controller before version 4.6.365.20210703, Zoom On-Premise Meeting Connector MMR before version 4.6.365.20210703, Zoom On-Premise Recording Connector before version 3.8.45.20210703, Zoom On-Premise Virtual Room Connector before version 4.4.6868.20210703, and Zoom On-Premise Virtual Room Connector Load Balancer before version 2.5.5496.20210703 fails to validate input sent in requests to set the network proxy password. This could lead to remote command injection by a web portal administrator.",yes,shell_command,
+CVE-2024-50303,"In the Linux kernel, the following vulnerability has been resolved:
+
+resource,kexec: walk_system_ram_res_rev must retain resource flags
+
+walk_system_ram_res_rev() erroneously discards resource flags when passing
+the information to the callback.
+
+This causes systems with IORESOURCE_SYSRAM_DRIVER_MANAGED memory to have
+these resources selected during kexec to store kexec buffers if that
+memory happens to be at placed above normal system ram.
+
+This leads to undefined behavior after reboot.  If the kexec buffer is
+never touched, nothing happens.  If the kexec buffer is touched, it could
+lead to a crash (like below) or undefined behavior.
+
+Tested on a system with CXL memory expanders with driver managed memory,
+TPM enabled, and CONFIG_IMA_KEXEC=y.  Adding printk's showed the flags
+were being discarded and as a result the check for
+IORESOURCE_SYSRAM_DRIVER_MANAGED passes.
+
+find_next_iomem_res: name(System RAM (kmem))
+		     start(10000000000)
+		     end(1034fffffff)
+		     flags(83000200)
+
+locate_mem_hole_top_down: start(10000000000) end(1034fffffff) flags(0)
+
+[.] BUG: unable to handle page fault for address: ffff89834ffff000
+[.] #PF: supervisor read access in kernel mode
+[.] #PF: error_code(0x0000) - not-present page
+[.] PGD c04c8bf067 P4D c04c8bf067 PUD c04c8be067 PMD 0
+[.] Oops: 0000 [#1] SMP
+[.] RIP: 0010:ima_restore_measurement_list+0x95/0x4b0
+[.] RSP: 0018:ffffc900000d3a80 EFLAGS: 00010286
+[.] RAX: 0000000000001000 RBX: 0000000000000000 RCX: ffff89834ffff000
+[.] RDX: 0000000000000018 RSI: ffff89834ffff000 RDI: ffff89834ffff018
+[.] RBP: ffffc900000d3ba0 R08: 0000000000000020 R09: ffff888132b8a900
+[.] R10: 4000000000000000 R11: 000000003a616d69 R12: 0000000000000000
+[.] R13: ffffffff8404ac28 R14: 0000000000000000 R15: ffff89834ffff000
+[.] FS:  0000000000000000(0000) GS:ffff893d44640000(0000) knlGS:0000000000000000
+[.] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+[.] ata5: SATA link down (SStatus 0 SControl 300)
+[.] CR2: ffff89834ffff000 CR3: 000001034d00f001 CR4: 0000000000770ef0
+[.] PKRU: 55555554
+[.] Call Trace:
+[.]  <TASK>
+[.]  ? __die+0x78/0xc0
+[.]  ? page_fault_oops+0x2a8/0x3a0
+[.]  ? exc_page_fault+0x84/0x130
+[.]  ? asm_exc_page_fault+0x22/0x30
+[.]  ? ima_restore_measurement_list+0x95/0x4b0
+[.]  ? template_desc_init_fields+0x317/0x410
+[.]  ? crypto_alloc_tfm_node+0x9c/0xc0
+[.]  ? init_ima_lsm+0x30/0x30
+[.]  ima_load_kexec_buffer+0x72/0xa0
+[.]  ima_init+0x44/0xa0
+[.]  __initstub__kmod_ima__373_1201_init_ima7+0x1e/0xb0
+[.]  ? init_ima_lsm+0x30/0x30
+[.]  do_one_initcall+0xad/0x200
+[.]  ? idr_alloc_cyclic+0xaa/0x110
+[.]  ? new_slab+0x12c/0x420
+[.]  ? new_slab+0x12c/0x420
+[.]  ? number+0x12a/0x430
+[.]  ? sysvec_apic_timer_interrupt+0xa/0x80
+[.]  ? asm_sysvec_apic_timer_interrupt+0x16/0x20
+[.]  ? parse_args+0xd4/0x380
+[.]  ? parse_args+0x14b/0x380
+[.]  kernel_init_freeable+0x1c1/0x2b0
+[.]  ? rest_init+0xb0/0xb0
+[.]  kernel_init+0x16/0x1a0
+[.]  ret_from_fork+0x2f/0x40
+[.]  ? rest_init+0xb0/0xb0
+[.]  ret_from_fork_asm+0x11/0x20
+[.]  </TASK>",no,,
+CVE-2023-3922,"An issue has been discovered in GitLab affecting all versions starting from 8.15 before 16.2.8, all versions starting from 16.3 before 16.3.5, all versions starting from 16.4 before 16.4.1. It was possible to hijack some links and buttons on the GitLab UI to a malicious page.",no,,link hijack; no injection stated
+CVE-2026-105116,"OpenAM before 16.1.3 contains a latent cross-site scripting defect that places the SAML message, relay state and target URL unencoded into the load-balancer cookie bounce auto-submit page. If reachable with cookieHashRedirectEnabled set, crafted requests could execute script in the OpenAM origin, though an unrelated HTTP 500 failure prevents exploitation in released versions.",yes,html_dom,
+CVE-2024-56714,"In the Linux kernel, the following vulnerability has been resolved:
+
+ionic: no double destroy workqueue
+
+There are some FW error handling paths that can cause us to
+try to destroy the workqueue more than once, so let's be sure
+we're checking for that.
+
+The case where this popped up was in an AER event where the
+handlers got called in such a way that ionic_reset_prepare()
+and thus ionic_dev_teardown() got called twice in a row.
+The second time through the workqueue was already destroyed,
+and destroy_workqueue() choked on the bad wq pointer.
+
+We didn't hit this in AER handler testing before because at
+that time we weren't using a private workqueue.  Later we
+replaced the use of the system workqueue with our own private
+workqueue but hadn't rerun the AER handler testing since then.",no,,
+CVE-2006-3148,"SQL injection vulnerability, possibly in search.inc.php, in Open-Realty 2.3.1 allows remote attackers to execute arbitrary SQL commands via the sorttype parameter to index.php.",yes,sql,
+CVE-2020-15244,"In Magento (rubygems openmage/magento-lts package) before versions 19.4.8 and 20.0.4, an admin user can generate soap credentials that can be used to trigger RCE via PHP Object Injection through product attributes and a product. The issue is patched in versions 19.4.8 and 20.0.4.",no,,PHP object injection is deserialization
+CVE-2026-56096,"The extension passes the user-supplied search query parameter to Apache Solr without restricting advanced Solr query syntax such as wildcards, field selectors and range queries. A remote, unauthenticated attacker can use this syntax to enumerate indexed field names and extract their stored values through boolean- and range-based blind extraction techniques, independent of any site-specific configuration.",yes,other,Solr query syntax
+CVE-2018-14009,"Codiad through 2.8.4 allows Remote Code Execution, a different vulnerability than CVE-2017-11366 and CVE-2017-15689.",no,,RCE; no injection or input vector stated
+CVE-2026-115993,Stored XSS vulnerability in the “Notes” field of the Checklists in Cervantes version v1.3-beta could allow an attacker to execute arbitrary code in another user's browser with elevated privileges,yes,html_dom,
+CVE-2026-5806,A security vulnerability has been detected in code-projects Easy Blog Site 1.0. This affects an unknown function of the file /posts/update.php. The manipulation of the argument postTitle leads to cross site scripting. The attack may be initiated remotely. The exploit has been disclosed publicly and may be used.,yes,html_dom,
+CVE-2021-29416,"An issue was discovered in PortSwigger Burp Suite before 2021.2. During viewing of a malicious request, it can be manipulated into issuing a request that does not respect its upstream proxy configuration. This could leak NetNTLM hashes on Windows systems that fail to block outbound SMB.",no,,
+CVE-2024-1545,Fault Injection vulnerability in RsaPrivateDecryption function in wolfssl/wolfcrypt/src/rsa.c in WolfSSL wolfssl5.6.6 on Linux/Windows allows remote attacker co-resides in the same system with a victim process to disclose information and escalate privileges via Rowhammer fault injection to the RsaKey structure.,no,,
+CVE-2024-42235,"In the Linux kernel, the following vulnerability has been resolved:
+
+s390/mm: Add NULL pointer check to crst_table_free() base_crst_free()
+
+crst_table_free() used to work with NULL pointers before the conversion
+to ptdescs.  Since crst_table_free() can be called with a NULL pointer
+(error handling in crst_table_upgrade() add an explicit check.
+
+Also add the same check to base_crst_free() for consistency reasons.
+
+In real life this should not happen, since order two GFP_KERNEL
+allocations will not fail, unless FAIL_PAGE_ALLOC is enabled and used.",no,,
+CVE-2021-24627,"The G Auto-Hyperlink WordPress plugin through 1.0.1 does not sanitise or escape an 'id' GET parameter before using it in a SQL statement, to select data to be displayed in the admin dashboard, leading to an authenticated SQL injection",yes,sql,
+CVE-2007-5704,Multiple SQL injection vulnerabilities in CodeWidgets.com Online Event Registration Template allow remote attackers to execute arbitrary SQL commands via the (1) Email Address and (2) Password fields in (a) login.asp and (b) admin_login.asp.,yes,sql,
+CVE-2026-81528,"A MongoDB C# driver document-replacement code path omits the element-name/shape validation that the equivalent write paths apply, so a value supplied as a replacement is forwarded to the server without neutralization of query-language special elements. An application that passes untrusted, loosely-typed input as a replacement value therefore allows that input to be interpreted by the database as update logic rather than as data, executing under the application's own database credentials. Applications using strongly-typed document mappings are not affected.",yes,nosql,
+CVE-2021-21137,Inappropriate implementation in DevTools in Google Chrome prior to 88.0.4324.96 allowed a remote attacker to obtain potentially sensitive information from disk via a crafted HTML page.,no,,
+CVE-2008-1250,"Multiple cross-site request forgery (CSRF) vulnerabilities in the web interface on the central phone server for the Snom 320 SIP Phone allow remote attackers to perform actions as the phone user, as demonstrated by inserting an address-book entry containing an XSS sequence.",yes,html_dom,
+CVE-2022-20726,"Multiple vulnerabilities in the Cisco IOx application hosting environment on multiple Cisco platforms could allow an attacker to inject arbitrary commands into the underlying host operating system, execute arbitrary code on the underlying host operating system, install applications without being authenticated, or conduct a cross-site scripting (XSS) attack against a user of the affected software. For more information about these vulnerabilities, see the Details section of this advisory.",yes,shell_command,multiple vulns incl. XSS
+CVE-2023-41179,"A vulnerability in the 3rd party AV uninstaller module contained in Trend Micro Apex One (on-prem and SaaS), Worry-Free Business Security and Worry-Free Business Security Services could allow an attacker to manipulate the module to execute arbitrary commands on an affected installation.
+
+Note that an attacker must first obtain administrative console access on the target system in order to exploit this vulnerability.",no,,command execution; no input vector stated
+CVE-2025-24561,Cross-Site Request Forgery (CSRF) vulnerability in awcode ReviewsTap reviewstap allows Stored XSS.This issue affects ReviewsTap: from n/a through <= 1.1.2.,yes,html_dom,
+CVE-2006-4879,SQL injection vulnerability in profile.php in David Bennett PHP-Post (PHPp) 1.0 and earlier allows remote attackers to execute arbitrary SQL commands via the user parameter.,yes,sql,
+CVE-2025-46891,Adobe Experience Manager versions 6.5.22 and earlier are affected by a stored Cross-Site Scripting (XSS) vulnerability that could be abused by a low privileged attacker to inject malicious scripts into vulnerable form fields. Malicious JavaScript may be executed in a victim’s browser when they browse to the page containing the vulnerable field.,yes,html_dom,
+CVE-2024-58053,"In the Linux kernel, the following vulnerability has been resolved:
+
+rxrpc: Fix handling of received connection abort
+
+Fix the handling of a connection abort that we've received.  Though the
+abort is at the connection level, it needs propagating to the calls on that
+connection.  Whilst the propagation bit is performed, the calls aren't then
+woken up to go and process their termination, and as no further input is
+forthcoming, they just hang.
+
+Also add some tracing for the logging of connection aborts.",no,,
+CVE-2024-38595,"In the Linux kernel, the following vulnerability has been resolved:
+
+net/mlx5: Fix peer devlink set for SF representor devlink port
+
+The cited patch change register devlink flow, and neglect to reflect
+the changes for peer devlink set logic. Peer devlink set is
+triggering a call trace if done after devl_register.[1]
+
+Hence, align peer devlink set logic with register devlink flow.
+
+[1]
+WARNING: CPU: 4 PID: 3394 at net/devlink/core.c:155 devlink_rel_nested_in_add+0x177/0x180
+CPU: 4 PID: 3394 Comm: kworker/u40:1 Not tainted 6.9.0-rc4_for_linust_min_debug_2024_04_16_14_08 #1
+Hardware name: QEMU Standard PC (Q35 + ICH9, 2009), BIOS rel-1.13.0-0-gf21b5a4aeb02-prebuilt.qemu.org 04/01/2014
+Workqueue: mlx5_vhca_event0 mlx5_vhca_state_work_handler [mlx5_core]
+RIP: 0010:devlink_rel_nested_in_add+0x177/0x180
+Call Trace:
+ <TASK>
+ ? __warn+0x78/0x120
+ ? devlink_rel_nested_in_add+0x177/0x180
+ ? report_bug+0x16d/0x180
+ ? handle_bug+0x3c/0x60
+ ? exc_invalid_op+0x14/0x70
+ ? asm_exc_invalid_op+0x16/0x20
+ ? devlink_port_init+0x30/0x30
+ ? devlink_port_type_clear+0x50/0x50
+ ? devlink_rel_nested_in_add+0x177/0x180
+ ? devlink_rel_nested_in_add+0xdd/0x180
+ mlx5_sf_mdev_event+0x74/0xb0 [mlx5_core]
+ notifier_call_chain+0x35/0xb0
+ blocking_notifier_call_chain+0x3d/0x60
+ mlx5_blocking_notifier_call_chain+0x22/0x30 [mlx5_core]
+ mlx5_sf_dev_probe+0x185/0x3e0 [mlx5_core]
+ auxiliary_bus_probe+0x38/0x80
+ ? driver_sysfs_add+0x51/0x80
+ really_probe+0xc5/0x3a0
+ ? driver_probe_device+0x90/0x90
+ __driver_probe_device+0x80/0x160
+ driver_probe_device+0x1e/0x90
+ __device_attach_driver+0x7d/0x100
+ bus_for_each_drv+0x80/0xd0
+ __device_attach+0xbc/0x1f0
+ bus_probe_device+0x86/0xa0
+ device_add+0x64f/0x860
+ __auxiliary_device_add+0x3b/0xa0
+ mlx5_sf_dev_add+0x139/0x330 [mlx5_core]
+ mlx5_sf_dev_state_change_handler+0x1e4/0x250 [mlx5_core]
+ notifier_call_chain+0x35/0xb0
+ blocking_notifier_call_chain+0x3d/0x60
+ mlx5_vhca_state_work_handler+0x151/0x200 [mlx5_core]
+ process_one_work+0x13f/0x2e0
+ worker_thread+0x2bd/0x3c0
+ ? rescuer_thread+0x410/0x410
+ kthread+0xc4/0xf0
+ ? kthread_complete_and_exit+0x20/0x20
+ ret_from_fork+0x2d/0x50
+ ? kthread_complete_and_exit+0x20/0x20
+ ret_from_fork_asm+0x11/0x20
+ </TASK>",no,,
+CVE-2026-81534,"The Email Customizer for WooCommerce (Pro) plugin for WordPress is vulnerable to Remote Code Execution in versions up to, and including, 3.9.5. This is due to insufficient authorization and input sanitization in the send_test_mail() function, which allows user-controlled PHP code to be written to executable files in the uploads directory. This makes it possible for authenticated attackers, with subscriber-level access and above, to execute arbitrary PHP code on the server, leading to full site compromise.",yes,code_eval,PHP code written to executable file
+CVE-2020-28848,"CSV Injection vulnerability in ChurchCRM version 4.2.0, allows remote attackers to execute arbitrary code via crafted CSV file.",yes,formula_csv,
+CVE-2026-94263,"The Advanced Custom Fields: Extended and Advanced Custom Fields: Extended PRO WordPress plugins from 0.9.2.4 to 0.9.2.7 do not consistently disable shortcode processing in the confirmation message of their front-end forms, allowing unauthenticated visitors to have arbitrary shortcodes executed server-side when they submit a form whose stored configuration does not carry the relevant setting.",yes,template,
+CVE-2026-6382,"The FileOrganizer  WordPress plugin before 1.1.9, Advanced File Manager  WordPress plugin before 5.4.12, File Manager Pro  WordPress plugin before 2.1.1, File Manager WordPress plugin before 8.0.4 do not properly escape a parameter before passing it to a shell command when processing image operations, allowing authenticated users to perform OS Command Injection. This requires the server to have the ImageMagick convert CLI available without either the PHP imagick or GD extensions.",yes,shell_command,
+CVE-2020-8800,SuiteCRM through 7.11.11 allows EmailsControllerActionGetFromFields PHP Object Injection.,no,,PHP object injection is deserialization
+CVE-2008-5644,Cross-site scripting (XSS) vulnerability in the file backend module in TYPO3 4.2.2 allows remote attackers to inject arbitrary web script or HTML via unknown vectors.,yes,html_dom,
+CVE-2006-0657,"Cross-site scripting (XSS) vulnerability in Softcomplex PHP Event Calendar 1.5 allows remote authenticated users to inject arbitrary web script or HTML, and corrupt data, via the (1) username and (2) password parameters, which are not sanitized before being written to users.php.  NOTE: while this issue was originally reported as XSS, the primary issue might be direct static code injection with resultant XSS.",yes,html_dom,description notes possible static code injection into users.php
+CVE-2024-26642,"In the Linux kernel, the following vulnerability has been resolved:
+
+netfilter: nf_tables: disallow anonymous set with timeout flag
+
+Anonymous sets are never used with timeout from userspace, reject this.
+Exception to this rule is NFT_SET_EVAL to ensure legacy meters still work.",no,,
+CVE-2025-43267,An injection issue was addressed with improved validation. This issue is fixed in macOS Sequoia 15.6. An app may be able to access sensitive user data.,yes,unclear,Apple wording; vector not stated
+CVE-2026-16759,"The Tutor LMS – eLearning and online course solution plugin for WordPress is vulnerable to Remote Code Execution limited to zero-argument function invocation in all versions up to, and including, 4.0.5 via the tutor_course_filter_ajax AJAX action. This is due to missing authorization on the handler combined with unsanitized array keys being passed to extract() inside tutor_load_template(), allowing attacker-controlled POST data to overwrite the local $template variable and, in the resulting templates/single-content-loader.php template, the $method_map and $context variables invoked at $method_map[$context](). This makes it possible for unauthenticated attackers to call an arbitrary zero-argument PHP function server-side and, via WordPress core edit_user(), to create a persistent subscriber-level account from request parameters.",no,,extract() variable overwrite; no syntax
+CVE-2017-5799,"A Remote Code Execution vulnerability in HPE OpenCall Media Platform (OCMP) was found. The vulnerability impacts OCMP versions prior to 3.4.2 RP201 (for OCMP 3.x), all versions prior to 4.4.7 RP702 (for OCMP 4.x).",no,,vague RCE; no injection stated
+CVE-2004-0253,"IBM Cloudscape 5.1 running jdk 1.4.2_03 allows remote attackers to execute arbitrary programs or cause a denial of service via certain SQL code, possibly due to a SQL injection vulnerability.",yes,sql,
+CVE-2023-3558,A vulnerability classified as problematic has been found in GZ Scripts Event Booking Calendar 1.8. Affected is an unknown function of the file /load.php. The manipulation of the argument first_name/second_name/phone/address_1/country leads to cross site scripting. It is possible to launch the attack remotely. The identifier of this vulnerability is VDB-233352. NOTE: The vendor was contacted early about this disclosure but did not respond in any way.,yes,html_dom,
+CVE-2005-3348,"HTTP response splitting vulnerability in index.php in phpSysInfo 2.4 and earlier, as used in phpgroupware 0.9.16 and earlier, and egroupware before 1.0.0.009, allows remote attackers to spoof web content and poison web caches via CRLF sequences in the charset parameter.",yes,crlf_header,
+CVE-2024-57806,"In the Linux kernel, the following vulnerability has been resolved:
+
+btrfs: fix transaction atomicity bug when enabling simple quotas
+
+Set squota incompat bit before committing the transaction that enables
+the feature.
+
+With the config CONFIG_BTRFS_ASSERT enabled, an assertion
+failure occurs regarding the simple quota feature.
+
+  [5.596534] assertion failed: btrfs_fs_incompat(fs_info, SIMPLE_QUOTA), in fs/btrfs/qgroup.c:365
+  [5.597098] ------------[ cut here ]------------
+  [5.597371] kernel BUG at fs/btrfs/qgroup.c:365!
+  [5.597946] CPU: 1 UID: 0 PID: 268 Comm: mount Not tainted 6.13.0-rc2-00031-gf92f4749861b #146
+  [5.598450] Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS 1.16.2-debian-1.16.2-1 04/01/2014
+  [5.599008] RIP: 0010:btrfs_read_qgroup_config+0x74d/0x7a0
+  [5.604303]  <TASK>
+  [5.605230]  ? btrfs_read_qgroup_config+0x74d/0x7a0
+  [5.605538]  ? exc_invalid_op+0x56/0x70
+  [5.605775]  ? btrfs_read_qgroup_config+0x74d/0x7a0
+  [5.606066]  ? asm_exc_invalid_op+0x1f/0x30
+  [5.606441]  ? btrfs_read_qgroup_config+0x74d/0x7a0
+  [5.606741]  ? btrfs_read_qgroup_config+0x74d/0x7a0
+  [5.607038]  ? try_to_wake_up+0x317/0x760
+  [5.607286]  open_ctree+0xd9c/0x1710
+  [5.607509]  btrfs_get_tree+0x58a/0x7e0
+  [5.608002]  vfs_get_tree+0x2e/0x100
+  [5.608224]  fc_mount+0x16/0x60
+  [5.608420]  btrfs_get_tree+0x2f8/0x7e0
+  [5.608897]  vfs_get_tree+0x2e/0x100
+  [5.609121]  path_mount+0x4c8/0xbc0
+  [5.609538]  __x64_sys_mount+0x10d/0x150
+
+The issue can be easily reproduced using the following reproducer:
+
+  root@q:linux# cat repro.sh
+  set -e
+
+  mkfs.btrfs -q -f /dev/sdb
+  mount /dev/sdb /mnt/btrfs
+  btrfs quota enable -s /mnt/btrfs
+  umount /mnt/btrfs
+  mount /dev/sdb /mnt/btrfs
+
+The issue is that when enabling quotas, at btrfs_quota_enable(), we set
+BTRFS_QGROUP_STATUS_FLAG_SIMPLE_MODE at fs_info->qgroup_flags and persist
+it in the quota root in the item with the key BTRFS_QGROUP_STATUS_KEY, but
+we only set the incompat bit BTRFS_FEATURE_INCOMPAT_SIMPLE_QUOTA after we
+commit the transaction used to enable simple quotas.
+
+This means that if after that transaction commit we unmount the filesystem
+without starting and committing any other transaction, or we have a power
+failure, the next time we mount the filesystem we will find the flag
+BTRFS_QGROUP_STATUS_FLAG_SIMPLE_MODE set in the item with the key
+BTRFS_QGROUP_STATUS_KEY but we will not find the incompat bit
+BTRFS_FEATURE_INCOMPAT_SIMPLE_QUOTA set in the superblock, triggering an
+assertion failure at:
+
+  btrfs_read_qgroup_config() -> qgroup_read_enable_gen()
+
+To fix this issue, set the BTRFS_FEATURE_INCOMPAT_SIMPLE_QUOTA flag
+immediately after setting the BTRFS_QGROUP_STATUS_FLAG_SIMPLE_MODE.
+This ensures that both flags are flushed to disk within the same
+transaction.",no,,
+CVE-2002-0539,Demarc PureSecure 1.05 allows remote attackers to gain administrative privileges via a SQL injection attack in a session ID that is stored in the s_key cookie.,yes,sql,
+CVE-2022-43168,Rukovoditel v3.2.1 was discovered to contain a SQL injection vulnerability via the reports_id parameter.,yes,sql,
+CVE-2024-32541,Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting') vulnerability in Tobias Battenberg WP-Cufon allows Stored XSS.This issue affects WP-Cufon: from n/a through 1.6.10.,yes,html_dom,
+CVE-2006-6542,SQL injection vulnerability in news.php in Fantastic News 2.1.4 and earlier allows remote attackers to execute arbitrary SQL commands via the id parameter.,yes,sql,
+CVE-2024-43878,"In the Linux kernel, the following vulnerability has been resolved:
+
+xfrm: Fix input error path memory access
+
+When there is a misconfiguration of input state slow path
+KASAN report error. Fix this error.
+west login:
+[   52.987278] eth1: renamed from veth11
+[   53.078814] eth1: renamed from veth21
+[   53.181355] eth1: renamed from veth31
+[   54.921702] ==================================================================
+[   54.922602] BUG: KASAN: wild-memory-access in xfrmi_rcv_cb+0x2d/0x295
+[   54.923393] Read of size 8 at addr 6b6b6b6b00000000 by task ping/512
+[   54.924169]
+[   54.924386] CPU: 0 PID: 512 Comm: ping Not tainted 6.9.0-08574-gcd29a4313a1b #25
+[   54.925290] Hardware name: QEMU Standard PC (Q35 + ICH9, 2009), BIOS 1.16.3-debian-1.16.3-2 04/01/2014
+[   54.926401] Call Trace:
+[   54.926731]  <IRQ>
+[   54.927009]  dump_stack_lvl+0x2a/0x3b
+[   54.927478]  kasan_report+0x84/0xa6
+[   54.927930]  ? xfrmi_rcv_cb+0x2d/0x295
+[   54.928410]  xfrmi_rcv_cb+0x2d/0x295
+[   54.928872]  ? xfrm4_rcv_cb+0x3d/0x5e
+[   54.929354]  xfrm4_rcv_cb+0x46/0x5e
+[   54.929804]  xfrm_rcv_cb+0x7e/0xa1
+[   54.930240]  xfrm_input+0x1b3a/0x1b96
+[   54.930715]  ? xfrm_offload+0x41/0x41
+[   54.931182]  ? raw_rcv+0x292/0x292
+[   54.931617]  ? nf_conntrack_confirm+0xa2/0xa2
+[   54.932158]  ? skb_sec_path+0xd/0x3f
+[   54.932610]  ? xfrmi_input+0x90/0xce
+[   54.933066]  xfrm4_esp_rcv+0x33/0x54
+[   54.933521]  ip_protocol_deliver_rcu+0xd7/0x1b2
+[   54.934089]  ip_local_deliver_finish+0x110/0x120
+[   54.934659]  ? ip_protocol_deliver_rcu+0x1b2/0x1b2
+[   54.935248]  NF_HOOK.constprop.0+0xf8/0x138
+[   54.935767]  ? ip_sublist_rcv_finish+0x68/0x68
+[   54.936317]  ? secure_tcpv6_ts_off+0x23/0x168
+[   54.936859]  ? ip_protocol_deliver_rcu+0x1b2/0x1b2
+[   54.937454]  ? __xfrm_policy_check2.constprop.0+0x18d/0x18d
+[   54.938135]  NF_HOOK.constprop.0+0xf8/0x138
+[   54.938663]  ? ip_sublist_rcv_finish+0x68/0x68
+[   54.939220]  ? __xfrm_policy_check2.constprop.0+0x18d/0x18d
+[   54.939904]  ? ip_local_deliver_finish+0x120/0x120
+[   54.940497]  __netif_receive_skb_one_core+0xc9/0x107
+[   54.941121]  ? __netif_receive_skb_list_core+0x1c2/0x1c2
+[   54.941771]  ? blk_mq_start_stopped_hw_queues+0xc7/0xf9
+[   54.942413]  ? blk_mq_start_stopped_hw_queue+0x38/0x38
+[   54.943044]  ? virtqueue_get_buf_ctx+0x295/0x46b
+[   54.943618]  process_backlog+0xb3/0x187
+[   54.944102]  __napi_poll.constprop.0+0x57/0x1a7
+[   54.944669]  net_rx_action+0x1cb/0x380
+[   54.945150]  ? __napi_poll.constprop.0+0x1a7/0x1a7
+[   54.945744]  ? vring_new_virtqueue+0x17a/0x17a
+[   54.946300]  ? note_interrupt+0x2cd/0x367
+[   54.946805]  handle_softirqs+0x13c/0x2c9
+[   54.947300]  do_softirq+0x5f/0x7d
+[   54.947727]  </IRQ>
+[   54.948014]  <TASK>
+[   54.948300]  __local_bh_enable_ip+0x48/0x62
+[   54.948832]  __neigh_event_send+0x3fd/0x4ca
+[   54.949361]  neigh_resolve_output+0x1e/0x210
+[   54.949896]  ip_finish_output2+0x4bf/0x4f0
+[   54.950410]  ? __ip_finish_output+0x171/0x1b8
+[   54.950956]  ip_send_skb+0x25/0x57
+[   54.951390]  raw_sendmsg+0xf95/0x10c0
+[   54.951850]  ? check_new_pages+0x45/0x71
+[   54.952343]  ? raw_hash_sk+0x21b/0x21b
+[   54.952815]  ? kernel_init_pages+0x42/0x51
+[   54.953337]  ? prep_new_page+0x44/0x51
+[   54.953811]  ? get_page_from_freelist+0x72b/0x915
+[   54.954390]  ? signal_pending_state+0x77/0x77
+[   54.954936]  ? preempt_count_sub+0x14/0xb3
+[   54.955450]  ? __might_resched+0x8a/0x240
+[   54.955951]  ? __might_sleep+0x25/0xa0
+[   54.956424]  ? first_zones_zonelist+0x2c/0x43
+[   54.956977]  ? __rcu_read_lock+0x2d/0x3a
+[   54.957476]  ? __pte_offset_map+0x32/0xa4
+[   54.957980]  ? __might_resched+0x8a/0x240
+[   54.958483]  ? __might_sleep+0x25/0xa0
+[   54.958963]  ? inet_send_prepare+0x54/0x54
+[   54.959478]  ? sock_sendmsg_nosec+0x42/0x6c
+[   54.960000]  sock_sendmsg_nosec+0x42/0x6c
+[   54.960502]  __sys_sendto+0x15d/0x1cc
+[   54.960966]  ? __x64_sys_getpeername+0x44/0x44
+[   54.961522]  ? __handle_mm_fault+0x679/0xae4
+[   54.962068]  ? find_vma+0x6b/0x
+---truncated---",no,,
+CVE-2024-50999,Netgear R8500 v1.0.2.160 was discovered to contain a command injection vulnerability in the sysNewPasswd parameter at password.cgi. This vulnerability allows attackers to execute arbitrary OS commands via a crafted request.,yes,shell_command,
+CVE-2007-2641,"SQL injection vulnerability in W1L3D4_bolum.asp in W1L3D4 Philboard 0.2 allows remote attackers to execute arbitrary SQL commands via the forumid parameter, a different vector than CVE-2007-0920.",yes,sql,
+CVE-2005-4137,SQL injection vulnerability in viewinvoice.php in DRZES HMS 3.2 allows remote attackers to execute arbitrary SQL commands via the invoiceID parameter.,yes,sql,
+CVE-2024-42233,"In the Linux kernel, the following vulnerability has been resolved:
+
+filemap: replace pte_offset_map() with pte_offset_map_nolock()
+
+The vmf->ptl in filemap_fault_recheck_pte_none() is still set from
+handle_pte_fault().  But at the same time, we did a pte_unmap(vmf->pte). 
+After a pte_unmap(vmf->pte) unmap and rcu_read_unlock(), the page table
+may be racily changed and vmf->ptl maybe fails to protect the actual page
+table.  Fix this by replacing pte_offset_map() with
+pte_offset_map_nolock().
+
+As David said, the PTL pointer might be stale so if we continue to use
+it infilemap_fault_recheck_pte_none(), it might trigger UAF.  Also, if
+the PTL fails, the issue fixed by commit 58f327f2ce80 (""filemap: avoid
+unnecessary major faults in filemap_fault()"") might reappear.",no,,
+CVE-2021-47152,"In the Linux kernel, the following vulnerability has been resolved:
+
+mptcp: fix data stream corruption
+
+Maxim reported several issues when forcing a TCP transparent proxy
+to use the MPTCP protocol for the inbound connections. He also
+provided a clean reproducer.
+
+The problem boils down to 'mptcp_frag_can_collapse_to()' assuming
+that only MPTCP will use the given page_frag.
+
+If others - e.g. the plain TCP protocol - allocate page fragments,
+we can end-up re-using already allocated memory for mptcp_data_frag.
+
+Fix the issue ensuring that the to-be-expanded data fragment is
+located at the current page frag end.
+
+v1 -> v2:
+ - added missing fixes tag (Mat)",no,,
+CVE-2025-7187,A vulnerability classified as critical has been found in code-projects Chat System 1.0. Affected is an unknown function of the file /user/fetch_member.php. The manipulation of the argument ID leads to sql injection. It is possible to launch the attack remotely. The exploit has been disclosed to the public and may be used.,yes,sql,
+CVE-2020-15816,"In Western Digital WD Discovery before 4.0.251.0, a malicious application running with standard user permissions could potentially execute code in the application's process through library injection by using DYLD environment variables.",no,,DYLD library injection
+CVE-2017-17525,"guiclient/guiclient.cpp in xTuple PostBooks 4.7.0 does not validate strings before launching the program specified by the BROWSER environment variable, which might allow remote attackers to conduct argument-injection attacks via a crafted URL.",yes,argument,
+CVE-2017-18437,cPanel before 64.0.21 allows a Webmail account to execute code via forwarders (SEC-240).,yes,unclear,code execution via mail forwarders; vector not stated
+CVE-2024-7437,"A vulnerability, which was classified as critical, was found in SimpleMachines SMF 2.1.4. Affected is an unknown function of the file /index.php?action=profile;u=2;area=showalerts;do=remove of the component Delete User Handler. The manipulation of the argument aid leads to improper control of resource identifiers. It is possible to launch the attack remotely. The exploit has been disclosed to the public and may be used.",no,,resource identifiers
+CVE-2006-1622,Cross-site scripting (XSS) vulnerability in PHPSelect linksubmit allows remote attackers to inject arbitrary web script or HTML via (1) the description parameter to linklist.php and possibly other vectors involving (2) index.php and (3) linksubmit.php.,yes,html_dom,
+CVE-2005-3843,SQL injection vulnerability in faq.php in Nicecoder iDesk 1.0 allows remote attackers to execute arbitrary SQL commands via the cat_id parameter.,yes,sql,
+CVE-2022-0391,"A flaw was found in Python, specifically within the urllib.parse module. This module helps break Uniform Resource Locator (URL) strings into components. The issue involves how the urlparse method does not sanitize input and allows characters like '\r' and '\n' in the URL path. This flaw allows an attacker to input a crafted URL, leading to injection attacks. This flaw affects Python versions prior to 3.10.0b1, 3.9.5, 3.8.11, 3.7.11 and 3.6.14.",yes,crlf_header,
+CVE-2005-4314,Cross-site scripting (XSS) vulnerability in ppcal.cgi in PPCal Shopping Cart 3.3.0 and earlier allows remote attackers to inject arbitrary web script or HTML via the (1) stop and (2) user parameters.,yes,html_dom,
+CVE-2025-65540,"Multiple Cross-Site Scripting (XSS) vulnerabilities exist in xmall v1.1 due to improper handling of user-supplied data. User input fields such as username and description are directly rendered into HTML without proper sanitization or encoding, allowing attackers to inject and execute malicious scripts.",yes,html_dom,
+CVE-2023-27479,"XWiki Platform is a generic wiki platform offering runtime services for applications built on top of it. In affected versions any user with view rights can execute arbitrary Groovy, Python or Velocity code in XWiki leading to full access to the XWiki installation. The root cause is improper escaping of UIX parameters. A proof of concept exploit is to log in, add an `XWiki.UIExtensionClass` xobject to the user profile page, with an Extension Parameters content containing `label={{/html}} {{async async=""true"" cached=""false"" context=""doc.reference""}}{{groovy}}println(""Hello "" + ""from groovy!""){{/groovy}}{{/async}}`. Then, navigating to `PanelsCode.ApplicationsPanelConfigurationSheet` (i.e., `<xwiki-host>/xwiki/bin/view/PanelsCode/ApplicationsPanelConfigurationSheet` where `<xwiki-host>` is the URL of your XWiki installation) should not execute the Groovy script. If it does, you will see `Hello from groovy!` displayed on the screen. This vulnerability has been patched in XWiki 13.10.11, 14.4.7 and 14.10-rc-1. Users are advised to upgrade. For users unable to upgrade the issue can be fixed by editing the `PanelsCode.ApplicationsPanelConfigurationSheet` wiki page and making the same modifications  as shown in commit `6de5442f3c`.",yes,template,XWiki macros via UIX parameters
+CVE-2026-44458,"Hono is a Web application framework that provides support for any JavaScript runtime. Prior to 4.12.18, the JSX renderer escapes style attribute object values for HTML but not for CSS. Untrusted input in a style object value or property name can therefore inject additional CSS declarations into the rendered style attribute. The impact is limited to CSS and does not allow JavaScript execution or HTML attribute breakout. This vulnerability is fixed in 4.12.18.",yes,other,CSS declarations in style attribute
+CVE-2023-22597,"
+InHand Networks InRouter 302, prior to version IR302 V3.5.56, and InRouter 615, prior to version InRouter6XX-S-V2.3.0.r5542, contain vulnerability CWE-319: Cleartext Transmission of Sensitive Information. They use an unsecured channel to communicate with the cloud platform by default. An unauthorized user could intercept this communication and steal sensitive information such as configuration information and MQTT credentials; this could allow MQTT command injection. 
+
+",no,,cleartext channel; MQTT injection only as effect
+CVE-2021-25327,"Skyworth Digital Technology RN510 V.3.1.0.4 contains a cross-site request forgery (CSRF) vulnerability in /cgi-bin/net-routeadd.asp and /cgi-bin/sec-urlfilter.asp. Missing CSRF protection in devices can lead to XSRF, as the above pages are vulnerable to cross-site scripting (XSS).",yes,html_dom,
+CVE-2006-1153,"SQL injection vulnerability in D2-Shoutbox 4.2 allows remote attackers to execute arbitrary SQL commands via the load parameter, when performing a Shoutbox action through Invision Power Board (IPB).",yes,sql,
+CVE-2022-31087,"LDAP Account Manager (LAM) is a webfrontend for managing entries (e.g. users, groups, DHCP settings) stored in an LDAP directory. In versions prior to 8.0 the tmp directory, which is accessible by /lam/tmp/, allows interpretation of .php (and .php5/.php4/.phpt/etc) files. An attacker capable of writing files under www-data privileges can write a web-shell into this directory, and gain a Code Execution on the host. This issue has been fixed in version 8.0. Users unable to upgrade should disallow executing PHP scripts in (/var/lib/ldap-account-manager/)tmp directory.",no,,PHP executes in writable tmp directory
+CVE-2021-27908,"In all versions prior to Mautic 3.3.2, secret parameters such as database credentials could be exposed publicly by an authorized admin user through leveraging Symfony parameter syntax in any of the free text fields in Mautic’s configuration that are used in publicly facing parts of the application.",yes,template,Symfony %parameter% placeholders
+CVE-2021-22879,"Nextcloud Desktop Client prior to 3.1.3 is vulnerable to resource injection by way of missing validation of URLs, allowing a malicious server to execute remote commands. User interaction is needed for exploitation.",no,,URL opened without validation
+CVE-2006-2765,Cross-site scripting (XSS) vulnerability in news_information.php in Interlink Advantage allows remote attackers to inject arbitrary web script or HTML via the flag parameter.,yes,html_dom,
+CVE-2025-2118,A vulnerability was found in Quantico Tecnologia PRMV 6.48. It has been classified as critical. This affects an unknown part of the file /admin/login.php of the component Login Endpoint. The manipulation of the argument username leads to sql injection. It is possible to initiate the attack remotely. The exploit has been disclosed to the public and may be used.,yes,sql,
+CVE-2007-1361,Cross-site scripting (XSS) vulnerability in virtuemart_parser.php in VirtueMart before 20070213 allows remote attackers to inject arbitrary web script or HTML via unspecified vectors.  NOTE: this issue is probably different than CVE-2007-0376.,yes,html_dom,
+CVE-2025-6078,"Partner Software's Partner Software application and Partner Web application allows an authenticated user to add notes on the 'Notes' page when viewing a job but does not completely sanitize input, making it possible to add notes with HTML tags and JavaScript, enabling an attacker to add a note containing malicious JavaScript, leading to stored XSS (cross-site scripting).",yes,html_dom,
+CVE-2025-50688,"A command injection vulnerability exists in TwistedWeb (version 14.0.0) due to improper input sanitization in the file upload functionality. An attacker can exploit this vulnerability by sending a specially crafted HTTP PUT request to upload a malicious file (e.g., a reverse shell script). Once uploaded, the attacker can trigger the execution of arbitrary commands on the target system, allowing for remote code execution. This could lead to escalation of privileges depending on the privileges of the web server process. The attack does not require physical access and can be conducted remotely, posing a significant risk to the confidentiality and integrity of the system.",no,,upload of executable file; called command injection
+CVE-2018-8168,"An elevation of privilege vulnerability exists when Microsoft SharePoint Server does not properly sanitize a specially crafted web request to an affected SharePoint server, aka ""Microsoft SharePoint Elevation of Privilege Vulnerability."" This affects Microsoft SharePoint Server, Microsoft SharePoint. This CVE ID is unique from CVE-2018-8149, CVE-2018-8155, CVE-2018-8156.",yes,unclear,sanitization failure; target not stated
+CVE-2022-28439,Baby Care System v1.0 was discovered to contain a SQL injection vulnerability via /admin/uesrs.php&&action=delete&userid=4.,yes,sql,
+CVE-2023-52754,"In the Linux kernel, the following vulnerability has been resolved:
+
+media: imon: fix access to invalid resource for the second interface
+
+imon driver probes two USB interfaces, and at the probe of the second
+interface, the driver assumes blindly that the first interface got
+bound with the same imon driver.  It's usually true, but it's still
+possible that the first interface is bound with another driver via a
+malformed descriptor.  Then it may lead to a memory corruption, as
+spotted by syzkaller; imon driver accesses the data from drvdata as
+struct imon_context object although it's a completely different one
+that was assigned by another driver.
+
+This patch adds a sanity check -- whether the first interface is
+really bound with the imon driver or not -- for avoiding the problem
+above at the probe time.",no,,
+CVE-2026-85726,"Chartbrew is an open-source web application that can connect directly to databases and APIs and use the data to create charts. Prior to 5.2.3, a date-typed MongoDB variable placed inside a quoted query placeholder was inserted as an unescaped string, unlike the safely escaped or coerced string, number, and Boolean branches. The vulnerable surface is mongoDB-backed public, shareable, or embedded charts processed by date-variable substitution. An unauthenticated user supplies a crafted URL filter to a public, shareable, or embedded MongoDB chart whose query places a date-typed variable in a quoted literal. The crafted date value breaks out of the quoted literal and changes query logic; the chart's returned row count becomes a Boolean oracle for character-by-character field extraction. The chart must be externally reachable and use the vulnerable date-in-quoted-placeholder branch. Extraction is read-only and limited to one queried collection per request, and it requires neither an account nor a known field value. The blind oracle can disclose any field in the queried collection, including secrets the chart does not display. This issue is fixed in version 5.2.3.",yes,nosql,
+CVE-2018-5692,"Piwigo v2.8.2 has XSS via the `tab`, `to`, `section`, `mode`, `installstatus`, and `display` parameters of the `admin.php` file.",yes,html_dom,
+CVE-2021-23562,This affects the package plupload before 2.3.9. A file name containing JavaScript code could be uploaded and run. An attacker would need to trick a user to upload this kind of file.,yes,html_dom,
+CVE-2024-26621,"In the Linux kernel, the following vulnerability has been resolved:
+
+mm: huge_memory: don't force huge page alignment on 32 bit
+
+commit efa7df3e3bb5 (""mm: align larger anonymous mappings on THP
+boundaries"") caused two issues [1] [2] reported on 32 bit system or compat
+userspace.
+
+It doesn't make too much sense to force huge page alignment on 32 bit
+system due to the constrained virtual address space.
+
+[1] https://lore.kernel.org/linux-mm/d0a136a0-4a31-46bc-adf4-2db109a61672@kernel.org/
+[2] https://lore.kernel.org/linux-mm/CAJuCfpHXLdQy1a2B6xN2d7quTYwg2OoZseYPZTRpU0eHHKD-sQ@mail.gmail.com/",no,,
+CVE-2021-1432,"A vulnerability in the CLI of Cisco IOS XE SD-WAN Software could allow an authenticated, local attacker to execute arbitrary commands on the underlying operating system as the root user. The attacker must be authenticated on the affected device as a low-privileged user to exploit this vulnerability. This vulnerability is due to insufficient validation of user-supplied input. An attacker could exploit this vulnerability by injecting arbitrary commands to a file as a lower-privileged user. The commands are then executed on the device by the root user. A successful exploit could allow the attacker to execute arbitrary commands as the root user.",yes,shell_command,
+CVE-2026-27059,Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting') vulnerability in PenciDesign Penci Recipe penci-recipe allows DOM-Based XSS.This issue affects Penci Recipe: from n/a through <= 4.1.,yes,html_dom,
+CVE-2021-27614,"SAP Business One Hana Chef Cookbook, versions - 8.82, 9.0, 9.1, 9.2, 9.3, 10.0, used to install SAP Business One on SAP HANA, allows an attacker to inject code that can be executed by the application. An attacker could thereby control the behaviour of the application thereby highly impacting the integrity and availability of the application.",yes,unclear,
+CVE-2006-2836,SQL injection vulnerability in comment.php in Pineapple Technologies Lore 1.5.6 and earlier allows remote attackers to execute arbitrary SQL commands via the article_id parameter.,yes,sql,
+CVE-2024-12282,"The WordPress连接微博 WordPress plugin through 2.5.6 does not have CSRF check in some places, and is missing sanitisation as well as escaping, which could allow attackers to make logged in admin add Stored XSS payloads via a CSRF attack.",yes,html_dom,
+CVE-2022-44738,Improper Neutralization of Formula Elements in a CSV File vulnerability in Patrick Robrecht Posts and Users Stats.This issue affects Posts and Users Stats: from n/a through 1.1.3.,yes,formula_csv,
+CVE-2024-41035,"In the Linux kernel, the following vulnerability has been resolved:
+
+USB: core: Fix duplicate endpoint bug by clearing reserved bits in the descriptor
+
+Syzbot has identified a bug in usbcore (see the Closes: tag below)
+caused by our assumption that the reserved bits in an endpoint
+descriptor's bEndpointAddress field will always be 0.  As a result of
+the bug, the endpoint_is_duplicate() routine in config.c (and possibly
+other routines as well) may believe that two descriptors are for
+distinct endpoints, even though they have the same direction and
+endpoint number.  This can lead to confusion, including the bug
+identified by syzbot (two descriptors with matching endpoint numbers
+and directions, where one was interrupt and the other was bulk).
+
+To fix the bug, we will clear the reserved bits in bEndpointAddress
+when we parse the descriptor.  (Note that both the USB-2.0 and USB-3.1
+specs say these bits are ""Reserved, reset to zero"".)  This requires us
+to make a copy of the descriptor earlier in usb_parse_endpoint() and
+use the copy instead of the original when checking for duplicates.",no,,
+CVE-2026-96367,"Privilege Defined With Unsafe Actions vulnerability in Drupal Webform allows Stored XSS. This issue affects Webform versions: from 0.0.0 to 6.2.12, from 6.3.0 to 6.3.1.",yes,html_dom,root cause is privilege definition
+CVE-2014-2260,Cross-site scripting (XSS) vulnerability in plugins/main/content/js/ajenti.coffee in Eugene Pankov Ajenti 1.2.13 allows remote authenticated users to inject arbitrary web script or HTML via the command field in the Cron functionality.,yes,html_dom,
+CVE-2024-42241,"In the Linux kernel, the following vulnerability has been resolved:
+
+mm/shmem: disable PMD-sized page cache if needed
+
+For shmem files, it's possible that PMD-sized page cache can't be
+supported by xarray.  For example, 512MB page cache on ARM64 when the base
+page size is 64KB can't be supported by xarray.  It leads to errors as the
+following messages indicate when this sort of xarray entry is split.
+
+WARNING: CPU: 34 PID: 7578 at lib/xarray.c:1025 xas_split_alloc+0xf8/0x128
+Modules linked in: binfmt_misc nft_fib_inet nft_fib_ipv4 nft_fib_ipv6   \
+nft_fib nft_reject_inet nf_reject_ipv4 nf_reject_ipv6 nft_reject        \
+nft_ct nft_chain_nat nf_nat nf_conntrack nf_defrag_ipv6 nf_defrag_ipv4  \
+ip_set rfkill nf_tables nfnetlink vfat fat virtio_balloon drm fuse xfs  \
+libcrc32c crct10dif_ce ghash_ce sha2_ce sha256_arm64 sha1_ce virtio_net \
+net_failover virtio_console virtio_blk failover dimlib virtio_mmio
+CPU: 34 PID: 7578 Comm: test Kdump: loaded Tainted: G W 6.10.0-rc5-gavin+ #9
+Hardware name: QEMU KVM Virtual Machine, BIOS edk2-20240524-1.el9 05/24/2024
+pstate: 83400005 (Nzcv daif +PAN -UAO +TCO +DIT -SSBS BTYPE=--)
+pc : xas_split_alloc+0xf8/0x128
+lr : split_huge_page_to_list_to_order+0x1c4/0x720
+sp : ffff8000882af5f0
+x29: ffff8000882af5f0 x28: ffff8000882af650 x27: ffff8000882af768
+x26: 0000000000000cc0 x25: 000000000000000d x24: ffff00010625b858
+x23: ffff8000882af650 x22: ffffffdfc0900000 x21: 0000000000000000
+x20: 0000000000000000 x19: ffffffdfc0900000 x18: 0000000000000000
+x17: 0000000000000000 x16: 0000018000000000 x15: 52f8004000000000
+x14: 0000e00000000000 x13: 0000000000002000 x12: 0000000000000020
+x11: 52f8000000000000 x10: 52f8e1c0ffff6000 x9 : ffffbeb9619a681c
+x8 : 0000000000000003 x7 : 0000000000000000 x6 : ffff00010b02ddb0
+x5 : ffffbeb96395e378 x4 : 0000000000000000 x3 : 0000000000000cc0
+x2 : 000000000000000d x1 : 000000000000000c x0 : 0000000000000000
+Call trace:
+ xas_split_alloc+0xf8/0x128
+ split_huge_page_to_list_to_order+0x1c4/0x720
+ truncate_inode_partial_folio+0xdc/0x160
+ shmem_undo_range+0x2bc/0x6a8
+ shmem_fallocate+0x134/0x430
+ vfs_fallocate+0x124/0x2e8
+ ksys_fallocate+0x4c/0xa0
+ __arm64_sys_fallocate+0x24/0x38
+ invoke_syscall.constprop.0+0x7c/0xd8
+ do_el0_svc+0xb4/0xd0
+ el0_svc+0x44/0x1d8
+ el0t_64_sync_handler+0x134/0x150
+ el0t_64_sync+0x17c/0x180
+
+Fix it by disabling PMD-sized page cache when HPAGE_PMD_ORDER is larger
+than MAX_PAGECACHE_ORDER.  As Matthew Wilcox pointed, the page cache in a
+shmem file isn't represented by a multi-index entry and doesn't have this
+limitation when the xarry entry is split until commit 6b24ca4a1a8d (""mm:
+Use multi-index entries in the page cache"").",no,,
+CVE-2024-39483,"In the Linux kernel, the following vulnerability has been resolved:
+
+KVM: SVM: WARN on vNMI + NMI window iff NMIs are outright masked
+
+When requesting an NMI window, WARN on vNMI support being enabled if and
+only if NMIs are actually masked, i.e. if the vCPU is already handling an
+NMI.  KVM's ABI for NMIs that arrive simultanesouly (from KVM's point of
+view) is to inject one NMI and pend the other.  When using vNMI, KVM pends
+the second NMI simply by setting V_NMI_PENDING, and lets the CPU do the
+rest (hardware automatically sets V_NMI_BLOCKING when an NMI is injected).
+
+However, if KVM can't immediately inject an NMI, e.g. because the vCPU is
+in an STI shadow or is running with GIF=0, then KVM will request an NMI
+window and trigger the WARN (but still function correctly).
+
+Whether or not the GIF=0 case makes sense is debatable, as the intent of
+KVM's behavior is to provide functionality that is as close to real
+hardware as possible.  E.g. if two NMIs are sent in quick succession, the
+probability of both NMIs arriving in an STI shadow is infinitesimally low
+on real hardware, but significantly larger in a virtual environment, e.g.
+if the vCPU is preempted in the STI shadow.  For GIF=0, the argument isn't
+as clear cut, because the window where two NMIs can collide is much larger
+in bare metal (though still small).
+
+That said, KVM should not have divergent behavior for the GIF=0 case based
+on whether or not vNMI support is enabled.  And KVM has allowed
+simultaneous NMIs with GIF=0 for over a decade, since commit 7460fb4a3400
+(""KVM: Fix simultaneous NMIs"").  I.e. KVM's GIF=0 handling shouldn't be
+modified without a *really* good reason to do so, and if KVM's behavior
+were to be modified, it should be done irrespective of vNMI support.",no,,
+CVE-2019-15642,"rpc.cgi in Webmin through 1.920 allows authenticated Remote Code Execution via a crafted object name because unserialise_variable makes an eval call. NOTE: the Webmin_Servers_Index documentation states ""RPC can be used to run any command or modify any file on a server, which is why access to it must not be granted to un-trusted Webmin users.""",yes,code_eval,Perl eval in unserialise_variable
+CVE-2013-3628,Zabbix 2.0.9 has an Arbitrary Command Execution Vulnerability,no,,vague command execution; no injection stated
+CVE-2025-47948,"Cocotais Bot is a QQ official robot framework based on qq-bot-sdk. Starting in version 1.5.0-test2-hotfix and prior to version 1.6.2, command echoing feature in the framework allows users to indirectly trigger privileged behavior by injecting special platform tags. Specifically, an unauthorized user can use the `/echo <qqbot-at-everyone />` command to cause the bot to send a message that mentions all members in the chat, bypassing any permission controls. This can lead to spam, disruption, or abuse of notification systems. Version 1.6.2 contains a patch for the issue.",yes,other,platform message tags
+CVE-2014-3996,"SQL injection vulnerability in the LinkViewFetchServlet servlet in ManageEngine Desktop Central (DC) and Desktop Central Managed Service Providers (MSP) edition before 9 build 90043, Password Manager Pro (PMP) and Password Manager Pro Managed Service Providers (MSP) edition before 7 build 7003, IT360 and IT360 Managed Service Providers (MSP) edition before 10.3.3 build 10330, and possibly other ManageEngine products, allows remote attackers or remote authenticated users to execute arbitrary SQL commands via the sv parameter to LinkViewFetchServlet.dat.",yes,sql,
+CVE-2024-26726,"In the Linux kernel, the following vulnerability has been resolved:
+
+btrfs: don't drop extent_map for free space inode on write error
+
+While running the CI for an unrelated change I hit the following panic
+with generic/648 on btrfs_holes_spacecache.
+
+assertion failed: block_start != EXTENT_MAP_HOLE, in fs/btrfs/extent_io.c:1385
+------------[ cut here ]------------
+kernel BUG at fs/btrfs/extent_io.c:1385!
+invalid opcode: 0000 [#1] PREEMPT SMP NOPTI
+CPU: 1 PID: 2695096 Comm: fsstress Kdump: loaded Tainted: G        W          6.8.0-rc2+ #1
+RIP: 0010:__extent_writepage_io.constprop.0+0x4c1/0x5c0
+Call Trace:
+ <TASK>
+ extent_write_cache_pages+0x2ac/0x8f0
+ extent_writepages+0x87/0x110
+ do_writepages+0xd5/0x1f0
+ filemap_fdatawrite_wbc+0x63/0x90
+ __filemap_fdatawrite_range+0x5c/0x80
+ btrfs_fdatawrite_range+0x1f/0x50
+ btrfs_write_out_cache+0x507/0x560
+ btrfs_write_dirty_block_groups+0x32a/0x420
+ commit_cowonly_roots+0x21b/0x290
+ btrfs_commit_transaction+0x813/0x1360
+ btrfs_sync_file+0x51a/0x640
+ __x64_sys_fdatasync+0x52/0x90
+ do_syscall_64+0x9c/0x190
+ entry_SYSCALL_64_after_hwframe+0x6e/0x76
+
+This happens because we fail to write out the free space cache in one
+instance, come back around and attempt to write it again.  However on
+the second pass through we go to call btrfs_get_extent() on the inode to
+get the extent mapping.  Because this is a new block group, and with the
+free space inode we always search the commit root to avoid deadlocking
+with the tree, we find nothing and return a EXTENT_MAP_HOLE for the
+requested range.
+
+This happens because the first time we try to write the space cache out
+we hit an error, and on an error we drop the extent mapping.  This is
+normal for normal files, but the free space cache inode is special.  We
+always expect the extent map to be correct.  Thus the second time
+through we end up with a bogus extent map.
+
+Since we're deprecating this feature, the most straightforward way to
+fix this is to simply skip dropping the extent map range for this failed
+range.
+
+I shortened the test by using error injection to stress the area to make
+it easier to reproduce.  With this patch in place we no longer panic
+with my error injection test.",no,,
+CVE-2025-10740,"The URL Shortener Plugin For WordPress plugin for WordPress is vulnerable to unauthorized access to functionality provided by the API due to a missing capability check on the verifyRequest function in all versions up to, and including, 3.0.7. This makes it possible for authenticated attackers, with Subscriber-level access and above, to modify links.",no,,

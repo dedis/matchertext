@@ -15,7 +15,7 @@ simulation. Arms:
   quote / escape / bind   the legacy value defences (%Q, %q, a bound ?).
   mt                      the value hole, %m -> M'(...)'.
   mt_strict               the verify-or-refuse route, VERIFY then %m.
-  ident_mt                the name hole, [...] over the name-encoded identifier.
+  ident_mt                the name hole, [...] over the encoded identifier.
 
 A payload counts against a defence only where the control actually breaks out
 (the effective set); a fragment that never parses is not an attack.
@@ -29,8 +29,8 @@ import sys
 import threading
 from collections import Counter, defaultdict
 from pathlib import Path
-from urllib.parse import unquote_to_bytes
 
+import adaptive
 from export import write
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,6 +39,8 @@ EXPORTS = ROOT / "data" / "exports"
 BUILD = ROOT / "data" / "build"
 SQLITE_TREE = ROOT / "sqlite"
 AMALG = BUILD / "sqlite" / "sqlite3.c"
+STOCK_AMALG = BUILD / "sqlite-stock" / "sqlite3.c"   # the same tree without matchertext
+STOCK_READER = BUILD / "stock_reader"
 # Lemon reads this flag too, so the amalgamation is generated with it.
 AMALG_OPTIONS = "-DSQLITE_ENABLE_MATCHERTEXT"
 SRC = ROOT / "test" / "matchertext" / "csrc" / "sqli_driver.c"
@@ -57,8 +59,12 @@ FAITHFUL_ARMS = ("mt", "mt_strict", "mt_v")
 TYPED_ARMS = ("mt_v", "ident_i")           # the strict-mode ?V / ?I paths
 # Arms whose inertness rests on the scanner, so a broken scanner must flip them.
 # mt_v is a bound parameter, safe like the additive bind arm, so it is excluded.
-SCORE_ARMS = MT_ARMS + ("ident_i",)
-LEGACY_ARMS = ("concat", "quote", "escape", "bind", "ident_concat")
+SCORE_ARMS = MT_ARMS + TYPED_ARMS
+LEGACY_ARMS = ("concat", "quote", "escape", "bind", "ident_concat", "ident_quote")
+# The columns of the fixture table t1, its rowid, and a name that matches none:
+# the names an identifier hole may hold without adding SQL. A double-quoted
+# name that matches no column is a string literal to SQLite.
+FIXTURE_NAMES = ("name", "id", "rowid", "no_such_column")
 CONTROL_ARMS = ("concat", "ident_concat")
 RAW_HOSTS = {"numeric_eq", "numeric_paren", "value_in", "expr_order", "expr_limit"}
 SQLITE_ATOM = re.compile(
@@ -84,8 +90,8 @@ def verify(s):
 
 
 def name_decode(s):
-    """A [...] identifier is read with the name alphabet: matcher escapes decode,
-    every other byte (backslash included) is verbatim."""
+    """A [...] identifier is read with the escape alphabet: matcher escapes
+    decode, every other byte (backslash included) is verbatim."""
     out, i = [], 0
     while i < len(s):
         if s[i] == "\\" and s[i + 1:i + 4] in UNESCAPE:
@@ -113,15 +119,23 @@ def build_amalgamation():
          "the matchertext amalgamation", AMALG.parent)
 
 
-def _compile(binary, extra):
+def build_stock_amalgamation():
+    """The amalgamation of the same tree without matchertext: stock SQLite."""
+    STOCK_AMALG.parent.mkdir(parents=True, exist_ok=True)
+    if not (STOCK_AMALG.parent / "Makefile").exists():
+        _run([str(SQLITE_TREE / "configure")], "the stock SQLite build tree", STOCK_AMALG.parent)
+    _run(["make", "sqlite3.c", "sqlite3.h"], "the stock amalgamation", STOCK_AMALG.parent)
+
+
+def _compile(binary, extra, src=SRC, amalg=AMALG):
     """Build one driver, unless it is newer than its sources and was built
     with the same command."""
     cc = os.environ.get("CC", "cc")
-    cmd = [cc, "-O2", "-o", str(binary), str(SRC), str(AMALG), "-I", str(AMALG.parent),
-           "-DSQLITE_ENABLE_MATCHERTEXT", *extra, "-DSQLITE_THREADSAFE=1",
+    cmd = [cc, "-O2", "-o", str(binary), str(src), str(amalg), "-I", str(amalg.parent),
+           *extra, "-DSQLITE_THREADSAFE=1",
            "-DHAVE_USLEEP=1", "-DSQLITE_OMIT_LOAD_EXTENSION", "-lm", "-lpthread"]
     stamp = binary.with_suffix(".cmd")
-    fresh = max(SRC.stat().st_mtime, AMALG.stat().st_mtime)
+    fresh = max(src.stat().st_mtime, amalg.stat().st_mtime)
     if (binary.exists() and binary.stat().st_mtime > fresh and stamp.exists()
             and stamp.read_text() == "\0".join(cmd)):
         return
@@ -130,12 +144,39 @@ def _compile(binary, extra):
     stamp.write_text("\0".join(cmd))
 
 
+# A2: each matchertext entry point that takes SQL must compile a literal and
+# refuse a run-time string.
+A2_PROBES = {
+    "prepare_v3": "sqlite3_matchertext_prepare_v3(db, {t}, -1, 0, 0, 0, pp)",
+    "sql_append": "sqlite3_matchertext_sql_append(sqlite3_matchertext_sql_new(), {t})",
+}
+
+
+def check_constant_sql():
+    cc = os.environ.get("CC", "cc")
+    probe = BUILD / "a2_probe.c"
+    for name, call in A2_PROBES.items():
+        for template, compiles in (('"SELECT 1"', True), ("z", False)):
+            probe.write_text('#include "sqlite3.h"\n'
+                             "void f(sqlite3 *db, const char *z, sqlite3_stmt **pp){\n"
+                             f"  (void)z; (void)pp; (void)db; {call.format(t=template)};\n}}\n")
+            r = subprocess.run([cc, "-fsyntax-only", "-DSQLITE_ENABLE_MATCHERTEXT",
+                                "-I", str(AMALG.parent), str(probe)],
+                               capture_output=True, text=True)
+            if (r.returncode == 0) != compiles:
+                sys.exit(f"A2 guard: {name} with {template} "
+                         f"{'does not compile' if compiles else 'compiles'}:\n{r.stderr[-2000:]}")
+
+
 def build_driver():
     """Build both the additive (default) driver and the strict driver, the
     latter to measure that the same delivery paths are refused wholesale."""
     build_amalgamation()
-    _compile(BIN, [])
-    _compile(BIN_STRICT, ["-DSQLITE_MATCHERTEXT_STRICT"])
+    check_constant_sql()
+    _compile(BIN, ["-DSQLITE_ENABLE_MATCHERTEXT"])
+    _compile(BIN_STRICT, ["-DSQLITE_ENABLE_MATCHERTEXT", "-DSQLITE_MATCHERTEXT_STRICT"])
+    build_stock_amalgamation()
+    _compile(STOCK_READER, [], SRC.parent / "stock_reader.c", STOCK_AMALG)
 
 
 # Deliberately broken scanners, to prove the oracle can see a defect at all.
@@ -153,7 +194,26 @@ SABOTAGE = {
         """SQLITE_PRIVATE int sqlite3MatchertextVerify(const unsigned char *z, i64 n){
   (void)z; (void)n; return 1;
 }"""),
+    "encode_identity": (
+        "SQLITE_PRIVATE char *sqlite3MatchertextEncode(const char *z, i64 n, i64 *pnOut){",
+        """SQLITE_PRIVATE char *sqlite3MatchertextEncode(const char *z, i64 n, i64 *pnOut){
+  char *zOut = sqlite3_malloc64(n+1);
+  if( zOut==0 ) return 0;
+  memcpy(zOut, z, (size_t)n);
+  zOut[n] = 0;
+  if( pnOut ) *pnOut = n;
+  return zOut;
+}"""),
+    "decode_identity": (
+        "SQLITE_PRIVATE i64 sqlite3MatchertextDecodeInPlace(char *z, i64 n){",
+        """SQLITE_PRIVATE i64 sqlite3MatchertextDecodeInPlace(char *z, i64 n){
+  (void)z; return n;
+}"""),
 }
+# Sabotages that let a value out of its hole: the run fails unless they turn
+# some contained case into a breakout. For the encoder only the probes below
+# can: no recorded payload has an unmatched closer followed by SQL.
+BREAKOUT_SABOTAGE = ("end_scans_to_first_closer", "encode_identity")
 
 
 def _replace_fn(src, signature, replacement):
@@ -223,6 +283,41 @@ class Driver:
             self.fail("stopped before its baselines")
         return out
 
+    def name_skeletons(self, ident_hosts):
+        """For each identifier pair, the skeletons of the statement that names a
+        real column of the fixture."""
+        out = defaultdict(set)
+        for v in FIXTURE_NAMES:
+            self.p.stdin.write(f"S {v.encode().hex()}\nR\n")
+            self.p.stdin.flush()
+            for line in self.p.stdout:
+                f = line.split()
+                if f[0] == "end":
+                    break
+                if f[0] != "ok" and int(f[0]) in ident_hosts \
+                        and f[2 + IDX["outcome"]] == "ok":
+                    out[(int(f[0]), int(f[1]))].add(f[2 + IDX["skel"]])
+            else:
+                self.fail("stopped in the name skeletons")
+        return out
+
+    def compose(self, values):
+        """Yield (value index, host, arm, SQL) for the statement each text hole
+        arm composes, SQL None where the arm refuses the value."""
+        w = self.p.stdin
+        for i, v in enumerate(values):
+            w.write(f"S {v.encode('utf-8', 'surrogateescape').hex()}\nQ\n")
+            w.flush()
+            if self.p.stdout.readline().split() != ["ok"]:
+                self.fail("did not take a value")
+            for line in self.p.stdout:
+                f = line.split()
+                if f[0] == "end":
+                    break
+                yield i, int(f[0]), int(f[1]), None if f[2] == "-" else unhex(f[2])
+            else:
+                self.fail("stopped in a composition")
+
     def sweep(self, values):
         """Yield (value index, host, arm, fields). Every value must end with its
         "end" line and the driver must exit cleanly, or the run is unusable."""
@@ -271,33 +366,34 @@ def refused(res):
             and unhex(res[IDX["err"]]).startswith("matchertext requires"))
 
 
-def verdict(arm, res, base, payload, is_ident, raw=False):
+def verdict(arm, res, base, payload, is_ident, raw=False, names=frozenset()):
     """INERT / BREAKOUT / REJECTED / MALFORMED.
 
     A breakout is a prepared statement whose parse differs from the benign
     baseline in structure, leaves SQL after the first statement (a stacked
     query), or returns more rows than the baseline. REJECTED is VERIFY
     refusing an unbalanced piece. For a name hole an identifier that resolves
-    nowhere is inert when the whole payload became that name.
+    nowhere is inert when the whole payload became that name, and one that
+    resolves is inert when the statement compiles as it does for a real column
+    of the fixture (names, from Driver.name_skeletons).
     """
     outcome = res[IDX["outcome"]]
     if outcome == "rejected":
         return "REJECTED"
     if outcome == "parse":
         # A name hole that resolves nowhere is contained when the whole payload
-        # became that one name. The name encoder and ?I give back the payload
-        # exactly; raw concatenation is read with the name alphabet.
+        # became that one name. The encoder and ?I give back the payload
+        # exactly; raw concatenation is read with the escape alphabet.
         if is_ident and res[IDX["name"]] != "-":
             got = unhex(res[IDX["name"]])
             if got == payload or (arm == "ident_concat" and got == name_decode(payload)):
                 return "INERT"
         return "MALFORMED"
     if is_ident:
-        # A name that resolves is one identifier by construction; naming a
-        # different real column than the baseline compiles differently, so the
-        # skeleton is not the oracle. Row count and no tail carry it.
-        if res[IDX["tail"]] == "0" and res[IDX["nrow"]] == base[IDX["nrow"]] \
-           and res[IDX["ro"]] == base[IDX["ro"]]:
+        # Naming another real column compiles differently from the baseline,
+        # so the skeleton is compared with that of every real column: SQL the
+        # value added, such as a subquery, compiles to none of them.
+        if res[IDX["tail"]] == "0" and res[IDX["skel"]] in names:
             return "INERT"
         return "BREAKOUT"
     if raw and arm == "concat" and SQLITE_ATOM.fullmatch(payload.strip()) \
@@ -322,6 +418,7 @@ def strict_sweep(con, payloads):
     drv = Driver(BIN_STRICT, strict=True)
     base = drv.baselines()
     ident_hosts = {h for h, (_, hole, _) in drv.hosts.items() if hole == 2}
+    names = drv.name_skeletons(ident_hosts)
     tally = defaultdict(lambda: [0, 0, 0, 0, 0])  # inert, breakout, rejected, refused, malformed
     lost = Counter()
     pending, cur = {}, -1
@@ -337,7 +434,7 @@ def strict_sweep(con, payloads):
                     f"VERIFY mismatch for payload {idx} ({arm}/{drv.hosts[h][0]}): "
                     f"python={expected} c={accepted} value={o[:160]!r}")
                 v = verdict(arm, r, base[(h, a)], o, h in ident_hosts,
-                            drv.hosts[h][0] in RAW_HOSTS)
+                            drv.hosts[h][0] in RAW_HOSTS, names[(h, a)])
                 tally[arm][{"INERT": 0, "BREAKOUT": 1, "REJECTED": 2,
                             "MALFORMED": 4}[v]] += 1
                 lost[arm] += unfaithful(drv, h, a, r)
@@ -387,6 +484,22 @@ def strict_sweep(con, payloads):
     return fail
 
 
+def benign_rejection(con):
+    """Strict ?V refuses a value that is not matchertext. Measure how often
+    that refuses benign text: the descriptions of the CVEs outside the corpus,
+    prose that no one wrote as an attack."""
+    texts = rejected = 0
+    for (desc,) in con.execute(
+            """SELECT description FROM cve WHERE state='PUBLISHED'
+               AND description IS NOT NULL
+               AND cve_id NOT IN (SELECT cve_id FROM classification)"""):
+        texts += 1
+        rejected += not verify(desc)
+    print(f"\nbenign text: strict ?V refuses {rejected:,} of {texts:,} "
+          f"CVE descriptions ({rejected / max(texts, 1):.2%})")
+    write("sqli_benign_rejection.csv", ["texts", "rejected"], [(texts, rejected)])
+
+
 def _sqlite_literals(payload):
     """Map exact PostgreSQL/SQL Server text literals to SQLite text literals."""
     out = []
@@ -431,14 +544,8 @@ def _sqlite_literals(payload):
 
 
 def sqlite_equivalent(payload):
-    """Apply only transport, literal, and comment rewrites with equal meaning."""
-    try:
-        decoded = unquote_to_bytes(payload).decode("utf-8")
-        if "\0" not in decoded:
-            payload = decoded
-    except UnicodeError:
-        pass
-
+    """Apply only literal and comment rewrites with equal meaning. The payload
+    is already canonical (matchertext.canon), so no transport decoding is left."""
     payload = _sqlite_literals(payload)
 
     quote = None
@@ -508,6 +615,7 @@ VMAP = {"INERT": 0, "BREAKOUT": 1, "REJECTED": 2, "MALFORMED": 3}
 RESULT_TABLES = ("mt_sqli_host", "mt_sqli_arm", "mt_sqli_value", "mt_sqli_case",
                  "mt_sqli_combo", "mt_sqli_strict")
 OUTPUTS = ("sqli_arm_outcomes.csv", "sqli_by_arm.csv", "sqli_exemplars.csv",
+           "sqli_benign_rejection.csv", "sqli_adaptive.csv", "sqli_downgrade.csv",
            "sqli_sabotage.csv")
 
 
@@ -524,6 +632,7 @@ def run(args):
     base = drv.baselines()
     control = {drv.arm_id["concat"], drv.arm_id["ident_concat"]}
     ident_hosts = {h for h, (_, hole, _) in drv.hosts.items() if hole == 2}
+    names = drv.name_skeletons(ident_hosts)
 
     con.executescript(DDL)
     con.executemany("INSERT INTO mt_sqli_host VALUES(?,?,?,?)",
@@ -544,7 +653,7 @@ def run(args):
             if drv.arms[a][0] in TYPED_ARMS:
                 continue          # the strict paths are measured by strict_sweep
             v = verdict(drv.arms[a][0], r, base[(h, a)], o, h in ident_hosts,
-                        drv.hosts[h][0] in RAW_HOSTS)
+                        drv.hosts[h][0] in RAW_HOSTS, names[(h, a)])
             if a in control and v == "BREAKOUT":
                 eff_pairs.add((h, o))
             guard[(drv.arms[a][0], v)] += 1
@@ -586,9 +695,15 @@ def run(args):
 
     fail = report(guard, eff_pairs, payloads, len(cases))
     fail += strict_sweep(con, payloads)
+    benign_rejection(con)
+    values = [("adaptive", v) for v in adaptive.values(
+        "sql", {o for _, o in eff_pairs}, {p for _, p in payloads}, 3000, 500)]
+    targeted, targeted_fail = run_adaptive(values)
+    fail += targeted_fail
+    downgrade = run_downgrade(payloads + values)
     sabotage = []
     if not getattr(args, "skip_sabotage", False):
-        sabotage, sabotage_fail = run_sabotage(payloads[:args.sabotage_n])
+        sabotage, sabotage_fail = run_sabotage(payloads[:getattr(args, "sabotage_n", None)])
         fail += sabotage_fail
     if fail:
         # Leave no result that a later stage could read as valid.
@@ -597,9 +712,15 @@ def run(args):
             (EXPORTS / name).unlink(missing_ok=True)
         sys.exit(f"\n{len(fail)} guard failure(s): the run is not usable")
     export(con)
+    write("sqli_downgrade.csv", ["arm", "n", "refused", "inert", "breakout"], downgrade)
+    write("sqli_adaptive.csv",
+          ["arm", "values", "n", "inert", "breakout", "rejected", "malformed", "effective",
+           "eff_breakout"], targeted)
     if sabotage:
         write("sqli_sabotage.csv",
-              ["sabotage", "arm", "cases", "changed_verdict", "detection_rate"], sabotage)
+              ["sabotage", "arm", "cases", "detected", "to_breakout", "to_breakout_probe",
+               "detection_rate"],
+              sabotage)
     con.close()
 
 
@@ -627,20 +748,22 @@ def export(con):
                          ORDER BY a.name, c.verdict, v.value LIMIT 4000"""))
 
 
-def verdicts_for(payloads, binary=None, selfcheck=True):
+def verdicts_for(payloads, binary=None, selfcheck=True, arms=SCORE_ARMS):
     drv = Driver(binary, selfcheck)
     base = drv.baselines()
     ident_hosts = {h for h, (_, hole, _) in drv.hosts.items() if hole == 2}
+    names = drv.name_skeletons(ident_hosts)
     out, pending, cur = {}, {}, -1
 
     def score(idx, rows):
         o = payloads[idx][1]
         for (h, a), r in rows.items():
             arm = drv.arms[a][0]
-            if arm in SCORE_ARMS:
-                out[(idx, h, arm)] = verdict(arm, r, base[(h, a)], o,
-                                             h in ident_hosts,
-                                             drv.hosts[h][0] in RAW_HOSTS)
+            if arm in arms:
+                out[(idx, h, arm)] = (
+                    verdict(arm, r, base[(h, a)], o, h in ident_hosts,
+                            drv.hosts[h][0] in RAW_HOSTS, names[(h, a)]),
+                    unfaithful(drv, h, a, r))
 
     for i, h, a, r in drv.sweep(p for _, p in payloads):
         if i != cur:
@@ -653,34 +776,129 @@ def verdicts_for(payloads, binary=None, selfcheck=True):
     return out
 
 
-# Identifiers whose [...] boundary is decided by matcher balance, so the
-# FINDEMBEDEND sabotage has something to change. The corpus rarely nests
-# brackets, so these are supplied explicitly.
-SABOTAGE_PROBES = ["a[b]", "x[]y", "id[z]", "p[q[r]s]", "n[a[m]e]", "a[b]c[d]"]
+def run_adaptive(values):
+    """The hole-targeted set (adaptive.py) through every arm of the additive
+    build, reported apart from the recorded corpus. As for the corpus, the
+    hole arms must not break out where the control does."""
+    out = verdicts_for(values, arms=MT_ARMS + TYPED_ARMS + LEGACY_ARMS)
+    eff = {(i, h) for (i, h, arm), (v, _) in out.items()
+           if arm in CONTROL_ARMS and v == "BREAKOUT"}
+    per_arm = defaultdict(lambda: [0] * 7)   # n, the four verdicts, effective, eff breakout
+    lost = Counter()
+    for (i, h, arm), (v, unf) in out.items():
+        c = per_arm[arm]
+        c[0] += 1
+        c[1 + VMAP[v]] += 1
+        c[5] += (i, h) in eff
+        c[6] += (i, h) in eff and v == "BREAKOUT"
+        lost[arm] += unf
+    rows = [(arm, len(values), *per_arm[arm]) for arm in LEGACY_ARMS + MT_ARMS + TYPED_ARMS]
+    print(f"\nhole-targeted set: {len(values):,} values, {len(eff):,} effective (value, fixture) pairs")
+    print(f"{'arm':13} {'inert':>8} {'breakout':>9} {'rejected':>9} {'malformed':>10}")
+    for arm, _, n, *c, e, eb in rows:
+        print(f"{arm:13} " + "".join(f"{x:>{w},}" for x, w in zip(c, (8, 10, 10, 11))))
+    fail = [f"hole-targeted: the {a} control never broke out" for a in CONTROL_ARMS
+            if not per_arm[a][2]]
+    fail += [f"hole-targeted: {a} produced {per_arm[a][2]:,} breakouts" for a in SCORE_ARMS
+             if per_arm[a][2]]
+    fail += [f"hole-targeted: {a} changed {lost[a]:,} values" for a in SCORE_ARMS if lost[a]]
+    for f in fail:
+        print("  GUARD: " + f)
+    return rows, fail
+
+
+# The benign values of the fixtures and the fixture names: a stock reading
+# that compiles as one of these does is inert.
+DOWNGRADE_BENIGN = ("alice", "1", "999999") + FIXTURE_NAMES
+
+
+def run_downgrade(payloads):
+    """An aware writer with a stock reader: the statements the text hole arms
+    compose for the corpus and the hole-targeted set, read by stock SQLite
+    (stock_reader.c, the same tree without matchertext). A case is refused
+    where the reader does not prepare it, inert where it compiles as a benign
+    value or a fixture name does and returns no more rows, else a breakout."""
+    reader = subprocess.Popen([str(STOCK_READER)], stdin=subprocess.PIPE,
+                              stdout=subprocess.PIPE, text=True)
+
+    def read(sql):
+        reader.stdin.write(sql.encode("utf-8", "surrogateescape").hex() + "\n")
+        reader.stdin.flush()
+        f = reader.stdout.readline().split()
+        if not f:
+            sys.exit(f"stock_reader stopped (exit {reader.wait()})")
+        return f[0] if len(f) == 1 else (f[0], int(f[1]))
+
+    drv = Driver()
+    benign = defaultdict(set)     # (host, arm) -> skeletons of the benign readings
+    most = defaultdict(int)       # (host, arm) -> most rows of a benign reading
+    for _, h, a, sql in drv.compose(DOWNGRADE_BENIGN):
+        r = read(sql) if sql is not None else "refused"
+        if isinstance(r, tuple):
+            benign[(h, a)].add(r[0])
+            most[(h, a)] = max(most[(h, a)], r[1])
+    counts = defaultdict(Counter)
+    for _, h, a, sql in drv.compose([p for _, p in payloads]):
+        if sql is None:
+            continue              # the arm refused the value: nothing reaches the reader
+        r = read(sql)
+        if isinstance(r, tuple):
+            v = "inert" if r[0] in benign[(h, a)] and r[1] <= most[(h, a)] else "breakout"
+        else:
+            v = "refused" if r == "refused" else "breakout"
+        counts[drv.arms[a][0]][v] += 1
+    for p in (drv.p, reader):
+        p.stdin.close()
+        if p.wait():
+            sys.exit("a driver failed in the downgrade test")
+    rows = [(arm, sum(c.values()), c["refused"], c["inert"], c["breakout"])
+            for arm, c in sorted(counts.items())]
+    print("\ndowngrade: the text holes read by stock SQLite")
+    for row in rows:
+        print("  {:10} n={:>8,} refused={:>8,} inert={:>8,} breakout={:>8,}".format(*row))
+    return rows
+
+
+# Values the corpus lacks. Identifiers whose [...] boundary is decided by
+# matcher balance, so the FINDEMBEDEND sabotage has something to change, and an
+# unmatched closer then SQL, which a broken encoder lets out of its hole.
+SABOTAGE_PROBES = ["a[b]", "x[]y", "id[z]", "p[q[r]s]", "n[a[m]e]", "a[b]c[d]",
+                   ")' OR '1'='1' --", "name], (SELECT 1) --"]
 
 
 def run_sabotage(payloads):
-    """G1. Break the scanner and require the matchertext arms to change verdict."""
+    """G1. Break the locator, VERIFY, the encoder, or the decoder, and require
+    the matchertext arms to notice: a changed verdict or a changed value. A
+    sabotage that lets a value out of its hole must also produce breakouts."""
     payloads = [("probe", p) for p in SABOTAGE_PROBES] + list(payloads)
     honest = verdicts_for(payloads)
     rows, fail = [], []
     for name in SABOTAGE:
         broken = verdicts_for(payloads, build_sabotage(name), selfcheck=False)
-        per_arm = defaultdict(lambda: [0, 0])
-        for key, v in honest.items():
+        # cases, detected, to breakout from recorded payloads, from probes
+        per_arm = defaultdict(lambda: [0, 0, 0, 0])
+        for key, (v, lost) in honest.items():
+            bv, blost = broken.get(key, (v, lost))
             c = per_arm[key[2]]
             c[0] += 1
-            c[1] += int(broken.get(key, v) != v)
+            c[1] += int(bv != v or blost != lost)
+            c[3 if key[0] < len(SABOTAGE_PROBES) else 2] += int(
+                bv == "BREAKOUT" and v != "BREAKOUT")
         for arm in SCORE_ARMS:
-            n, d = per_arm[arm]
-            rows.append((name, arm, n, d, round(d / n, 4) if n else 0))
-    print("\nG1 sabotage: a deliberately broken scanner must change the verdict")
-    for name, arm, n, d, rate in rows:
-        print(f"  {name:28} {arm:10} {d:>7,}/{n:<8,} {rate:>7.1%}")
+            n, d, b, bp = per_arm[arm]
+            rows.append((name, arm, n, d, b, bp, round(d / n, 4) if n else 0))
+    print("\nG1 sabotage: a broken matchertext core must change a verdict or a value")
+    print(f"  {'sabotage':28} {'arm':10} {'detected':>16} {'rate':>7}"
+          f" {'to breakout':>12} {'of probes':>10}")
+    for name, arm, n, d, b, bp, rate in rows:
+        print(f"  {name:28} {arm:10} {d:>7,}/{n:<8,} {rate:>7.1%} {b:>12,} {bp:>10,}")
     for name in SABOTAGE:
         if not any(r[3] for r in rows if r[0] == name):
             fail.append(f"sabotage {name} went unnoticed")
-            print(f"  G1: sabotage {name} went unnoticed by every arm")
+        if name in BREAKOUT_SABOTAGE and not any(r[4] + r[5] for r in rows if r[0] == name):
+            fail.append(f"sabotage {name} produced no breakout")
+    for f in fail:
+        print("  G1: " + f)
     return rows, fail
 
 
@@ -688,7 +906,7 @@ def report(guard, eff_pairs, payloads, ncase):
     print(f"\nsqli sweep: {ncase:,} cases over {len(payloads):,} distinct payloads")
     print(f"effective set: {len({p for _, p in eff_pairs}):,} payloads break out undefended")
     arms = ["concat", "quote", "escape", "bind", "mt", "mt_strict",
-            "ident_concat", "ident_mt"]
+            "ident_concat", "ident_quote", "ident_mt"]
     print(f"\n{'arm':13} {'inert':>8} {'breakout':>9} {'rejected':>9} {'malformed':>10}")
     for a in arms:
         print(f"{a:13} " + "".join(
@@ -714,5 +932,5 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--limit", type=int, help="use only the first N payloads")
     ap.add_argument("--skip-sabotage", action="store_true")
-    ap.add_argument("--sabotage-n", type=int, default=4000)
+    ap.add_argument("--sabotage-n", type=int, help="sabotage only the first N payloads")
     run(ap.parse_args())

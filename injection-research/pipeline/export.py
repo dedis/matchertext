@@ -96,19 +96,23 @@ def cwe_disagreement(con):
           ["cve_id", "cna_family", "adp_family", "nvd_family"], sorted(rows))
 
 
-def audit_sample(con, per_method=AUDIT_PER_METHOD):
+def audit_rows(con, per_method=AUDIT_PER_METHOD):
+    """A hash-ordered, hence fixed and effectively random, sample per labeling layer."""
     rows = []
     for (method,) in con.execute("SELECT DISTINCT method FROM classification ORDER BY method"):
-        sample = sorted(
+        rows.extend(sorted(
             con.execute("""SELECT c.cve_id, c.weakness_family, c.syntax_type, c.method,
-                                  c.confidence, substr(v.description, 1, 500)
+                                  c.confidence, v.description
                            FROM classification c JOIN cve v USING(cve_id)
                            WHERE c.method=?""", (method,)),
-            key=lambda r: hashlib.md5(r[0].encode()).hexdigest())[:per_method]
-        rows.extend(sample)
+            key=lambda r: hashlib.md5(r[0].encode()).hexdigest())[:per_method])
+    return rows
+
+
+def audit_sample(con, per_method=AUDIT_PER_METHOD):
     write("audit_sample.csv",
           ["cve_id", "weakness_family", "syntax_type", "method", "confidence", "description"],
-          rows)
+          [(*r[:5], (r[5] or "")[:500]) for r in audit_rows(con, per_method)])
 
 
 def coverage(con):
@@ -120,7 +124,7 @@ def coverage(con):
         ["published_with_epss", q("""SELECT COUNT(*) FROM cve v JOIN epss USING(cve_id)
                                      WHERE v.state='PUBLISHED'""")],
         ["injection_related", q("SELECT COUNT(*) FROM classification")],
-        ["injection_with_poc", q("""SELECT COUNT(DISTINCT cve_id) FROM poc
+        ["injection_with_poc", q("""SELECT COUNT(DISTINCT cve_id) FROM poc_evidence
                                     WHERE cve_id IN (SELECT cve_id FROM classification)""")],
         ["sanity_xss_n", q("SELECT COUNT(*) FROM classification WHERE syntax_type='html_dom'")],
         ["sanity_sqli_n", q("SELECT COUNT(*) FROM classification WHERE syntax_type='sql'")],
@@ -166,7 +170,7 @@ def poc_by_source(con):
     write("poc_by_source.csv", ["source", "poc_rows", "distinct_cves", "injection_cves"],
           con.execute("""SELECT p.source, COUNT(*), COUNT(DISTINCT p.cve_id),
                                 COUNT(DISTINCT c.cve_id)
-                         FROM poc p LEFT JOIN classification c USING(cve_id)
+                         FROM poc_evidence p LEFT JOIN classification c USING(cve_id)
                          GROUP BY 1 ORDER BY 2 DESC"""))
 
 

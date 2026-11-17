@@ -4,10 +4,15 @@
 // judgement of the corpus lives in pipeline/html_experiment.py: this prints
 // measurements.
 //
-// Usage: node html_driver.mjs <path to packages/parse5/dist/index.js>
+// Usage: node html_driver.mjs <path to packages/parse5/dist/index.js> [--bytes]
 //
-// A parser without the matchertext option is stock parse5: with the option off
-// the fork passes the whole stock test suite unchanged.
+// With the matchertext options off in the parser and the serializer, the fork
+// passes the whole stock test suite unchanged.
+//
+// --bytes adds two arms that write the document of the element or attribute
+// hole as UTF-8 bytes and decode them as a reader does (A3 at the byte level):
+// mt_utf8 with the WHATWG UTF-8 decoder, and mt_sjis with the Shift_JIS
+// decoder, a charset that the writer did not declare.
 //
 // Input: one JSON object per line, {"i": index, "v": value}.
 // Output: one JSON object per line:
@@ -36,9 +41,15 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
 const distPath = process.argv[2];
-const { parse, serialize, composeHtml, verifyMatchertext, MatchertextError, defaultTreeAdapter: adapter } = await import(
-    pathToFileURL(distPath).href
-);
+const {
+    parse,
+    serialize,
+    composeHtml,
+    htmlTemplate,
+    verifyMatchertext,
+    MatchertextError,
+    defaultTreeAdapter: adapter,
+} = await import(pathToFileURL(distPath).href);
 // The escaping that parse5 itself uses, from the fork's own dependencies.
 const { escapeText, escapeAttribute } = createRequire(distPath)('entities/escape');
 
@@ -70,6 +81,24 @@ const HOSTS = [
     { name: 'comment', kind: 'comment' },
 ].map((host) => ({ pre: '', post: '', wrap: ['', ''], ...host }));
 
+// The compose arm writes each host as a template literal, since composeHtml takes no markup built at run time. The
+// startup check below holds each to the document of its host.
+const COMPOSE = {
+    text: (v) => htmlTemplate`<div id=h [${v}]>`,
+    table_cell: (v) => htmlTemplate`<table><tr><td id=h [${v}]></tr></table>`,
+    svg_text: (v) => htmlTemplate`<svg><text id=h [${v}]></svg>`,
+    textarea: (v) => htmlTemplate`<textarea id=h [${v}]>`,
+    title: (v) => htmlTemplate`<title id=h [${v}]>`,
+    style: (v) => htmlTemplate`<style id=h [${v}]>`,
+    script_string: (v) => htmlTemplate`<script id=h [var x = "${v}";]>`,
+    attr_dq: (v) => htmlTemplate`<div id=h title=[${v}]></div>`,
+    attr_sq: (v) => htmlTemplate`<div id=h title=[${v}]></div>`,
+    attr_unquoted: (v) => htmlTemplate`<div id=h title=[${v}]></div>`,
+    href: (v) => htmlTemplate`<a id=h href=[${v}]></a>`,
+    onclick: (v) => htmlTemplate`<a id=h onclick=[${v}]></a>`,
+};
+
+const BYTE_ARMS = { mt_utf8: 'utf-8', mt_sjis: 'shift_jis' };
 const ARMS = [
     'concat',
     'escape',
@@ -80,8 +109,9 @@ const ARMS = [
     'mt_section',
     'mt_encode',
     'compose',
+    ...(process.argv[3] === '--bytes' ? Object.keys(BYTE_ARMS) : []),
 ];
-const MT_ARMS = new Set(['dom_mt', 'mt_verify', 'mt_section', 'mt_encode', 'compose']);
+const MT_ARMS = new Set(['dom_mt', 'mt_verify', 'mt_section', 'mt_encode', 'compose', 'mt_utf8']);
 // The serializer writes raw text that the guard refuses as a matchertext element when the text is matchertext.
 const MT_OUTPUT = { matchertextOutput: true };
 
@@ -207,11 +237,13 @@ function write(host, arm, v) {
                 return html === null ? 'REJECTED' : parse(html, MT);
             }
             case 'compose': {
-                const strings =
-                    host.kind === 'text'
-                        ? [`${host.pre}<${host.tag} id=h [${w0}`, `${w1}]>${host.post}`]
-                        : [`${host.pre}<${host.tag} id=h ${host.attr}=[`, `]></${host.tag}>${host.post}`];
-                return composeHtml(strings, [v]);
+                return composeHtml(COMPOSE[host.name](v));
+            }
+            case 'mt_utf8':
+            case 'mt_sjis': {
+                const html = matchertextDocument(host, 'mt_verify', v);
+                if (html === null) return 'REJECTED';
+                return parse(new TextDecoder(BYTE_ARMS[arm]).decode(new TextEncoder().encode(html)), MT);
             }
         }
     } catch (error) {
@@ -280,7 +312,9 @@ function shape(host, document) {
 
         const isHole = value === null && node.attrs?.some(({ name, value: v }) => name === 'id' && v === 'h');
         const attrs = (node.attrs ?? [])
-            .map(({ name, value: v }) => (isHole && host.kind === 'attr' && name === host.attr ? `${name}=HOLE` : `${name}=${JSON.stringify(v)}`))
+            .map(({ name, value: v }) =>
+                isHole && host.kind === 'attr' && name === host.attr ? `${name}=HOLE` : `${name}=${JSON.stringify(v)}`,
+            )
             .join(' ');
         const kids = children(node);
 
@@ -333,8 +367,10 @@ function matchertextDocument(host, arm, v) {
                 throw error;
             }
         }
-        case 'compose': {
-            // composeHtml writes no document; the equivalent document is the one mt_verify writes.
+        case 'compose':
+        case 'mt_utf8': {
+            // composeHtml writes no document; the equivalent document is the one mt_verify writes. mt_utf8 sends
+            // that document as bytes.
             return matchertextDocument(host, 'mt_verify', v);
         }
     }
@@ -390,6 +426,27 @@ for (const [h, host] of HOSTS.entries()) {
     for (const [a, arm] of ARMS.entries()) {
         if (legal(host, arm)) pairs.push([h, a]);
     }
+}
+
+// A2: composeHtml must refuse markup that is not a template literal.
+for (const forged of [
+    () => htmlTemplate(['<p [', ']>'], 'x'),
+    () => composeHtml({ strings: ['<p [', ']>'], values: ['x'] }),
+]) {
+    try {
+        forged();
+    } catch (error) {
+        if (error instanceof TypeError) continue;
+        throw error;
+    }
+    fail('composeHtml accepted markup that is not a template literal');
+}
+
+// Each compose template must write the document that mt_verify writes for its host.
+for (const host of HOSTS) {
+    if (!legal(host, 'compose')) continue;
+    const want = serialize(parse(matchertextDocument(host, 'mt_verify', BENIGN), MT));
+    if (serialize(composeHtml(COMPOSE[host.name](BENIGN))) !== want) fail(`compose template of ${host.name} differs`);
 }
 
 // The benign value gives the structure every arm must keep. A baseline that is not inert means a broken host.

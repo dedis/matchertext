@@ -27,7 +27,7 @@ FAMILY_ANCHORS = {
     # executable regular expression is code evaluation, and LLM prompt
     # injection has its own syntax. Without these anchors both resolve to 77.
     624: CODE, 1427: OTHER,
-    74: OTHER, 75: OTHER, 91: OTHER, 99: OTHER, 1236: OTHER,
+    74: OTHER, 75: OTHER, 91: OTHER, 1236: OTHER,
 }
 
 SYNTAX_ANCHORS = {
@@ -61,10 +61,17 @@ REVIEWED_INHERITED = {
     76: (OTHER, True, None),
 }
 
-# CWE-99 descendants that are not injection: duplicate identifiers, file names,
-# and dynamically chosen variables. No untrusted value enters an embedded
+# CWE-99 (resource injection) and its descendants are not injection: the value
+# names a resource, a file, an identifier, or a variable, and enters no embedded
 # language. They carry no labels and do not admit a CVE to the corpus.
-NOT_INJECTION = {102, 462, 621, 627, 641, 694, 914}
+NOT_INJECTION = {99, 102, 462, 621, 627, 641, 694, 914}
+
+# NVD long gave CWE-94 to memory corruption that ends in code execution. A
+# code-eval label from a CWE alone is dropped when the description names memory
+# corruption and no phrase rule names an injection.
+MEMORY_CORRUPTION = re.compile(
+    r"\b(?:memory corruption|corrupt(?:s|ion of)? memory|(?:buffer|heap|stack|integer) overflow"
+    r"|use[- ]after[- ]free|double free|out[- ]of[- ]bounds|dangling pointer)\b", re.I)
 
 # CWE-74 itself and CWE-75 carry no syntax information; a family derived only
 # from these may be refined by phrase rules or the NB classifier.

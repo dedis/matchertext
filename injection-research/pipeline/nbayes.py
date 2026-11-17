@@ -1,20 +1,23 @@
-"""Character-trigram multinomial naive Bayes, stdlib only."""
+"""Word unigram and bigram multinomial naive Bayes, stdlib only."""
 import math
+import re
 from collections import Counter
 
-
-def trigrams(text):
-    t = " ".join(text.lower().split())
-    return [t[i:i + 3] for i in range(len(t) - 2)]
+WORD = re.compile(r"[a-z0-9_]+")
 
 
-class TrigramNB:
+def features(text):
+    w = WORD.findall(text.lower())
+    return w + [a + " " + b for a, b in zip(w, w[1:])]
+
+
+class WordNB:
     def fit(self, texts, labels):
         self.classes = sorted(set(labels))
         docs = Counter(labels)
         feat = {c: Counter() for c in self.classes}
         for text, y in zip(texts, labels):
-            feat[y].update(trigrams(text))
+            feat[y].update(features(text))
         self.vocab = set().union(*feat.values())
         n = len(labels)
         self.log_prior = {c: math.log(docs[c] / n) for c in self.classes}
@@ -27,7 +30,7 @@ class TrigramNB:
 
     def predict(self, text):
         """Returns (label, margin) where margin is the log-odds gap to the runner-up."""
-        grams = [g for g in trigrams(text) if g in self.vocab]
+        grams = [g for g in features(text) if g in self.vocab]
         best = second = -math.inf
         label = self.classes[0]
         for c in self.classes:

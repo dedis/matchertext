@@ -17,7 +17,9 @@ import sqlite3
 from collections import defaultdict
 from pathlib import Path
 
-from report import TRUNCATED, extract_payload
+import matchertext
+from export import write
+from report import EXTENDED, TRUNCATED, extract_payload
 
 ROOT = Path(__file__).resolve().parents[1]
 DB = ROOT / "data" / "cve.db"
@@ -85,6 +87,15 @@ def skeleton(payload):
     return " ".join(out)
 
 
+def group_skeleton(syntax, payload):
+    """The skeleton, led by matchertext.SINK when an HTML/DOM payload runs in an
+    execution context, so that one group never mixes the two."""
+    sk = skeleton(payload)
+    if syntax in matchertext.PAYLOAD_DEPENDENT and matchertext.html_sink(payload):
+        return f"{matchertext.SINK} {sk}"
+    return sk
+
+
 def representative_payload(con):
     syn_of = dict(con.execute("SELECT cve_id, syntax_type FROM classification"))
     paths = defaultdict(list)
@@ -138,11 +149,16 @@ def representative_payload(con):
 
 def run(args):
     con = sqlite3.connect(DB)
-    rows = []
+    rows, canonicalized = [], 0
     for cid, syn, payload in representative_payload(con):
+        # Every later measurement reads this value (premise A3).
+        canonical = matchertext.canon(payload)
+        canonicalized += canonical != payload
+        payload = canonical
         sk = skeleton(payload)
         if not sk or sk.strip("<idnqTAG /|;&=*+.:,-") == "":
             continue
+        sk = group_skeleton(syn, payload)
         gid = hashlib.md5(f"{syn}\x00{sk}".encode()).hexdigest()[:12]
         rows.append((cid, syn, gid, sk, payload))
 
@@ -157,8 +173,14 @@ def run(args):
 
     groups = con.execute("SELECT COUNT(DISTINCT group_id) FROM syntactic_group").fetchone()[0]
     print(f"syntactic groups: {len(rows)} CVEs -> {groups} distinct skeletons")
+    print(f"payloads changed by canonicalization: {canonicalized}")
     print("fragments dropped as cut mid-expression: "
           + (", ".join(f"{s} {n}" for s, n in TRUNCATED.most_common()) or "none"))
+    print("fragments completed with the closers that follow: "
+          + (", ".join(f"{s} {n}" for s, n in EXTENDED.most_common()) or "none"))
+    write("extraction_balance.csv", ["syntax_type", "dropped_cut", "completed"],
+          [(s, TRUNCATED[s], EXTENDED[s]) for s in sorted(TRUNCATED.keys() | EXTENDED.keys())])
+    write("canonicalization.csv", ["payloads", "changed"], [(len(rows), canonicalized)])
     for sk, n in con.execute("""SELECT skeleton, COUNT(*) c FROM syntactic_group
                                 GROUP BY skeleton ORDER BY c DESC LIMIT 8"""):
         print(f"  {n:>5}  {sk[:70]}")

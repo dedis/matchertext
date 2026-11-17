@@ -19,6 +19,7 @@ import sqlite3
 from collections import defaultdict
 from pathlib import Path
 
+import audit
 import export
 import matchertext
 
@@ -212,7 +213,7 @@ def tbl_syntax(con, top=6):
             SELECT c.syntax_type, COUNT(*) n,
                    COUNT(DISTINCT CASE WHEN p.cve_id IS NOT NULL THEN c.cve_id END) w
             FROM classification c
-            LEFT JOIN (SELECT DISTINCT cve_id FROM poc) p USING(cve_id)
+            LEFT JOIN (SELECT DISTINCT cve_id FROM poc_evidence) p USING(cve_id)
             GROUP BY 1 ORDER BY n DESC""").fetchall()
     lines = ["\\begin{tabular}{lrr}", "\\toprule",
              "Injection syntax & CVEs & with PoC \\\\", "\\midrule"]
@@ -236,7 +237,7 @@ def tbl_poc_sources(con):
     for src, rows, cves, inj in con.execute("""
             SELECT p.source, COUNT(*), COUNT(DISTINCT p.cve_id),
                    COUNT(DISTINCT CASE WHEN c.cve_id IS NOT NULL THEN p.cve_id END)
-            FROM poc p LEFT JOIN classification c USING(cve_id)
+            FROM poc_evidence p LEFT JOIN classification c USING(cve_id)
             GROUP BY 1 ORDER BY 2 DESC"""):
         lines.append(f"\\texttt{{{src}}} & {num(rows)} & {num(cves)} & {num(inj)} \\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
@@ -262,24 +263,20 @@ SQLI_ARMS = [
     ("quote",        "\\texttt{\\%Q} escaping",    "legacy"),
     ("escape",       "\\texttt{\\%q} escaping",    "legacy"),
     ("bind",         "Bound parameter",           "legacy"),
+    ("ident_quote",  "\\texttt{\"\\%w\"} name escaping", "legacy"),
     ("mt",           "\\texttt{M'(\\ldots)'} value hole", "mt"),
     ("mt_strict",    "\\textsc{Verify} then \\texttt{M'(\\ldots)'}", "mt"),
     ("ident_mt",     "\\texttt{[\\ldots]} name hole",     "mt"),
 ]
 
 
-# The strict build has no in-band holes: the value hole's strict form is the
-# typed ?V parameter (mt_v) and the name hole's is ?I (ident_i). Every other
-# delivery path splices text through the refused legacy prepare.
-STRICT_OF = {"mt": "mt_v", "mt_strict": "mt_v", "ident_mt": "ident_i"}
-
-
 def tbl_sqli_arms(con):
     """Verdict counts per delivery path, additive build beside strict. In the
     additive default the matcher-delimited holes contain every payload and the
-    controls break out. Under strict the legacy prepare is refused, so the typed
-    ?V and ?I API is the only path; it contains every payload the same way, and
-    every text-splicing path is refused wholesale."""
+    controls break out. Under strict every text-splicing path, in-band holes
+    included, is refused; the typed ?V and ?I parameters, which the prose
+    reports, are the admitted paths. Refused counts both Verify rejections and
+    refused prepares."""
     add = {a: r for a, *r in con.execute(
         """SELECT arm, SUM(n_inert), SUM(n_breakout), SUM(n_rejected),
                   SUM(n_malformed) FROM mt_sqli_combo GROUP BY arm""")}
@@ -301,16 +298,109 @@ def tbl_sqli_arms(con):
         if group != last:
             lines.append("\\midrule")
             last = group
-        src = STRICT_OF.get(arm)
-        if src and src in strict:
-            si, sb, sr, _, sm = strict[src]      # ?V / ?I: inert, breakout, rejected, malformed
-            scells = [si, sb, sr, sm]
-        else:                                    # legacy path: refused before the parser
-            scells = [0, 0, strict.get(arm, [0, 0, 0, 0, 0])[3], 0]
-        cells = list(add[arm]) + scells
-        lines.append(f"{label:34} & " + " & ".join(num(v) for v in cells) + " \\\\")
+        acells = [num(v) for v in add[arm]]
+        if arm in strict:
+            si, sb, sr, sf, sm = strict[arm]
+            scells = [num(v) for v in (si, sb, sr + sf, sm)]
+        else:
+            scells = ["--"] * 4
+        lines.append(f"{label:34} & " + " & ".join(acells + scells) + " \\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
     return "\n".join(lines) + "\n"
+
+
+def extraction_macros():
+    """How canonicalization (premise A3) and the two extraction rules that read
+    matcher balance touched the payload-backed set (syntactic_group.py)."""
+    with open(EXPORTS / "canonicalization.csv", newline="") as f:
+        canon = next(csv.DictReader(f))
+    with open(EXPORTS / "extraction_balance.csv", newline="") as f:
+        rows = list(csv.DictReader(f))
+    return [("CanonChanged", num(int(canon["changed"]))),
+            ("BalanceDropped", num(sum(int(r["dropped_cut"]) for r in rows))),
+            ("BalanceCompleted", num(sum(int(r["completed"]) for r in rows)))]
+
+
+def targeted_macros():
+    """The hole-targeted sets (adaptive.py), reported apart from the recorded
+    corpus, the byte arms of the HTML set, and the SQL holes read by a stock
+    SQLite."""
+    def rows(name):
+        with open(EXPORTS / name, newline="") as f:
+            return {r["arm"]: {k: int(v) for k, v in r.items() if k != "arm"}
+                    for r in csv.DictReader(f)}
+    sql, html = rows("sqli_adaptive.csv"), rows("html_adaptive.csv")
+    down = rows("sqli_downgrade.csv")
+    sql_holes = ("mt", "mt_strict", "ident_mt", "mt_v", "ident_i")
+    # The paper says a stock SQLite refuses every value-hole statement.
+    for a in ("mt", "mt_strict"):
+        assert down[a]["refused"] == down[a]["n"], f"stock SQLite read a {a} statement"
+    return [
+        ("SqliTargetedValues", num(sql["concat"]["values"])),
+        ("SqliTargetedEffective",
+         num(sql["concat"]["eff_breakout"] + sql["ident_concat"]["eff_breakout"])),
+        ("SqliTargetedHoleCases", num(sum(sql[a]["n"] for a in sql_holes))),
+        ("HtmlTargetedValues", num(html["concat"]["values"])),
+        ("HtmlTargetedEffective", num(html["concat"]["eff_breakout"])),
+        ("HtmlUtfEightRead", num(html["mt_utf8"]["n"] - html["mt_utf8"]["rejected"])),
+        ("HtmlSjisBreakout", num(html["mt_sjis"]["breakout"])),
+        ("SqliDowngradeValueCases", num(sum(down[a]["n"] for a in ("mt", "mt_strict")))),
+        ("SqliDowngradeNameCases", num(down["ident_mt"]["n"])),
+        ("SqliDowngradeNameBreakout", num(down["ident_mt"]["breakout"])),
+    ]
+
+
+def compat_macros():
+    """SQLite's test suite on the additive build (compat.py), quoted when
+    compat.csv exists: it runs apart from the pipeline."""
+    path = EXPORTS / "compat.csv"
+    if not path.exists():
+        return []
+    with open(path, newline="") as f:
+        r = {row["build"]: row for row in csv.DictReader(f)}
+    return [("SqliteSuiteTests", num(int(r["additive"]["tests"]))),
+            ("SqliteSuiteStockErrors", num(int(r["stock"]["errors"])))]
+
+
+def perf_macros():
+    """Timings of the forks (perf.py), quoted when perf.csv exists: it runs
+    apart from the pipeline."""
+    path = EXPORTS / "perf.csv"
+    if not path.exists():
+        return []
+    with open(path, newline="") as f:
+        r = {row["case"]: (float(row["baseline"]), float(row["fork"])) for row in csv.DictReader(f)}
+    lengths = sorted(int(c.rsplit("_", 1)[1]) for c in r if c.startswith("prepare_typed_"))
+    lo, hi = lengths[0], lengths[-1]
+
+    def per_byte(path):
+        return (r[f"prepare_{path}_{hi}"][1] - r[f"prepare_{path}_{lo}"][1]) / (hi - lo)
+    ratio = lambda case: r[case][1] / r[case][0]
+    return [
+        ("PerfSpeedtestRatio", f"{ratio('speedtest1'):.2f}"),
+        ("PerfTypedShortExtraNs", num(round(r[f"prepare_typed_{lo}"][1] - r[f"prepare_typed_{lo}"][0]))),
+        ("PerfTypedShortLength", num(lo)),
+        ("PerfTypedNsPerByte", f"{per_byte('typed'):.1f}"),
+        ("PerfMtNsPerByte", f"{per_byte('mt'):.1f}"),
+        ("PerfParseRatio", f"{max(ratio('parse5_parse'), ratio('parse5_parse_matchertext')):.2f}"),
+        ("PerfSerializeRatio", f"{ratio('parse5_serialize'):.2f}"),
+    ]
+
+
+def audit_macros(con):
+    """Quoted once the label audit's gold.csv is complete; absent before."""
+    m = audit.metrics(con)
+    if m is None:
+        return []
+    ci = lambda r: f"{pct(r[0], 1)} ({pct(r[1], 1)}--{pct(r[2], 1)})"
+    rows = [("AuditGraded", num(m["graded"])),
+            ("AuditHostableShare",
+             ci((m["hostable_share"], m["hostable_low"], m["hostable_high"])))]
+    if m["kappa"] is not None:
+        rows.append(("AuditKappa", f"{m['kappa']:.2f}"))
+    for layer, p in m["precision"].items():
+        rows.append((f"AuditPrecision{layer.title()}", ci(p)))
+    return rows
 
 
 def sqli_macros(con):
@@ -391,9 +481,20 @@ def sqli_macros(con):
     sab = EXPORTS / "sqli_sabotage.csv"
     if sab.exists():
         with open(sab, newline="") as f:
-            best = max((float(r["detection_rate"]) for r in csv.DictReader(f)),
-                       default=0.0)
-        vals.append(("SqliSabotageDetect", pct(best, 1)))
+            rows = list(csv.DictReader(f))
+        vals += [("SqliSabotageDetect",
+                  pct(max((float(r["detection_rate"]) for r in rows), default=0.0), 1)),
+                 ("SqliSabotageBreakouts", num(sum(int(r["to_breakout"]) for r in rows))),
+                 ("SqliSabotageProbeBreakouts",
+                  num(sum(int(r["to_breakout_probe"]) for r in rows)))]
+    benign = EXPORTS / "sqli_benign_rejection.csv"
+    if benign.exists():
+        with open(benign, newline="") as f:
+            r = next(csv.DictReader(f))
+        texts, rejected = int(r["texts"]), int(r["rejected"])
+        vals += [("SqliBenignTexts", num(texts)),
+                 ("SqliBenignRejected", num(rejected)),
+                 ("SqliBenignRejectedShare", pct(rejected / max(texts, 1), 2))]
     return vals
 
 
@@ -501,7 +602,8 @@ def html_macros(con):
             rows = list(csv.DictReader(f))
         vals += [("HtmlSabotages", num(len(rows))),
                  ("HtmlSabotageDetected",
-                  num(sum(r["detection"] != "unnoticed" for r in rows)))]
+                  num(sum(r["detection"] != "unnoticed" for r in rows))),
+                 ("HtmlSabotageBreakouts", num(sum(int(r["to_breakout"]) for r in rows)))]
     return vals
 
 
@@ -516,7 +618,7 @@ def run(args):
 
     published = q("SELECT COUNT(*) FROM cve WHERE state='PUBLISHED'")
     injection = q("SELECT COUNT(*) FROM classification")
-    with_poc = q("""SELECT COUNT(DISTINCT cve_id) FROM poc
+    with_poc = q("""SELECT COUNT(DISTINCT cve_id) FROM poc_evidence
                     WHERE cve_id IN (SELECT cve_id FROM classification)""")
 
     # Projection: the context condition is readable from the syntax label alone,
@@ -524,6 +626,18 @@ def run(args):
     # measured on the payload-backed HTML/DOM subset discounts the ceiling.
     hosts = "','".join(sorted(matchertext.HOST))
     hostable = q(f"SELECT COUNT(*) FROM classification WHERE syntax_type IN ('{hosts}')")
+    # The counterfactual under the same premise A2: SQL and HTML/DOM already have
+    # a deployed per-language defense (parameterized queries, contextual
+    # auto-escaping), and they hold most of the hostable CVEs.
+    per_language = q("""SELECT COUNT(*) FROM classification
+                        WHERE syntax_type IN ('sql', 'html_dom')""")
+    # The ceiling is a design choice: the share if every non-matcher context got
+    # a hole form as SQL does, and the share among known-exploited CVEs.
+    with_nm = "','".join(sorted(matchertext.HOST | set(matchertext.NONMATCHER)))
+    hostable_nm = q(f"SELECT COUNT(*) FROM classification WHERE syntax_type IN ('{with_nm}')")
+    kev_inj = q("SELECT COUNT(*) FROM classification JOIN kev USING(cve_id)")
+    kev_host = q(f"""SELECT COUNT(*) FROM classification JOIN kev USING(cve_id)
+                     WHERE syntax_type IN ('{hosts}')""")
     htmldom = q("SELECT COUNT(*) FROM classification WHERE syntax_type='html_dom'")
     hd_backed = inert["html_dom"] + reject["html_dom"] + outside["html_dom"]
     js_rate = outside["html_dom"] / hd_backed if hd_backed else 0
@@ -553,12 +667,29 @@ def run(args):
             resolved.append((suite, cwe, n, fam, syn or ""))
     resolved.sort(key=lambda r: (r[0], -r[2]))
 
-    # Naive-Bayes holdout scores, weighted by class support, from the CSV
-    # classify.py writes. Blank precision/recall mean the class never scored.
-    nb = list(csv.DictReader(open(ROOT / "data" / "exports" / "nb_holdout.csv")))
-    nb_n = sum(int(r["test_n"]) for r in nb) or 1
-    wmean = lambda k: sum(float(r[k] or 0) * int(r["test_n"]) for r in nb) / nb_n
-    per = {r["class"]: r for r in nb}
+    # Label sensitivity: a CWE-labeled CVE whose CWEs map to syntaxes on both
+    # sides of the hostable boundary keeps the first by source priority.
+    # Resolving every such conflict away from HOST gives the lowest ceiling the
+    # CWE layer supports.
+    cve_cwes = defaultdict(set)
+    for cid, cwe in con.execute("""SELECT a.cve_id, a.cwe_id FROM cwe_assignment a
+                                   JOIN classification c USING(cve_id)
+                                   WHERE c.method='cwe'"""):
+        cve_cwes[cid].add(cwe)
+    cwe_label = dict(con.execute(
+        "SELECT cve_id, syntax_type FROM classification WHERE method='cwe'"))
+    syn_of = {}
+    label_conflicts = 0
+    for cid, cwes in cve_cwes.items():
+        syns = set()
+        for cwe in cwes:
+            if cwe not in syn_of:
+                syn_of[cwe] = labels_from_cwes([cwe], parents)[2]
+            if syn_of[cwe]:
+                syns.add(syn_of[cwe])
+        if cwe_label[cid] in matchertext.HOST and syns - matchertext.HOST:
+            label_conflicts += 1
+
     methods = dict(con.execute("SELECT method, COUNT(*) FROM classification GROUP BY 1"))
     n_groups = q("SELECT COUNT(DISTINCT group_id) FROM syntactic_group")
     singletons = q("""SELECT COUNT(*) FROM
@@ -586,25 +717,16 @@ def run(args):
         ("MethodNb", num(methods.get("nb", 0))),
         ("MethodNbShare", pct(methods.get("nb", 0) / injection, 1)),
         ("MethodUnknown", num(methods.get("unknown", 0))),
-        ("NbTestDocs", num(nb_n)),
-        ("NbPrecision", f"{wmean('precision'):.3f}"),
-        ("NbRecall", f"{wmean('recall'):.3f}"),
-        ("NbCoverage", pct(float(nb[0]["coverage"]) if nb else 0)),
-        ("NbPrecisionHtmlDom", f"{float(per['html_dom']['precision']):.2f}"),
-        ("NbRecallHtmlDom", f"{float(per['html_dom']['recall']):.2f}"),
-        ("NbPrecisionSql", f"{float(per['sql']['precision']):.2f}"),
-        ("NbRecallSql", f"{float(per['sql']['recall']):.2f}"),
-        ("NbPrecisionCodeEval", f"{float(per['code_eval']['precision']):.2f}"),
-        ("NbRecallCodeEval", f"{float(per['code_eval']['recall']):.2f}"),
         ("MethodDeterministicShare",
          pct((methods.get("cwe", 0) + methods.get("rule", 0)) / injection, 1)),
         ("AuditPerMethod", num(export.AUDIT_PER_METHOD)),
+        *audit_macros(con),
         ("InjectionWithPoc", num(with_poc)),
         ("InjectionWithPocShare", pct(with_poc / injection)),
-        ("PocRows", num(q("SELECT COUNT(*) FROM poc"))),
+        ("PocRows", num(q("SELECT COUNT(*) FROM poc_evidence"))),
         # per-source PoC reach over the whole corpus, for \cref{sec:data}
         *[(f"Poc{''.join(c for c in s.title() if c.isalpha())}CVEs", num(n)) for s, n in con.execute(
-            "SELECT source, COUNT(DISTINCT cve_id) FROM poc GROUP BY 1 ORDER BY 2 DESC")],
+            "SELECT source, COUNT(DISTINCT cve_id) FROM poc_evidence GROUP BY 1 ORDER BY 2 DESC")],
         ("KevRows", num(q("SELECT COUNT(*) FROM kev"))),
         ("VedasScored", num(q("""SELECT COUNT(*) FROM cve v JOIN exploit_score USING(cve_id)
                                  WHERE v.state='PUBLISHED'"""))),
@@ -646,9 +768,25 @@ def run(args):
         ("SqlRejected", num(reject["sql"])),
         ("LdapInert", num(inert["ldap"])),
         ("LdapRejected", num(reject["ldap"])),
+        # the general LDAP payload lists, not aimed at a CVE (validate.py)
+        ("LdapCorpus", num(q("SELECT COUNT(*) FROM payload_assessment WHERE syntax_type='ldap'"))),
+        ("LdapCorpusInert", num(q("""SELECT COUNT(*) FROM payload_assessment
+                                     WHERE syntax_type='ldap' AND mechanism='inert'"""))),
+        *extraction_macros(),
+        *targeted_macros(),
+        *perf_macros(),
+        *compat_macros(),
         # projection onto the full corpus
         ("HostableCVEs", num(hostable)),
         ("HostableShare", pct(hostable / injection)),
+        ("HostableWithNonmatcherShare", pct(hostable_nm / injection)),
+        ("HostableShareExact", pct(hostable / injection, 1)),
+        ("PerLanguageShare", pct(per_language / injection, 1)),
+        ("PerLanguageOfHostable", pct(per_language / hostable, 1)),
+        ("LabelConflictCVEs", num(label_conflicts)),
+        ("HostableLowShare", pct((hostable - label_conflicts) / injection, 1)),
+        ("KevInjectionCVEs", num(kev_inj)),
+        ("KevHostableShare", pct(kev_host / kev_inj)),
         ("HtmlDomCVEs", num(htmldom)),
         ("HtmlDomBacked", num(hd_backed)),
         ("HtmlDomJsSinks", num(outside["html_dom"])),
