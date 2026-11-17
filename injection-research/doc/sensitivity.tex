@@ -1,0 +1,24 @@
+\section{Corpus sensitivity and payload provenance}
+\label{sec:appendix:corpus}
+
+\begin{table}[h]
+\centering
+\caption{Delimitable share (scope, exploitation), contained share
+(projection), and attack strings among \dataPayloadAuditPerSource graded
+payloads per source (provenance). 95\% intervals.}
+\label{tab:sens}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\input{generated/tbl-sensitivity}
+\end{table}
+
+The gate's neighbors (CWE-116/117, encoding; CWE-140/150, delimiters; CWE-134,
+format strings; CWE-611, XXE) name no language a value is parsed in. OWASP's
+\dataOwaspCWEs CWEs give \dataOwaspStyleCVEs CVEs in this snapshot,
+\dataOwaspStyleInCorpus in the corpus; most others carry CWE-20
+(\dataOwaspStyleCweTwenty). EPSS is of \dataEpssDate. The central interval
+resamples HTML/DOM skeleton groups; a per-source or per-year row applies one
+sink rate (at least \dataMinStratum{} CVEs) to all. One rater graded payloads
+blind to the source, and the delivery rules from the description: the upload
+rule holds for \dataRulePrecisionWholeDocument, the language-model rule for
+\dataRulePrecisionLlmMediated.

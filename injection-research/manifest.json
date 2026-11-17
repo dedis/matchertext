@@ -252,7 +252,7 @@
     "ghsl_page": 835,
     "remote_attempt": 15953,
     "remote_payload": 13947,
-    "sha256": "bc7747aca226e39ec1c1c256942b0552b8b82725fc4ff638bac45c5cb20db8e1",
+    "sha256": "477e31e7f85e875c992850c1a792caf62c7e30b8dea8a464e0aafda0eddf6f9e",
     "web_payload": 452
   },
   "some-poc-or-exp": {
@@ -261,6 +261,15 @@
     "license": "NOASSERTION",
     "url": "https://github.com/coffeehb/Some-PoC-oR-ExP.git",
     "use": "research-only"
+  },
+  "toolchain": {
+    "cc": "Apple clang version 21.0.0 (clang-2100.4.1.1)",
+    "lean": "leanprover/lean4:v4.33.0-rc1",
+    "node": "v26.0.0",
+    "parse5-fork": "14f46549e1d7d4041e6ca85970022b18309e3bda",
+    "python": "3.14.7",
+    "sqlite-fork": "51a40b27651684f405add11ccab562f0ad89238d",
+    "tcl": "9.0.4"
   },
   "trickest-cve": {
     "commit": "cd1cce0f59136b6fe4011223cad28c76c77c44a8",
@@ -276,13 +285,6 @@
     "commit": "12068c70ac2b3a7d371213a5509f59809ac1d99c",
     "fetched": "2026-11-15",
     "url": "https://github.com/cisagov/vulnrichment.git"
-  },
-  "wy876-poc": {
-    "fetched": "2026-11-15",
-    "license": "NOASSERTION",
-    "status": "unavailable",
-    "url": "https://github.com/wy876/POC.git",
-    "use": "repository terms apply"
   },
   "xray": {
     "commit": "aee9f9cecc3d49a1842a33c38b96af35a7d90168",

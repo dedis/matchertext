@@ -15,6 +15,8 @@ and NVD, else other sources; the subtree excludes \mbox{CWE-99} and descendants,
 and \mbox{CWE-94} is dropped where the description names memory corruption.
 This yields \textbf{\dataInjectionCVEs} injection CVEs, \textbf{\dataInjectionSharePrecise} of published
 records, spanning \dataInjectionCWEs distinct CWEs.
+Its neighbors, and the OWASP CWEs outside it, name no language a value is
+parsed in (\cref{sec:appendix:corpus}).
 
 \paragraph{Layered labeling}
 Each CVE's syntax type is resolved by a fallback chain, ordered from most to
@@ -27,6 +29,7 @@ Second, phrase rules over the CNA description (``SQL injection'', \dots).
 Third, a word naive-Bayes classifier, trained on the labeled set and on the
 gate's rejects as a not-injection class, labels the rest above a margin.
 Fourth, an explicit \texttt{unknown} bucket.
+Where a language model writes the syntax, the label is an LLM prompt (A4).
 Of the injection CVEs, \dataMethodCwe (\dataMethodCweShare) are labeled deterministically from CWEs,
 \dataMethodRule from phrase rules, \dataMethodNb from naive Bayes, and only \dataMethodUnknown remain
 unknown, so the classification rests overwhelmingly on the deterministic

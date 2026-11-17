@@ -12,19 +12,18 @@ Dimensions and their strongest signal:
   technique                                     <- PoC payload -> description
   engine                                        <- payload dialect / product name
   injection_point / impact                      <- description phrase rules
+  delivery                                      <- description phrase rule (HTML/DOM)
 Only determined labels are stored; coverage is (rows in dimension)/(injection CVEs).
 """
 import argparse
 import re
 import sqlite3
-from collections import defaultdict
 from pathlib import Path
 
-from report import extract_payload
+from taxonomy import whole_document
 
 ROOT = Path(__file__).resolve().parents[1]
 DB = ROOT / "data" / "cve.db"
-RAW = ROOT / "data" / "raw"
 # lower index = more authoritative source for the CVSS vector
 CVSS_SRC = {"cna": 0, "adp_cisa": 1, "nvd": 2, "ghsa": 3, "redhat": 4, "nuclei": 5}
 VER_RANK = {"4.0": 0, "3.1": 1, "3.0": 2, "2.0": 3}
@@ -159,40 +158,14 @@ def run(args):
     syn_of = dict(con.execute("SELECT cve_id, syntax_type FROM classification"))
     desc_of = dict(con.execute("""SELECT cve_id, COALESCE(description, '') FROM cve
                                   WHERE cve_id IN (SELECT cve_id FROM classification)"""))
-    poc_paths = defaultdict(list)
-    # Ordered so the representative payload per CVE is a property of the data,
-    # not of physical row order: without it, ingesting a new PoC source silently
-    # reshuffles which file each CVE's payload is extracted from.
-    for cid, lp in con.execute("""SELECT cve_id, local_path FROM poc
-                                  WHERE local_path IS NOT NULL
-                                  ORDER BY cve_id, source, ref"""):
-        if cid in syn_of:
-            poc_paths[cid].append(lp)
     vectors = best_vectors(con)
-    # Same fallback as syntactic_group: local file first, then a payload
-    # recovered from a linked GitHub repo.
-    def _table(name):
-        return con.execute("""SELECT COUNT(*) FROM sqlite_master
-                              WHERE type='table' AND name=?""", (name,)).fetchone()[0]
-    remote = dict(con.execute(
-        "SELECT cve_id, payload FROM remote_payload WHERE payload IS NOT NULL")
-        if _table("remote_payload") else ())
-    web = dict(con.execute(
-        "SELECT cve_id, payload FROM web_payload WHERE payload IS NOT NULL")
-        if _table("web_payload") else ())
+    # The payload syntactic_group chose for the CVE, so both stages read one value.
+    payload_of = dict(con.execute("SELECT cve_id, example FROM syntactic_group"))
 
     rows = []
     for cid, syn in syn_of.items():
         desc = desc_of.get(cid, "")
-        payload = None
-        for lp in poc_paths.get(cid, ()):
-            try:
-                payload = extract_payload((RAW / lp).read_text(encoding="utf-8", errors="replace"), syn)
-            except OSError:
-                payload = None
-            if payload:
-                break
-        payload = payload or remote.get(cid) or web.get(cid)
+        payload = payload_of.get(cid)
         blob = f"{payload or ''} {desc}"
 
         for dim, label in cvss_facets(vectors.get(cid, "")).items():
@@ -212,6 +185,8 @@ def run(args):
             lbl = first(rules, desc)
             if lbl:
                 rows.append((cid, dim, lbl, "rule", None))
+        if syn == "html_dom" and whole_document(desc):
+            rows.append((cid, "delivery", "whole_document", "rule", None))
 
     con.executescript("""
         DROP TABLE IF EXISTS subclass;

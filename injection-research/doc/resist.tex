@@ -131,8 +131,8 @@ carry child markup.
 This restriction is exactly right for embedding an untrusted string as inert data but is not
 a substitute for rendering a user's rich HTML, a harder problem left to
 allow-list sanitizers.
-The clean guarantee covers the data-not-markup case, where the large majority of
-injection bugs arise.
+The clean guarantee covers the data-not-markup case; the \dataDocumentCVEs XSS
+CVEs whose attacker uploads a whole document get no hole (A2).
 
 \subsection{Preventing LDAP injection}
 \label{sec:resist:ldap}

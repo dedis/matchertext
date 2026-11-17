@@ -5,9 +5,11 @@ a label-adjusted matcher-delimitable ceiling.
     python3 pipeline/audit.py sheets   freeze the sample, write the two rater sheets
     python3 pipeline/audit.py gold     prefill gold.csv where the raters agree
     python3 pipeline/audit.py report   print the metrics
+    python3 pipeline/audit.py payload-sheet   freeze the payload sample, write its sheet
+    python3 pipeline/audit.py rule-sheet      freeze the delivery-rule sample, write its sheet
 
-latex.py quotes the metrics once gold.csv is complete. The labeling guide is
-audit/README.md.
+latex.py quotes the metrics once gold.csv is complete, and the payload and rule
+precisions once their sheets are graded. The labeling guide is audit/README.md.
 """
 import argparse
 import csv
@@ -253,10 +255,106 @@ def report(con):
     print("sampled CVEs the gate now drops: {}, graded not injection: {}".format(*m["dropped"]))
 
 
+# Payload audit: is each recovered payload an attack string of its labeled
+# syntax? One sheet, sampled per payload source and blind to it.
+PAYLOAD_PER_SOURCE = 40
+PAYLOAD_KEY = AUDIT / "payload_sample.csv"
+PAYLOAD_SHEET = AUDIT / "payload_rater.csv"
+# Rule audit: does the description say what the delivery rule claims?
+RULE_SAMPLE = 40
+RULE_KEY = AUDIT / "rule_sample.csv"
+RULE_SHEET = AUDIT / "rule_rater.csv"
+VERDICTS = ("yes", "no")
+
+
+def salted(key, salt):
+    return hashlib.sha256(f"{salt}:{key}".encode()).hexdigest()
+
+
+def payload_sheet(con):
+    """Freeze PAYLOAD_PER_SOURCE payload-backed CVEs per payload source and
+    write one sheet with the payload and its syntax label only."""
+    for path in (PAYLOAD_KEY, PAYLOAD_SHEET):
+        if path.exists():
+            sys.exit(f"{path.relative_to(ROOT)} exists; delete it to draw a new sample")
+    by_source = defaultdict(list)
+    for cid, src, syn, payload in con.execute(
+            "SELECT cve_id, source, syntax_type, example FROM syntactic_group"):
+        by_source[src].append((salted(cid, "payload-sample"), cid, src, syn, payload))
+    rows = [r for src in sorted(by_source) for r in sorted(by_source[src])[:PAYLOAD_PER_SOURCE]]
+    write_csv(PAYLOAD_KEY, ["cve_id", "source", "syntax"], [r[1:4] for r in rows])
+    rows.sort(key=lambda r: salted(r[1], "payload-sheet"))
+    write_csv(PAYLOAD_SHEET, ["cve_id", "syntax", "payload", "attack", "notes"],
+              [(r[1], r[3], r[4], "", "") for r in rows])
+
+
+def rule_sheet(con):
+    """Freeze RULE_SAMPLE CVEs per delivery rule (whole document, language
+    model) and write one sheet with the description and the rule's claim."""
+    for path in (RULE_KEY, RULE_SHEET):
+        if path.exists():
+            sys.exit(f"{path.relative_to(ROOT)} exists; delete it to draw a new sample")
+    with open(export.EXPORTS / "llm_relabeled.csv", newline="") as f:
+        relabeled = {r["cve_id"] for r in csv.DictReader(f)}
+    rules = {
+        "whole_document": """SELECT s.cve_id, v.description FROM subclass s JOIN cve v USING(cve_id)
+                             WHERE s.dimension = 'delivery' AND s.label = 'whole_document'""",
+        "llm_mediated": """SELECT c.cve_id, v.description FROM classification c JOIN cve v USING(cve_id)
+                           WHERE c.syntax_type = 'llm_prompt'""",
+    }
+    rows = []
+    for rule, sql in rules.items():
+        hits = sorted((salted(cid, "rule-sample"), cid, rule, desc)
+                      for cid, desc in con.execute(sql)
+                      if rule != "llm_mediated" or cid in relabeled)
+        rows += hits[:RULE_SAMPLE]
+    write_csv(RULE_KEY, ["cve_id", "rule"], [r[1:3] for r in rows])
+    rows.sort(key=lambda r: salted(r[1], "rule-sheet"))
+    write_csv(RULE_SHEET, ["cve_id", "claim", "description", "holds", "notes"],
+              [(r[1], RULE_CLAIMS[r[2]], r[3], "", "") for r in rows])
+
+
+RULE_CLAIMS = {
+    "whole_document": "the attacker supplies a whole document (an uploaded file), not a value in a page",
+    "llm_mediated": "a language model turns the attacker's text into the injected syntax",
+}
+
+
+def graded(key, sheet, verdict, group):
+    """{group value: (yes, graded)} once every row of sheet carries a verdict,
+    else None. A misspelled verdict stops with the file and line."""
+    if not (key.exists() and sheet.exists()):
+        return None
+    with open(key, newline="") as f:
+        groups = {r["cve_id"]: r[group] for r in csv.DictReader(f)}
+    counts = defaultdict(lambda: [0, 0])
+    with open(sheet, newline="") as f:
+        for line, r in enumerate(csv.DictReader(f), start=2):
+            v = r[verdict].strip().lower()
+            if not v:
+                return None
+            if v not in VERDICTS:
+                sys.exit(f"{sheet.relative_to(ROOT)}:{line}: {verdict} must be yes or no")
+            counts[groups[r["cve_id"]]][0] += v == "yes"
+            counts[groups[r["cve_id"]]][1] += 1
+    return {g: tuple(c) for g, c in sorted(counts.items())}
+
+
+def payload_metrics():
+    """{payload source: (attack payloads, graded)}, or None until graded."""
+    return graded(PAYLOAD_KEY, PAYLOAD_SHEET, "attack", "source")
+
+
+def rule_metrics():
+    """{delivery rule: (claim holds, graded)}, or None until graded."""
+    return graded(RULE_KEY, RULE_SHEET, "holds", "rule")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=("sheets", "gold", "report"))
+    ap.add_argument("command", choices=("sheets", "gold", "report", "payload-sheet",
+                                        "rule-sheet"))
     args = ap.parse_args()
     if args.command == "gold":
         gold()
@@ -264,8 +362,15 @@ def main():
     con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
     if args.command == "sheets":
         sheets(con)
+    elif args.command == "payload-sheet":
+        payload_sheet(con)
+    elif args.command == "rule-sheet":
+        rule_sheet(con)
     else:
         report(con)
+        for name, m in (("payload", payload_metrics()), ("rule", rule_metrics())):
+            for g, (k, n) in (m or {}).items():
+                print(f"{name} audit {g:16} {k}/{n} = {k / n:.1%}")
 
 
 if __name__ == "__main__":

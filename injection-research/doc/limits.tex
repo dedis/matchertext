@@ -5,8 +5,9 @@ The attacker that targets the hole is a generated set
 (\cref{sec:prevent:exec}), not a search that learns from the parser.
 The HTML evidence is one parser, parse5, not a browser, and its oracle reads the
 tree, not the JavaScript, URL, or CSS inside it.
-Syntax labels are audited on a sample (\cref{sec:classify}).
+Syntax labels are audited on a sample (\cref{sec:classify}), and payloads by
+one rater.
 The projection assumes that the payload-backed CVEs of a syntax represent its
-other CVEs.
+other CVEs; \cref{tab:sens} shows how far it moves if they do not.
 A stock reader misreads the HTML holes and the SQL name hole
 (\cref{sec:prevent:html,sec:appendix:systems}), and the timings are from one machine.

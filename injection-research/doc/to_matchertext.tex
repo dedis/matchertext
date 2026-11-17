@@ -70,19 +70,6 @@ noncomputable def toMatchertextC (esc : α → List α) (n : Nat) (bs : α) (tag
   encAux Pi esc (fun st => decide (n ≤ st.length + 1))
     (fun b out => decide (out = [] ∧ ∃ p t, b = p ++ [bs, t] ∧ tag t)) [] [] v
 
--- Neither conjunct of the hypothesis below implies the other. Depth 0 does not
--- give MT: ")(" balances to zero yet dips below it at the first character.
-theorem depth_zero_not_mt
-    (hdisj : ∀ x y z, (x, y) ∈ Pi → (z, x) ∈ Pi → False)
-    {o c : α} (hp : (o, c) ∈ Pi) :
-    depth Pi [c, o] = 0 ∧ ¬ MT Pi [c, o] := by ...
-
--- Lemma: matcher-free escapes are matchertext of depth 0; one way to discharge
--- the hypothesis below, no longer the only one.
-theorem esc_mt (esc : α → List α)
-    (hesc : ∀ c x, x ∈ esc c → Nonmatcher Pi x) (c : α) :
-    MT Pi (esc c) ∧ depth Pi (esc c) = 0 := by ...
-
 -- Lemma: the escapes this implementation ships, a backslash and a tag followed
 -- by a matched pair as in \o(), are matchertext by nesting rather than flatness.
 theorem esc_mt_paired
@@ -90,13 +77,6 @@ theorem esc_mt_paired
     {bs t o c : α}
     (hbs : Nonmatcher Pi bs) (ht : Nonmatcher Pi t) (hp : (o, c) ∈ Pi) :
     MT Pi [bs, t, o, c] ∧ depth Pi [bs, t, o, c] = 0 := by ...
-
--- Lemma: unwinding the pending stack preserves matchertext.
-theorem unwind_mt (esc : α → List α)
-    (hesc : ∀ c, MT Pi (esc c) ∧ depth Pi (esc c) = 0)
-    (st : List (Ctx α)) (hst : ∀ p ∈ st, MT Pi p.2)
-    (out : List α) (hout : MT Pi out) :
-    MT Pi (unwind esc st out) := by ...
 
 -- Invariant (the crux): every accumulated segment stays matchertext, whatever the
 -- decisions `cap` and `split` choose.

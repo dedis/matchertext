@@ -67,3 +67,26 @@ python3 pipeline/latex.py          # quotes the results as \dataAudit* macros
 ```
 
 A misspelled value stops `gold` and `report` with the file and line.
+
+## Payload and rule audits
+
+Two more sheets check the corpus that the label audit does not.
+
+- `payload_rater.csv`: 40 payload-backed CVEs per payload source, shuffled and
+  blind to the source. Fill `attack` with `yes` if `payload` is an attack
+  string in `syntax`: it carries the breakout or the injected construct (a
+  quote, comment, or keyword; markup, a handler, or a script URL; a shell
+  separator or substitution with a command). Fill `no` for documentation,
+  program code, prose, a placeholder, or an attack in another syntax.
+  `payload_sample.csv` holds the source of each row.
+- `rule_rater.csv`: up to 40 CVEs per delivery rule. Fill `holds` with `yes` if
+  `description` states `claim`, `no` otherwise. `rule_sample.csv` holds the
+  rule of each row.
+
+Label from the sheet alone, as above.
+
+```sh
+python3 pipeline/audit.py payload-sheet   # draw the payload sample
+python3 pipeline/audit.py rule-sheet      # draw the rule sample
+python3 pipeline/audit.py report          # also prints both precisions
+```

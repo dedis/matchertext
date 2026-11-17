@@ -50,7 +50,8 @@ embedding or rejection; \textulc{\emph{Outside}} counts CVEs failing a premise o
 
 \paragraph{Results}
 Of the \dataPayloadBackedCVEs payload-backed injection CVEs, the recorded
-payloads of \textbf{\dataContained} (\textbf{\dataContainedShare}) are contained
+payloads of \textbf{\dataContained} (\textbf{\dataContainedShare}, 95\% CI
+\dataContainedInterval) are contained
 by a matcher-delimited slot that a matchertext-aware host language reads to
 matcher balance.
 The split turns on the host language's native delimiter, and the per-syntax
@@ -71,7 +72,8 @@ split by the premise of \cref{sec:threat} they fail. \dataOutsideSemantic target
 execution/semantic sinks (server-side templates, expression languages, code
 evaluation, spreadsheet formulas, HTML/DOM execution contexts) that the host language
 runs by design: the template payload \verb|{{7*7}}| is already valid matchertext
-yet still executes. The other \dataOutsideNonmatcher target non-matcher contexts we
+yet still executes. \dataOutsideDocument are XSS through an uploaded SVG, HTML,
+or PDF document, which no hole receives (A2). The other \dataOutsideNonmatcher target non-matcher contexts we
 give no hole form: shell separators (\verb|;|~\verb-|-~\verb|&|), CR/LF header
 breaks, and XML/XXE angle brackets.
 
@@ -89,8 +91,10 @@ CVEs (\textbf{\dataHostableShare}) target a matcher-delimitable syntax.
 This is an upper bound: execution contexts (script URLs, JavaScript, template
 expressions) are \textbf{\dataJsSinkRate} (\dataHtmlDomJsSinks) of the HTML/DOM payloads.
 With hole forms for the non-matcher contexts it would be
-\dataHostableWithNonmatcherShare; among the \dataKevInjectionCVEs known-exploited
-CVEs it is \dataKevHostableShare.
+\dataHostableWithNonmatcherShare. The ceiling counts disclosed CVEs, not attacks:
+among the \dataKevInjectionCVEs known-exploited CVEs it is \dataKevHostableShare,
+and \dataEpssWeightedHostableShare weighted by EPSS (\cref{tab:sens}): exploited
+injection is mostly shell and code.
 Parameterized queries and auto-escaping cover \dataPerLanguageOfHostable of these.
 
 Within one syntax the simulation leaves little to project: the threat model of
@@ -105,23 +109,13 @@ verbatim, so the syntaxes matchertext can delimit are over-represented among CVE
 that carry a payload. Applying the pooled contained rate of \dataContainedShare to
 the whole corpus would overcount, yielding \dataNaiveEstimate contained CVEs
 (\dataSkewCost above the reweighted result).
-Weighting each syntax's rate by its corpus share instead (\cref{tab:strata})
-gives \textbf{\dataCentralEstimate} (\textbf{\dataCentralShare}): the
-\dataHostableShare ceiling less the HTML/DOM execution contexts.
+Weighting each syntax's rate by its corpus share instead (\cref{tab:sens})
+gives \textbf{\dataCentralEstimate} (\textbf{\dataCentralShare}, 95\% CI
+\dataCentralInterval): the \dataHostableShare ceiling less the HTML/DOM
+execution contexts.
 This is reach under the threat model, not a measured containment rate;
 \cref{sec:prevent:exec} measures containment for SQL on a live parser.
 
-\begin{table}[t]
-\centering
-\caption{Strata: per-syntax rates from the payload-backed subset, weighted by
-each syntax's corpus share. A dagger marks a rate that the rule of
-\cref{sec:threat} fixes from the syntax label; only the HTML/DOM rate depends
-on the payloads.}
-\label{tab:strata}
-\small
-\setlength{\tabcolsep}{5pt}
-\input{generated/tbl-strata}
-\end{table}
 Against a single denominator, the full \dataInjectionCVEs injection CVEs, the reach
 runs from a floor of \textbf{\dataFloorShare} to a ceiling of
 \textbf{\dataHostableShare}, with \dataCentralShare central. The floor counts only
@@ -220,7 +214,8 @@ statements rejected before the parser.}
 Over the effective set no matchertext hole admitted a breakout (\cref{tab:sqli}):
 \dataSqliMtBreakout through the \verb|M'(...)'| value hole, \dataSqliMtStrictBreakout
 through the verify-then-embed route, and \dataSqliIdentMtBreakout through the
-\verb|[|$\dots$\verb|]| name hole.
+\verb|[|$\dots$\verb|]| name hole; per payload, a rate above
+\dataSqliZeroBound is excluded at 95\%.
 The legacy defenses hold as well: SQLite's \texttt{printf} escapes \texttt{\%Q},
 \texttt{\%q}, and \texttt{"\%w"} and a bound parameter, the baseline.
 Concatenation is the contrast: \dataSqliConcatBreakout breakouts of the value
@@ -325,7 +320,7 @@ composed document.}
 \paragraph{Results}
 Matchertext contains every payload (\cref{tab:html}, lower block). Concatenation
 breaks out on \dataHtmlEffective (value, host) pairs; in the fork, no arm admits a
-breakout on any of them (\dataHtmlMtBreakout). Each payload is inert text in its hole,
+breakout on any of them (\dataHtmlMtBreakout; per payload, below \dataHtmlZeroBound at 95\%). Each payload is inert text in its hole,
 or it is refused: the \dataHtmlNonMtPayloads payloads that are not matchertext, once
 per host. The encoding arm holds those too, so it contains the whole corpus and
 refuses nothing. The few \textulc{\emph{Altered}} cases are a zero byte, which every HTML parser

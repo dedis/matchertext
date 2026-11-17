@@ -26,7 +26,7 @@ origin rather than merged, preserving provenance and exposing cross-source
 disagreement.
 
 \paragraph{Proof-of-concept payloads}
-Six PoC databases supply real attack strings:
+PoC databases supply real attack strings:
 \href{https://gitlab.com/exploit-database/exploitdb}{Exploit-DB}, the
 \href{https://github.com/projectdiscovery/nuclei-templates}{Nuclei detection
 templates}, the
@@ -35,11 +35,11 @@ modules, the
 \href{https://github.com/nomi-sec/PoC-in-GitHub}{nomi-sec PoC-in-GitHub} index,
 the \href{https://github.com/trickest/cve}{trickest/cve} exploit index, and
 \href{https://github.com/vulhub/vulhub}{Vulhub}'s reproduction environments.
-The first three, and Vulhub's worked exploit requests, are cloned locally so
-that a payload can be extracted.
-PoC-in-GitHub and trickest contribute links only.
-Of a trickest entry, only the candidate exploit repositories, not the
-advisory write-ups, count as PoC evidence.
+The first three, Vulhub's worked exploit requests, and six smaller PoC
+collections are cloned locally so that a payload can be extracted.
+PoC-in-GitHub, trickest, and two similar indexes contribute links only.
+Of a trickest entry, the candidate exploit repositories and the researchers'
+write-ups count as PoC evidence, not the vendor's commits, issues, and advisories.
 References are unified in one table with a local path where a payload is
 extractable; because exploit code is dual-use, the corpus stores only links,
 identifiers, and locally-extracted fragments, redistributing no exploit files.
@@ -54,5 +54,6 @@ coverage of the injection subset is reported with the results in
 \cref{sec:results}.
 A key methodological caveat is that these sources have different, sometimes
 mutable, update cadences (NVD in particular re-scores CVEs continuously).
-The analysis therefore fixes a dated snapshot and treats ``field missing in
+The analysis therefore fixes the snapshot of \dataSnapshotDate{} and treats ``field missing in
 source'' as distinct from ``property absent in the vulnerability.''
+It also pins the forks and tools; git sources, many under restrictive terms, are not archived.

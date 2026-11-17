@@ -19,6 +19,11 @@ cd injection-research
 - The GitHub CLI (`gh`) for optional GitHub payload recovery
 - Node.js and npm, for the HTML replay through the `parse5/` submodule
 
+`run_all.py` records in the `toolchain` entry of `manifest.json` the commits of
+the `sqlite/` and `parse5/` forks and the versions of Python, Node.js, the C
+compiler, Tcl, and Lean that the run used. A reproduction uses the same
+versions.
+
 The SQL replay generates the MatcherText amalgamation from `sqlite/` in
 `data/build/sqlite/` and compiles `test/matchertext/csrc/sqli_driver.c` with it.
 It does not use the Python SQLite driver for the replay.
@@ -52,8 +57,8 @@ The full run executes these stages in order:
 
 1. Acquire and verify inputs.
 2. Build `data/cve.db`.
-3. Classify and subclass injection CVEs.
-4. Build syntactic payload groups.
+3. Classify injection CVEs.
+4. Build syntactic payload groups, then subclass injection CVEs.
 5. Validate the general payload corpus.
 6. Replay SQL payloads through the MatcherText SQLite drivers.
 7. Replay HTML payloads through the MatcherText parse5 fork.
@@ -134,8 +139,8 @@ python3 pipeline/classify.py --nb-margin 4.0
 Run the dependent classification stages next:
 
 ```sh
-python3 pipeline/subclass.py
 python3 pipeline/syntactic_group.py
+python3 pipeline/subclass.py
 ```
 
 A CVE enters the corpus when it has a CWE in the CWE-74 subtree or its
@@ -145,6 +150,8 @@ give none. `NOT_INJECTION` in `pipeline/taxonomy.py` removes CWE-99 and its
 seven descendants from the subtree: no untrusted value in them enters an
 embedded language. A code-eval label from a CWE alone is dropped when the
 description names memory corruption, which NVD long filed under CWE-94.
+A CVE of a matcher-delimitable syntax whose description puts a language model
+between the attacker and that syntax (`LLM_MEDIATED`) is labelled `llm_prompt`.
 
 `classify.py` also writes `data/exports/anchor_audit.csv`. It lists each
 labelled CWE and whether it has its own anchor or inherits its labels from an
@@ -152,9 +159,12 @@ ancestor. The stage stops when a CWE with CVEs inherits labels that
 `REVIEWED_INHERITED` in `pipeline/taxonomy.py` does not list. Review such a CWE
 in the CSV, then give it an anchor or add its labels to that list.
 
-`subclass.py` adds the independent privilege, vector, interaction, technique,
-engine, injection-point, and impact labels. `syntactic_group.py` groups
-payload-backed CVEs by their normalized attack structure.
+`syntactic_group.py` groups payload-backed CVEs by their normalized attack
+structure and records where each payload came from: a PoC file, a GitHub
+repository linked as PoC evidence, advisory text, the CVE description, or an
+advisory page. `subclass.py` reads that payload and adds the independent
+privilege, vector, interaction, technique, engine, injection-point, impact, and
+HTML/DOM delivery labels.
 
 ### 4. Validate the payload corpus
 
@@ -313,8 +323,8 @@ First build and classify the database. Authenticate `gh` if it is available:
 gh auth login
 python3 pipeline/build_db.py
 python3 pipeline/classify.py
-python3 pipeline/subclass.py
 python3 pipeline/syntactic_group.py
+python3 pipeline/subclass.py
 ```
 
 Run the GitHub recovery passes as required:
@@ -326,6 +336,13 @@ python3 pipeline/fetch_github.py --trees
 python3 pipeline/fetch_github.py --fanout-trees
 python3 pipeline/fetch_github.py --alternates
 python3 pipeline/fetch_github.py --constructed
+```
+
+After a change to the extractor or to the syntax labels, extract each recovered
+payload again from its pinned file:
+
+```sh
+python3 pipeline/fetch_github.py --reextract
 ```
 
 Recover payloads from advisory pages and GitHub Security Lab:
@@ -357,7 +374,7 @@ follow the source terms recorded in `manifest.json`.
 
 | Path                       | Contents                                                 |
 |----------------------------|----------------------------------------------------------|
-| `manifest.json`            | Git commits, HTTP hashes, and sidecar pin                |
+| `manifest.json`            | Git commits, HTTP hashes, sidecar pin, and the toolchain |
 | `snapshot-archive/sha256/` | Immutable HTTP and sidecar objects                       |
 | `data/raw/`                | Pinned source repositories and downloaded files          |
 | `data/cve.db`              | Parsed corpus, classifications, groups, and replay cases |

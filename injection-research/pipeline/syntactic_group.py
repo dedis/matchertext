@@ -19,7 +19,8 @@ from pathlib import Path
 
 import matchertext
 from export import write
-from report import EXTENDED, TRUNCATED, extract_payload
+from fetch_github import repo_of
+from report import EXTENDED, TRUNCATED, accept, extract_payload
 
 ROOT = Path(__file__).resolve().parents[1]
 DB = ROOT / "data" / "cve.db"
@@ -97,9 +98,15 @@ def group_skeleton(syntax, payload):
 
 
 def representative_payload(con):
+    """Yield (cve_id, syntax, payload, source, origin) for each CVE with a payload.
+
+    The sources are tried in order, and source names the one that gave the
+    payload: a local PoC file, a linked GitHub repository, advisory text, the
+    CVE description, or an advisory page. origin locates it in that source.
+    """
     syn_of = dict(con.execute("SELECT cve_id, syntax_type FROM classification"))
     paths = defaultdict(list)
-    # See subclass.py: ordered so payload selection is stable across ingestions.
+    # Ordered so payload selection is stable across ingestions.
     for cid, lp in con.execute("""SELECT cve_id, local_path FROM poc
                                   WHERE local_path IS NOT NULL
                                   ORDER BY cve_id, source, ref"""):
@@ -107,50 +114,61 @@ def representative_payload(con):
             paths[cid].append(lp)
     # Payloads recovered from linked GitHub repos, which have no local file.
     # Local files win: they are pinned in the corpus snapshot, whereas a remote
-    # payload depends on a repo that may since have vanished.
+    # payload depends on a repo that may since have vanished. A repository
+    # counts only if the CVE links it as PoC evidence: the other links name the
+    # vendor's repository, whose documentation and code are not attacks.
     def _table(name):
         return con.execute("""SELECT COUNT(*) FROM sqlite_master
                               WHERE type='table' AND name=?""", (name,)).fetchone()[0]
-    remote = dict(con.execute(
-        "SELECT cve_id, payload FROM remote_payload WHERE payload IS NOT NULL")
-        if _table("remote_payload") else ())
+    linked = defaultdict(set)
+    for cid, ref in con.execute(
+            "SELECT cve_id, ref FROM poc_evidence WHERE ref LIKE '%github.com/%'"):
+        if repo := repo_of(ref):
+            linked[cid].add(f"{repo[0]}/{repo[1]}".lower())
+    remote = {cid: (payload, f"{repo}@{sha}:{file}") for cid, repo, sha, file, payload in con.execute(
+        "SELECT cve_id, repo, sha, file, payload FROM remote_payload WHERE payload IS NOT NULL")
+        if repo.lower() in linked[cid] and accept(payload)} if _table("remote_payload") else {}
     evidence = defaultdict(list)
     if _table("evidence_text"):
-        for cid, text in con.execute(
-                "SELECT cve_id, text FROM evidence_text ORDER BY cve_id, source, ref"):
-            evidence[cid].append(text)
+        for cid, ref, text in con.execute(
+                "SELECT cve_id, ref, text FROM evidence_text ORDER BY cve_id, source, ref"):
+            evidence[cid].append((ref, text))
     descriptions = dict(con.execute(
         "SELECT cve_id, description FROM cve WHERE description IS NOT NULL"))
     # Advisory pages are the last resort: unlike a pinned commit they can be
     # edited in place, so they are only consulted when nothing else has one.
-    web = dict(con.execute(
-        "SELECT cve_id, payload FROM web_payload WHERE payload IS NOT NULL")
-        if _table("web_payload") else ())
+    web = {cid: (payload, url) for cid, url, payload in con.execute(
+        "SELECT cve_id, url, payload FROM web_payload WHERE payload IS NOT NULL")
+        } if _table("web_payload") else {}
     for cid, syn in syn_of.items():
-        found = None
         for lp in paths.get(cid, ()):
             try:
                 found = extract_payload((RAW / lp).read_text(encoding="utf-8", errors="replace"), syn)
             except OSError:
                 found = None
             if found:
+                yield cid, syn, found, "poc_file", lp
                 break
-        if not found:
-            found = remote.get(cid)
-        if not found:
-            for text in evidence.get(cid, ()):
+        else:
+            if cid in remote:
+                yield cid, syn, *remote[cid][:1], "repo", remote[cid][1]
+                continue
+            for ref, text in evidence.get(cid, ()):
                 if found := extract_payload(text, syn):
+                    yield cid, syn, found, "advisory", ref
                     break
-        if not found and (description := descriptions.get(cid)):
-            found = extract_payload(description, syn)
-        if found or (found := web.get(cid)):
-            yield cid, syn, found
+            else:
+                if (description := descriptions.get(cid)) and (
+                        found := extract_payload(description, syn)):
+                    yield cid, syn, found, "description", cid
+                elif cid in web:
+                    yield cid, syn, *web[cid][:1], "web", web[cid][1]
 
 
 def run(args):
     con = sqlite3.connect(DB)
     rows, canonicalized = [], 0
-    for cid, syn, payload in representative_payload(con):
+    for cid, syn, payload, source, origin in representative_payload(con):
         # Every later measurement reads this value (premise A3).
         canonical = matchertext.canon(payload)
         canonicalized += canonical != payload
@@ -160,14 +178,15 @@ def run(args):
             continue
         sk = group_skeleton(syn, payload)
         gid = hashlib.md5(f"{syn}\x00{sk}".encode()).hexdigest()[:12]
-        rows.append((cid, syn, gid, sk, payload))
+        rows.append((cid, syn, gid, sk, payload, source, origin))
 
     con.executescript("""
         DROP TABLE IF EXISTS syntactic_group;
         CREATE TABLE syntactic_group(cve_id TEXT PRIMARY KEY, syntax_type TEXT,
-                                     group_id TEXT, skeleton TEXT, example TEXT);
+                                     group_id TEXT, skeleton TEXT, example TEXT,
+                                     source TEXT, origin TEXT);
     """)
-    con.executemany("INSERT OR REPLACE INTO syntactic_group VALUES(?,?,?,?,?)", rows)
+    con.executemany("INSERT OR REPLACE INTO syntactic_group VALUES(?,?,?,?,?,?,?)", rows)
     con.execute("CREATE INDEX idx_syngroup_gid ON syntactic_group(group_id)")
     con.commit()
 

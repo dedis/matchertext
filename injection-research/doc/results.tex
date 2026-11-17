@@ -24,7 +24,10 @@ only a tenth of the corpus, carries a disproportionate share of them.
 \paragraph{Proof-of-concept coverage}
 \textbf{\dataInjectionWithPoc} injection CVEs (\dataInjectionWithPocShare) carry at least one linked PoC.
 The PoC databases overlap, so unifying them raises payload coverage well
-above any single source. Of these, \textbf{\dataPayloadBackedCVEs} yield an extractable payload. The remainder
+above any single source. \textbf{\dataPayloadBackedCVEs} injection CVEs yield an
+extractable payload, from a PoC file, linked repository, advisory, or the
+description; \dataPayloadPrecisionAllShare are attack strings
+(\cref{sec:appendix:corpus}). Most PoCs yield none: they
 are links only or exploits from which no literal attack string can be recovered, such as modules
 that construct their payload programmatically.
 Extraction drops a fragment cut inside an open matcher (\dataBalanceDropped) and

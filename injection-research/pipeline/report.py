@@ -229,7 +229,7 @@ def literal_end(text, start):
     return None
 
 
-def _accept(frag, truncation_check=True):
+def accept(frag, truncation_check=True):
     return (3 <= len(frag) <= 200
             and not is_placeholder(frag)
             and not (truncation_check and is_truncated(frag))
@@ -446,7 +446,7 @@ def extract_labelled(text, syn):
             # detects a regex stopping mid-expression, and a labelled line is a
             # delimited whole, so a trailing `{` in `'};alert(1);{'` is the real
             # payload rather than a cut.
-            if (_accept(raw, truncation_check=False) and _ATTACKISH.search(raw)
+            if (accept(raw, truncation_check=False) and _ATTACKISH.search(raw)
                     and not _ONLY_PUNCT.match(raw) and "=" in raw):
                 return raw
             inner = extract_payload(raw, syn, labelled=False)
@@ -501,9 +501,9 @@ def extract_payload(text, syn, labelled=True, constructed=True, prefer_construct
                 frag = re.split(r"\s+HTTP/\d|,\s+then\b", frag, 1, re.I)[0].rstrip()
                 if _PCT.search(frag):
                     frag = urlform_decode(frag)
-            if _accept(frag, truncation_check=not whole):
+            if accept(frag, truncation_check=not whole):
                 return frag
-            TRUNCATED[syn] += _accept(frag, truncation_check=False)
+            TRUNCATED[syn] += accept(frag, truncation_check=False)
     # Literal forms first, so an unencoded payload is never routed through the
     # decoder; only fall back to the URL forms when nothing else matched.
     for rx in URL_SIGNS.get(syn, ()):
@@ -521,9 +521,9 @@ def extract_payload(text, syn, labelled=True, constructed=True, prefer_construct
                     close = re.search(r"&lt;/script&gt;", frag, re.I)
                     if close:
                         frag = frag[:close.end()]
-            if _accept(frag, truncation_check=not whole):
+            if accept(frag, truncation_check=not whole):
                 return frag
-            TRUNCATED[syn] += _accept(frag, truncation_check=False)
+            TRUNCATED[syn] += accept(frag, truncation_check=False)
     if constructed and not prefer_constructed and _BUILD_HINT.search(text):
         return built_payload()
     return None
