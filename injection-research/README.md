@@ -122,9 +122,12 @@ python3 pipeline/syntactic_group.py
 ```
 
 A CVE enters the corpus when it has a CWE in the CWE-74 subtree or its
-description matches a phrase rule. `NOT_INJECTION` in `pipeline/taxonomy.py`
-removes seven CWE-99 descendants from the subtree: no untrusted value in them
-enters an embedded language.
+description matches a phrase rule. The CWEs of the CVE record and NVD decide;
+those of GitHub, Red Hat, and Nuclei count only for a CVE that the first two
+give none. `NOT_INJECTION` in `pipeline/taxonomy.py` removes CWE-99 and its
+seven descendants from the subtree: no untrusted value in them enters an
+embedded language. A code-eval label from a CWE alone is dropped when the
+description names memory corruption, which NVD long filed under CWE-94.
 
 `classify.py` also writes `data/exports/anchor_audit.csv`. It lists each
 labelled CWE and whether it has its own anchor or inherits its labels from an
@@ -158,7 +161,9 @@ python3 pipeline/sqli_experiment.py
 
 This command generates the amalgamation and builds the normal and strict
 MatcherText SQLite drivers. It then replays every distinct SQL payload through
-all control and defense arms. The run stops, and removes its results, when a
+all control and defense arms, `%Q`, `%q`, `"%w"`, and bound parameters among
+them. It also measures how often strict `?V` refuses benign text, the CVE
+descriptions outside the corpus. The run stops, and removes its results, when a
 guard fails: a driver exits early, a control never breaks out, a matchertext
 arm breaks out or changes a value, the strict build admits a legacy path, or
 the matchertext API compiles SQL that is not a string literal. It
@@ -177,6 +182,12 @@ python3 pipeline/sqli_experiment.py --skip-sabotage
 python3 pipeline/sqli_experiment.py --sabotage-n 1000
 ```
 
+The sabotage runs rebuild the core with one defect each: the locator, Verify,
+the encoder, or the decoder. Each must change a verdict or a value, and a
+broken locator or encoder must produce a breakout. The encoder breakouts come
+only from two constructed probes in `SABOTAGE_PROBES`: no recorded payload has
+an unmatched closer followed by SQL.
+
 ### 5b. Replay HTML payloads
 
 ```sh
@@ -192,8 +203,9 @@ matchertext option reads each matchertext document. The run stops, and
 removes its results, when a guard fails: the driver exits early, a control
 never breaks out, a matchertext arm or the guarded serializer breaks out, a
 matchertext document fails to parse or to serialize back, `composeHtml`
-accepts markup that is not a template literal, or a deliberately broken fork
-goes unnoticed. It writes:
+accepts markup that is not a template literal, a deliberately broken fork goes
+unnoticed, or a fork whose hole ends at the first closer or whose serializer
+guard is off produces no breakout. It writes:
 
 - `data/exports/html_arm_outcomes.csv`
 - `data/exports/html_by_arm.csv`

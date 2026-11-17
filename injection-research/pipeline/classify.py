@@ -17,14 +17,17 @@ from collections import defaultdict
 from pathlib import Path
 
 from nbayes import WordNB
-from taxonomy import (FAMILY_ANCHORS, FAMILY_OF_SYNTAX, NOT_INJECTION, OTHER,
-                      REVIEWED_INHERITED, SYNTAX_ANCHORS, labels_from_cwes,
-                      mask_rules, rule_match)
+from taxonomy import (FAMILY_ANCHORS, FAMILY_OF_SYNTAX, MEMORY_CORRUPTION,
+                      NOT_INJECTION, OTHER, REVIEWED_INHERITED, SYNTAX_ANCHORS,
+                      labels_from_cwes, mask_rules, rule_match)
 
 ROOT = Path(__file__).resolve().parents[1]
 DB = ROOT / "data" / "cve.db"
 EXPORTS = ROOT / "data" / "exports"
 SOURCE_PRIORITY = {"cna": 0, "adp_cisa": 1, "nvd": 2, "ghsa": 3, "redhat": 4, "nuclei": 5}
+# The CVE record and NVD. The other sources count only for a CVE that these
+# give no CWE, so a secondary source cannot overrule them.
+PRIMARY_SOURCES = {"cna", "adp_cisa", "nvd"}
 NOT_INJECTION_CLASS = "none"
 
 
@@ -103,25 +106,31 @@ def run(args):
     con = sqlite3.connect(DB)
     parents, subtree = load_hierarchy(con)
 
-    cwes = defaultdict(list)
+    primary, secondary = defaultdict(set), defaultdict(set)
     for cve_id, cwe, src in con.execute("SELECT cve_id, cwe_id, source FROM cwe_assignment"):
-        cwes[cve_id].append((SOURCE_PRIORITY.get(src, 9), cwe))
+        (primary if src in PRIMARY_SOURCES else secondary)[cve_id].add(
+            (SOURCE_PRIORITY.get(src, 9), cwe))
 
     EXPORTS.mkdir(parents=True, exist_ok=True)
     anchor_audit(con, parents, subtree)
 
     results = {}  # cve_id -> [family, syntax, method, confidence]
     train, pending = [], []
-    overridden = contradicted = abstained = 0
+    overridden = contradicted = abstained = memory = 0
     for cve_id, desc in con.execute(
             "SELECT cve_id, COALESCE(description,'') FROM cve WHERE state='PUBLISHED'"):
-        ids = [c for _, c in sorted(set(cwes.get(cve_id, ())))]
+        ids = [c for _, c in sorted(primary.get(cve_id) or secondary.get(cve_id, ()))]
         rm = rule_match(desc) if desc else None
-        if not (rm or any(c in subtree for c in ids)):
+        admitted = rm or any(c in subtree for c in ids)
+        if admitted:
+            fam, generic, syn = labels_from_cwes(ids, parents)
+            if not rm and syn == "code_eval" and MEMORY_CORRUPTION.search(desc):
+                memory += 1
+                admitted = False
+        if not admitted:
             if desc:
                 train.append((cve_id, desc, NOT_INJECTION_CLASS))
             continue
-        fam, generic, syn = labels_from_cwes(ids, parents)
         method = conf = None
         if syn is not None:
             method = "cwe"
@@ -187,7 +196,7 @@ def run(args):
     print(f"injection-related: {len(results)} of {total} published CVEs; by method: {counts}")
     print(f"family set by syntax: {overridden}; classifier labels refused for "
           f"contradicting the CWE family: {contradicted}; left unknown as not "
-          f"injection: {abstained}")
+          f"injection: {abstained}; code-eval CWE on memory corruption, dropped: {memory}")
     con.close()
 
 

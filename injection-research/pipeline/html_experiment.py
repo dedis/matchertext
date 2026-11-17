@@ -81,7 +81,15 @@ SABOTAGE = {
         "this.options.matchertext",
         "false",
     ),
+    "guard_off": (
+        "serializer/index.js",
+        "function rawTextEndsEarly(tn, text) {",
+        "function rawTextEndsEarly(tn, text) {\n    return false;",
+    ),
 }
+# Sabotages that let a value out of its hole or raw text element: the run fails
+# unless they turn some contained case into a breakout.
+BREAKOUT_SABOTAGE = ("hole_closes_at_first_closer", "guard_off")
 # Values whose verdicts depend on matcher nesting, which the corpus rarely has.
 SABOTAGE_PROBES = ["a[b]", "x]><b>y</b>", "(a]", "[a](b){c}", "]]><img src=x onerror=alert(1)>"]
 
@@ -251,7 +259,7 @@ def run(args):
     fail = guards(guard, raw, hosts, concat)
     sabotage = []
     if not fail and not getattr(args, "skip_sabotage", False):
-        sabotage, sabotage_fail = run_sabotage(payloads[:getattr(args, "sabotage_n", 2000)])
+        sabotage, sabotage_fail = run_sabotage(payloads[:getattr(args, "sabotage_n", None)])
         fail += sabotage_fail
     if fail:
         # Leave no result that a later stage could read as valid.
@@ -274,7 +282,8 @@ def run(args):
     con.commit()
     export(con)
     if sabotage:
-        write("html_sabotage.csv", ["sabotage", "cases", "changed_verdict", "detection"], sabotage)
+        write("html_sabotage.csv",
+              ["sabotage", "cases", "changed_verdict", "to_breakout", "detection"], sabotage)
     report(guard, arms, len(payloads), len(effective))
     con.close()
 
@@ -367,16 +376,20 @@ def run_sabotage(payloads):
         r = subprocess.run(["node", str(DRIVER), str(dist / "index.js")], input="",
                            capture_output=True, text=True)
         if r.returncode:
-            rows.append((name, 0, 0, "baseline refused"))
+            rows.append((name, 0, 0, 0, "baseline refused"))
             continue
         broken = verdicts(values, dist, selfcheck=False)
         changed = sum(broken[k] != v for k, v in honest.items())
-        rows.append((name, len(honest), changed, "verdicts changed" if changed else "unnoticed"))
+        escaped = sum(broken[k] == "BREAKOUT" != v for k, v in honest.items())
+        rows.append((name, len(honest), changed, escaped,
+                     "verdicts changed" if changed else "unnoticed"))
         if not changed:
             fail.append(f"sabotage {name} went unnoticed")
+        if name in BREAKOUT_SABOTAGE and not escaped:
+            fail.append(f"sabotage {name} produced no breakout")
     print("\nsabotage: a broken fork must change the verdicts")
-    for name, n, changed, detection in rows:
-        print(f"  {name:28} {changed:>7,}/{n:<8,} {detection}")
+    for name, n, changed, escaped, detection in rows:
+        print(f"  {name:28} {changed:>7,}/{n:<8,} {escaped:>7,} to breakout  {detection}")
     return rows, fail
 
 
@@ -391,5 +404,5 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--limit", type=int, help="use only the first N payloads")
     ap.add_argument("--skip-sabotage", action="store_true")
-    ap.add_argument("--sabotage-n", type=int, default=2000)
+    ap.add_argument("--sabotage-n", type=int, help="sabotage only the first N payloads")
     run(ap.parse_args())

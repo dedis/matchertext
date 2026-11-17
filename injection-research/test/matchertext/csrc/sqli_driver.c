@@ -52,7 +52,7 @@ typedef unsigned long long u64;
 
 /* How an arm fills the hole. */
 enum { C_CONCAT, C_QUOTE, C_ESCAPE, C_BIND, C_MT, C_MTSTRICT,
-       C_IDENT_CONCAT, C_IDENT_MT, C_MT_V, C_IDENT_I };
+       C_IDENT_CONCAT, C_IDENT_QUOTE, C_IDENT_MT, C_MT_V, C_IDENT_I };
 
 typedef struct Host {
   const char *zName, *zPre, *zPost, *zBenign;
@@ -106,6 +106,7 @@ static const Arm aArm[] = {
   {"mt",           HOLE_VALUE, C_MT,           0, 0},  /* %m  -> M'(...)' value hole */
   {"mt_strict",    HOLE_VALUE, C_MTSTRICT,     0, 0},  /* VERIFY then %m */
   {"ident_concat", HOLE_IDENT, C_IDENT_CONCAT, 0, 0},  /* <v>    naive, control */
+  {"ident_quote",  HOLE_IDENT, C_IDENT_QUOTE,  0, 0},  /* "%w"   escaping baseline */
   {"ident_mt",     HOLE_IDENT, C_IDENT_MT,     0, 0},  /* [<name enc>] name hole */
   /* The strict-mode typed API: the only value and identifier paths a strict
   ** build admits, exercised through the sqlite3_matchertext_sql builder. */
@@ -140,12 +141,16 @@ static u64 fnvInt(u64 h, i64 v){
   return h;
 }
 
-/* Collapse the p4 operand to one sentinel when it is exactly the value (or its
-** decoded form), so the value is the only thing p4 may differ by; the rest of
-** p4 stays under the comparison. */
-static u64 fnvRedact(u64 h, const char *z, const char *zA, const char *zB){
+/* Collapse the p4 operand to one sentinel when it is exactly the value, its
+** decoded form, or its encoded form, so the value is the only thing p4 may
+** differ by; the rest of p4 stays under the comparison.  A literal that holds
+** the encoded form is a value the decoder failed to restore: a changed value,
+** which the echo fixture reports, not a changed parse. */
+static u64 fnvRedact(u64 h, const char *z, const char *zA, const char *zB,
+                     const char *zC){
   if( z==0 ) return fnvByte(h, 0xff);
-  if( (zA && strcmp(z, zA)==0) || (zB && strcmp(z, zB)==0) ){
+  if( (zA && strcmp(z, zA)==0) || (zB && strcmp(z, zB)==0)
+   || (zC && strcmp(z, zC)==0) ){
     return fnvByte(fnvByte(h, 0x01), 0);
   }
   return fnvStr(h, z);
@@ -171,6 +176,7 @@ static char *renderHole(int eConv, int eConcat, const char *z){
       if( !sqlite3_matchertext_verify(z, -1) ) return 0;
       return sqlite3_mprintf("%m", z);
     case C_IDENT_CONCAT: return sqlite3_mprintf("%s", z);
+    case C_IDENT_QUOTE:  return sqlite3_mprintf("\"%w\"", z);
     case C_IDENT_MT: {
       char *zEnc = sqlite3_matchertext_encode(z, gnVal, 0);
       char *zOut;
@@ -236,24 +242,28 @@ static void emit(const Result *p){
 static int explainHash(const char *zSql, const char *zHide, u64 *pOut){
   char *zX = sqlite3_mprintf("EXPLAIN %s", zSql);
   char *zDec = sqlite3_matchertext_decode(zHide, gnVal, 0);
+  char *zEnc = sqlite3_matchertext_encode(zHide, gnVal, 0);
   sqlite3_stmt *p = 0;
   u64 h = 1469598103934665603ULL;
   int rc;
-  if( zX==0 ){ sqlite3_free(zDec); return SQLITE_NOMEM; }
+  if( zX==0 ){ sqlite3_free(zDec); sqlite3_free(zEnc); return SQLITE_NOMEM; }
   rc = sqlite3_prepare_v2(gDb, zX, -1, &p, 0);
   sqlite3_free(zX);
-  if( rc!=SQLITE_OK ){ sqlite3_finalize(p); sqlite3_free(zDec); return rc; }
+  if( rc!=SQLITE_OK ){
+    sqlite3_finalize(p); sqlite3_free(zDec); sqlite3_free(zEnc); return rc;
+  }
   while( sqlite3_step(p)==SQLITE_ROW ){
     h = fnvInt(h, sqlite3_column_int64(p, 0));
     h = fnvStr(h, (const char*)sqlite3_column_text(p, 1));
     h = fnvInt(h, sqlite3_column_int64(p, 2));
     h = fnvInt(h, sqlite3_column_int64(p, 3));
     h = fnvInt(h, sqlite3_column_int64(p, 4));
-    h = fnvRedact(h, (const char*)sqlite3_column_text(p, 5), zHide, zDec);
+    h = fnvRedact(h, (const char*)sqlite3_column_text(p, 5), zHide, zDec, zEnc);
     h = fnvInt(h, sqlite3_column_int64(p, 6));
   }
   rc = sqlite3_finalize(p);
   sqlite3_free(zDec);
+  sqlite3_free(zEnc);
   *pOut = h;
   return rc;
 }
@@ -288,21 +298,25 @@ static int typedPrepare(int iHost, int bExplain,
 static int typedExplainHash(int iHost, const sqlite3_matchertext_arg *pArg,
                             const char *zHide, i64 nHide, u64 *pOut){
   char *zDec = sqlite3_matchertext_decode(zHide, nHide, 0);
+  char *zEnc = sqlite3_matchertext_encode(zHide, nHide, 0);
   sqlite3_stmt *p = 0;
   u64 h = 1469598103934665603ULL;
   int rc = typedPrepare(iHost, 1, pArg, &p);
-  if( rc!=SQLITE_OK ){ sqlite3_finalize(p); sqlite3_free(zDec); return rc; }
+  if( rc!=SQLITE_OK ){
+    sqlite3_finalize(p); sqlite3_free(zDec); sqlite3_free(zEnc); return rc;
+  }
   while( sqlite3_step(p)==SQLITE_ROW ){
     h = fnvInt(h, sqlite3_column_int64(p, 0));
     h = fnvStr(h, (const char*)sqlite3_column_text(p, 1));
     h = fnvInt(h, sqlite3_column_int64(p, 2));
     h = fnvInt(h, sqlite3_column_int64(p, 3));
     h = fnvInt(h, sqlite3_column_int64(p, 4));
-    h = fnvRedact(h, (const char*)sqlite3_column_text(p, 5), zHide, zDec);
+    h = fnvRedact(h, (const char*)sqlite3_column_text(p, 5), zHide, zDec, zEnc);
     h = fnvInt(h, sqlite3_column_int64(p, 6));
   }
   rc = sqlite3_finalize(p);
   sqlite3_free(zDec);
+  sqlite3_free(zEnc);
   *pOut = h;
   return rc;
 }

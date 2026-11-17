@@ -263,6 +263,7 @@ SQLI_ARMS = [
     ("quote",        "\\texttt{\\%Q} escaping",    "legacy"),
     ("escape",       "\\texttt{\\%q} escaping",    "legacy"),
     ("bind",         "Bound parameter",           "legacy"),
+    ("ident_quote",  "\\texttt{\"\\%w\"} name escaping", "legacy"),
     ("mt",           "\\texttt{M'(\\ldots)'} value hole", "mt"),
     ("mt_strict",    "\\textsc{Verify} then \\texttt{M'(\\ldots)'}", "mt"),
     ("ident_mt",     "\\texttt{[\\ldots]} name hole",     "mt"),
@@ -402,9 +403,20 @@ def sqli_macros(con):
     sab = EXPORTS / "sqli_sabotage.csv"
     if sab.exists():
         with open(sab, newline="") as f:
-            best = max((float(r["detection_rate"]) for r in csv.DictReader(f)),
-                       default=0.0)
-        vals.append(("SqliSabotageDetect", pct(best, 1)))
+            rows = list(csv.DictReader(f))
+        vals += [("SqliSabotageDetect",
+                  pct(max((float(r["detection_rate"]) for r in rows), default=0.0), 1)),
+                 ("SqliSabotageBreakouts", num(sum(int(r["to_breakout"]) for r in rows))),
+                 ("SqliSabotageProbeBreakouts",
+                  num(sum(int(r["to_breakout_probe"]) for r in rows)))]
+    benign = EXPORTS / "sqli_benign_rejection.csv"
+    if benign.exists():
+        with open(benign, newline="") as f:
+            r = next(csv.DictReader(f))
+        texts, rejected = int(r["texts"]), int(r["rejected"])
+        vals += [("SqliBenignTexts", num(texts)),
+                 ("SqliBenignRejected", num(rejected)),
+                 ("SqliBenignRejectedShare", pct(rejected / max(texts, 1), 2))]
     return vals
 
 
@@ -512,7 +524,8 @@ def html_macros(con):
             rows = list(csv.DictReader(f))
         vals += [("HtmlSabotages", num(len(rows))),
                  ("HtmlSabotageDetected",
-                  num(sum(r["detection"] != "unnoticed" for r in rows)))]
+                  num(sum(r["detection"] != "unnoticed" for r in rows))),
+                 ("HtmlSabotageBreakouts", num(sum(int(r["to_breakout"]) for r in rows)))]
     return vals
 
 
@@ -535,6 +548,11 @@ def run(args):
     # measured on the payload-backed HTML/DOM subset discounts the ceiling.
     hosts = "','".join(sorted(matchertext.HOST))
     hostable = q(f"SELECT COUNT(*) FROM classification WHERE syntax_type IN ('{hosts}')")
+    # The counterfactual under the same premise A2: SQL and HTML/DOM already have
+    # a deployed per-language defense (parameterized queries, contextual
+    # auto-escaping), and they hold most of the hostable CVEs.
+    per_language = q("""SELECT COUNT(*) FROM classification
+                        WHERE syntax_type IN ('sql', 'html_dom')""")
     # The ceiling is a design choice: the share if every non-matcher context got
     # a hole form as SQL does, and the share among known-exploited CVEs.
     with_nm = "','".join(sorted(matchertext.HOST | set(matchertext.NONMATCHER)))
@@ -677,6 +695,8 @@ def run(args):
         ("HostableShare", pct(hostable / injection)),
         ("HostableWithNonmatcherShare", pct(hostable_nm / injection)),
         ("HostableShareExact", pct(hostable / injection, 1)),
+        ("PerLanguageShare", pct(per_language / injection, 1)),
+        ("PerLanguageOfHostable", pct(per_language / hostable, 1)),
         ("LabelConflictCVEs", num(label_conflicts)),
         ("HostableLowShare", pct((hostable - label_conflicts) / injection, 1)),
         ("KevInjectionCVEs", num(kev_inj)),

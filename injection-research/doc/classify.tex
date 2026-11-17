@@ -9,13 +9,11 @@ depends on how the untrusted value is delimited in the target language, not on
 how the weakness is categorized.
 
 \paragraph{Injection gate}
-A CVE is treated as injection-related if it carries any CWE in the
-\mbox{CWE-74} (``Injection'') subtree (computed from the CWE ChildOf
-hierarchy across all enrichment sources) or if its description matches a
-phrase rule for a known injection class.
-The subtree excludes seven descendants of \mbox{CWE-99} (``Resource
-Injection''): duplicate identifiers, file names, and dynamically chosen
-variables, where no untrusted value enters an embedded language.
+A CVE is injection-related if its description matches an injection phrase rule
+or it has a CWE in the \mbox{CWE-74} (``Injection'') subtree, from the CVE
+record and NVD, else from the other sources. The subtree excludes \mbox{CWE-99}
+and its descendants; a \mbox{CWE-94} label is dropped where the description
+names memory corruption.
 This yields \textbf{\dataInjectionCVEs} injection CVEs, \textbf{\dataInjectionSharePrecise} of published
 records, spanning \dataInjectionCWEs distinct CWEs.
 
@@ -36,8 +34,6 @@ unknown, so the classification rests overwhelmingly on the deterministic
 layers.
 
 \paragraph{Label accuracy}
-Only the naive-Bayes layer is statistical, and it labels \dataMethodNbShare of
-CVEs, so it moves no share by more than that.
 Two raters labeled a blind sample of \dataAuditPerMethod CVEs per layer from the
 description alone (Cohen's $\kappa=\dataAuditKappa$, \dataAuditGraded graded).
 The exact syntax is right for \dataAuditPrecisionCwe of CWE-map labels,

@@ -318,8 +318,11 @@ def load_nuclei(con):
         rel = str(f.relative_to(RAW))
         poc_rows.append((cid, "nuclei", str(f.relative_to(base)), rel, "template"))
         text = f.read_text(encoding="utf-8", errors="replace")
-        for n in CWE_RE.findall(text):
-            cwe_rows.add((cid, int(n), "nuclei"))
+        # Only the classification field: CWE ids elsewhere in a template are
+        # references or matcher text, not the template's weakness.
+        for line in re.findall(r"^\s*cwe-id:(.*)$", text, re.M):
+            for n in CWE_RE.findall(line):
+                cwe_rows.add((cid, int(n), "nuclei"))
         cm = re.search(r"cvss-metrics:\s*(\S+)", text)
         cs = re.search(r"cvss-score:\s*([\d.]+)", text)
         if cm or cs:

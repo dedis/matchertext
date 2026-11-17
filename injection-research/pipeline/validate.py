@@ -26,7 +26,7 @@ from pathlib import Path
 
 import matchertext
 from classify import load_hierarchy
-from syntactic_group import skeleton
+from syntactic_group import group_skeleton
 from taxonomy import labels_from_cwes
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,7 +39,7 @@ def assess_payloads(con):
     rows, tally = [], defaultdict(Counter)
     for corpus, syn, payload in con.execute(
             "SELECT corpus, syntax_type, payload FROM payload"):
-        sk = skeleton(payload)
+        sk = group_skeleton(syn, payload)
         preventable, mech, _ = matchertext.assess(syn, sk)
         rows.append((corpus, syn, payload, sk, int(preventable), mech or None))
         tally[syn][mech if preventable else "not_applicable"] += 1

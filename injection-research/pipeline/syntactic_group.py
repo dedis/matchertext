@@ -17,6 +17,7 @@ import sqlite3
 from collections import defaultdict
 from pathlib import Path
 
+import matchertext
 from report import TRUNCATED, extract_payload
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -85,6 +86,15 @@ def skeleton(payload):
     return " ".join(out)
 
 
+def group_skeleton(syntax, payload):
+    """The skeleton, led by matchertext.SINK when an HTML/DOM payload runs in an
+    execution context, so that one group never mixes the two."""
+    sk = skeleton(payload)
+    if syntax in matchertext.PAYLOAD_DEPENDENT and matchertext.html_sink(payload):
+        return f"{matchertext.SINK} {sk}"
+    return sk
+
+
 def representative_payload(con):
     syn_of = dict(con.execute("SELECT cve_id, syntax_type FROM classification"))
     paths = defaultdict(list)
@@ -143,6 +153,7 @@ def run(args):
         sk = skeleton(payload)
         if not sk or sk.strip("<idnqTAG /|;&=*+.:,-") == "":
             continue
+        sk = group_skeleton(syn, payload)
         gid = hashlib.md5(f"{syn}\x00{sk}".encode()).hexdigest()[:12]
         rows.append((cid, syn, gid, sk, payload))
 

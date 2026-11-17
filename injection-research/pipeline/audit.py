@@ -34,6 +34,7 @@ GOLD = AUDIT / "gold.csv"
 SHEET = ["cve_id", "description", "injection", "syntax", "notes"]
 SYNTAX_VALUES = (set(taxonomy.SYNTAXES) - {"unknown"}) | {"other", "unclear"}
 NONE = "none"  # the category of a CVE graded as not injection
+OUT = "out"    # the layer of a sampled CVE that the corpus gate has since dropped
 BOOTSTRAP = 2000
 
 
@@ -172,8 +173,9 @@ def metrics(con):
         stratum = {r["cve_id"]: r["method"] for r in csv.DictReader(f)}
     with open(STRATA, newline="") as f:
         size = {r["method"]: int(r["cves"]) for r in csv.DictReader(f)}
-    label = {cid: (method, syn) for cid, method, syn in con.execute(
-        "SELECT cve_id, method, syntax_type FROM classification")}
+    label = defaultdict(lambda: (OUT, None), (
+        (cid, (method, syn)) for cid, method, syn in con.execute(
+            "SELECT cve_id, method, syntax_type FROM classification")))
     side = lambda method, syn: (method, syn in matchertext.HOST)
     cells = Counter()
     for method, syn, n in con.execute(
@@ -214,7 +216,12 @@ def metrics(con):
            "hostable_share": ceiling(shares(None), cells),
            "hostable_low": boot[int(0.025 * BOOTSTRAP)],
            "hostable_high": boot[int(0.975 * BOOTSTRAP) - 1],
-           "strata": {}, "precision": {}}
+           "strata": {}, "precision": {},
+           # sampled CVEs the corpus gate has since dropped, and how many of
+           # them the raters found not injection
+           "dropped": (sum(label[cid][0] == OUT for cid in graded),
+                       sum(label[cid][0] == OUT and cat == NONE
+                           for cid, cat in graded.items()))}
     for h in sorted(size):
         rows = [cat for cid, cat in graded.items() if stratum[cid] == h]
         out["strata"][h] = {"graded": len(rows),
@@ -243,6 +250,7 @@ def report(con):
         print(f"precision {method:8} {pct(p)}")
     print(f"adjusted ceiling {m['hostable_share']:.1%} "
           f"[{m['hostable_low']:.1%}, {m['hostable_high']:.1%}]")
+    print("sampled CVEs the gate now drops: {}, graded not injection: {}".format(*m["dropped"]))
 
 
 def main():
