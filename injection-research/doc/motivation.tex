@@ -1,21 +1,10 @@
 \section{Background and motivation}
 \label{sec:motivation}
 
-Injection remains among the most damaging and persistent classes of software
-vulnerability. This section surveys the breadth of the problem beyond its most
-familiar members, reviews the measured prevalence and cost, then shows why the
-very machinery built to contain injection has itself become a recurring source
-of vulnerabilities: the motivation for the structural approach this paper evaluates.
-
 \subsection{A wider family of embedding hazards}
 \label{sec:bg:hazards}
 
-SQL injection and XSS are only the most familiar members
-of a much larger family that share the boundary-crossing cause of \cref{sec:intro}.
-The same failure recurs across many more language pairs than those two,
-and produces symptoms well beyond information disclosure.
-
-Several are, like SQL injection, outright remote compromises: the 2021
+Several hazards are, like SQL injection, outright remote compromises: the 2021
 Log4Shell vulnerability expanded a \verb|${jndi:...}| sequence appearing
 anywhere in a logged string into a remote lookup that executed
 attacker-supplied code~\cite{cve2021log4shell}. Command injection lets
@@ -147,13 +136,6 @@ outside the waist; \cref{sec:prevent} measures how much that leaves.}
 \label{fig:bg:waist}
 \end{figure*}
 
-The defenses of \cref{sec:bg:sanitizer} share a shape: each is written for one
-composing language and one host language, and works by knowing that host language
-well enough to transform values for it. A Java-to-SQL escaper knows SQL, and an HTML
-sanitizer knows the browser's parser closely enough to predict it. Neither
-transfers to the other's problem, so the number of defenses to write, audit,
-and re-synchronize grows with the product of the two populations.
-
 \Cref{fig:bg:waist} shows the alternative: a rule that both sides implement
 once decouples them, because the rule mentions neither. A language that emits
 valid matchertext is compatible with every host language that reads to matcher balance.
@@ -162,7 +144,3 @@ what the other is. The count falls from $N \times M$ relationships to $N + M$
 implementations. This decoupling is the shape the Internet protocol stack takes for the
 same reason: a waist thin enough that what sits above and below it can vary
 independently.
-
-Whether that shape is worth adopting is a security question rather than an
-aesthetic one, and it turns on what the shared rule actually guarantees when the
-value in the hole is chosen by an attacker.

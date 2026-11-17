@@ -3,8 +3,8 @@
 
 The attacker that targets the hole is a generated set
 (\cref{sec:prevent:exec}), not a search that learns from the parser.
-The HTML evidence is one parser, parse5, not a browser, and its oracle reads the
-tree, not the JavaScript, URL, or CSS inside it.
+The browsers are Playwright builds; the HTML oracle reads the tree and one
+JavaScript string, not URLs or CSS.
 Syntax labels are audited on a sample (\cref{sec:classify}), and payloads by
 one rater.
 The projection assumes that the payload-backed CVEs of a syntax represent its

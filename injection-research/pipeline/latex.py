@@ -526,20 +526,21 @@ def sqli_macros(con):
 
 # Each block opens with a row that names it, so the reader sees which rows use matchertext.
 HTML_ARMS = [
-    ("concat",      "Concatenation",                     "stock"),
-    ("escape",      "Entity escaping",                   "stock"),
-    ("dom_stock",   "Stock writer",                      "stock"),
-    ("dom_guarded", "Guarded writer",                    "guard"),
-    ("dom_mt",      "Matchertext writer",                "fork"),
-    ("mt_verify",   "\\textsc{Verify}, hole",             "fork"),
-    ("mt_section",  "\\textsc{Verify}, MDATA",            "fork"),
-    ("mt_encode",   "Encoding",                          "fork"),
-    ("compose",     "\\texttt{composeHtml}",             "fork"),
+    ("concat",         "Concatenation",                     "stock"),
+    ("escape",         "Entity escaping",                   "stock"),
+    ("dom_stock",      "Stock writer",                      "stock"),
+    ("dom_guarded",    "Guarded writer",                    "guard"),
+    ("dom_mt",         "Matchertext writer",                "fork"),
+    ("mt_verify",      "\\textsc{Verify}, hole",             "fork"),
+    ("mt_section",     "\\textsc{Verify}, MDATA",            "fork"),
+    ("mt_encode",      "Encoding",                          "fork"),
+    ("compose",        "\\texttt{composeHtml}",             "fork"),
 ]
 HTML_GROUPS = {"stock": "Without matchertext: stock parse5",
                "guard": "Without matchertext: fork serializer",
                "fork": "With matchertext: parse5 fork"}
-HTML_MT_ARMS = ("dom_mt", "mt_verify", "mt_section", "mt_encode", "compose")
+HTML_MT_ARMS = ("dom_mt", "mt_verify", "mt_section", "mt_encode", "compose", "compose_js", "compose_dom")
+HTML_ENGINES = ("chromium", "firefox", "webkit")
 
 
 def has_table(con, name):
@@ -548,14 +549,25 @@ def has_table(con, name):
 
 
 def tbl_html_arms(con):
-    """Verdict counts per delivery path over the HTML hosts. Refused joins the
-    arm's own VERIFY refusals and the guarded serializer's refusals."""
+    """Verdict counts per delivery path over the HTML hosts that are not semantic sinks (A4). Refused joins the
+    arm's own VERIFY refusals and the serializer's refusals; no arm of the table writes a document that the parser
+    refuses (the run guards it). The last column is the most breakouts in one browser of the documents that a
+    browser receives."""
     rows = {a: r for a, *r in con.execute(
-        """SELECT arm, SUM(n_inert), SUM(n_altered), SUM(n_breakout),
-                  SUM(n_rejected) + SUM(n_refused), SUM(n_malformed)
-           FROM mt_html_combo GROUP BY arm""")}
+        """SELECT c.arm, SUM(n_inert), SUM(n_altered), SUM(n_breakout),
+                  SUM(n_rejected) + SUM(n_refused)
+           FROM mt_html_combo c JOIN mt_html_host h ON h.name = c.host
+           WHERE h.semantic = 0 GROUP BY c.arm""")}
+    if any(n for (n,) in con.execute("""SELECT SUM(n_malformed) FROM mt_html_combo c JOIN mt_html_host h
+                                         ON h.name = c.host WHERE h.semantic = 0 GROUP BY c.arm""")):
+        raise SystemExit("tbl-html-arms: an arm wrote a document that the parser refused")
+    in_browser = {a: max(n) for a, *n in con.execute(
+        f"""SELECT a.name, {", ".join(f"SUM(c.{e} = 'BREAKOUT')" for e in HTML_ENGINES)}
+            FROM mt_html_case c JOIN mt_html_arm a USING(arm_id) JOIN mt_html_host h USING(host_id)
+            WHERE h.semantic = 0 GROUP BY a.name""")}
     lines = ["\\begin{tabular}{@{}l rrrrr@{}}", "\\toprule",
-             "& & & Broke & & Not \\\\", "Delivery & Inert & Altered & out & Refused & HTML \\\\"]
+             "& & & Broke & & Browser \\\\",
+             "Delivery & Inert & Altered & out & Refused & breakout \\\\"]
     last = None
     for arm, label, group in HTML_ARMS:
         if arm not in rows:
@@ -563,9 +575,72 @@ def tbl_html_arms(con):
         if group != last:
             lines += ["\\midrule", f"\\multicolumn{{6}}{{@{{}}l}}{{\\emph{{{HTML_GROUPS[group]}}}}} \\\\"]
             last = group
-        lines.append(f"{label:34} & " + " & ".join(num(v) for v in rows[arm]) + " \\\\")
+        lines.append(f"{label:34} & " + " & ".join(num(v) for v in [*rows[arm], in_browser.get(arm, 0)])
+                     + " \\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
     return "\n".join(lines) + "\n"
+
+
+def html_layer_macros(con):
+    """The browsers, the JavaScript layer, the mXSS fixtures, and the client path of the HTML replay."""
+    q = lambda sql: con.execute(sql).fetchone()[0] or 0
+    arm = lambda name: f"(SELECT arm_id FROM mt_html_arm WHERE name='{name}')"
+    any_engine = lambda cond: " OR ".join(f"c.{e} {cond}" for e in HTML_ENGINES)
+    contained = HTML_MT_ARMS + ("dom_guarded",)
+    lock = json.loads((ROOT / "test" / "matchertext" / "jssrc" / "package-lock.json").read_text())
+    with open(EXPORTS / "html_browsers.csv", newline="") as f:
+        engines = list(csv.DictReader(f))
+    version = {r["engine"]: r["version"] for r in engines}
+    with open(EXPORTS / "html_mxss.csv", newline="") as f:
+        mxss = {r["arm"]: r for r in csv.DictReader(f)}
+    js = lambda name, v: q(f"SELECT COUNT(*) FROM mt_html_case WHERE arm_id={arm(name)} AND js='{v}'")
+    nonsemantic = "host_id IN (SELECT host_id FROM mt_html_host WHERE semantic=0)"
+    # The text says that every case that a browser judges otherwise than parse5 is concatenation in the option
+    # host, where parse5 drops markup that the browsers keep.
+    other = q(f"""SELECT COUNT(*) FROM mt_html_case c
+                  WHERE c.chromium != '-' AND ({any_engine("!= c.verdict")})
+                    AND NOT (c.arm_id={arm('concat')}
+                             AND c.host_id=(SELECT host_id FROM mt_html_host WHERE name='option'))""")
+    if other:
+        raise RuntimeError(f"{other} cases that a browser judges otherwise than parse5 are not concatenation in option")
+    return [
+        ("PlaywrightVersion", lock["packages"]["node_modules/playwright"]["version"]),
+        ("HtmlChromiumVersion", version["chromium"]),
+        ("HtmlFirefoxVersion", version["firefox"]),
+        ("HtmlWebkitVersion", version["webkit"]),
+        ("HtmlBrowserCases", num(q("SELECT COUNT(*) FROM mt_html_case WHERE chromium != '-'"))),
+        # The documents that each browser also reads by a page load, with the same tree as the inert write.
+        ("HtmlPageChecked", num(int(engines[0]["page_checked"]))),
+        # Cases that a browser judges otherwise than parse5.
+        ("HtmlBrowserDiffers", num(q(
+            f"""SELECT COUNT(*) FROM mt_html_case c
+                WHERE c.chromium != '-' AND ({any_engine("!= c.verdict")})"""))),
+        ("HtmlEscapeContextBreakout", num(q(
+            f"SELECT COUNT(*) FROM mt_html_case WHERE arm_id={arm('escape_context')} AND verdict='BREAKOUT' "
+            f"AND {nonsemantic}"))),
+        ("HtmlAutoescapeBreakout", num(q(
+            f"SELECT COUNT(*) FROM mt_html_case WHERE arm_id={arm('autoescape')} AND verdict='BREAKOUT' "
+            f"AND {nonsemantic}"))),
+        # The JavaScript string of the script host: the verified hole delimits only the HTML layer.
+        ("HtmlJsCases", num(q(f"SELECT COUNT(*) FROM mt_html_case WHERE arm_id={arm('mt_verify')} AND js != '-'"))),
+        ("HtmlJsHoleEnds", num(js("mt_verify", "BREAKOUT") + js("mt_verify", "MALFORMED"))),
+        ("HtmlJsConcatBreakout", num(js("concat", "BREAKOUT"))),
+        ("HtmlJsComposeCases", num(q(
+            f"SELECT COUNT(*) FROM mt_html_case WHERE arm_id={arm('compose_js')} AND js != '-'"))),
+        ("HtmlJsComposeInert", num(js("compose_js", "INERT"))),
+        ("HtmlJsEscapeContextInert", num(js("escape_context", "INERT"))),
+        ("HtmlJsAutoescapeInert", num(js("autoescape", "INERT"))),
+        # DOMPurify's mXSS fixtures as values: the stock writer lets some out on the round trip; the writers
+        # that keep the value as text, in parse5 and the browsers, let none out.
+        ("HtmlMxssProbes", num(int(mxss["concat"]["probes"]))),
+        ("HtmlMxssCases", num(sum(int(mxss[a]["n"]) for a in contained if a in mxss))),
+        ("HtmlMxssStockBreakout", num(int(mxss["dom_stock"]["breakout"]))),
+        ("HtmlMxssContainedBreakout", num(sum(
+            int(mxss[a]["breakout"]) + sum(int(mxss[a][e]) for e in HTML_ENGINES) for a in contained if a in mxss))),
+        # The client path of DOM-based XSS: composeHtml, then innerHTML.
+        ("HtmlComposeDomCases", num(q(
+            f"SELECT COUNT(*) FROM mt_html_case WHERE arm_id={arm('compose_dom')} AND chromium != '-'"))),
+    ]
 
 
 def html_macros(con):
@@ -583,8 +658,13 @@ def html_macros(con):
         ("HtmlSemanticHosts", num(q("SELECT COUNT(*) FROM mt_html_host WHERE semantic=1"))),
         ("HtmlArms", num(q("SELECT COUNT(*) FROM mt_html_arm"))),
         ("HtmlCases", num(q("SELECT COUNT(*) FROM mt_html_case"))),
+        # Over the hosts that are not semantic sinks (A4); href and onclick apart.
         ("HtmlEffective", num(q("""SELECT COUNT(*) FROM (SELECT DISTINCT value_id, host_id
-                                   FROM mt_html_case WHERE effective=1)"""))),
+                                   FROM mt_html_case JOIN mt_html_host USING(host_id)
+                                   WHERE effective=1 AND semantic=0)"""))),
+        ("HtmlEffectiveSemantic", num(q("""SELECT COUNT(*) FROM (SELECT DISTINCT value_id, host_id
+                                           FROM mt_html_case JOIN mt_html_host USING(host_id)
+                                           WHERE effective=1 AND semantic=1)"""))),
         ("HtmlMatchertextPayloads", num(q("SELECT COUNT(*) FROM mt_html_value WHERE is_mt=1"))),
         ("HtmlNonMtPayloads", num(q("SELECT COUNT(*) FROM mt_html_value WHERE is_mt=0"))),
         # A zero byte reads as U+FFFD in every HTML parser, so the hole holds an altered value.
@@ -607,12 +687,13 @@ def html_macros(con):
         vals.append((f"Html{name}UncoveredBreakout", num(q(
             f"""SELECT COALESCE(SUM(n_eff_breakout), 0) FROM mt_html_combo
                 WHERE arm='{arm}' AND host IN {hosts}"""))))
-    # The trees that the guard refuses and the matchertext writer delivers as holes.
+    # The trees that the guard refuses and the matchertext writer delivers as holes (altered only by the line
+    # breaks and NUL characters that every parser normalizes).
     vals.append(("HtmlGuardedRefusedMtInert", num(q(
         """SELECT COUNT(*) FROM mt_html_case g JOIN mt_html_case m USING(value_id, host_id)
            WHERE g.arm_id=(SELECT arm_id FROM mt_html_arm WHERE name='dom_guarded')
              AND m.arm_id=(SELECT arm_id FROM mt_html_arm WHERE name='dom_mt')
-             AND g.verdict='REFUSED' AND m.verdict='INERT'"""))))
+             AND g.verdict='REFUSED' AND m.verdict IN ('INERT', 'ALTERED')"""))))
     # How a parser without the option reads the documents of the verified element and attribute holes.
     legacy = {r: n for r, n in con.execute(
         """SELECT reader, COUNT(*) FROM mt_html_case
@@ -622,6 +703,7 @@ def html_macros(con):
              ("HtmlLegacyElements", num(legacy.get("ELEMENTS", 0))),
              ("HtmlLegacyElementsShare",
               pct(legacy.get("ELEMENTS", 0) / max(sum(legacy.values()), 1), 1))]
+    vals += html_layer_macros(con)
     sab = EXPORTS / "html_sabotage.csv"
     if sab.exists():
         with open(sab, newline="") as f:

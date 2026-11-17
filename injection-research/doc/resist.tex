@@ -1,19 +1,9 @@
 \section{Injection resistance by matcher-delimiting untrusted input}
 \label{sec:resist}
 
-We develop the discipline first for SQL injection, then for cross-site scripting, whose
-several distinct HTML escaping contexts collapse to one discipline.
-The same argument then covers two settings where the host language already delimits with
-matchers, so the discipline asks for no new syntax.
-These are LDAP directory filters, whose parenthesised assertions are
-matcher-delimited already, and the PDF document format, whose literal strings
-already require matcher balance.
-
 \subsection{Preventing SQL injection}
 \label{sec:resist:sql}
 
-Take the setting that most sharply motivates the discipline: untrusted input
-embedded into a query language such as SQL.
 Recall the classic vulnerability of \cref{sec:intro}: a server composes a clause
 like \verb|"WHERE name = '"+userName+"'"|.
 A \verb|userName| containing a quote closes the literal early and appends
@@ -35,10 +25,6 @@ an unmatched \verb|]| which is not matchertext, and thus cannot embed at all.
 Because the guarantee depends only on the delimiter being a matcher, not on what
 the value denotes, it holds wherever untrusted input appears, not only string
 values but numbers and even identifiers such as table or column names.
-That last case is a strength over parameterized queries (prepared statements),
-whose placeholders bind only \emph{values}: an identifier cannot be parameterized
-and is usually left to ad-hoc allow-listing, whereas \verb|FROM [|\textit{table}\verb|]|
-covers it directly.
 Which tables a caller may name remains an authorization question, distinct from
 injection.
 
@@ -83,10 +69,7 @@ in any position, can escape its delimiters or alter the surrounding query
 structure, closing off the sub-class of injection that depends on breaking out
 of a delimiter. This guarantee is the inertness of \cref{sec:threat}. It does not by itself
 establish that later decoding, reparsing, or execution of the contained value
-is safe. It does not adjudicate whether a well-formed value is
-\emph{authorized}, which remains a matter of access control, and it
-complements rather than replaces parameterized queries where those already
-suffice.
+is safe.
 
 \subsection{Cross-site scripting across HTML contexts}
 \label{sec:resist:xss}

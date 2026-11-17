@@ -1,11 +1,6 @@
 \section{Threat model and security property}
 \label{sec:threat}
 
-All the current claims are purely conditional, and this section
-makes the conditions explicit: what is trusted, what the attacker controls, the
-property that is meant to hold, and the deployment premises it requires.
-The property is stated below as an invariant on the host language's parse.
-
 \paragraph{Asset and trusted base}
 Consider a host-language program with a hole $P[\cdot]$ into which an untrusted value
 $v$ is placed. The asset is the invariant that the \emph{structure} of the

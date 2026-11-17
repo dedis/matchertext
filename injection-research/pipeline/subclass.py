@@ -45,7 +45,8 @@ TECHNIQUE = {
         ("blind_boolean", r"\band\s+\d+\s*=\s*\d+|\bboolean-based\b|\bblind\b"),
     ]),
     "html_dom": _rx([
-        ("dom_based", r"\bDOM[- ]based\b|document\.(?:location|write|cookie)|\.innerHTML|location\.hash"),
+        # A DOM source marks DOM-based XSS; a sink that a payload calls (document.write, document.cookie) does not.
+        ("dom_based", r"\bDOM[- ]based\b|location\.(?:hash|search)|document\.(?:URL|referrer)|window\.name"),
         ("mutation", r"\bmutation\b|\bmXSS\b"),
         ("stored", r"\bstored\b|\bpersistent\b|\bsecond[- ]order\b"),
         ("reflected", r"\breflected\b|\bnon[- ]persistent\b"),

@@ -18,6 +18,9 @@ cd injection-research
 - Internet access for an initial download
 - The GitHub CLI (`gh`) for optional GitHub payload recovery
 - Node.js and npm, for the HTML replay through the `parse5/` submodule
+- Go, for the `html/template` arm of the HTML replay
+- About 1.2 GB of disk for the Chromium, Firefox, and WebKit builds of the HTML
+  browser replay, which `pipeline/browsers.py` downloads
 
 `run_all.py` records in the `toolchain` entry of `manifest.json` the commits of
 the `sqlite/` and `parse5/` forks and the versions of Python, Node.js, the C
@@ -89,6 +92,19 @@ reads snapshots:
 
 ```sh
 export MATCHERTEXT_SNAPSHOT_ARCHIVE=https://anonymous.4open.science/api/repo/matchertext-security-D2DC/file/archive
+python3 pipeline/run_all.py
+```
+
+The mirror limits single-file requests, and a full run reads about 30
+objects. A download that the mirror rate-limits waits and retries for about 8
+minutes, then stops. To avoid the limit, download the mirror's repository ZIP
+(360 MB) once and use its `archive` folder as a local archive:
+
+```sh
+mkdir -p data/mirror
+curl -o data/mirror/repo.zip https://anonymous.4open.science/api/repo/matchertext-security-D2DC/zip
+unzip -q data/mirror/repo.zip 'archive/*' -d data/mirror
+export MATCHERTEXT_SNAPSHOT_ARCHIVE=$PWD/data/mirror/archive
 python3 pipeline/run_all.py
 ```
 
@@ -227,15 +243,37 @@ an unmatched closer followed by SQL.
 ### 5b. Replay HTML payloads
 
 ```sh
+python3 pipeline/browsers.py        # optional: html_experiment.py runs it too
 python3 pipeline/html_experiment.py
 ```
 
-This command builds the MatcherText parse5 fork in `parse5/` when its sources
-changed, and runs `test/matchertext/jssrc/html_driver.mjs`. It replays every
-distinct HTML payload through 13 host contexts and 9 arms: the raw control,
-entity escaping, a tree written by the stock and by the guarded serializer,
-and five matchertext arms, one of them a tree written with matchertext output. It also records how a parser without the
-matchertext option reads each matchertext document. With both MatcherText
+`pipeline/browsers.py` installs Playwright from
+`test/matchertext/jssrc/package-lock.json` and the Chromium, Firefox, and
+WebKit builds that this Playwright version pins into `data/build/browsers`,
+then launches each and prints its version. These are Playwright's builds, not
+branded Chrome, Firefox, or Safari, and Playwright picks the WebKit build by
+operating system; the replay records the versions in
+`data/exports/html_browsers.csv`. On Linux, also run
+`npx playwright install-deps chromium firefox webkit` as root.
+
+`html_experiment.py` builds the MatcherText parse5 fork in `parse5/` when its
+sources changed and the Go writer `test/matchertext/gosrc/autoescape`, and runs
+`test/matchertext/jssrc/html_driver.mjs`. It replays every distinct HTML
+payload through 16 host contexts and 13 arms: the raw control, one entity
+escaper everywhere, the OWASP escaping rule of each context, Go's
+`html/template`, a tree written by the stock and by the guarded serializer,
+and seven matchertext arms (one of them a tree written with matchertext output,
+one that encodes the value as a JavaScript string before the hole, and one that
+sets the output of `composeHtml` by `innerHTML`). The script host also gets
+a JavaScript verdict. Chromium, Firefox, and WebKit parse every document that
+a browser receives as a page load does (`test/matchertext/jssrc/browser.mjs`;
+not by `DOMParser`, which differs from a page load in Chromium and WebKit): a
+document with `noscript` loads in a frame, any other is written into a document
+without a browsing context, and every 50th of those is also loaded in a frame,
+which must give the same tree. It also records how
+a parser without the matchertext option reads each matchertext document. The
+22 mXSS fixtures of DOMPurify (`test/matchertext/jssrc/mxss_probes.json`,
+pinned commit) run apart as values through every arm. With both MatcherText
 options off, the fork passes parse5's test suite unchanged; the serializer
 guard, on by default, changes html5lib serializer tests 18 (`plaintext`) and 27
 (a leading line feed in `pre`, `textarea`, `listing`), whose stock output
@@ -249,7 +287,10 @@ matchertext document fails to parse or to serialize back, `composeHtml`
 accepts markup that is not a template literal, a deliberately broken fork goes
 unnoticed, or a fork whose hole ends at the first closer or whose serializer
 guard is off produces no breakout, or the Shift_JIS reader never breaks out.
-It writes:
+It also stops when a contained arm breaks out in a browser, the control never
+breaks out in a browser or of the JavaScript string, the stock writer lets no
+mXSS fixture out, the JavaScript-encoded hole does not hold the value, or a page
+load reads a sampled document otherwise than the inert write. It writes:
 
 - `data/exports/html_arm_outcomes.csv`
 - `data/exports/html_by_arm.csv`
@@ -257,6 +298,10 @@ It writes:
 - `data/exports/html_exemplars.csv`
 - `data/exports/html_adaptive.csv`
 - `data/exports/html_sabotage.csv`
+- `data/exports/html_browser.csv`
+- `data/exports/html_js.csv`
+- `data/exports/html_mxss.csv`
+- `data/exports/html_browsers.csv`
 
 `run_all.py` runs this stage after the SQL replay. `latex.py` writes its
 macros and `doc/generated/tbl-html-arms.tex`.

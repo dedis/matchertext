@@ -1,0 +1,9 @@
+{
+  "name": "matchertext-jssrc",
+  "private": true,
+  "description": "Drivers of the parse5 fork; Playwright replays their documents in Chromium, Firefox, and WebKit.",
+  "type": "module",
+  "devDependencies": {
+    "playwright": "1.65.1"
+  }
+}
