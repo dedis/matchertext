@@ -14,6 +14,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
+import matchertext
 import remote_sidecar
 
 csv.field_size_limit(1 << 24)
@@ -633,7 +634,8 @@ def load_payloads(con):
             for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
                 s = line.strip()
                 if PAYLOAD_MIN <= len(s) <= PAYLOAD_MAX and not s.startswith("#"):
-                    rows.add((corpus, path, syn, s))
+                    # Every later measurement reads this value (premise A3).
+                    rows.add((corpus, path, syn, matchertext.canon(s)))
     con.executemany("INSERT OR IGNORE INTO payload VALUES(?,?,?,?)", sorted(rows))
     con.commit()
 

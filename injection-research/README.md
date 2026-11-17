@@ -97,7 +97,11 @@ python3 pipeline/build_db.py
 ```
 
 This command parses `data/raw/`, imports the pinned remote-payload sidecar, and
-recreates the source tables in `data/cve.db`.
+recreates the source tables in `data/cve.db`. Each payload of the general
+payload lists is stored canonical, as premise A3 of the paper requires:
+`matchertext.canon` undoes the URL encoding (two rounds) and applies NFKC.
+`syntactic_group.py` does the same for each CVE payload, so the skeletons,
+Verify, and both replays all read one value.
 
 ### 3. Classify injection CVEs
 

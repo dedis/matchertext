@@ -9,11 +9,10 @@ depends on how the untrusted value is delimited in the target language, not on
 how the weakness is categorized.
 
 \paragraph{Injection gate}
-A CVE is injection-related if its description matches an injection phrase rule
-or it has a CWE in the \mbox{CWE-74} (``Injection'') subtree, from the CVE
-record and NVD, else from the other sources. The subtree excludes \mbox{CWE-99}
-and its descendants; a \mbox{CWE-94} label is dropped where the description
-names memory corruption.
+A CVE is injection-related if an injection phrase rule matches its description
+or it has a CWE in the \mbox{CWE-74} (``Injection'') subtree, from the CVE record
+and NVD, else other sources; the subtree excludes \mbox{CWE-99} and descendants,
+and \mbox{CWE-94} is dropped where the description names memory corruption.
 This yields \textbf{\dataInjectionCVEs} injection CVEs, \textbf{\dataInjectionSharePrecise} of published
 records, spanning \dataInjectionCWEs distinct CWEs.
 

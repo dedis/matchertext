@@ -29,7 +29,6 @@ import sys
 import threading
 from collections import Counter, defaultdict
 from pathlib import Path
-from urllib.parse import unquote_to_bytes
 
 from export import write
 
@@ -515,14 +514,8 @@ def _sqlite_literals(payload):
 
 
 def sqlite_equivalent(payload):
-    """Apply only transport, literal, and comment rewrites with equal meaning."""
-    try:
-        decoded = unquote_to_bytes(payload).decode("utf-8")
-        if "\0" not in decoded:
-            payload = decoded
-    except UnicodeError:
-        pass
-
+    """Apply only literal and comment rewrites with equal meaning. The payload
+    is already canonical (matchertext.canon), so no transport decoding is left."""
     payload = _sqlite_literals(payload)
 
     quote = None

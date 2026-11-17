@@ -27,10 +27,37 @@ no matcher hosting (shell metacharacters, CR/LF, XML/XXE angle brackets).
 """
 import html
 import re
-from urllib.parse import unquote
+import unicodedata
+from urllib.parse import unquote, unquote_plus
 
 PAIR = {")": "(", "]": "[", "}": "{"}
 OPEN = set("([{")
+# The nesting limit of the C and JavaScript VERIFY.
+MAX_MATCHER_DEPTH = 1000
+
+_PERCENT = re.compile(r"%[0-9A-Fa-f]{2}")
+
+
+def percent_decode(text, rounds=2):
+    """Undo the URL transport encoding of a recorded payload. A form-encoded
+    `+` is a space; the second round undoes the double encoding (%2527) common
+    in the corpus. Text with no percent-escape is not URL-encoded."""
+    if not _PERCENT.search(text):
+        return text
+    text = unquote_plus(text)
+    for _ in range(rounds - 1):
+        decoded = unquote(text)
+        if decoded == text:
+            break
+        text = decoded
+    return text
+
+
+def canon(payload):
+    """canon(v) of premise A3: the value as the host language reads it, with
+    the transport decoding undone and Unicode normalized (NFKC). Every
+    measurement of a payload uses this value."""
+    return unicodedata.normalize("NFKC", percent_decode(payload))
 
 # Contexts a matchertext host can delimit with a matcher pair (paper 4.7.1-4.7.4).
 HOST = {"sql", "xpath_xquery", "nosql", "html_dom", "ldap"}
@@ -66,10 +93,10 @@ _JS_CODE = re.compile(
 
 
 def html_sink(payload):
-    """Does this HTML/DOM payload run in an execution context? Character
-    references and percent-encoding are decoded, and tab and line breaks
-    dropped, as a browser does before it reads a URL scheme."""
-    text = re.sub(r"[\t\n\r]", "", html.unescape(unquote(payload)))
+    """Does this canonical HTML/DOM payload run in an execution context?
+    Character references are decoded, and tab and line breaks dropped, as a
+    browser does before it reads a URL scheme."""
+    text = re.sub(r"[\t\n\r]", "", html.unescape(payload))
     if _TEMPLATE_EXPR.search(text) or _LEADING_SCRIPT_URL.match(text):
         return True
     if "<" in text or _ATTRIBUTE.search(text):
@@ -94,6 +121,8 @@ def verify(skeleton):
     for t in skeleton.split():
         if t in OPEN:
             stack.append(t)
+            if len(stack) > MAX_MATCHER_DEPTH:
+                return False
         elif t in PAIR:
             if not stack or stack.pop() != PAIR[t]:
                 return False

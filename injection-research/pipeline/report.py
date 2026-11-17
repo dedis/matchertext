@@ -67,7 +67,10 @@ _SIGNS = {
                   r"(?:[\"'`]?\s*(?:cat|ls|id|whoami|uname|curl|wget|nc|sh|bash|echo|ping|dir|type|net)\b"
                   r"|\$|`|base64_decode)[^\n)]{0,80}\)"],
     "crlf_header": [r"(?:%0[dD]%0[aA]|\\r\\n)[A-Za-z][\w-]{1,40}:[^\n]*"],
-    "ldap": [r"\*\)\([^\n]*", r"\)\(\w+=[^\n]*"],
+    # The breakout forms `*)(` and `)(attr=` carry an unmatched closer; a whole
+    # filter such as `(|(uid=*)(cn=*))` is balanced.
+    "ldap": [r"\*\)\([^\n]*", r"\)\(\w+=[^\n]*",
+             r"\(\s*[|&!]\s*\(\s*[\w.-]+\s*[~<>]?=[^\n]*"],
     "xpath_xquery": [r"'?\s*or\s*'?1'?\s*=\s*'?1[^\n]*", r"count\(/[^\n]*", r"//\*[^\n]*"],
     "template": [r"\{\{[^\n]*?\}\}", r"<%[^\n]*?%>", r"#\{[^\n]*?\}"],
     "expression_language": [r"\$\{[^\n]*?\}", r"#\{[^\n]*?\}", r"%\{[^\n]*?\}"],
@@ -141,27 +144,22 @@ URL_SIGNS = {s: [re.compile(p, re.I) for p in ps] for s, ps in _URL_SIGNS.items(
 _PCT = re.compile(r"%([0-9A-Fa-f]{2})")
 
 
-def urlform_decode(frag, rounds=2):
-    """Undo the transport encoding a recorded URL payload carries.
-
-    Two rounds because double-encoding (%2527 -> %27 -> ') is common in the
-    corpus; `+` is a query-string space, and an emptied SQL comment (/**/) is a
-    whitespace substitute used to evade naive filters.
-    """
-    for _ in range(rounds):
-        decoded = _PCT.sub(lambda m: chr(int(m.group(1), 16)), frag)
-        if decoded == frag:
-            break
-        frag = decoded
-    return re.sub(r"/\*\*?/", " ", frag).replace("+", " ")
+def urlform_decode(frag):
+    """Undo the transport encoding a recorded URL payload carries
+    (matchertext.percent_decode). In a URL `+` is a space even with no
+    percent-escape, and an emptied SQL comment (/**/) is a whitespace substitute
+    used to evade naive filters."""
+    return re.sub(r"/\*\*?/", " ", matchertext.percent_decode(frag.replace("+", " ")))
 
 
 _PAIR = {")": "(", "]": "[", "}": "{"}
 
 
-# Fragments dropped as cut by their signature, per syntax: the selection the
-# truncation guard makes, reported by syntactic_group.py.
+# The two extraction rules that read matcher balance, per syntax, reported by
+# syntactic_group.py: fragments dropped as cut by their signature, and
+# fragments completed with the closers that follow them.
 TRUNCATED = Counter()
+EXTENDED = Counter()
 
 
 def is_truncated(frag):
@@ -243,7 +241,7 @@ def _accept(frag, truncation_check=True):
             and not _URL_PARAM.match(frag))
 
 
-def extend_balance(text, end, frag, limit=8):
+def extend_balance(text, end, frag, syn, limit=8):
     """Reclaim closers a regex could not count.
 
     A pattern cannot match nested parentheses, so `eval(base64_decode($x))` is
@@ -251,10 +249,13 @@ def extend_balance(text, end, frag, limit=8):
     characters immediately following the match are closing matchers, they belong
     to the payload: append them until it balances.
     """
+    extended = False
     while is_truncated(frag) and limit and end < len(text) and text[end] in ")]}":
         frag += text[end]
         end += 1
         limit -= 1
+        extended = True
+    EXTENDED[syn] += extended
     return frag
 
 
@@ -480,7 +481,7 @@ def extract_payload(text, syn, labelled=True, constructed=True, prefer_construct
             lit = literal_end(text, m.start())
             if lit is not None and lit < end:
                 end = lit
-            frag = " ".join(extend_balance(text, end, text[m.start():end]).split())
+            frag = " ".join(extend_balance(text, end, text[m.start():end], syn).split())
             # A fragment that runs to the end of its line or literal is the
             # whole payload, so an unmatched opener in it is real.
             whole = end == lit or end >= len(text) or text[end] == "\n"

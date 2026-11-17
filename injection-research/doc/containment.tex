@@ -29,6 +29,7 @@ with \cref{tab:mech}.}
 \end{figure*}
 
 \paragraph{Simulating containment}
+Payloads are first canonicalized (A3: URL decoding, NFKC; \dataCanonChanged change).
 For each of the \dataPayloadBackedCVEs payload-backed CVEs, we reuse its syntactic
 skeleton and decide whether the target syntax is matcher-delimitable and, if so,
 whether the skeleton passes \textsc{Verify}, contained inertly if it does and by
@@ -51,12 +52,12 @@ embedding or rejection; \textulc{\emph{Outside}} counts CVEs failing a premise o
 Of the \dataPayloadBackedCVEs payload-backed injection CVEs, the recorded
 payloads of \textbf{\dataContained} (\textbf{\dataContainedShare}) are contained
 by a matcher-delimited slot that a matchertext-aware host language reads to
-matcher balance, assuming no intervening decoding.
+matcher balance.
 The split turns on the host language's native delimiter, and the per-syntax
-mechanisms of \cref{sec:resist} appear directly in the corpus. LDAP is the pure
-rejection case: every real LDAP payload fails \textsc{Verify} (\dataLdapInert
-inert, \dataLdapRejected rejected), its parenthesis breakout carrying an unmatched
-\verb|)|. SQL and XSS break out on nonmatchers, so they are overwhelmingly valid
+mechanisms of \cref{sec:resist} appear directly in the corpus. Every LDAP CVE payload is a
+parenthesis breakout that fails \textsc{Verify} (\dataLdapRejected of
+\dataLdapRejected, several templates or prose); general LDAP lists are mostly
+balanced (\dataLdapCorpusInert of \dataLdapCorpus). SQL and XSS break out on nonmatchers, so they are overwhelmingly valid
 matchertext and embed inertly, the \dataSqlRejected SQL rejections carrying an
 unbalanced function or subquery parenthesis.
 The ratio is descriptive, not predictive: these payloads were written against
@@ -90,8 +91,7 @@ expressions) are \textbf{\dataJsSinkRate} (\dataHtmlDomJsSinks) of the HTML/DOM 
 With hole forms for the non-matcher contexts it would be
 \dataHostableWithNonmatcherShare; among the \dataKevInjectionCVEs known-exploited
 CVEs it is \dataKevHostableShare.
-Under A2, parameterized queries and auto-escaping already cover
-\dataPerLanguageOfHostable of these.
+Parameterized queries and auto-escaping cover \dataPerLanguageOfHostable of these.
 
 Within one syntax the simulation leaves little to project: the threat model of
 \cref{sec:threat} contains every payload of a matcher-delimitable syntax and none
@@ -187,8 +187,7 @@ The \dataSqliIdentMtMalformed name-hole cases that do not compile are the
 \dataSqliNulPayloads payloads with a trailing zero byte, which ends a SQLite
 statement wherever it appears rather than the hole failing to contain it. The set
 retains every recorded payload.
-SQLite variants allow one transport percent-decoding pass, SQL Server
-\verb|N'...'| text, PostgreSQL dollar-quoted text, and a terminal MySQL \verb|#|
+SQLite variants allow SQL Server \verb|N'...'| text, PostgreSQL dollar-quoted text, and a terminal MySQL \verb|#|
 comment, with no function, operator, query, or objective changed.
 The oracle is the compiled statement, not the string: the \textsc{Explain}
 bytecode with the value operand redacted, the read-only flag, whether any SQL
@@ -340,9 +339,8 @@ stock browser parses with the option and sends the guarded serialization, from
 which every matchertext tree of the sweep parses back unchanged.
 
 \paragraph{Falsifiability}
-A broken \textsc{Verify}, hole locator, option, or serializer guard is each
-detected (\dataHtmlSabotageDetected of \dataHtmlSabotages, \dataHtmlSabotageBreakouts
-breakouts) by changed verdicts or a failed benign baseline. The fork's \textsc{Verify} and holes agree with an independent
+Each broken build (\textsc{Verify}, hole locator, option, serializer guard) is
+detected by changed verdicts (\dataHtmlSabotageBreakouts breakouts) or a failed baseline. The fork's \textsc{Verify} and holes agree with an independent
 implementation on random inputs and at the depth limit.
 The experiment tests L2 for an HTML parser and its serializer, not for the
 JavaScript or CSS in its text, which are further host languages.

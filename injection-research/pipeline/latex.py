@@ -309,6 +309,18 @@ def tbl_sqli_arms(con):
     return "\n".join(lines) + "\n"
 
 
+def extraction_macros():
+    """How canonicalization (premise A3) and the two extraction rules that read
+    matcher balance touched the payload-backed set (syntactic_group.py)."""
+    with open(EXPORTS / "canonicalization.csv", newline="") as f:
+        canon = next(csv.DictReader(f))
+    with open(EXPORTS / "extraction_balance.csv", newline="") as f:
+        rows = list(csv.DictReader(f))
+    return [("CanonChanged", num(int(canon["changed"]))),
+            ("BalanceDropped", num(sum(int(r["dropped_cut"]) for r in rows))),
+            ("BalanceCompleted", num(sum(int(r["completed"]) for r in rows)))]
+
+
 def audit_macros(con):
     """Quoted once the label audit's gold.csv is complete; absent before."""
     m = audit.metrics(con)
@@ -690,6 +702,11 @@ def run(args):
         ("SqlRejected", num(reject["sql"])),
         ("LdapInert", num(inert["ldap"])),
         ("LdapRejected", num(reject["ldap"])),
+        # the general LDAP payload lists, not aimed at a CVE (validate.py)
+        ("LdapCorpus", num(q("SELECT COUNT(*) FROM payload_assessment WHERE syntax_type='ldap'"))),
+        ("LdapCorpusInert", num(q("""SELECT COUNT(*) FROM payload_assessment
+                                     WHERE syntax_type='ldap' AND mechanism='inert'"""))),
+        *extraction_macros(),
         # projection onto the full corpus
         ("HostableCVEs", num(hostable)),
         ("HostableShare", pct(hostable / injection)),
