@@ -5,30 +5,6 @@ All the current claims are purely conditional, and this section
 makes the conditions explicit: what is trusted, what the attacker controls, the
 property that is meant to hold, and the deployment premises it requires.
 The property is stated below as an invariant on the host language's parse.
-\Cref{fig:threat:pipeline} shows the path an untrusted value takes and where each
-premise binds.
-
-\begin{figure*}[t]
-\footnotesize
-\begin{verbatim}
-  UNTRUSTED  │                           TRUSTED COMPUTING BASE
-─────────────┼──────────────────────────────────────────────────────────────────────────────────
-  attacker   │   canon(v)   ──►   VERIFY   ──►  s_o[ v ]s_c  ──►  host parser  ──►  interpreter
-     └─ v ───┼─► decode &         v ∈ L ?       value placed      ends value        binds the
-  arbitrary  │   normalize        fail ─┐       in the hole       by matcher        terminal
-  bytes,     │                          ▼                         balance           as data
-  encodings, │              ToMatchertext(v): escape unmatched
-  invalid    │              matchers, re-embed at the hole
-─────────────┼──────────────────────────────────────────────────────────────────────────────────
-  binds:     │      A3            (TCB ii)          A2            A1 · L1 · L2      L3 · A4
-\end{verbatim}
-\caption{Where each premise binds. The attacker chooses $v$ and nothing else;
-everything right of the boundary must be correct for inertness to hold. A3 binds
-at the first stage while its violation surfaces at the last. A still-encoded
-value such as \texttt{\%5D} passes \textsc{Verify} and becomes an unmatched
-matcher only when the parser reads it.}
-\label{fig:threat:pipeline}
-\end{figure*}
 
 \paragraph{Asset and trusted base}
 Consider a host-language program with a hole $P[\cdot]$ into which an untrusted value
@@ -38,12 +14,12 @@ occupies a single data position and contributes no host-language syntax. The gua
 rests on three components. Component (i) is a \emph{matchertext-aware host language}
 that delimits the hole with a matcher pair, ending the embedded value by
 matcher balance rather than by scanning for its native closer. Component (ii)
-is the \textsc{Verify} recognizer that decides membership in the matchertext
-language $L$. Component (iii) is the total encoder \textsc{ToMatchertext} and
-its inverse. Their output-in-$L$ obligation is discharged in
+is the \textsc{Verify} recognizer: it accepts only strings of the matchertext
+language $L$, and all of them up to its nesting-depth limit $D$. Component (iii) is the total encoder \textsc{ToMatchertext} and
+its inverse. Their output-in-$L$ obligation is proved in
 \cref{sec:appendix:tomatchertext}, narrowing~(iii) to the decoder round-trip.
 The boundary-locating step of (i) is the load-bearing part. Premise L1 below
-discharges its principle by machine-checked proof, so the host language is trusted only
+proves its principle by machine check, so the host language is trusted only
 for that step's \emph{implementation}.
 
 \paragraph{Attacker}
@@ -65,7 +41,7 @@ a tree's hole lexemes.
 all $v,v'\in L$, $P[v]$ parses exactly when $P[v']$ does, and then
 $\mathrm{skel}(P[v])=\mathrm{skel}(P[v'])$.
 The attacker wins if a value \textsc{Verify} accepts changes the skeleton; rejection
-is a loss. Closure~\cite{matchertext} constrains the
+is a loss. Every accepted value is in $L$, so Definition~1 covers it. Closure~\cite{matchertext} constrains the
 \emph{string}, inertness the \emph{parser}.
 
 \paragraph{Deployment premises}
@@ -106,12 +82,34 @@ Inertness holds under four premises:
 	not meaning.
 \end{itemize}
 
+\begin{figure*}[t]
+\footnotesize
+\begin{verbatim}
+  UNTRUSTED  │                           TRUSTED COMPUTING BASE
+─────────────┼──────────────────────────────────────────────────────────────────────────────────
+  attacker   │   canon(v)   ──►   VERIFY   ──►  s_o v s_c    ──►  host parser  ──►  interpreter
+     └─ v ───┼─► decode &         v ∈ L ?       value placed      ends value        binds the
+  arbitrary  │   normalize        fail ─┐       in the hole       by matcher        terminal
+  bytes,     │                          ▼                         balance           as data
+  encodings, │              ToMatchertext(v): escape unmatched
+  invalid    │              matchers, re-embed at the hole
+─────────────┼──────────────────────────────────────────────────────────────────────────────────
+  binds:     │      A3            (TCB ii)          A2            A1 · L1 · L2      L3 · A4
+\end{verbatim}
+\caption{Where each premise binds. The attacker chooses $v$ and nothing else;
+everything right of the boundary must be correct for inertness to hold. A3 binds
+at the first stage while its violation surfaces at the last. A still-encoded
+value such as \texttt{\%5D} passes \textsc{Verify} and becomes an unmatched
+matcher only when the parser reads it.}
+\label{fig:threat:pipeline}
+\end{figure*}
+
 \paragraph{From closure to inertness}
 We model the aware host language of A1 as a grammar $G$ with one distinguished production
 $\mathit{hole}\rightarrow s_o\,\mathit{content}\,s_c$. Here $\mathit{content}$ is
 recovered by the matcher-balance locator and enters $G$ as a single terminal.
 Its lexeme is the value in its canonical, fully-decoded form (A3).
-Inertness then rests on three premises, each separately dischargeable:
+Inertness then rests on three premises, each proved or tested separately:
 \begin{itemize}
 \item[\textbf{L1}] \emph{Boundary.} Reading to matcher balance ends the
 	embedding exactly at $|v|$: every prefix of a valid $v$ has non-negative
@@ -135,6 +133,10 @@ Closure is machine-checked in the formalism of~\cite{matchertext},
 which gives the correctness of \textsc{Verify} a paper proof sketch. This paper proves L1 once for all host languages
 (\cref{sec:appendix:lean}) and tests L2 and L3 for SQLite (\cref{sec:prevent:exec}) and
 L2 for HTML (\cref{sec:prevent:html}).
+
+
+\Cref{fig:threat:pipeline} shows the path an untrusted value takes and where each
+premise binds.
 
 \paragraph{Scope}
 In scope is \emph{structural} injection: an attacker-controlled value that

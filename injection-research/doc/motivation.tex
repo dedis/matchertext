@@ -93,12 +93,6 @@ A sanitizer instead must shadow the host-language parser and its quirks. The sec
 literature has repeatedly favored safety by construction, typed template
 contexts, and parameterized queries over ad-hoc
 escaping~\cite{samuel11csas,momot16langsec,owasp_parameterization}.
-The check is not the whole trusted base: a matchertext host language must also end an
-embedded value by matcher balance and suppress its own decoding inside the
-hole, and the write path adds an encoder and its inverse (\cref{sec:threat}).
-Matchertext thus relocates trust rather than eliminating it: what must hold
-uniformly across languages shrinks to a small language-independent check, and what
-remains per host language is a bounded change to a parser the host language already owns.
 
 
 \subsection{The narrow waist}

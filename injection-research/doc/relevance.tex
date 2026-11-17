@@ -6,9 +6,8 @@ about security. Matchertext was designed so that a string in one language can be
 placed in another verbatim. Its stated benefit, that the writer of embedded
 text need reason about only one language's rules at a time, is a usability
 argument~\cite{matchertext}.
-This section states the discipline precisely enough to reason about, explains
-why an embedding property bears on injection at all, and sets out the questions
-the rest of the paper answers.
+This section states the discipline precisely enough to reason about, and explains
+why an embedding property bears on injection at all.
 
 \subsection{The discipline}
 \label{sec:relevance:discipline}
@@ -30,11 +29,27 @@ paper uses only these.
 First, \emph{closure}, also called always-embeddability: if $m\in L$ and
 $(s_o,s_c)$ is a matched delimiter pair, then $s_o\,m\,s_c\in L$, at any nesting
 depth and with no escaping or expansion.
-Second, membership in $L$ is decided by a single linear scan, the
-\textsc{Verify} recognizer.
+Second, a single linear scan, the \textsc{Verify} recognizer
+(\cref{fig:verify}), decides membership in $L$. With a depth limit $D$ it
+accepts only strings of $L$ and rejects the deeper ones.
+\begin{figure}[t]
+\begin{verbatim}
+Verify(v): stack = []
+  for c in v:
+    if c is an opener:
+      push(c); if |stack| > D: reject
+    if c is a closer:
+      if stack is empty: reject
+      if pop() != opener(c): reject
+  accept if stack is empty
+\end{verbatim}
+\caption{\textsc{Verify}. Our builds also reject nesting deeper than $D=1000$.}
+\label{fig:verify}
+\end{figure}
 Third, a total encoder \textsc{ToMatchertext} maps \emph{any} string into $L$ by
 escaping only its unmatched matchers, so free-form input that legitimately
-contains an unmatched bracket need not be rejected.
+contains an unmatched bracket need not be rejected: \verb|f(x| becomes
+\verb|f\o()x|, where \verb|\o()| stands for an opening \verb|(|.
 Closure is machine-checked, and so is
 \textsc{ToMatchertext}'s landing in $L$ on every input
 (\cref{sec:appendix:tomatchertext}), leaving only its decoder round-trip
@@ -45,11 +60,7 @@ compliance study, see~\cite{matchertext}.
 \subsection{From embedding to security}
 \label{sec:relevance:security}
 
-Conventional defenses attack the \emph{collision}: they transform the value so
-its dangerous characters can no longer be confused with the host language's. This is why
-each must know the host language's syntax, and why there is a different one per host
-language and context.
-Matchertext attacks the \emph{boundary} instead. Suppose a host language delimits an
+Suppose a host language delimits an
 untrusted value with a matcher pair and finds its end by counting matchers
 rather than by scanning for a terminator. Escaping the region then requires
 emitting an unmatched matcher, and by closure no valid matchertext string
@@ -65,19 +76,6 @@ recognizer serves every host language, which is exactly what a sanitizer cannot 
 And the check is a \emph{verification} rather than a transformation, so a
 rejected value is data that does not embed, whereas a missed case in an escaping
 routine \emph{is} the injection.
-Together these are the narrow waist applied to security: one uniform obligation
-on the value, in place of one bespoke transformation per host language and context.
-
-\subsection{What must hold, and what we ask}
-\label{sec:relevance:questions}
-
 Closure constrains \emph{strings}, whereas security is a claim about
 \emph{parsers}, and the second does not follow from the first without
-assumptions about the host language.
-Three questions organize the rest of the paper. First, what is guaranteed and
-under what assumptions (\cref{sec:threat})? Second, can a real language adopt
-this, and at what cost (\cref{sec:resist})? Third, how much of the real
-injection landscape can it reach? This is a proper subset of injection.
-\Cref{sec:corpus,sec:results,sec:prevent} measure it against a corpus of
-recorded vulnerabilities, reporting both the contained fraction and the fraction
-out of reach in principle.
+assumptions about the host language (\cref{sec:threat}).

@@ -15,15 +15,15 @@ that the parser does not re-enter the hole, and that the interpreter treats its 
 We discharge the first with a machine-checked proof; the other two are per
 host language.
 We then ask how much of the real landscape this could reach.
-We start from a reproducible corpus of \textbf{\dataInjectionCVEs} injection CVEs,
+We start from a reproducible corpus of \textbf{91,760} injection CVEs,
 classified by the embedded syntax each attack targets.
 We measure the structure of recorded attack strings under a matchertext-aware
 host language rather than a deployed one.
-We find that \textbf{\dataContainedShare} of those with a recoverable payload are structurally
+We find that \textbf{78\%} of those with a recoverable payload are structurally
 contained.
-At most \textbf{\dataHostableShare} of all injection CVEs target a matcher-delimitable syntax.
-We implement the design in SQLite and test \dataSqliPayloads recorded SQL payloads
-across \dataSqliCases cases; no matcher-delimited value or identifier escapes its
+At most \textbf{80\%} of all injection CVEs target a matcher-delimitable syntax.
+We implement the design in SQLite and test 6,577 recorded SQL payloads
+across 578,776  cases; no matcher-delimited value or identifier escapes its
 slot.
 The residue is execution sinks and non-matcher-delimited contexts, which no
 delimiting discipline can reach, so the boundary the measurement draws is a

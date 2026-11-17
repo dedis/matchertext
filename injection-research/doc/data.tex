@@ -9,13 +9,12 @@ the corpus is reproducible.
 
 \paragraph{Identity and enrichment}
 The \href{https://github.com/CVEProject/cvelistV5}{MITRE CVE List}
-(\texttt{cvelistV5}) is the canonical record of identity, CNA provenance, and
-description.
-\href{https://nvd.nist.gov/vuln/data-feeds}{NVD} supplies normalized CWE, CPE,
-and CVSS; \href{https://github.com/cisagov/vulnrichment}{CISA Vulnrichment}
-backfills recent CWE/CVSS via its ADP container;
-\href{https://github.com/cisagov/kev-data}{CISA KEV} marks known-exploited CVEs;
-\href{https://www.first.org/epss/}{FIRST EPSS} supplies exploit-likelihood
+(\texttt{cvelistV5}) is the canonical record of identity, of the CVE Numbering
+Authority (CNA) that assigned it, and of its description.
+\href{https://nvd.nist.gov/vuln/data-feeds}{NVD} supplies normalized CWE and CVSS; \href{https://github.com/cisagov/vulnrichment}{CISA Vulnrichment}
+backfills recent CWE/CVSS via its Authorized Data Publisher (ADP) container;
+\href{https://github.com/cisagov/kev-data}{CISA Known Exploited Vulnerabilities} (KEV) marks known-exploited CVEs;
+\href{https://www.first.org/epss/}{FIRST Exploit Prediction Scoring System} (EPSS) supplies exploit-likelihood
 scores; and the \href{https://cwe.mitre.org/}{MITRE CWE list} provides the
 weakness hierarchy used for classification.
 \href{https://github.com/github/advisory-database}{GitHub Security Advisories},

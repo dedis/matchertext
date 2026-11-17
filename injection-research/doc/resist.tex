@@ -1,12 +1,7 @@
 \section{Injection resistance by matcher-delimiting untrusted input}
 \label{sec:resist}
 
-Delimiting untrusted input with a matcher pair rather than a nonmatcher (such as
-a quote) prevents that input from breaking out of its slot.
-Escaping the delimiter would require an unmatched matcher, which the
-always-embeddability theorem of matchertext forbids in valid
-matchertext~\cite{matchertext}.
-We develop this first for SQL injection, then for cross-site scripting, whose
+We develop the discipline first for SQL injection, then for cross-site scripting, whose
 several distinct HTML escaping contexts collapse to one discipline.
 The same argument then covers two settings where the host language already delimits with
 matchers, so the discipline asks for no new syntax.
@@ -61,7 +56,7 @@ not a breakout, where in conventional escaping one missed case \emph{is} the
 injection; a bug in \textsc{Verify} or the host's locator is a breakout.
 
 Reading inverts the encoder. An escape \textsc{esc}$(c)$ is a backslash, a tag,
-and a matched pair; the encoder also escapes the pair of any input run that
+and a matched pair (\verb|\o()| for \verb|(|, \verb|\c[]| for \verb|]|); the encoder also escapes the pair of any input run that
 already has that shape, and leaves every other backslash alone. Then
 \textsc{FromMatchertext} scans the balance-delimited region once, mapping each
 \textsc{esc}$(c)$ back to its matcher $c$ and copying every other character,
@@ -114,15 +109,15 @@ SQL.
 Each hole is read verbatim up to a matched close bracket and the host language performs no
 transformation, using matchertext markup forms~\cite{matchertext}
 (\eg \verb|<div [|\emph{v}\verb|]>|, \verb|value=[|\emph{v}\verb|]|, and
-\verb|<![MDATA[|\emph{v}\verb|]]>|).
+\verb|<![MDATA[|\emph{v}\verb|]]>|, a CDATA-like section read to matcher balance).
 Because the matchers are \verb|()[]{}| and not \verb|<>|, the characters that
 drove every breakout above, \verb|<|, \verb|&|, the quote, and even the literal
 \verb|</script>| sequence, become ordinary data inside a matched hole.
 The parser counts brackets rather than scanning for tags, so an injected
 \verb|<img src=x onerror=steal()>| is inert text.
 The three context-specific sanitizers thus reduce to the single \textsc{Verify}
-recognizer, the same one used for SQL, whose only rejection is an unmatched
-matcher.
+recognizer, the same one used for SQL, which rejects only an unmatched
+matcher or nesting deeper than $D$.
 
 As with the numeric-context caveat for SQL, the guarantee is structural and stops
 at sinks that execute their contents by design.
@@ -193,7 +188,7 @@ A1 route & Example & Changes & New syntax & Compatibility & Trusted delta \\
 Reuse native matchers & \verb|/URI (|$v$\verb|)| & nothing & none & full & none \\
 Change the reading rule & \verb|(uid=|$v$\verb|)| & host parser & none & per host lang.\ & boundary reader \\
 Extend the host-lang.\ grammar & \verb|WHERE name = [|$v$\verb|]| & host parser & hole form & per host lang.\ & boundary reader \\
-Replace the host language & MinML for markup & host parser & wholly new & none & whole parser \\
+Replace the host language & MinML~\cite{matchertext} markup & host parser & wholly new & none & whole parser \\
 \hline
 \end{tabular}
 \vspace{0.6em}
@@ -216,7 +211,7 @@ parser, or directory server that interprets the composed text must end the
 embedded value by matcher balance.
 Premise A2 constrains the \emph{application} that composes it: the untrusted value
 must reach a matcher-delimited hole rather than be concatenated in beside one.
-The two are discharged by changes to different languages, by different people,
+The two are met by changes to different languages, by different people,
 and are worth separating.
 
 \paragraph{Making the host language aware (A1)}
@@ -231,8 +226,8 @@ actually concentrates, at the price of a change inside the host language's parse
 The change is not always conservative: T-SQL already gives
 \verb|[|$\dots$\verb|]| a meaning as a delimited identifier.
 A hole form for SQL must either pick different delimiters or accept that it is not
-backward-compatible in the way \cite{matchertext}'s \verb|M"|$\dots$\verb|"|
-literal is for C.
+backward-compatible in the way the \verb|M"|$\dots$\verb|"| literal
+of~\cite{matchertext}, a C string literal read to matcher balance, is for C.
 Replacing the host language obtains A1 by construction and reaches everything it
 covers, but only for new deployments, since nothing previously written parses.
 
@@ -243,7 +238,8 @@ developer discipline: nothing stops a programmer from concatenating into the que
 around a hole rather than into it.
 This is where the source-level syntaxes of~\cite{matchertext} earn their place in
 a security argument, and \cref{tab:resist:a2} sets them against the status quo.
-A matchertext literal with structural interpolation makes the template's holes
+A matchertext literal with structural interpolation, \verb|M{}"|$\dots$\verb|"|
+with \verb|{|$v$\verb|}| holes, makes the template's holes
 explicit and its structure fixed, so an interpolated value cannot alter the
 surrounding query no matter what it contains.
 This is an application of the discipline that~\cite{matchertext} identifies as its
@@ -256,49 +252,3 @@ Together the two premises replace an obligation on the programmer at every use
 site with an obligation on two parsers: A1 relocates a bounded part of the host language's
 parser, and A2 adds a lexical form to the application language.
 Neither removes a parser from the trusted base, and neither is meant to.
-
-\subsection{Comparison with existing defenses}
-\label{sec:resist:baselines}
-
-\Cref{sec:bg:sanitizer} contrasts matchertext with hand-escaping and sanitizers.
-The strongest defenses for these host languages are not sanitizers and
-matchertext should be measured against those stronger defenses instead.
-
-\emph{Parameterized queries} are the strongest of them: a prepared statement
-fixes the query structure before any value is bound, so no value can alter it,
-and the technique holds today with no change to the language. It binds \emph{values},
-however, and only values: a table or column name cannot be a placeholder, so
-identifier positions fall back to ad-hoc allow-listing, which is the
-construction \cref{sec:resist:sql} covers directly with
-\verb|FROM [|\textit{table}\verb|]|.
-\emph{Contextual auto-escaping} and typed template contexts do the same work for
-markup, selecting the escaper from the syntactic context rather than leaving the
-choice to the programmer.
-Browser-side mechanisms such as Trusted Types enforce a related discipline at the
-host language.
-\emph{Taint tracking} is orthogonal to all of these defenses: it decides \emph{which}
-values are untrusted, not what happens when one reaches a hole.
-
-Matchertext differs from all of these baselines in what it is a defense \emph{of}.
-Each baseline is a mechanism for one host language: prepared statements know SQL,
-auto-escapers know markup, and neither transfers to LDAP filters, PDF strings, or
-URIs, each of which needs a defense written and maintained separately.
-Inertness is stated over a hole rather than over a value, and \textsc{Verify}
-inspects six characters and knows nothing about the language around them, so one
-check serves every host language and covers identifier positions as readily as values.
-That single check is the narrow waist of \cref{sec:bg:waist} claimed as a security property:
-$N$ host languages need $N$ defenses today, and one discipline instead of $N$ is the
-distinctive claim.
-Two consequences follow: correctness stops depending on a per-context choice,
-removing the failure mode that defeated every participant in the study of
-\cref{sec:bg:prevalence}; and because the obligation is a check rather than a
-transformation, a value it rejects is refused data, not a breakout.
-
-The cost is where the obligation lands.
-The baselines ask for a library; matchertext asks the host language to read to matcher
-balance, which \cref{tab:resist:a1} shows is free where the format already
-reads to matcher balance, as PDF does, and a parser change elsewhere, LDAP
-included.
-Matchertext and parameterized queries also compose: nothing in \cref{sec:threat} prevents a parameterized query
-from carrying a matcher-delimited identifier, which is the combination neither
-mechanism reaches alone.

@@ -160,7 +160,8 @@ standalone SQL corpora.
 
 \paragraph{The modified engine}
 Our driver realizes the discipline of \cref{sec:resist} directly: it places a
-value in the SQL text inside an \verb|M'(...)'| literal, wraps an identifier in
+value in the SQL text inside an \verb|M'(...)'| text literal, which the fork reads to
+matcher balance, wraps an identifier in
 \verb|[|$\dots$\verb|]| that the engine reads to matcher balance (A1), and
 prepares the statement through the ordinary interface.
 The fork offers this hole beside legacy composition rather than replacing it, so
@@ -171,9 +172,11 @@ entry points; the measurement reports the additive default and strict build side
 by side.
 
 \paragraph{Fixtures and oracle}
+A \emph{fixture} is a query with one slot, and an \emph{arm} is one path that
+puts a value into it: concatenation, an escape, a bound parameter, or a hole.
 We place each of the \dataSqliPayloads distinct SQL payloads (\dataSqliFamilies
-families) through every compatible hole-arm pair and compare it against the same
-hole holding a benign value.
+families) through every compatible fixture-arm pair and compare it against the same
+slot holding a benign value.
 The 16 fixtures cover single- and double-quoted text, raw and parenthesized
 numbers, \texttt{IN} lists, \texttt{ORDER BY} and \texttt{LIMIT} expressions,
 one- to four-column selects, one- and two-column inserts, and identifier
@@ -215,8 +218,8 @@ Over the effective set no matchertext hole admitted a breakout (\cref{tab:sqli})
 \dataSqliMtBreakout through the \verb|M'(...)'| value hole, \dataSqliMtStrictBreakout
 through the verify-then-embed route, and \dataSqliIdentMtBreakout through the
 \verb|[|$\dots$\verb|]| name hole.
-The legacy defenses hold as well: \texttt{\%Q}, \texttt{\%q}, and
-\texttt{"\%w"} escaping and a bound parameter, the baseline.
+The legacy defenses hold as well: SQLite's \texttt{printf} escapes \texttt{\%Q},
+\texttt{\%q}, and \texttt{"\%w"} and a bound parameter, the baseline.
 Concatenation is the contrast: \dataSqliConcatBreakout breakouts of the value
 control and \dataSqliIdentConcatBreakout of the identifier control, on the very
 same payloads.
@@ -225,7 +228,7 @@ composition open. Recompiled in strict mode, every text-splicing prepare, the
 concatenation and the in-band \verb|M'(...)'| alike, is refused before the parser
 (\cref{tab:sqli}, right); its API takes SQL only as literals (A2).
 The admitted paths are the typed \texttt{?V} and
-\texttt{?I} parameters (\dataSqliStrictValueBreakout and
+\texttt{?I} parameters for a value and a name (\dataSqliStrictValueBreakout and
 \dataSqliStrictIdentBreakout breakouts); \texttt{?V} verifies, then binds an
 ordinary parameter, refusing the \dataSqliStrictValueRejected non-matchertext values
 and \dataSqliBenignRejectedShare of benign CVE descriptions.
@@ -239,7 +242,7 @@ position a bound parameter cannot fill.
 
 \paragraph{Falsifiability}
 A zero is evidence only if the oracle could have reported a one.
-A broken locator, \textsc{Verify}, encoder, or decoder changes a verdict or
+A broken locator, \textsc{Verify}, encoder, or decoder changes an outcome or
 value of the holes resting on it (up to \dataSqliSabotageDetect); the locator
 breaks out \dataSqliSabotageBreakouts recorded cases. No recorded payload has an
 unmatched closer then SQL, so two constructed probes show the broken locator and
@@ -340,7 +343,7 @@ which every matchertext tree of the sweep parses back unchanged.
 
 \paragraph{Falsifiability}
 Each broken build (\textsc{Verify}, hole locator, option, serializer guard) is
-detected by changed verdicts (\dataHtmlSabotageBreakouts breakouts) or a failed baseline. The fork's \textsc{Verify} and holes agree with an independent
+detected by changed outcomes (\dataHtmlSabotageBreakouts breakouts) or a failed baseline. The fork's \textsc{Verify} and holes agree with an independent
 implementation on random inputs and at the depth limit.
 The experiment tests L2 for an HTML parser and its serializer, not for the
 JavaScript or CSS in its text, which are further host languages.

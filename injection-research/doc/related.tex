@@ -1,22 +1,31 @@
 \section{Related work}
 \label{sec:related}
 
-\Cref{sec:resist:baselines} sets matchertext head-to-head against the defenses
-deployed today; here we place it in the broader literature, grouped by how each
-line attacks the embedding boundary.
-
-\paragraph{Language-based construction}
-The strongest host-language-specific defenses fix the embedded language's
-structure before any value is bound. For queries, these include
-parameterized queries~\cite{owasp_parameterization} and their typed hardenings
-SQL~DOM~\cite{mcclure05sqldom} and Safe Query Objects~\cite{cook05safequery}.
-Others are language-integrated query~\cite{cheney13liq} and
+\paragraph{Deployed defenses}
+Parameterized queries~\cite{owasp_parameterization}, the strongest
+host-language-specific defense, fix the query structure before any value is
+bound and need no language change, but they bind only \emph{values}: a table or column
+name cannot be a placeholder and falls back to ad-hoc allow-listing, which
+\verb|FROM [|\textit{table}\verb|]| covers directly (\cref{sec:resist:sql}).
+Typed hardenings include SQL~DOM~\cite{mcclure05sqldom}, Safe Query
+Objects~\cite{cook05safequery}, language-integrated query~\cite{cheney13liq}, and
 Ur/Web~\cite{chlipala15urweb}, which collapses web composition into one
-statically typed language. For markup,
-examples include contextual auto-escaping~\cite{samuel11csas} and typed-value
-sink gates such as SafeHtml and Trusted Types~\cite{kern14securing,trustedtypes}.
-Each defense buys a strong guarantee by knowing the language it protects;
-matchertext keeps values as plain text and fixes only the \emph{boundary}.
+statically typed language. For markup, contextual
+auto-escaping~\cite{samuel11csas} selects the escaper from the syntactic
+context, and sink gates such as SafeHtml and Trusted
+Types~\cite{kern14securing,trustedtypes} admit only values of a trusted type.
+Taint tracking is orthogonal: it decides \emph{which} values are untrusted, not
+what happens when one reaches a hole.
+Each of these defenses knows the one language it protects and does not transfer
+to LDAP filters, PDF strings, or URIs. \textsc{Verify} inspects six characters,
+so one check serves every host language and covers names as readily as values.
+Correctness then stops depending on a per-context choice, the failure mode that
+defeated every participant in the study of \cref{sec:bg:prevalence}, and a value
+the check rejects is refused data, not a breakout.
+The cost is where the obligation lands: the baselines ask for a library,
+matchertext for a host language that reads to matcher balance
+(\cref{tab:resist:a1}). The two compose: a parameterized query can carry a
+matcher-delimited identifier, which neither reaches alone.
 
 \paragraph{Syntax embedding and safe quotation}
 The closest work makes embedding safe by construction in the language itself.
@@ -29,16 +38,23 @@ matchertext asks only one shared lexical invariant.
 The metaprogramming it draws on likewise assumes a known embedded language:
 hygienic macros, staged generation, tagless-final embeddings, and language
 workbenches~\cite{kohlbecker86hygienic,dybvig92syntactic,taha00metaml,sheard02template,mainland07quoted,carette09tagless,renggli10embedding}.
+Type-specific languages and typed literal macros~\cite{omar14tsl,omar18tlm} let a
+library define literal syntax with typed splices; the interpolating literal of A2
+is such a literal whose splices are holes.
 
-\paragraph{Static analysis and detection}
+\paragraph{Static analysis and run-time checks}
 A large body of work finds injection flaws in existing code rather than preventing
 them: information-flow and taint analyses tracing untrusted data to
 sinks~\cite{huang04webssari,livshits05finding,jovanovic06pixy,xie06static,tripp09taj,tripp13andromeda,arzt14flowdroid},
 string analysis reasoning about the generated query~\cite{wassermann07sound}, and
 the SAST tools that productize both~\cite{dahse14simulation}. These detect a bad
-construction after the fact and trade soundness against precision. Matchertext
-instead makes the boundary-breaking construction unrepresentable, complementary to
-the analysis that catches what a boundary rule cannot.
+construction after the fact and trade soundness against precision.
+SQLGuard~\cite{buehrer05sqlguard}, CANDID~\cite{bandhakavi07candid}, and
+Diglossia~\cite{son13diglossia}, which also covers NoSQL, parse each query again
+with a stand-in for the input and reject it if the trees differ: they check what
+inertness states, per query and with a parser of each host language.
+Matchertext gets the property from the delimiter, with no second parse; the
+analyses still catch what a boundary rule cannot.
 
 \paragraph{Cross-cutting structural defenses}
 Closer in ambition are defenses that enforce a global invariant separating
@@ -47,19 +63,28 @@ CSSE tags input and evaluates it in context across SQL, XSS, and shell
 injection~\cite{pietraszek05csse}. Document Structure Integrity~\cite{nadji09dsi},
 BLUEPRINT~\cite{terlouw09blueprint}, and Noncespaces~\cite{vangundy12noncespaces}
 protect HTML structure through browser cooperation and randomized or
-nonce-marked namespaces. Content Security Policy mitigates content injection at
-execution time~\cite{w3c_csp}. SQLrand~\cite{boyd04sqlrand} and
+nonce-marked namespaces, and BEEP~\cite{jim07beep} lets the browser run only the
+scripts a page policy allows. Content Security Policy mitigates content
+injection at execution time~\cite{w3c_csp}. SQLrand~\cite{boyd04sqlrand} and
 instruction-set randomization~\cite{barrantes03isr} randomize the accepted
 language so injected code cannot speak it.
 All mark trusted structure \emph{out of band} (propagated metadata, browser
 state, or a secret). Matchertext makes the boundary self-delimiting \emph{in
 band}, with no tag to carry.
-The web's lack of a universal escaper, precisely because parse context is
-per-language and non-composable~\cite{owasp_xss}, is what forces these
-per-context schemes. Matchertext instead offers one rule for locating the hole
-before any context-specific encoder runs.
+Framing removes the in-band boundary: a length-prefixed
+netstring~\cite{bernstein97netstrings} or an argument vector passed to
+\texttt{execve} carries a value that no content can end early, but only in a
+format or API built for it. It remains the fix for the shell contexts that
+matchertext leaves out.
 
-\paragraph{Defining injection}
+\paragraph{Prompt injection}
+Language-model defenses also mark untrusted data: StruQ~\cite{chen25struq} and
+Spotlighting~\cite{hines24spotlighting} separate instructions from data with
+reserved tokens, delimiters, or encodings. A forged delimiter is a structural
+breakout, which a matcher boundary rules out; a model that follows instructions
+inside the data is an A4 sink, which no delimiter confines.
+
+\paragraph{Defining injection and measuring it}
 Formal framings ground the inertness property of \cref{sec:threat}.
 Language-theoretic security frames the root cause as processing rich input
 without first recognizing it~\cite{momot16langsec}. Su and Wassermann define
@@ -67,4 +92,11 @@ injection as untrusted input altering the generated command's syntactic
 structure~\cite{su06essence}, and Ray and Ligatti by whether input is used as a
 normal-form value rather than as code~\cite{ray12defining}, the vocabulary
 matchertext targets. Matchertext addresses the subset of these framings that
-shares a single lexical boundary mechanism.
+shares a single lexical boundary mechanism. Its language $L$ is a Dyck language
+over three pairs with free nonmatchers, a visibly pushdown
+language~\cite{alur04vpl}: one stack recognizes it, with no grammar of the host.
+Our corpus inherits known defects of its sources: NVD records carry
+inconsistent vulnerability types and product names~\cite{anwar22nvd}, many
+reports lack what a reproduction needs~\cite{mu18reproducibility}, and
+developer-centered security~\cite{acar16developer} asks for studies of defenses
+in developers' hands, which we leave open.

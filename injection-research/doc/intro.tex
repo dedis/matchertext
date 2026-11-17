@@ -35,19 +35,20 @@ matchertext. One recognizer inspects only the six matcher characters and serves
 every host language. The rule was built for verbatim embedding~\cite{matchertext}, which
 names injection as a use; this paper states and measures that use.
 
-Each question becomes one part of the design. Because an embedding rule is not yet
-a security property, we state the guarantee as \emph{inertness}, that a host
-language's parse does not depend on what its holes contain and
-discharge its boundary premise with a machine-checked Lean proof
-(\cref{sec:threat}). Because the convention must be retrofitted, we show it
-resisting SQL, HTML, LDAP, and PDF injection, free where a format already reads to
-matcher balance and a bounded parser change elsewhere (\cref{sec:resist}). Because
-no rule reaches every context, execution sinks stay out of reach, and the ceiling
-we report depends on which syntaxes we give a hole form.
-
-We measure the reach over a reproducible corpus of \dataInjectionCVEs injection
-CVEs, replaying recorded attack strings under a matchertext-aware host language
-(\cref{sec:corpus,sec:results,sec:prevent}): \dataContainedShare of attacks with a
-usable payload are contained under the threat model, and at most
-\dataHostableShare target a delimitable syntax. A matchertext-aware SQLite fork we
-build admits no breakout over the recorded SQL payloads.
+We make four contributions:
+\begin{itemize}
+\item A security property, \emph{inertness}: a host language's parse does not
+	depend on what its \emph{holes} (the matcher-delimited slots for untrusted
+	values) contain. A machine-checked Lean proof covers its boundary premise
+	(\cref{sec:threat}).
+\item Hole forms for SQL, HTML, LDAP, and PDF: free where a format already reads
+	to matcher balance, a bounded parser change elsewhere (\cref{sec:resist}).
+\item A reproducible corpus of \dataInjectionCVEs injection CVEs labeled by
+	target syntax (\cref{sec:corpus,sec:results,sec:prevent}):
+	\dataContainedShare of attacks with a usable payload are contained under the
+	threat model, and at most \dataHostableShare target a delimitable syntax.
+	Execution sinks stay out of reach.
+\item Matchertext-aware forks of SQLite and of the parse5 HTML parser, which
+	admit no breakout over the recorded SQL and HTML payloads
+	(\cref{sec:prevent:exec,sec:prevent:html}).
+\end{itemize}
