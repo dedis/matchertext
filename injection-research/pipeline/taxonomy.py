@@ -73,6 +73,35 @@ MEMORY_CORRUPTION = re.compile(
     r"\b(?:memory corruption|corrupt(?:s|ion of)? memory|(?:buffer|heap|stack|integer) overflow"
     r"|use[- ]after[- ]free|double free|out[- ]of[- ]bounds|dangling pointer)\b", re.I)
 
+# A language model in the attack path: the attacker writes a prompt, and the
+# model writes the host syntax. A matcher boundary cannot confine what a model
+# does with the instructions in a value (premise A4), so a CVE of a delimitable
+# syntax whose description says this gets the llm_prompt label instead.
+LLM_MEDIATED = re.compile(
+    r"\bprompt[- ]injection\b|\btext-to-sql\b"
+    r"|\b(?:LLM|AI|model)[- ](?:generated|produced|written)\b"
+    r"|\b(?:outputs?|responses?) (?:of|from) (?:the |an? )?(?:underlying )?"
+    r"(?:LLM|large language model|language model|AI model)s?\b"
+    r"|\b(?:LLM|language model)(?:'s|s')? (?:outputs?|responses?)\b"
+    r"|\binstruct\w* the (?:underlying )?(?:LLM|large language model|language model|model|AI agent|agent)\b",
+    re.I)
+
+# An HTML/DOM CVE whose attacker supplies a whole document, an uploaded SVG,
+# HTML, XML, PDF, or Markdown file, rather than a value placed in a page. No
+# hole receives the value (premise A2). A file name is a value, so it does not
+# count.
+_WHOLE_DOCUMENT = re.compile(
+    r"\b(?:upload\w*|attach\w*)\b[^.]{0,80}?(?:\bsvgs?\b|\.svg\b"
+    r"|\b(?:x?html?|xml|pdf|markdown)\s+(?:files?|documents?|pages?)\b|\.(?:x?html?|xml|pdf|md)\b)"
+    r"|(?:\bsvgs?\b|\b(?:x?html?|xml|pdf|markdown)\s+(?:files?|documents?|pages?)\b)[^.]{0,60}?\bupload",
+    re.I | re.S)
+_FILE_NAME = re.compile(r"\bfile ?names?\b", re.I)
+
+
+def whole_document(description):
+    return bool(_WHOLE_DOCUMENT.search(description)) and not _FILE_NAME.search(description)
+
+
 # CWE-74 itself and CWE-75 carry no syntax information; a family derived only
 # from these may be refined by phrase rules or the NB classifier.
 GENERIC_ANCHORS = {74, 75}

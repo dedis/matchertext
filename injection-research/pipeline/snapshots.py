@@ -1,13 +1,19 @@
 """Content-addressed storage for reproducible pipeline inputs."""
 import hashlib
+import json
 import os
 import shutil
+import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ARCHIVE = os.environ.get("MATCHERTEXT_SNAPSHOT_ARCHIVE",
                          str(ROOT / "snapshot-archive")).rstrip("/")
+# The anonymous mirror limits single-file requests and answers a burst with a short JSON error in place of the
+# object. A download waits these many seconds before each retry, about 8 minutes in all, then fails.
+RATE_LIMIT_WAITS = (15, 30, 60, 120, 240)
 
 
 def sha256(path):
@@ -50,6 +56,45 @@ def store(path, digest=None):
     return digest
 
 
+def _rate_limit_reply(data):
+    """Whether *data* is the mirror's rate-limit reply rather than an object."""
+    if len(data) > 4096:
+        return False
+    try:
+        return json.loads(data).get("error") == "rate_limited"
+    except (ValueError, AttributeError):
+        return False
+
+
+def _download(digest, tmp):
+    """Download object *digest* from the HTTP archive into *tmp*. Return False when the archive does not serve it;
+    wait and retry while the archive rate-limits, and fail once the waits run out."""
+    req = urllib.request.Request(f"{ARCHIVE}/sha256/{digest}",
+                                 headers={"User-Agent": "matchertext-injection-research"})
+    for wait in (*RATE_LIMIT_WAITS, None):
+        try:
+            with urllib.request.urlopen(req) as response, open(tmp, "wb") as output:
+                shutil.copyfileobj(response, output, 1 << 20)
+            limited = tmp.stat().st_size <= 4096 and _rate_limit_reply(tmp.read_bytes())
+        except urllib.error.HTTPError as error:
+            limited = error.code == 429 or _rate_limit_reply(error.read())
+            if not limited:
+                tmp.unlink(missing_ok=True)
+                return False
+        except Exception:
+            tmp.unlink(missing_ok=True)
+            return False
+        if not limited:
+            return True
+        tmp.unlink(missing_ok=True)
+        if wait is None:
+            raise RuntimeError(f"the snapshot archive keeps rate-limiting downloads ({digest}); "
+                               "use its repository ZIP as a local archive (README)")
+        print(f"snapshot archive rate-limited; retrying {digest[:12]} in {wait} s", flush=True)
+        time.sleep(wait)
+    raise AssertionError("unreachable")
+
+
 def materialize(digest, dest):
     """Copy a verified object into *dest*. Return False when it is unavailable."""
     source = _local_blob(digest)
@@ -61,16 +106,8 @@ def materialize(digest, dest):
         if sha256(source) != digest:
             raise RuntimeError(f"corrupt snapshot object: {source}")
         shutil.copyfile(source, tmp)
-    else:
-        url = f"{ARCHIVE}/sha256/{digest}"
-        req = urllib.request.Request(url,
-                                     headers={"User-Agent": "matchertext-injection-research"})
-        try:
-            with urllib.request.urlopen(req) as response, open(tmp, "wb") as output:
-                shutil.copyfileobj(response, output, 1 << 20)
-        except Exception:
-            tmp.unlink(missing_ok=True)
-            return False
+    elif not _download(digest, tmp):
+        return False
     if sha256(tmp) != digest:
         tmp.unlink()
         raise RuntimeError(f"snapshot hash mismatch: {digest}")

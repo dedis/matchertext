@@ -16,8 +16,9 @@ import sqlite3
 from collections import defaultdict
 from pathlib import Path
 
+import matchertext
 from nbayes import WordNB
-from taxonomy import (FAMILY_ANCHORS, FAMILY_OF_SYNTAX, MEMORY_CORRUPTION,
+from taxonomy import (FAMILY_ANCHORS, FAMILY_OF_SYNTAX, LLM_MEDIATED, MEMORY_CORRUPTION,
                       NOT_INJECTION, OTHER, REVIEWED_INHERITED, SYNTAX_ANCHORS,
                       labels_from_cwes, mask_rules, rule_match)
 
@@ -84,6 +85,12 @@ def anchor_audit(con, parents, subtree):
             f"taxonomy.REVIEWED_INHERITED")
 
 
+def mediated(syn, desc):
+    """The syntax, or llm_prompt where a language model writes the
+    delimitable syntax from the attacker's prompt (taxonomy.LLM_MEDIATED)."""
+    return "llm_prompt" if syn in matchertext.HOST and LLM_MEDIATED.search(desc) else syn
+
+
 def evaluate(model, test, margin):
     stats = defaultdict(lambda: [0, 0, 0])  # tp, fp, fn
     covered = 0
@@ -117,6 +124,7 @@ def run(args):
     results = {}  # cve_id -> [family, syntax, method, confidence]
     train, pending = [], []
     overridden = contradicted = abstained = memory = 0
+    relabeled = []  # (cve_id, syntax) a language model writes, now llm_prompt
     for cve_id, desc in con.execute(
             "SELECT cve_id, COALESCE(description,'') FROM cve WHERE state='PUBLISHED'"):
         ids = [c for _, c in sorted(primary.get(cve_id) or secondary.get(cve_id, ()))]
@@ -136,6 +144,9 @@ def run(args):
             method = "cwe"
         elif rm:
             syn, method = rm[1], "rule"
+        if method and (mt := mediated(syn, desc)) != syn:
+            relabeled.append((cve_id, syn))
+            syn = mt
         if rm and (fam is None or (fam == OTHER and generic)):
             fam, generic = rm[0], False
         if method:
@@ -173,13 +184,16 @@ def run(args):
             if y == NOT_INJECTION_CLASS:
                 abstained += 1
             elif m >= margin:
+                mt = mediated(y, desc)
                 r = results[cve_id]
                 if refinable:
-                    r[0] = FAMILY_OF_SYNTAX[y]
-                elif FAMILY_OF_SYNTAX[y] != r[0]:
+                    r[0] = FAMILY_OF_SYNTAX[mt]
+                elif FAMILY_OF_SYNTAX[mt] != r[0]:
                     contradicted += 1     # a specific CWE family outranks the classifier
                     continue
-                r[1], r[2], r[3] = y, "nb", round(m, 2)
+                if mt != y:
+                    relabeled.append((cve_id, y))
+                r[1], r[2], r[3] = mt, "nb", round(m, 2)
 
     con.executescript("""
         DROP TABLE IF EXISTS classification;
@@ -189,6 +203,10 @@ def run(args):
     con.executemany("INSERT INTO classification VALUES(?,?,?,?,?,?)",
                     [(cid, 1, *r) for cid, r in results.items()])
     con.commit()
+    with open(EXPORTS / "llm_relabeled.csv", "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["cve_id", "syntax_before"])
+        w.writerows(sorted(relabeled))
 
     counts = dict(con.execute(
         "SELECT method, COUNT(*) FROM classification GROUP BY method"))
@@ -196,7 +214,8 @@ def run(args):
     print(f"injection-related: {len(results)} of {total} published CVEs; by method: {counts}")
     print(f"family set by syntax: {overridden}; classifier labels refused for "
           f"contradicting the CWE family: {contradicted}; left unknown as not "
-          f"injection: {abstained}; code-eval CWE on memory corruption, dropped: {memory}")
+          f"injection: {abstained}; code-eval CWE on memory corruption, dropped: {memory}; "
+          f"delimitable syntax written by a language model, relabeled llm_prompt: {len(relabeled)}")
     con.close()
 
 

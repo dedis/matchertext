@@ -59,7 +59,7 @@ CREATE TABLE cwe_hierarchy(child_id INTEGER, parent_id INTEGER, UNIQUE(child_id,
 -- link-only sources (github).
 CREATE TABLE poc(cve_id TEXT, source TEXT, ref TEXT, local_path TEXT, kind TEXT,
                  UNIQUE(cve_id, source, ref));
--- What counts as PoC evidence: advisory and write-up links are not exploits.
+-- What counts as PoC evidence: advisory links are not exploits.
 CREATE VIEW poc_evidence AS SELECT * FROM poc WHERE kind IS NOT 'reference';
 -- Per-source advisory metadata (severity / fix status) for breadth.
 CREATE TABLE advisory(cve_id TEXT, source TEXT, severity TEXT, status TEXT, ref TEXT,
@@ -120,7 +120,6 @@ PAYLOAD_MIN, PAYLOAD_MAX = 3, 200
 # mistaken for attack payloads by later stages.
 POC_COLLECTIONS = {
     "awesome-poc": "awesome-poc",
-    "wy876-poc": "wy876-poc",
     "penetration-testing-poc": "penetration-testing-poc",
     "some-poc-or-exp": "some-poc-or-exp",
     "peiqi-wiki": "peiqi-wiki",
@@ -135,6 +134,16 @@ POC_SECTIONED = {
     "trickest": "trickest-cve",
     "0xmarcio-cve": "0xmarcio-cve",
 }
+# A "Reference" link of a sectioned index is a researcher's write-up, and so PoC
+# evidence, when it names a GitHub repository whose owner or name says it holds
+# exploits or reports, or a document file in any repository. The other GitHub
+# references are the vendor's commits, issues, and advisories, whose repository
+# holds the product, not an exploit.
+GITHUB_LINK = re.compile(r"https?://(?:www\.)?github\.com/([\w.-]+)/([\w.-]+)(/[^#?]*)?", re.I)
+WRITEUP_HINT = ("cve", "poc", "exploit", "vuln", "advisor", "0day", "xss", "sqli",
+                "inject", "rce", "cnvd", "pentest", "bug", "exp")
+NOT_WRITEUP_HINT = ("expres", "export", "expect", "expo")
+WRITEUP_DOC = {".md", ".txt", ".pdf", ".markdown", ".rst", ""}
 POC_TEXT_EXT = {".c", ".cpp", ".go", ".html", ".java", ".js", ".json", ".md",
                 ".php", ".pl", ".py", ".rb", ".rst", ".sh", ".txt", ".xml",
                 ".yaml", ".yml"}
@@ -479,14 +488,30 @@ def link_exploitdb_ids(con):
     _poc(con, rows)
 
 
+def writeup(url):
+    """Is this Reference link a researcher's write-up (see WRITEUP_HINT)?"""
+    m = GITHUB_LINK.match(url)
+    if not m:
+        return False
+    tokens = re.split(r"[^a-z0-9]+", f"{m.group(1)} {m.group(2)}".lower())
+    if any(t.startswith(WRITEUP_HINT) and not t.startswith(NOT_WRITEUP_HINT) for t in tokens):
+        return True
+    parts = (m.group(3) or "").strip("/").split("/")
+    if len(parts) < 3 or parts[0] not in ("blob", "raw"):
+        return False
+    name = parts[-1].lower()
+    return (name[name.rfind("."):] if "." in name else "") in WRITEUP_DOC
+
+
 def load_trickest(con):
     """trickest/cve and 0xMarcio/cve: per-CVE markdown whose POC section lists exploit links.
 
     The section has two subsections and they are not equivalent: "Github" holds
     candidate PoC repositories, "Reference" holds advisory and write-up URLs that
     are usually not exploits. Tag them apart so a PoC count can exclude the
-    latter rather than inflating on advisory links. Only the POC section is
-    read, so the file header's link to the CVE's own record is not a PoC.
+    advisories rather than inflating on them; a Reference link that writeup()
+    accepts is a write-up. Only the POC section is read, so the file header's
+    link to the CVE's own record is not a PoC.
     """
     for source, dirname in POC_SECTIONED.items():
         base = RAW / dirname
@@ -505,7 +530,9 @@ def load_trickest(con):
                 if line.startswith("####"):
                     kind = line.lstrip("# ").strip().lower()
                 elif line.startswith("- http") and kind:
-                    rows.append((cid, source, line[2:].strip(), None, kind))
+                    url = line[2:].strip()
+                    rows.append((cid, source, url, None,
+                                 "writeup" if kind == "reference" and writeup(url) else kind))
         _poc(con, rows)
 
 

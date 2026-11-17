@@ -44,7 +44,6 @@ GIT_REPOS = {
     # no open-source license remain research inputs; their terms are recorded in
     # the manifest and their files stay below data/raw, which is not exported.
     "awesome-poc": "https://github.com/Threekiii/Awesome-POC.git",
-    "wy876-poc": "https://github.com/wy876/POC.git",
     "penetration-testing-poc": "https://github.com/Mr-xn/Penetration_Testing_POC.git",
     "some-poc-or-exp": "https://github.com/coffeehb/Some-PoC-oR-ExP.git",
     "peiqi-wiki": "https://github.com/PeiQi0/PeiQi-WIKI-Book.git",
@@ -55,7 +54,6 @@ GIT_REPOS = {
 }
 SOURCE_METADATA = {
     "awesome-poc": {"license": "NOASSERTION", "use": "research-only"},
-    "wy876-poc": {"license": "NOASSERTION", "use": "repository terms apply"},
     "penetration-testing-poc": {"license": "Apache-2.0"},
     "some-poc-or-exp": {"license": "NOASSERTION", "use": "research-only"},
     "peiqi-wiki": {"license": "NOASSERTION", "use": "authorized research only"},

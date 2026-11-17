@@ -9,12 +9,15 @@ doc/generated/, which main.tex pulls in:
   tbl-poc-sources.tex  PoC linkage per source
   tbl-anchors.tex      ground-truth CWEs that resolve to an injection label
   tbl-html-arms.tex    HTML replay verdicts per delivery path
+  tbl-sensitivity.tex  scope, exploitation, projection, provenance (tab:sens)
 
 Macros end in \\xspace so they can be written inline without a trailing {}.
 Counts are formatted 13{,}691 and percentages 82\\%, matching the prose style.
 """
 import argparse
 import csv
+import json
+import random
 import sqlite3
 from collections import defaultdict
 from pathlib import Path
@@ -39,7 +42,26 @@ DISPLAY = {
     "formula_csv": "Formula (CSV)", "template": "Template", "xml": "XML",
     "argument": "Argument", "expression_language": "Expression language",
     "llm_prompt": "LLM prompt", "unknown": "Unknown",
+    "html_document": "HTML document",
 }
+
+# An HTML/DOM CVE whose attacker supplies a whole document (subclass.py) has no
+# hole for the value (premise A2), so it is counted apart from HTML/DOM: its
+# own stratum, outside. Every containment and ceiling query reads this.
+STRATUM = """CASE WHEN c.syntax_type = 'html_dom' AND c.cve_id IN
+    (SELECT cve_id FROM subclass WHERE dimension = 'delivery' AND label = 'whole_document')
+    THEN 'html_document' ELSE c.syntax_type END"""
+# Published CVEs with a CWE next to the CWE-74 subtree that the gate leaves out:
+# encoding and escaping (116, 117), delimiters (140, 150), format strings
+# (134), and external entities (611).
+NEIGHBOR_CWES = (116, 117, 134, 140, 150, 611)
+# The 37 CWEs of OWASP Top 10:2025 A05 Injection, as its page lists them.
+OWASP_A05 = (20, 74, 76, 77, 78, 79, 80, 83, 86, 88, 89, 90, 91, 93, 94, 95, 96, 97,
+             98, 99, 103, 104, 112, 113, 114, 115, 116, 129, 159, 470, 493, 500,
+             564, 610, 643, 644, 917)
+BOOTSTRAP = 2000
+# A per-year or per-source HTML/DOM sink rate is quoted only above this many CVEs.
+MIN_STRATUM = 200
 
 
 def num(n):
@@ -55,23 +77,31 @@ def macro(name, value):
 
 
 def containment(con):
-    """Per-syntax inert / rejected / outside over payload-backed CVEs."""
+    """Per-stratum inert / rejected / outside over payload-backed CVEs, the
+    outside split by the premise it fails, and each skeleton group as
+    (stratum, CVEs, contained CVEs) for the bootstrap."""
     inert, reject, outside = defaultdict(int), defaultdict(int), defaultdict(int)
-    semantic = nonmatcher = 0
-    for syn, sk, n in con.execute("""SELECT syntax_type, skeleton, COUNT(*)
-                                     FROM syntactic_group GROUP BY group_id"""):
+    semantic = document = nonmatcher = 0
+    groups = []
+    for syn, sk, n in con.execute(f"""SELECT {STRATUM}, g.skeleton, COUNT(*)
+                                      FROM syntactic_group g JOIN classification c USING(cve_id)
+                                      GROUP BY g.group_id, 1"""):
         ok, mech, _ = matchertext.assess(syn, sk)
+        groups.append((syn, n, n if ok else 0))
         if ok:
             (inert if mech == "inert" else reject)[syn] += n
         else:
             outside[syn] += n
-            # An outside case fails one of the two threat-model conditions: the
-            # sink executes the value, or the context has no matcher delimiters.
-            if syn in matchertext.SEMANTIC or syn == "html_dom":
+            # An outside case fails a premise of the threat model: the sink
+            # executes the value (A4), no hole receives it (A2), or the context
+            # has no matcher delimiters.
+            if syn == "html_document":
+                document += n
+            elif syn in matchertext.SEMANTIC or syn == "html_dom":
                 semantic += n
             else:
                 nonmatcher += n
-    return inert, reject, outside, semantic, nonmatcher
+    return inert, reject, outside, (semantic, document, nonmatcher), groups
 
 
 def post_stratify(con, inert, reject, outside):
@@ -89,37 +119,19 @@ def post_stratify(con, inert, reject, outside):
 
     The rates themselves are not measured, except for HTML/DOM: the threat
     model contains every payload of a HOST syntax and none outside, so the
-    syntax label fixes the rate ("label"), and a syntax with no payload-backed
-    CVE gets the same rule ("structural"). Only a PAYLOAD_DEPENDENT syntax has
-    a rate the payloads decide ("measured"). The estimate is therefore the
-    hostable count less the HTML/DOM javascript: sinks.
-
-    Returns (estimate, [(syntax, corpus_n, backed_n, rate, basis)]).
+    syntax label fixes the rate, and a syntax with no payload-backed CVE gets
+    the same rule. Only a PAYLOAD_DEPENDENT syntax has
+    a rate the payloads decide. The estimate is therefore the hostable count
+    less the HTML/DOM javascript: sinks.
     """
-    corpus = dict(con.execute(
-        "SELECT syntax_type, COUNT(*) FROM classification GROUP BY 1"))
-    est, rows = 0.0, []
-    for syn, n in sorted(corpus.items(), key=lambda kv: -kv[1]):
+    est = 0.0
+    for syn, n in con.execute(f"SELECT {STRATUM}, COUNT(*) FROM classification c GROUP BY 1"):
         backed = inert[syn] + reject[syn] + outside[syn]
         if backed:
-            rate = (inert[syn] + reject[syn]) / backed
-            basis = "measured" if syn in matchertext.PAYLOAD_DEPENDENT else "label"
-        else:
-            rate, basis = (1.0 if syn in matchertext.HOST else 0.0), "structural"
-        est += n * rate
-        rows.append((syn, n, backed, rate, basis))
-    return est, rows
-
-
-def tbl_strata(rows, top=8):
-    lines = ["\\begin{tabular}{lrrr}", "\\toprule",
-             "Syntax & CVEs & Payload-backed & Contained \\\\", "\\midrule"]
-    for syn, n, backed, rate, basis in rows[:top]:
-        mark = "" if basis == "measured" else "$^{\\dagger}$"
-        lines.append(f"{DISPLAY.get(syn, syn):<19} & {num(n):>9} & {num(backed):>7} "
-                     f"& {rate * 100:.1f}\\%{mark} \\\\")
-    lines += ["\\bottomrule", "\\end{tabular}"]
-    return "\n".join(lines) + "\n"
+            est += n * (inert[syn] + reject[syn]) / backed
+        elif syn in matchertext.HOST:
+            est += n
+    return est
 
 
 def tbl_mech(inert, reject, outside):
@@ -150,35 +162,49 @@ def place(*pairs):
     return line
 
 
-def fig_tree(grouped, contained, inert, reject, outside, semantic, nonmatcher):
+def connector(*spans):
+    """A tree connector line: each span is (left, right, {column: glyph}),
+    drawn as a horizontal rule from left to right with the glyphs on it."""
+    line = [" "] * (max(right for _, right, _ in spans) + 1)
+    for left, right, glyphs in spans:
+        line[left:right + 1] = "─" * (right - left + 1)
+        for col, glyph in glyphs.items():
+            line[col] = glyph
+    return "".join(line).rstrip()
+
+
+def fig_tree(grouped, contained, inert, reject, outside, semantic, document, nonmatcher):
     """The two-decision containment tree.
 
     Emitted as a complete verbatim block rather than macros, because verbatim
     does not expand them; the paper \\input{}s this file inside its figure.
     """
     p = lambda a, b: f"({round(100 * a / b) if b else 0}%)"
+    # Column centres of the leaves: two below the context test, three below
+    # OUTSIDE, one per premise an outside case fails.
+    sink, doc, nm = 46, 64, 86
     return "\n".join([
         r"\begin{verbatim}",
         place((35, f"{grouped:,} payload-backed CVEs")),
-        "                    ┌──────────"
-        "────┴─────────"
-        "─────┐",
+        connector((20, 50, {20: "┌", 35: "┴", 50: "┐"})),
         "                   yes                            no",
         "       matcher-delimitable context?            OUTSIDE",
         place((20, f"{contained:,} {p(contained, grouped)}"),
-              (52, f"{outside:,} {p(outside, grouped)}")),
-        "        ┌───────────┴"
-        "───────────┐        ┌"
-        "──────────┴───"
-        "───────┐",
-        place((8, "pass"), (32, "fail"), (42, str(semantic)), (64, str(nonmatcher))),
-        "    VERIFY(v)               VERIFY(v)  execution sinks       non-matcher delimiters",
-        "        ▼                       ▼      templates, eval,      shell ; | &",
-        "   INERT EMBED              REJECTED   javascript:           CR/LF, XML <>",
-        # (A4) tags the execution-sink branch with the threat-model assumption
-        # it violates (threat.tex).
+              (50, f"{outside:,} {p(outside, grouped)}")),
+        connector((8, 32, {8: "┌", 20: "┴", 32: "┐"}),
+                  (sink, nm, {sink: "┌", 50: "┴", doc: "┬", nm: "┐"})),
+        place((8, "pass"), (32, "fail"), (sink, f"{semantic:,}"), (doc, f"{document:,}"),
+              (nm, f"{nonmatcher:,}")),
+        place((8, "VERIFY(v)"), (32, "VERIFY(v)"), (sink, "execution sinks"),
+              (doc, "whole documents"), (nm, "non-matcher delimiters")),
+        place((8, "▼"), (32, "▼"), (sink, "templates, eval,"), (doc, "uploaded SVG,"),
+              (nm, "shell ; | &")),
+        place((8, "INERT EMBED"), (32, "REJECTED"), (sink, "javascript:"),
+              (doc, "HTML, PDF"), (nm, "CR/LF, XML <>")),
+        # Each outside branch is tagged with the threat-model premise it fails
+        # (threat.tex).
         place((8, f"{inert:,} {p(inert, contained)}"),
-              (32, f"{reject:,} {p(reject, contained)}"), (44, "(A4)")),
+              (32, f"{reject:,} {p(reject, contained)}"), (sink, "(A4)"), (doc, "(A2)")),
         r"\end{verbatim}",
     ]) + "\n"
 
@@ -500,20 +526,21 @@ def sqli_macros(con):
 
 # Each block opens with a row that names it, so the reader sees which rows use matchertext.
 HTML_ARMS = [
-    ("concat",      "Concatenation",                     "stock"),
-    ("escape",      "Entity escaping",                   "stock"),
-    ("dom_stock",   "Stock writer",                      "stock"),
-    ("dom_guarded", "Guarded writer",                    "guard"),
-    ("dom_mt",      "Matchertext writer",                "fork"),
-    ("mt_verify",   "\\textsc{Verify}, hole",             "fork"),
-    ("mt_section",  "\\textsc{Verify}, MDATA",            "fork"),
-    ("mt_encode",   "Encoding",                          "fork"),
-    ("compose",     "\\texttt{composeHtml}",             "fork"),
+    ("concat",         "Concatenation",                     "stock"),
+    ("escape",         "Entity escaping",                   "stock"),
+    ("dom_stock",      "Stock writer",                      "stock"),
+    ("dom_guarded",    "Guarded writer",                    "guard"),
+    ("dom_mt",         "Matchertext writer",                "fork"),
+    ("mt_verify",      "\\textsc{Verify}, hole",             "fork"),
+    ("mt_section",     "\\textsc{Verify}, MDATA",            "fork"),
+    ("mt_encode",      "Encoding",                          "fork"),
+    ("compose",        "\\texttt{composeHtml}",             "fork"),
 ]
 HTML_GROUPS = {"stock": "Without matchertext: stock parse5",
                "guard": "Without matchertext: fork serializer",
                "fork": "With matchertext: parse5 fork"}
-HTML_MT_ARMS = ("dom_mt", "mt_verify", "mt_section", "mt_encode", "compose")
+HTML_MT_ARMS = ("dom_mt", "mt_verify", "mt_section", "mt_encode", "compose", "compose_js", "compose_dom")
+HTML_ENGINES = ("chromium", "firefox", "webkit")
 
 
 def has_table(con, name):
@@ -522,14 +549,25 @@ def has_table(con, name):
 
 
 def tbl_html_arms(con):
-    """Verdict counts per delivery path over the HTML hosts. Refused joins the
-    arm's own VERIFY refusals and the guarded serializer's refusals."""
+    """Verdict counts per delivery path over the HTML hosts that are not semantic sinks (A4). Refused joins the
+    arm's own VERIFY refusals and the serializer's refusals; no arm of the table writes a document that the parser
+    refuses (the run guards it). The last column is the most breakouts in one browser of the documents that a
+    browser receives."""
     rows = {a: r for a, *r in con.execute(
-        """SELECT arm, SUM(n_inert), SUM(n_altered), SUM(n_breakout),
-                  SUM(n_rejected) + SUM(n_refused), SUM(n_malformed)
-           FROM mt_html_combo GROUP BY arm""")}
+        """SELECT c.arm, SUM(n_inert), SUM(n_altered), SUM(n_breakout),
+                  SUM(n_rejected) + SUM(n_refused)
+           FROM mt_html_combo c JOIN mt_html_host h ON h.name = c.host
+           WHERE h.semantic = 0 GROUP BY c.arm""")}
+    if any(n for (n,) in con.execute("""SELECT SUM(n_malformed) FROM mt_html_combo c JOIN mt_html_host h
+                                         ON h.name = c.host WHERE h.semantic = 0 GROUP BY c.arm""")):
+        raise SystemExit("tbl-html-arms: an arm wrote a document that the parser refused")
+    in_browser = {a: max(n) for a, *n in con.execute(
+        f"""SELECT a.name, {", ".join(f"SUM(c.{e} = 'BREAKOUT')" for e in HTML_ENGINES)}
+            FROM mt_html_case c JOIN mt_html_arm a USING(arm_id) JOIN mt_html_host h USING(host_id)
+            WHERE h.semantic = 0 GROUP BY a.name""")}
     lines = ["\\begin{tabular}{@{}l rrrrr@{}}", "\\toprule",
-             "& & & Broke & & Not \\\\", "Delivery & Inert & Altered & out & Refused & HTML \\\\"]
+             "& & & Broke & & Browser \\\\",
+             "Delivery & Inert & Altered & out & Refused & breakout \\\\"]
     last = None
     for arm, label, group in HTML_ARMS:
         if arm not in rows:
@@ -537,9 +575,72 @@ def tbl_html_arms(con):
         if group != last:
             lines += ["\\midrule", f"\\multicolumn{{6}}{{@{{}}l}}{{\\emph{{{HTML_GROUPS[group]}}}}} \\\\"]
             last = group
-        lines.append(f"{label:34} & " + " & ".join(num(v) for v in rows[arm]) + " \\\\")
+        lines.append(f"{label:34} & " + " & ".join(num(v) for v in [*rows[arm], in_browser.get(arm, 0)])
+                     + " \\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
     return "\n".join(lines) + "\n"
+
+
+def html_layer_macros(con):
+    """The browsers, the JavaScript layer, the mXSS fixtures, and the client path of the HTML replay."""
+    q = lambda sql: con.execute(sql).fetchone()[0] or 0
+    arm = lambda name: f"(SELECT arm_id FROM mt_html_arm WHERE name='{name}')"
+    any_engine = lambda cond: " OR ".join(f"c.{e} {cond}" for e in HTML_ENGINES)
+    contained = HTML_MT_ARMS + ("dom_guarded",)
+    lock = json.loads((ROOT / "test" / "matchertext" / "jssrc" / "package-lock.json").read_text())
+    with open(EXPORTS / "html_browsers.csv", newline="") as f:
+        engines = list(csv.DictReader(f))
+    version = {r["engine"]: r["version"] for r in engines}
+    with open(EXPORTS / "html_mxss.csv", newline="") as f:
+        mxss = {r["arm"]: r for r in csv.DictReader(f)}
+    js = lambda name, v: q(f"SELECT COUNT(*) FROM mt_html_case WHERE arm_id={arm(name)} AND js='{v}'")
+    nonsemantic = "host_id IN (SELECT host_id FROM mt_html_host WHERE semantic=0)"
+    # The text says that every case that a browser judges otherwise than parse5 is concatenation in the option
+    # host, where parse5 drops markup that the browsers keep.
+    other = q(f"""SELECT COUNT(*) FROM mt_html_case c
+                  WHERE c.chromium != '-' AND ({any_engine("!= c.verdict")})
+                    AND NOT (c.arm_id={arm('concat')}
+                             AND c.host_id=(SELECT host_id FROM mt_html_host WHERE name='option'))""")
+    if other:
+        raise RuntimeError(f"{other} cases that a browser judges otherwise than parse5 are not concatenation in option")
+    return [
+        ("PlaywrightVersion", lock["packages"]["node_modules/playwright"]["version"]),
+        ("HtmlChromiumVersion", version["chromium"]),
+        ("HtmlFirefoxVersion", version["firefox"]),
+        ("HtmlWebkitVersion", version["webkit"]),
+        ("HtmlBrowserCases", num(q("SELECT COUNT(*) FROM mt_html_case WHERE chromium != '-'"))),
+        # The documents that each browser also reads by a page load, with the same tree as the inert write.
+        ("HtmlPageChecked", num(int(engines[0]["page_checked"]))),
+        # Cases that a browser judges otherwise than parse5.
+        ("HtmlBrowserDiffers", num(q(
+            f"""SELECT COUNT(*) FROM mt_html_case c
+                WHERE c.chromium != '-' AND ({any_engine("!= c.verdict")})"""))),
+        ("HtmlEscapeContextBreakout", num(q(
+            f"SELECT COUNT(*) FROM mt_html_case WHERE arm_id={arm('escape_context')} AND verdict='BREAKOUT' "
+            f"AND {nonsemantic}"))),
+        ("HtmlAutoescapeBreakout", num(q(
+            f"SELECT COUNT(*) FROM mt_html_case WHERE arm_id={arm('autoescape')} AND verdict='BREAKOUT' "
+            f"AND {nonsemantic}"))),
+        # The JavaScript string of the script host: the verified hole delimits only the HTML layer.
+        ("HtmlJsCases", num(q(f"SELECT COUNT(*) FROM mt_html_case WHERE arm_id={arm('mt_verify')} AND js != '-'"))),
+        ("HtmlJsHoleEnds", num(js("mt_verify", "BREAKOUT") + js("mt_verify", "MALFORMED"))),
+        ("HtmlJsConcatBreakout", num(js("concat", "BREAKOUT"))),
+        ("HtmlJsComposeCases", num(q(
+            f"SELECT COUNT(*) FROM mt_html_case WHERE arm_id={arm('compose_js')} AND js != '-'"))),
+        ("HtmlJsComposeInert", num(js("compose_js", "INERT"))),
+        ("HtmlJsEscapeContextInert", num(js("escape_context", "INERT"))),
+        ("HtmlJsAutoescapeInert", num(js("autoescape", "INERT"))),
+        # DOMPurify's mXSS fixtures as values: the stock writer lets some out on the round trip; the writers
+        # that keep the value as text, in parse5 and the browsers, let none out.
+        ("HtmlMxssProbes", num(int(mxss["concat"]["probes"]))),
+        ("HtmlMxssCases", num(sum(int(mxss[a]["n"]) for a in contained if a in mxss))),
+        ("HtmlMxssStockBreakout", num(int(mxss["dom_stock"]["breakout"]))),
+        ("HtmlMxssContainedBreakout", num(sum(
+            int(mxss[a]["breakout"]) + sum(int(mxss[a][e]) for e in HTML_ENGINES) for a in contained if a in mxss))),
+        # The client path of DOM-based XSS: composeHtml, then innerHTML.
+        ("HtmlComposeDomCases", num(q(
+            f"SELECT COUNT(*) FROM mt_html_case WHERE arm_id={arm('compose_dom')} AND chromium != '-'"))),
+    ]
 
 
 def html_macros(con):
@@ -557,8 +658,13 @@ def html_macros(con):
         ("HtmlSemanticHosts", num(q("SELECT COUNT(*) FROM mt_html_host WHERE semantic=1"))),
         ("HtmlArms", num(q("SELECT COUNT(*) FROM mt_html_arm"))),
         ("HtmlCases", num(q("SELECT COUNT(*) FROM mt_html_case"))),
+        # Over the hosts that are not semantic sinks (A4); href and onclick apart.
         ("HtmlEffective", num(q("""SELECT COUNT(*) FROM (SELECT DISTINCT value_id, host_id
-                                   FROM mt_html_case WHERE effective=1)"""))),
+                                   FROM mt_html_case JOIN mt_html_host USING(host_id)
+                                   WHERE effective=1 AND semantic=0)"""))),
+        ("HtmlEffectiveSemantic", num(q("""SELECT COUNT(*) FROM (SELECT DISTINCT value_id, host_id
+                                           FROM mt_html_case JOIN mt_html_host USING(host_id)
+                                           WHERE effective=1 AND semantic=1)"""))),
         ("HtmlMatchertextPayloads", num(q("SELECT COUNT(*) FROM mt_html_value WHERE is_mt=1"))),
         ("HtmlNonMtPayloads", num(q("SELECT COUNT(*) FROM mt_html_value WHERE is_mt=0"))),
         # A zero byte reads as U+FFFD in every HTML parser, so the hole holds an altered value.
@@ -581,12 +687,13 @@ def html_macros(con):
         vals.append((f"Html{name}UncoveredBreakout", num(q(
             f"""SELECT COALESCE(SUM(n_eff_breakout), 0) FROM mt_html_combo
                 WHERE arm='{arm}' AND host IN {hosts}"""))))
-    # The trees that the guard refuses and the matchertext writer delivers as holes.
+    # The trees that the guard refuses and the matchertext writer delivers as holes (altered only by the line
+    # breaks and NUL characters that every parser normalizes).
     vals.append(("HtmlGuardedRefusedMtInert", num(q(
         """SELECT COUNT(*) FROM mt_html_case g JOIN mt_html_case m USING(value_id, host_id)
            WHERE g.arm_id=(SELECT arm_id FROM mt_html_arm WHERE name='dom_guarded')
              AND m.arm_id=(SELECT arm_id FROM mt_html_arm WHERE name='dom_mt')
-             AND g.verdict='REFUSED' AND m.verdict='INERT'"""))))
+             AND g.verdict='REFUSED' AND m.verdict IN ('INERT', 'ALTERED')"""))))
     # How a parser without the option reads the documents of the verified element and attribute holes.
     legacy = {r: n for r, n in con.execute(
         """SELECT reader, COUNT(*) FROM mt_html_case
@@ -596,6 +703,7 @@ def html_macros(con):
              ("HtmlLegacyElements", num(legacy.get("ELEMENTS", 0))),
              ("HtmlLegacyElementsShare",
               pct(legacy.get("ELEMENTS", 0) / max(sum(legacy.values()), 1), 1))]
+    vals += html_layer_macros(con)
     sab = EXPORTS / "html_sabotage.csv"
     if sab.exists():
         with open(sab, newline="") as f:
@@ -607,12 +715,193 @@ def html_macros(con):
     return vals
 
 
+def interval(k, n):
+    """A share of n with its 95% Wilson interval, as the paper prints it."""
+    p, lo, hi = audit.wilson(k, n)
+    return f"{pct(p, 1)} ({pct(lo, 1)}--{pct(hi, 1)})"
+
+
+def bootstrap(groups, stat, seed=42):
+    """95% percentile interval of stat over skeleton groups drawn with
+    replacement. A group is the unit, because its CVEs share one payload
+    structure and so one verdict."""
+    rng = random.Random(seed)
+    draws = sorted(stat(rng.choices(groups, k=len(groups))) for _ in range(BOOTSTRAP))
+    return draws[int(0.025 * BOOTSTRAP)], draws[int(0.975 * BOOTSTRAP) - 1]
+
+
+def sensitivity(con, hosts, injection, hostable, groups, strat, js_rate):
+    """How the ceiling and the central estimate move under other scopes,
+    weightings, and payload subsets. Returns (macros, table)."""
+    q = lambda sql: con.execute(sql).fetchone()
+    host = f"{STRATUM} IN ('{hosts}')"
+    document = q(f"SELECT COUNT(*) FROM classification c WHERE {STRATUM} = 'html_document'")[0]
+    neighbors = q(f"""SELECT COUNT(DISTINCT a.cve_id) FROM cwe_assignment a JOIN cve v USING(cve_id)
+                      WHERE v.state = 'PUBLISHED' AND a.cwe_id IN {NEIGHBOR_CWES}
+                        AND a.cve_id NOT IN (SELECT cve_id FROM classification)""")[0]
+    kev_n, kev_h = q(f"SELECT COUNT(*), SUM({host}) FROM classification c JOIN kev USING(cve_id)")
+    epss_n, epss_w, epss_h = q(f"""SELECT COUNT(*), SUM(e.score), SUM(e.score * ({host}))
+                                   FROM classification c JOIN epss e USING(cve_id)""")
+    likely_n, likely_h = q(f"""SELECT COUNT(*), SUM({host}) FROM classification c
+                               JOIN epss e USING(cve_id) WHERE e.score >= 0.1""")
+    year = q("""SELECT MAX(substr(v.published_at, 1, 4)) FROM classification
+                JOIN cve v USING(cve_id)""")[0]
+    year_n, year_h = q(f"""SELECT COUNT(*), SUM({host}) FROM classification c JOIN cve v
+                           USING(cve_id) WHERE substr(v.published_at, 1, 4) = '{year}'""")
+    owasp_cves = f"""SELECT DISTINCT a.cve_id FROM cwe_assignment a JOIN cve v USING(cve_id)
+                     WHERE a.source = 'nvd' AND v.state = 'PUBLISHED' AND a.cwe_id IN {OWASP_A05}"""
+    owasp_n = q(f"SELECT COUNT(*) FROM ({owasp_cves})")[0]
+    owasp_in = q(f"""SELECT COUNT(*) FROM ({owasp_cves})
+                     WHERE cve_id IN (SELECT cve_id FROM classification)""")[0]
+    owasp_cwe20 = q(f"""SELECT COUNT(*) FROM ({owasp_cves})
+                        WHERE cve_id NOT IN (SELECT cve_id FROM classification)
+                          AND cve_id IN (SELECT cve_id FROM cwe_assignment
+                                         WHERE source = 'nvd' AND cwe_id = 20)""")[0]
+
+    # The central estimate moves only with the HTML/DOM sink rate (post_stratify).
+    hd_n = q(f"SELECT COUNT(*) FROM classification c WHERE {STRATUM} = 'html_dom'")[0]
+    central = lambda rate: (strat - hd_n * (1 - js_rate) + hd_n * (1 - rate)) / injection
+    hd_groups = [(n, n - k) for syn, n, k in groups if syn == "html_dom"]
+    sink_rate = lambda gs: sum(o for _, o in gs) / sum(n for n, _ in gs)
+    central_lo, central_hi = bootstrap(hd_groups, lambda gs: central(sink_rate(gs)))
+    central_lo, central_hi = min(central_lo, central_hi), max(central_lo, central_hi)
+    within = [(n, k) for _, n, k in groups]
+    within_lo, within_hi = bootstrap(
+        within, lambda gs: sum(k for _, k in gs) / sum(n for n, _ in gs))
+    # The projection assumes that the payload-backed CVEs of a syntax stand for
+    # its other CVEs. The HTML/DOM sink rate per payload source and per year of
+    # publication shows how far the estimate moves if they do not.
+    by = defaultdict(lambda: [0, 0])
+    for src, yr, sk in con.execute(f"""SELECT g.source, substr(v.published_at, 1, 4), g.skeleton
+                                      FROM syntactic_group g JOIN classification c USING(cve_id)
+                                      JOIN cve v USING(cve_id) WHERE {STRATUM} = 'html_dom'"""):
+        out = not matchertext.assess("html_dom", sk)[0]
+        for key in (("source", src), ("year", yr)):
+            by[key][0] += 1
+            by[key][1] += out
+    spread = {}
+    for dim in ("source", "year"):
+        rates = [o / n for (d, _), (n, o) in by.items() if d == dim and n >= MIN_STRATUM]
+        spread[dim] = len(rates), central(max(rates)), central(min(rates))
+
+    span = lambda lo, hi: f"{pct(lo, 1)}--{pct(hi, 1)}"
+    rows = [
+        ("Scope", None, None),
+        ("As labeled", num(injection), pct(hostable / injection, 1)),
+        ("Uploaded documents as delimitable", num(document),
+         pct((hostable + document) / injection, 1)),
+        ("Neighbor CWEs added", num(neighbors), pct(hostable / (injection + neighbors), 1)),
+        ("Exploitation", None, None),
+        ("Known exploited (KEV)", num(kev_n), interval(kev_h, kev_n)),
+        ("EPSS-weighted", num(epss_n), pct(epss_h / epss_w, 1)),
+        (r"EPSS $\geq 0.1$", num(likely_n), interval(likely_h, likely_n)),
+        (f"Published in {year}", num(year_n), interval(year_h, year_n)),
+        ("Projection, contained", None, None),
+        ("Central estimate", num(injection),
+         f"{pct(central(js_rate), 1)} ({span(central_lo, central_hi)})"),
+        (f"Sink rate per payload source ({spread['source'][0]})", "", span(*spread["source"][1:])),
+        (f"Sink rate per year ({spread['year'][0]})", "", span(*spread["year"][1:])),
+    ]
+    # Payload provenance: the payload-backed CVEs of each source, and the share
+    # of the graded sample that is an attack string of its syntax.
+    graded = audit.payload_metrics() or {}
+    rows.append(("Payload source, attack strings", None, None))
+    for src, n in con.execute("SELECT source, COUNT(*) FROM syntactic_group GROUP BY 1 "
+                              "ORDER BY 2 DESC"):
+        rows.append((SOURCE_LABELS[src], num(n), interval(*graded[src]) if src in graded else ""))
+    lines = [r"\begin{tabular}{@{}lrr@{}}", r"\toprule", r"& CVEs & Share \\", r"\midrule"]
+    for label, n, share in rows:
+        lines.append(rf"\multicolumn{{3}}{{@{{}}l}}{{\emph{{{label}}}}} \\" if n is None
+                     else rf"{label} & {n} & {share} \\")
+    lines += [r"\bottomrule", r"\end{tabular}"]
+
+    vals = [
+        ("DocumentCVEs", num(document)),
+        ("DocumentHostableShare", pct((hostable + document) / injection, 1)),
+        ("NeighborCVEs", num(neighbors)),
+        ("NeighborHostableShare", pct(hostable / (injection + neighbors), 1)),
+        ("KevHostableInterval", interval(kev_h, kev_n)),
+        ("EpssWeightedHostableShare", pct(epss_h / epss_w, 1)),
+        ("EpssLikelyCVEs", num(likely_n)),
+        ("EpssLikelyHostableShare", pct(likely_h / likely_n, 1)),
+        ("LatestYear", year),
+        ("LatestYearHostableShare", pct(year_h / year_n, 1)),
+        ("CentralInterval", span(central_lo, central_hi)),
+        ("MinStratum", num(MIN_STRATUM)),
+        ("ContainedInterval", span(within_lo, within_hi)),
+        ("CentralSpreadLow", pct(min(spread[d][1] for d in spread), 1)),
+        ("CentralSpreadHigh", pct(max(spread[d][2] for d in spread), 1)),
+        ("OwaspCWEs", num(len(OWASP_A05))),
+        ("OwaspStyleCVEs", num(owasp_n)),
+        ("OwaspStyleInCorpus", num(owasp_in)),
+        ("OwaspStyleCweTwenty", num(owasp_cwe20)),
+        ("CorpusBeyondOwasp", num(injection - owasp_in)),
+    ]
+    return vals, "\n".join(lines) + "\n"
+
+
+# The payload sources of syntactic_group.py: macro names and table labels.
+SOURCE_NAMES = {"poc_file": "PocFile", "repo": "Repo", "advisory": "Advisory",
+                "description": "Description", "web": "Web"}
+SOURCE_LABELS = {"poc_file": "PoC file", "repo": "Linked repository",
+                 "advisory": "Advisory text", "description": "CVE description",
+                 "web": "Advisory page"}
+
+
+def provenance_macros(con):
+    """Payload-backed CVEs per payload source, and the audited share of them that
+    is a real payload of the labeled syntax, once the payload audit is graded."""
+    vals = [(f"Payload{SOURCE_NAMES[src]}CVEs", num(n)) for src, n in con.execute(
+        "SELECT source, COUNT(*) FROM syntactic_group GROUP BY 1")]
+    m = audit.payload_metrics()
+    if m:
+        vals.append(("PayloadAuditPerSource", num(audit.PAYLOAD_PER_SOURCE)))
+        vals += [(f"PayloadPrecision{SOURCE_NAMES[src]}", interval(k, n))
+                 for src, (k, n) in m.items()]
+        k, n = map(sum, zip(*m.values()))
+        vals += [("PayloadPrecisionAll", interval(k, n)), ("PayloadPrecisionAllShare", pct(k / n))]
+    rules = audit.rule_metrics()
+    if rules:
+        vals.append(("RuleAuditPerRule", num(audit.RULE_SAMPLE)))
+        vals += [(f"RulePrecision{''.join(w.title() for w in rule.split('_'))}", interval(k, n))
+                 for rule, (k, n) in rules.items()]
+    return vals
+
+
+def bound_macros(con):
+    """The 95% upper bound on the breakout rate of a payload like the recorded
+    ones when none of n independent payloads breaks out of a hole: 3/n, the
+    rule of three. A payload, not a case, is the unit, because the cases of one
+    payload are not independent."""
+    vals = []
+    for name, table in (("Sqli", "mt_sqli_case"), ("Html", "mt_html_case")):
+        if has_table(con, table):
+            n = con.execute(f"SELECT COUNT(DISTINCT value_id) FROM {table} WHERE effective = 1"
+                            ).fetchone()[0]
+            vals += [(f"{name}EffectiveValues", num(n)), (f"{name}ZeroBound", pct(3 / n, 2))]
+    return vals
+
+
+MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August",
+          "September", "October", "November", "December")
+
+
+def snapshot_macros():
+    """The snapshot date, the day every input was fetched, and the EPSS model day."""
+    manifest = json.loads((ROOT / "manifest.json").read_text())
+    day = lambda d: f"{int(d[8:10])} {MONTHS[int(d[5:7]) - 1]} {d[:4]}"
+    fetched = {e["fetched"] for e in manifest.values() if "fetched" in e}
+    if len(fetched) != 1:
+        raise SystemExit(f"manifest inputs were fetched on several days: {sorted(fetched)}")
+    return [("SnapshotDate", day(fetched.pop())), ("EpssDate", day(manifest["epss"]["date"]))]
+
+
 def run(args):
     con = sqlite3.connect(DB)
     q = lambda sql: con.execute(sql).fetchone()[0]
     OUT.mkdir(parents=True, exist_ok=True)
 
-    inert, reject, outside, semantic, nonmatcher = containment(con)
+    inert, reject, outside, (semantic, document, nonmatcher), groups = containment(con)
     grouped = sum(inert.values()) + sum(reject.values()) + sum(outside.values())
     contained = sum(inert.values()) + sum(reject.values())
 
@@ -625,26 +914,27 @@ def run(args):
     # so it extends to injection CVEs with no payload. The javascript: rate
     # measured on the payload-backed HTML/DOM subset discounts the ceiling.
     hosts = "','".join(sorted(matchertext.HOST))
-    hostable = q(f"SELECT COUNT(*) FROM classification WHERE syntax_type IN ('{hosts}')")
+    hostable = q(f"SELECT COUNT(*) FROM classification c WHERE {STRATUM} IN ('{hosts}')")
     # The counterfactual under the same premise A2: SQL and HTML/DOM already have
     # a deployed per-language defense (parameterized queries, contextual
     # auto-escaping), and they hold most of the hostable CVEs.
-    per_language = q("""SELECT COUNT(*) FROM classification
-                        WHERE syntax_type IN ('sql', 'html_dom')""")
+    per_language = q(f"""SELECT COUNT(*) FROM classification c
+                         WHERE {STRATUM} IN ('sql', 'html_dom')""")
     # The ceiling is a design choice: the share if every non-matcher context got
     # a hole form as SQL does, and the share among known-exploited CVEs.
     with_nm = "','".join(sorted(matchertext.HOST | set(matchertext.NONMATCHER)))
-    hostable_nm = q(f"SELECT COUNT(*) FROM classification WHERE syntax_type IN ('{with_nm}')")
+    hostable_nm = q(f"SELECT COUNT(*) FROM classification c WHERE {STRATUM} IN ('{with_nm}')")
     kev_inj = q("SELECT COUNT(*) FROM classification JOIN kev USING(cve_id)")
-    kev_host = q(f"""SELECT COUNT(*) FROM classification JOIN kev USING(cve_id)
-                     WHERE syntax_type IN ('{hosts}')""")
+    kev_host = q(f"""SELECT COUNT(*) FROM classification c JOIN kev USING(cve_id)
+                     WHERE {STRATUM} IN ('{hosts}')""")
     htmldom = q("SELECT COUNT(*) FROM classification WHERE syntax_type='html_dom'")
     hd_backed = inert["html_dom"] + reject["html_dom"] + outside["html_dom"]
     js_rate = outside["html_dom"] / hd_backed if hd_backed else 0
-    removed = round(htmldom * js_rate)
+    removed = round(q(f"SELECT COUNT(*) FROM classification c WHERE {STRATUM} = 'html_dom'")
+                    * js_rate)
     # Post-stratified rather than the pooled rate applied to the whole corpus.
     # The naive form is kept only so the paper can show what the skew costs.
-    strat, strata = post_stratify(con, inert, reject, outside)
+    strat = post_stratify(con, inert, reject, outside)
     central = round(strat)
     naive = contained / grouped * injection
 
@@ -677,7 +967,7 @@ def run(args):
                                    WHERE c.method='cwe'"""):
         cve_cwes[cid].add(cwe)
     cwe_label = dict(con.execute(
-        "SELECT cve_id, syntax_type FROM classification WHERE method='cwe'"))
+        f"SELECT c.cve_id, {STRATUM} FROM classification c WHERE c.method='cwe'"))
     syn_of = {}
     label_conflicts = 0
     for cid, cwes in cve_cwes.items():
@@ -764,6 +1054,7 @@ def run(args):
         ("RejectedCVEs", num(sum(reject.values()))),
         ("OutsideCVEs", num(sum(outside.values()))),
         ("OutsideSemantic", num(semantic)),
+        ("OutsideDocument", num(document)),
         ("OutsideNonmatcher", num(nonmatcher)),
         ("SqlRejected", num(reject["sql"])),
         ("LdapInert", num(inert["ldap"])),
@@ -811,17 +1102,19 @@ def run(args):
     ]
     vals += sqli_macros(con)
     vals += html_macros(con)
+    sens_vals, sens_table = sensitivity(con, hosts, injection, hostable, groups, strat, js_rate)
+    vals += sens_vals + provenance_macros(con) + bound_macros(con) + snapshot_macros()
     (OUT / "numbers.tex").write_text(
         HEADER + "".join(macro(k, v) for k, v in vals))
     tables = {"tbl-mech": tbl_mech(inert, reject, outside),
               "fig-tree": fig_tree(grouped, contained, sum(inert.values()),
                                    sum(reject.values()), sum(outside.values()),
-                                   semantic, nonmatcher),
+                                   semantic, document, nonmatcher),
               "tbl-syntax": tbl_syntax(con),
-              "tbl-strata": tbl_strata(strata),
               "tbl-payload-corpus": tbl_payload_corpus(con),
               "tbl-poc-sources": tbl_poc_sources(con),
-              "tbl-anchors": tbl_anchors(resolved)}
+              "tbl-anchors": tbl_anchors(resolved),
+              "tbl-sensitivity": sens_table}
     if has_table(con, "mt_sqli_combo"):
         tables["tbl-sqli-arms"] = tbl_sqli_arms(con)
     if has_table(con, "mt_html_combo"):

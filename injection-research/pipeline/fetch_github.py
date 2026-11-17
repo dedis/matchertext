@@ -26,6 +26,7 @@ Usage:
   python3 pipeline/fetch_github.py --fanout-trees  # exact CVE paths in collections
   python3 pipeline/fetch_github.py --alternates    # try another repo per miss
   python3 pipeline/fetch_github.py --constructed   # retry statically built payloads
+  python3 pipeline/fetch_github.py --reextract     # current extractor on pinned files
 """
 import argparse
 import io
@@ -105,7 +106,7 @@ def candidates(con, max_fanout, done):
     """CVEs with a specific (non-aggregator) GitHub repo and no payload yet."""
     rows = con.execute("""
         SELECT cl.cve_id, cl.syntax_type, p.ref
-        FROM classification cl JOIN poc p USING(cve_id)
+        FROM classification cl JOIN poc_evidence p USING(cve_id)
         WHERE p.local_path IS NULL AND p.ref LIKE '%github.com%'
           AND cl.cve_id NOT IN (SELECT cve_id FROM poc WHERE local_path IS NOT NULL)
           AND cl.cve_id NOT IN (SELECT cve_id FROM syntactic_group)
@@ -129,7 +130,7 @@ def alternate_candidates(con, max_fanout):
     """Best untried repository for each unresolved CVE."""
     rows = con.execute("""
         SELECT cl.cve_id, cl.syntax_type, p.ref
-        FROM classification cl JOIN poc p USING(cve_id)
+        FROM classification cl JOIN poc_evidence p USING(cve_id)
         JOIN remote_payload r USING(cve_id)
         LEFT JOIN syntactic_group s USING(cve_id)
         WHERE r.payload IS NULL AND s.cve_id IS NULL
@@ -618,6 +619,43 @@ def run_constructed(con, args):
                       file=sys.stderr, flush=True)
 
 
+def run_reextract(con, args):
+    """Extract each recovered payload again from its pinned file with the
+    current extractor and the current syntax label, so that the sidecar holds no
+    payload the extractor now rejects. A file that can no longer be read keeps
+    its payload, which syntactic_group.py still checks with report.accept."""
+    rows = con.execute("""SELECT r.cve_id, c.syntax_type, r.repo, r.sha, r.file
+                          FROM remote_payload r JOIN classification c USING(cve_id)
+                          WHERE r.payload IS NOT NULL AND r.file IS NOT NULL
+                          ORDER BY r.cve_id""").fetchall()
+
+    def again(row):
+        cve, syn, slug, sha, file = row
+        owner, repo = slug.split("/", 1)
+        # An archive member carries the archive's root directory, repo-<sha>.
+        root, _, rest = file.partition("/")
+        text = fetch_text(owner, repo, sha, rest if root == f"{repo}-{sha}" else file)
+        if text is None:
+            return cve, None, "reextract_unavailable"
+        payload = extract_payload(text, syn, prefer_constructed=True)
+        return cve, payload, "payload" if payload else "reextract_no_payload"
+
+    counts = {}
+    with ThreadPoolExecutor(max_workers=args.workers) as ex:
+        for cve, payload, status in ex.map(again, rows):
+            counts[status] = counts.get(status, 0) + 1
+            if status == "reextract_unavailable":
+                continue
+            con.execute("UPDATE remote_payload SET payload=?, status=? WHERE cve_id=?",
+                        (payload, status, cve))
+            con.execute("""UPDATE remote_attempt SET payload=?, status=?
+                           WHERE cve_id=? AND repo=(SELECT repo FROM remote_payload
+                                                    WHERE cve_id=?)""",
+                        (payload, status, cve, cve))
+    con.commit()
+    print(f"re-extracted {len(rows)} pinned files: {counts}", file=sys.stderr, flush=True)
+
+
 def one(item, sha=None):
     cve, syn, (owner, repo) = item
     slug = f"{owner}/{repo}"
@@ -653,6 +691,10 @@ def run(args):
         return
     if args.fanout_trees:
         run_fanout(con, args)
+        finish(con)
+        return
+    if args.reextract:
+        run_reextract(con, args)
         finish(con)
         return
     tree_shas = {}
@@ -867,6 +909,8 @@ if __name__ == "__main__":
                       help="try one untested repository for each unresolved CVE")
     mode.add_argument("--constructed", action="store_true",
                       help="rescan pinned misses for statically built payloads")
+    mode.add_argument("--reextract", action="store_true",
+                      help="extract each recovered payload again from its pinned file")
     ap.add_argument("--workers", type=int, default=8,
                     help="concurrent archive downloads; the work is I/O bound,\nso this is the lever, not core count")
     ap.add_argument("--deep", action="store_true",
