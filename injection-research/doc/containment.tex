@@ -48,11 +48,12 @@ embedding or rejection; \textulc{\emph{Outside}} counts CVEs failing an assumpti
 \end{table}
 
 \paragraph{Results}
-Of the \dataPayloadBackedCVEs payload-backed injection CVEs, the recorded
+Of \dataPayloadBackedCVEs payload-backed injection CVEs, the recorded
 payloads of \textbf{\dataContained} (\textbf{\dataContainedShare}, 95\% CI
 \dataContainedInterval) are contained
-by a matcher-delimited slot that a matchertext-aware host language reads to
-matcher balance.
+under the hosting model of \cref{sec:threat}.
+This result estimates applicability;
+it does not establish remediation of each original CVE.
 The split turns on the host language's native delimiter, and the per-syntax
 mechanisms of \cref{sec:resist} appear directly in the corpus. All \dataLdapRejected LDAP CVE
 payloads are parenthesis breakouts that fail \textsc{Verify}, several in templates
@@ -61,9 +62,10 @@ or prose; general LDAP payload lists are mostly balanced
 matchertext and embed inertly, the \dataSqlRejected SQL rejections carrying an
 unbalanced function or subquery parenthesis.
 The ratio is descriptive, not predictive: these payloads were written against
-quote- and tag-delimited host languages, and an attacker aware of a
-matcher-delimited slot would balance the matchers, shifting cases from rejection to
-inert embedding without affecting containment, since both routes hold the value.
+quote- and tag-delimited host languages.
+An attacker aware of a matcher-delimited slot might balance the matchers,
+shifting cases from rejection to inert embedding
+without affecting containment, since both routes hold the value.
 
 \paragraph{Where matchertext cannot help}
 The remaining \dataOutsideCVEs payload-backed CVEs are outside both conditions,
@@ -78,9 +80,10 @@ breaks, XML/XXE angle brackets, and NoSQL and XPath queries. The last
 \dataOutsideUnknown have no syntax label.
 
 \paragraph{From the measured subset to the whole corpus}
-The outcomes so far cover only the \dataPayloadBackedCVEs payload-backed CVEs.
-How far does the reach extend across all \dataInjectionCVEs injection CVEs, most
-carrying no payload to replay? We estimate it by \emph{projection}: carrying the
+Beyond the \dataPayloadBackedCVEs payload-backed CVEs,
+how far does the reach extend across all \dataInjectionCVEs injection CVEs, most
+carrying no payload to replay?
+We estimate this by \emph{projection}: carrying the
 per-syntax containment rates from the payload-backed subset onto the full corpus,
 weighted by each syntax's CVE count.
 Classifying the \emph{mechanism} needs a payload, but the \emph{context}
