@@ -1,13 +1,15 @@
 \section{Matchertext and its security relevance}
 \label{sec:relevance}
 
-The narrow waist of \cref{sec:bg:waist} is a claim about \emph{embedding}, not
-about security. Matchertext was designed so that a string in one language can be
-placed in another verbatim. Its stated benefit, that the writer of embedded
-text need reason about only one language's rules at a time, is a usability
-argument~\cite{matchertext}.
+The narrow waist property above directly concerns \emph{embedding},
+not about security.
+Matchertext enables a string in one language to be
+embedded in another verbatim,
+without escaping or other expansion or searching for safe delimiters.
+A usability benefit is that the writer of embedded text
+need reason about only one language's rules at a time~\cite{matchertext}.
 
-\subsection{The discipline}
+\subsection{The matchertext discipline}
 \label{sec:relevance:discipline}
 
 Matchertext is a purely syntactic rule over an alphabet $\Sigma$ and a set $\Pi$
@@ -17,13 +19,15 @@ for every other character, the language $L$ of matchertext strings is defined
 inductively. Any string of nonmatchers is in $L$, and if $m_1,m_2,m_3\in L$ and
 $(o,c)\in\Pi$ then $m_1\,o\,m_2\,c\,m_3\in L$.
 The concrete configuration takes $\Sigma$ to be Unicode and $\Pi$ to be the
-three ASCII pairs \verb|()|, \verb|[]|, and \verb|{}|; the angle brackets are
-excluded as too often legitimately unmatched~\cite{matchertext}.
+three ASCII pairs \verb|()|, \verb|[]|, and \verb|{}|.
+The ASCII \verb|<>| characters excluded
+because they are standardized as mathematical operators, not angle brackets,
+and are often legitimately unmatched~\cite{matchertext}.
 Nothing else is fixed: the discipline assigns no meaning to any character and is
 oblivious to the syntax of any particular language.
 
-Three results carry over from the original development, and the rest of this
-paper uses only these.
+Three basic results carry over from the original development,
+and the rest of this paper uses only these.
 First, \emph{closure}, also called always-embeddability: if $m\in L$ and
 $(s_o,s_c)$ is a matched delimiter pair, then $s_o\,m\,s_c\in L$, at any nesting
 depth and with no escaping or expansion.
@@ -52,7 +56,8 @@ Closure is machine-checked in~\cite{matchertext}, which also sketches a paper
 proof for \textsc{Verify}. We machine-check that \textsc{ToMatchertext} lands in
 $L$ on every input (\cref{sec:appendix:tomatchertext}), leaving only its decoder
 round-trip informal.
-For the rationale behind $\Pi$, the hosting syntaxes, and the empirical
+For the detailed rationale behind this particular choice of $\Pi$,
+the hosting syntaxes, and the empirical
 compliance study, see~\cite{matchertext}.
 
 \subsection{From embedding to security}
@@ -71,9 +76,9 @@ Two consequences make this a security question rather than a syntactic one.
 The check is \emph{language-independent}: \textsc{Verify} inspects only the six
 matcher characters and knows nothing about SQL, HTML, or LDAP, so the same
 recognizer serves every host language, which a sanitizer cannot do.
-And the check is a \emph{verification} rather than a transformation, so a
+Further, the check is a \emph{verification} rather than a transformation, so a
 rejected value is data that does not embed, whereas a missed case in an escaping
 routine \emph{is} the injection.
 Closure constrains \emph{strings}, whereas security is a claim about
-\emph{parsers}, and the second does not follow from the first without
+\emph{parsers}; the second does not follow from the first without
 assumptions about the host language (\cref{sec:threat}).

@@ -20,18 +20,19 @@ implicit typing (the ``Norway problem'')~\cite{oconnor23yaml},
 regular-expression denial of service~\cite{owasp_redos}, and the XML
 ``billion laughs'' entity expansion~\cite{sullivan09xml}.
 
-Ad-hoc syntactic fixes also tend to backfire: PHP's \verb|magic_quotes|
+Ad-hoc syntactic fixes also tend to backfire.
+PHP's \verb|magic_quotes|
 auto-escaped request data inconsistently, invited double-escaping bugs, and
 was deprecated~\cite{php_magicquotes}. What unites most of these cases
 is structural: content meant to be inert data is read as syntax because a
 bracket or quote within it escapes its intended region. Because this breakout recurs
-across language pairs, one discipline can address it everywhere at once. It
-cannot address shell separators, which are not matchers, or the execution and
-algorithmic hazards (Log4Shell's balanced lookup, template evaluation, ReDoS,
-entity expansion).
+across language pairs, one discipline can address it everywhere at once.
+It does not automatically address shell separators, which are not matchers,
+or the execution and algorithmic hazards
+(Log4Shell's balanced lookup, template evaluation, ReDoS, entity expansion).
 
 
-\subsection{Prevalence, cost, and the sanitizer attack surface}
+\subsection{Prevalence, cost, and sanitizer attack surface}
 \label{sec:bg:prevalence}
 
 These failures are neither rare nor fading: injection has appeared in every
@@ -66,13 +67,14 @@ each divergence is a bypass. The bypasses recur as named classes: mutation
 XSS~\cite{heiderich13mxss,heyes20mxss}, in which the browser's own parser
 rewrites sanitized markup into an executable form, parsing differentials~\cite{klein24parsing}, and DOM
 clobbering~\cite{khodayari23clobbering}.
-The flaws are a steady stream: DOMPurify has at least nine CVEs, and it had
+The flaws constitute a steady stream:
+DOMPurify has at least nine CVEs, and it had
 sixteen security advisories in under three months of 2026
 alone~\cite{dompurify_advisories}. The Rails HTML sanitizer disclosed five
 CVEs on a single day~\cite{rails_sanitizer_cves}.
 The point is not that sanitizers are dispensable. It is that a transformation
 re-implementing another language's parser, re-synchronized as it changes, is
-inherently a large attack surface.
+inherently a large and fragile attack surface.
 
 This is the concrete case for preferring a structural \emph{check} to a
 structural \emph{transformation}.
@@ -83,7 +85,7 @@ contexts, and parameterized queries over ad-hoc
 escaping~\cite{samuel11csas,momot16langsec,owasp_parameterization}.
 
 
-\subsection{The narrow waist}
+\subsection{A narrow waist for structural embedding}
 \label{sec:bg:waist}
 
 \begin{figure*}[t]
@@ -133,8 +135,10 @@ outside the waist; \cref{sec:prevent} measures how much that leaves.}
 \label{fig:bg:waist}
 \end{figure*}
 
-\Cref{fig:bg:waist} shows the alternative for $N$ emitting languages and $M$
+\Cref{fig:bg:waist} illustrates the contrasting alternatives
+for $N$ emitting languages and $M$
 host languages. The rule names neither side, so any language that emits valid
-matchertext suits any host language that reads to matcher balance, and neither
-needs to know the other. The Internet protocol stack has this shape: a thin
-waist lets the layers above and below vary independently.
+matchertext suits any host language that reads to matcher balance,
+and neither language needs to know the other's syntax.
+The Internet protocol stack has this classic shape:
+a ``narrow waist'' lets the layers above and below vary independently.
