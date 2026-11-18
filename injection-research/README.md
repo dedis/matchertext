@@ -9,6 +9,16 @@ Run all commands from this directory:
 cd injection-research
 ```
 
+## Safety
+
+The corpus holds exploit code. `fetch.py` checks out Exploit-DB, Metasploit,
+Nuclei, Vulhub, and the PoC collections at their pinned commits in `data/raw/`;
+`fetch_github.py` reads each GitHub repository that a CVE links as PoC evidence
+from an archive in memory and keeps only the payload. Some PoC repositories are
+fake and carry malware. The pipeline reads these files as text and never runs
+them. Do not run or build them, and run the pipeline in a virtual machine or
+container that holds no credentials.
+
 ## Requirements
 
 - Python 3.11 or later
@@ -326,6 +336,30 @@ parse5's benchmark page on the upstream parse5 under the fork and on the fork
 `compat.py` runs SQLite's full Tcl test suite on the stock and the additive
 build and writes `data/exports/compat.csv`.
 
+### 5d. Test the matchertext implementations
+
+```sh
+go test ./test/matchertext/
+```
+
+The Go implementation in `../go/matchertext` is the oracle; the C file
+`sqlite/src/matchertext.c` and the parse5 fork share no code with it. The tests
+compare Verify, the end of an embedded value, and the encoder of the C file
+with the oracle on random inputs, pin the escapes and the depth limit, and
+compile the file without warnings under C89 and C99, and inert without
+`SQLITE_ENABLE_MATCHERTEXT`. They also compare the fork's Verify, element hole,
+and attribute hole with the oracle, so the fork must be built first (`npm ci`
+and `npm run build` in `parse5/`, which `html_experiment.py` also runs).
+`MATCHERTEXT_SRC` and `MATCHERTEXT_PARSE5` point the tests at another copy,
+such as a deliberately broken one.
+
+```sh
+python3 -m unittest discover -s test
+```
+
+These unit tests pin the phrase rules, the CWE walk, the classifier, the
+holdout split, and the technique rules of the labeling stages.
+
 ### 6. Generate exports and paper data
 
 Run these commands after classification and replay:
@@ -337,7 +371,7 @@ python3 pipeline/latex.py
 ```
 
 They write the analysis CSV files and `report.html` under `data/exports/`.
-They also write the macros, eight tables and one figure under `doc/generated/`
+They also write the macros, five tables and one figure under `doc/generated/`
 for the paper.
 
 ### 7. Audit the syntax labels

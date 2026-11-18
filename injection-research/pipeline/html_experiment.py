@@ -63,6 +63,7 @@ from pathlib import Path
 import adaptive
 import browsers
 from export import write
+from matchertext import verify
 
 ROOT = Path(__file__).resolve().parents[1]
 DB = ROOT / "data" / "cve.db"
@@ -96,8 +97,6 @@ SELFCHECK = {
     "js_contained": "INERT",
     "js_escaped": "INERT",
 }
-MAX_MATCHER_DEPTH = 1000
-PAIR = {")": "(", "]": "[", "}": "{"}
 
 # Deliberately broken forks, to prove that the verdicts can see a defect at all: per sabotage, the file and its
 # (signature, replacement) edits.
@@ -121,20 +120,6 @@ SABOTAGE = {
 BREAKOUT_SABOTAGE = ("hole_closes_at_first_closer", "guard_off")
 # Values whose verdicts depend on matcher nesting, which the corpus rarely has.
 SABOTAGE_PROBES = ["a[b]", "x]><b>y</b>", "(a]", "[a](b){c}", "]]><img src=x onerror=alert(1)>"]
-
-
-def verify(s):
-    """VERIFY with the depth limit of the C and JavaScript implementations."""
-    stack = []
-    for ch in s:
-        if ch in "([{":
-            if len(stack) == MAX_MATCHER_DEPTH:
-                return False
-            stack.append(ch)
-        elif ch in PAIR:
-            if not stack or stack.pop() != PAIR[ch]:
-                return False
-    return not stack
 
 
 def _run(cmd, what, cwd):

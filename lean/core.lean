@@ -1,4 +1,8 @@
-import Mathlib
+module
+
+public import Mathlib
+
+@[expose] public section
 
 variable {α : Type*}              -- the alphabet Σ, kept abstract
 variable (Pi : Set (α × α))       -- the set of pairs Π

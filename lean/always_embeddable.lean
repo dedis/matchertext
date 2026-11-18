@@ -1,4 +1,8 @@
-import core
+module
+
+public import core
+
+@[expose] public section
 
 variable {α : Type*}
 variable (Pi : Set (α × α))
@@ -47,25 +51,24 @@ theorem mt_wrap {m : List α} (hm : MT Pi m) {o c : α} (hp : (o, c) ∈ Pi) :
   rw [h]
   apply MT.nest [] m [] o c hp (mt_nil Pi) hm (mt_nil Pi)
 
--- Prove that given a list of openers and closers, the ith opener matches the (n-i)th closer
--- Note: the list of openers and closers can contain characters that are non-matchers
--- Formally: openers.filter(o => o ∈ Openers)
---                  .zip(closers.filter(c => c ∈ Closers).reverse())
---                  .foldLeft(True)((acc, curr) => (curr.o, curr.c) ∈ Pi ∧ acc)
+-- A context: a prefix and a suffix whose unmatched openers and closers pair up, the ith opener of the prefix
+-- with the ith closer from the end of the suffix. Around and between them the context may hold any
+-- matchertext: nonmatchers, and balanced groups such as the "t1(name,id)" of a SQL prefix.
 -- Example:
---   1) List("Hello".tochars(), '[', "World".tochars(),'{') and List('}','!',']') describe valide matcher pairs
---   2) List('(') and List(']') describe invalid matcher pairs
+--   1) "INSERT INTO t1(name,id) VALUES(" and ");" form a context: the balanced "INSERT INTO t1(name,id) VALUES",
+--      then the pair "(" ")", then the nonmatcher ";".
+--   2) "(" and "]" do not: the two do not pair.
 inductive AllMatch (Pi : Set (α × α)) : List α → List α → Prop where
   | pair (o c : α) (hp : (o, c) ∈ Pi) : AllMatch Pi [o] [c]
   | cons (o c : α) (s_o' s_c' : List α) (hp : (o, c) ∈ Pi) (rest : AllMatch Pi s_o' s_c') :
     AllMatch Pi (o :: s_o') (s_c' ++ [c])
-  | nonmatch_o (x : α) (s_o' s_c' : List α) (hx : Nonmatcher Pi x) (rest : AllMatch Pi s_o' s_c') :
-    AllMatch Pi (x :: s_o') s_c'
-  | nonmatch_c (y : α) (s_o' s_c' : List α) (hy : Nonmatcher Pi y) (rest : AllMatch Pi s_o' s_c') :
-    AllMatch Pi s_o' (s_c' ++ [y])
+  | mt_o (b : List α) (s_o' s_c' : List α) (hb : MT Pi b) (rest : AllMatch Pi s_o' s_c') :
+    AllMatch Pi (b ++ s_o') s_c'
+  | mt_c (b : List α) (s_o' s_c' : List α) (hb : MT Pi b) (rest : AllMatch Pi s_o' s_c') :
+    AllMatch Pi s_o' (s_c' ++ b)
 
 -- Prove that embedding a matchertext string inside a valid matcher context always produces valid matchertext.
--- Note: the surrounding prefix and suffix may contain characters that are non-matchers.
+-- Note: the surrounding prefix and suffix may hold any matchertext besides the matchers that pair up.
 -- Formally:
 --   if AllMatch Pi s_o s_c
 --   and MT Pi m
@@ -97,13 +100,13 @@ theorem embedding_closed_under_context
     have h: (o :: s_o' ++ m ++ (s_c' ++ [c])) = ([o] ++ (s_o' ++ m ++ s_c') ++ [c]) := by simp
     rw [h]
     apply mt_wrap Pi ih hp
-  | nonmatch_o x s_o' s_c' hx rest ih =>
-    have h: ((x :: s_o') ++ m ++ s_c') = ([x] ++ (s_o' ++ m ++ s_c')) := by simp
+  | mt_o b s_o' s_c' hb rest ih =>
+    have h: ((b ++ s_o') ++ m ++ s_c') = (b ++ (s_o' ++ m ++ s_c')) := by simp
     rw [h]
-    apply mt_append Pi (MT.flat [x] (by simpa using hx)) ih
-  | nonmatch_c y s_o' s_c' hy rest ih =>
-    have h: (s_o' ++ m ++ (s_c' ++ [y])) = ((s_o' ++ m ++ s_c') ++ [y]) := by simp
+    apply mt_append Pi hb ih
+  | mt_c b s_o' s_c' hb rest ih =>
+    have h: (s_o' ++ m ++ (s_c' ++ b)) = ((s_o' ++ m ++ s_c') ++ b) := by simp
     rw [h]
-    apply mt_append Pi ih (MT.flat [y] (by simpa using hy))
+    apply mt_append Pi ih hb
 
--- 'always_embeddable' depends on axioms: [propext, Quot.sound]
+-- 'always_embeddable' depends on axioms: [propext]

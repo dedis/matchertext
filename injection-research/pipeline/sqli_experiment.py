@@ -32,6 +32,7 @@ from pathlib import Path
 
 import adaptive
 from export import write
+from matchertext import verify
 
 ROOT = Path(__file__).resolve().parents[1]
 DB = ROOT / "data" / "cve.db"
@@ -67,26 +68,15 @@ LEGACY_ARMS = ("concat", "quote", "escape", "bind", "ident_concat", "ident_quote
 FIXTURE_NAMES = ("name", "id", "rowid", "no_such_column")
 CONTROL_ARMS = ("concat", "ident_concat")
 RAW_HOSTS = {"numeric_eq", "numeric_paren", "value_in", "expr_order", "expr_limit"}
+# Fixtures whose row count depends on the value by the meaning of the operator: LIKE wildcards.
+WILDCARD_HOSTS = {"value_like"}
 SQLITE_ATOM = re.compile(
     r"(?:[+-]?(?:(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?|0x[0-9a-f]+)"
     r"|null|true|false|'(?:''|[^'])*'|x'[0-9a-f]*')\Z", re.I | re.S)
 SQLITE_VOLATILE = re.compile(r"\b(?:random|randomblob)\s*\(", re.I)
 
-PAIR = {")": "(", "]": "[", "}": "{"}
-OPEN = {v: k for k, v in PAIR.items()}
 ESCAPE_OF = {"(": "o()", ")": "c()", "[": "o[]", "]": "c[]", "{": "o{}", "}": "c{}"}
 UNESCAPE = {v: k for k, v in ESCAPE_OF.items()}
-
-
-def verify(s):
-    stack = []
-    for ch in s:
-        if ch in OPEN:
-            stack.append(ch)
-        elif ch in PAIR:
-            if not stack or stack.pop() != PAIR[ch]:
-                return False
-    return not stack
 
 
 def name_decode(s):
@@ -366,12 +356,14 @@ def refused(res):
             and unhex(res[IDX["err"]]).startswith("matchertext requires"))
 
 
-def verdict(arm, res, base, payload, is_ident, raw=False, names=frozenset()):
+def verdict(arm, res, base, payload, is_ident, raw=False, names=frozenset(), rows=True):
     """INERT / BREAKOUT / REJECTED / MALFORMED.
 
     A breakout is a prepared statement whose parse differs from the benign
     baseline in structure, leaves SQL after the first statement (a stacked
-    query), or returns more rows than the baseline. REJECTED is VERIFY
+    query), or, where `rows`, returns more rows than the baseline. In a LIKE
+    fixture a wildcard in a value matches more rows by LIKE's own meaning, with
+    the structure unchanged, so there the rows are not compared. REJECTED is VERIFY
     refusing an unbalanced piece. For a name hole an identifier that resolves
     nowhere is inert when the whole payload became that name, and one that
     resolves is inert when the statement compiles as it does for a real column
@@ -401,7 +393,7 @@ def verdict(arm, res, base, payload, is_ident, raw=False, names=frozenset()):
         return "INERT"
     if any(res[IDX[k]] != base[IDX[k]] for k in STRUCTURAL):
         return "BREAKOUT"
-    if int(res[IDX["tail"]]) > 0 or int(res[IDX["nrow"]]) > int(base[IDX["nrow"]]):
+    if int(res[IDX["tail"]]) > 0 or (rows and int(res[IDX["nrow"]]) > int(base[IDX["nrow"]])):
         return "BREAKOUT"
     return "INERT"
 
@@ -434,7 +426,8 @@ def strict_sweep(con, payloads):
                     f"VERIFY mismatch for payload {idx} ({arm}/{drv.hosts[h][0]}): "
                     f"python={expected} c={accepted} value={o[:160]!r}")
                 v = verdict(arm, r, base[(h, a)], o, h in ident_hosts,
-                            drv.hosts[h][0] in RAW_HOSTS, names[(h, a)])
+                            drv.hosts[h][0] in RAW_HOSTS, names[(h, a)],
+                            drv.hosts[h][0] not in WILDCARD_HOSTS)
                 tally[arm][{"INERT": 0, "BREAKOUT": 1, "REJECTED": 2,
                             "MALFORMED": 4}[v]] += 1
                 lost[arm] += unfaithful(drv, h, a, r)
@@ -653,7 +646,8 @@ def run(args):
             if drv.arms[a][0] in TYPED_ARMS:
                 continue          # the strict paths are measured by strict_sweep
             v = verdict(drv.arms[a][0], r, base[(h, a)], o, h in ident_hosts,
-                        drv.hosts[h][0] in RAW_HOSTS, names[(h, a)])
+                        drv.hosts[h][0] in RAW_HOSTS, names[(h, a)],
+                        drv.hosts[h][0] not in WILDCARD_HOSTS)
             if a in control and v == "BREAKOUT":
                 eff_pairs.add((h, o))
             guard[(drv.arms[a][0], v)] += 1
@@ -762,7 +756,8 @@ def verdicts_for(payloads, binary=None, selfcheck=True, arms=SCORE_ARMS):
             if arm in arms:
                 out[(idx, h, arm)] = (
                     verdict(arm, r, base[(h, a)], o, h in ident_hosts,
-                            drv.hosts[h][0] in RAW_HOSTS, names[(h, a)]),
+                            drv.hosts[h][0] in RAW_HOSTS, names[(h, a)],
+                            drv.hosts[h][0] not in WILDCARD_HOSTS),
                     unfaithful(drv, h, a, r))
 
     for i, h, a, r in drv.sweep(p for _, p in payloads):

@@ -11,7 +11,9 @@ rather than receive a syntax it does not have.
 """
 import argparse
 import csv
+import functools
 import hashlib
+import re
 import sqlite3
 from collections import defaultdict
 from pathlib import Path
@@ -32,8 +34,11 @@ PRIMARY_SOURCES = {"cna", "adp_cisa", "nvd"}
 NOT_INJECTION_CLASS = "none"
 
 
-def bucket(cve_id):
-    return int(hashlib.md5(cve_id.encode()).hexdigest(), 16) % 10
+def bucket(text):
+    """The holdout split of a description. Descriptions that differ only in numbers, case, or spacing (one
+    vendor's template for many CVEs) share a split, so the holdout does not test on a copy of a training text."""
+    key = " ".join(re.sub(r"\d+(?:\.\d+)*", " ", text.lower()).split())
+    return int(hashlib.md5(key.encode()).hexdigest(), 16) % 10
 
 
 def load_hierarchy(con):
@@ -112,6 +117,7 @@ def run(args):
     margin = getattr(args, "nb_margin", 3.0)
     con = sqlite3.connect(DB)
     parents, subtree = load_hierarchy(con)
+    syntax_of = functools.cache(lambda cwe: labels_from_cwes([cwe], parents)[2])
 
     primary, secondary = defaultdict(set), defaultdict(set)
     for cve_id, cwe, src in con.execute("SELECT cve_id, cwe_id, source FROM cwe_assignment"):
@@ -127,8 +133,11 @@ def run(args):
     relabeled = []  # (cve_id, syntax) a language model writes, now llm_prompt
     for cve_id, desc in con.execute(
             "SELECT cve_id, COALESCE(description,'') FROM cve WHERE state='PUBLISHED'"):
-        ids = [c for _, c in sorted(primary.get(cve_id) or secondary.get(cve_id, ()))]
         rm = rule_match(desc) if desc else None
+        # Within one source, a CWE of the syntax that the description names comes first, then the lower number.
+        named = rm[1] if rm else None
+        ids = [c for *_, c in sorted((p, named is not None and syntax_of(c) != named, c)
+                                     for p, c in primary.get(cve_id) or secondary.get(cve_id, ()))]
         admitted = rm or any(c in subtree for c in ids)
         if admitted:
             fam, generic, syn = labels_from_cwes(ids, parents)
@@ -164,8 +173,8 @@ def run(args):
         results[cve_id] = [fam or OTHER, syn or "unknown", method or "unknown", conf]
 
     if pending and train:
-        tr = [(t, y) for cid, t, y in train if bucket(cid) != 0]
-        te = [(t, y) for cid, t, y in train if bucket(cid) == 0]
+        tr = [(t, y) for _, t, y in train if bucket(t) != 0]
+        te = [(t, y) for _, t, y in train if bucket(t) == 0]
         stats, covered = evaluate(WordNB().fit(*zip(*tr)), te, margin)
         with open(EXPORTS / "nb_holdout.csv", "w", newline="") as f:
             w = csv.writer(f)

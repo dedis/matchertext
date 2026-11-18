@@ -1,6 +1,10 @@
-import core
-import embed_boundary
-import always_embeddable
+module
+
+public import core
+public import embed_boundary
+public import always_embeddable
+
+@[expose] public section
 
 variable {α : Type*}
 variable (Pi : Set (α × α))
@@ -61,7 +65,7 @@ theorem depth_zero_not_mt
   have hco : ¬ Opener Pi c := fun h => disjoint Pi hdisj c ⟨h, hc⟩
   refine ⟨by simp [depth, delta, ho, hco, hc], fun hm => ?_⟩
   have h := depth_prefix_nonneg Pi hdisj hm [c] ⟨[o], rfl⟩
-  rw [depth_singleton, if_neg hco, if_pos hc] at h
+  rw [depth_singleton, ite_eq_right hco, ite_eq_left hc] at h
   norm_num at h
 
 -- Lemma: matcher-free escapes are matchertext of depth 0; one way to discharge
@@ -132,22 +136,22 @@ theorem encAux_mt (esc : α → List α)
   | cons x xs ih =>
     simp only [encAux]
     by_cases hox : Opener Pi x
-    · rw [if_pos hox]
+    · rw [ite_eq_left hox]
       by_cases hcap : cap st
       · -- opener at the limit: escape it in place
-        rw [if_pos hcap]
+        rw [ite_eq_left hcap]
         exact ih st hst _ (mt_append Pi hout (hesc x).1)
       · -- opener: push `(x, out)`, start a fresh accumulator
-        rw [if_neg hcap]
+        rw [ite_eq_right hcap]
         apply ih
         · intro p hp
           rcases List.mem_cons.mp hp with rfl | hmem
           · exact hout
           · exact hst p hmem
         · exact mt_nil Pi
-    · rw [if_neg hox]
+    · rw [ite_eq_right hox]
       by_cases hcx : Closer Pi x
-      · rw [if_pos hcx]
+      · rw [ite_eq_left hcx]
         rcases st with _ | ⟨⟨o, b⟩, st'⟩
         · -- empty stack: the closer is unmatched, escape it
           show MT Pi (encAux Pi esc cap split [] (out ++ esc x) xs)
@@ -160,26 +164,26 @@ theorem encAux_mt (esc : α → List α)
                         else encAux Pi esc cap split st' (b ++ [o] ++ out ++ [x]) xs)
                       else encAux Pi esc cap split ((o, b) :: st') (out ++ esc x) xs)
           by_cases hp' : (o, x) ∈ Pi
-          · rw [if_pos hp']
+          · rw [ite_eq_left hp']
             have hb : MT Pi b := hst (o, b) (by simp)
             have htail : ∀ p ∈ st', MT Pi p.2 := fun p hp => hst p (List.mem_cons_of_mem _ hp)
             by_cases hsp : split b out
             · -- matched but split: escape both members around the body
-              rw [if_pos hsp]
+              rw [ite_eq_left hsp]
               exact ih st' htail _ (mt_append Pi (mt_append Pi (mt_append Pi hb (hesc o).1)
                 hout) (hesc x).1)
             · -- matched: commit `[o] ++ body ++ [x]` into the parent level
-              rw [if_neg hsp]
+              rw [ite_eq_right hsp]
               apply ih
               · exact htail
               · simpa using mt_append Pi hb (mt_wrap Pi hout hp')
           · -- kind mismatch: unmatched closer, escape it, stack untouched
-            rw [if_neg hp']
+            rw [ite_eq_right hp']
             apply ih
             · exact hst
             · exact mt_append Pi hout (hesc x).1
       · -- nonmatcher: passes through verbatim
-        rw [if_neg hcx]
+        rw [ite_eq_right hcx]
         have hnx : Nonmatcher Pi x := by
           simp only [Nonmatcher, Matcher, not_or]
           exact ⟨hox, hcx⟩

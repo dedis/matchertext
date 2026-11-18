@@ -459,7 +459,9 @@ def load_debian(con):
     con.commit()
 
 
-EDB_ID_RE = re.compile(r"(?:exploits?|/)(\d{3,6})")
+# The forms of an Exploit-DB link that name an exploit; /docs, /papers, /ghdb, and /shellcodes number other
+# entries.
+EDB_ID_RE = re.compile(r"exploit-db\.com/(?:(?:exploits|download|raw)/|exploit\.php\?id=)(\d+)\b")
 
 
 def link_exploitdb_ids(con):
