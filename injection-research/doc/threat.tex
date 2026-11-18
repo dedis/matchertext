@@ -8,7 +8,7 @@ host language's parse of $P[v]$ is independent of the content of $v$. The value
 occupies a single data position and contributes no host-language syntax. The guarantee
 rests on three components. Component (i) is a \emph{matchertext-aware host language}
 that delimits the hole with a matcher pair, ending the embedded value by
-matcher balance rather than by scanning for its native closer. Component (ii)
+matcher balance rather than by scanning for a fixed closer. Component (ii)
 is the \textsc{Verify} recognizer: it accepts only strings of the matchertext
 language $L$, and all of them up to its nesting-depth limit $D$. Component (iii) is the total encoder \textsc{ToMatchertext} and
 its inverse. Their output-in-$L$ obligation is proved in
@@ -44,7 +44,7 @@ Inertness holds under four deployment assumptions
 \begin{itemize}
 \item[\textbf{A1}] \emph{Aware host language.} The host language that interprets the composed text
 	is matchertext-aware: it ends the value by matcher balance rather
-	than at its native closer.
+	than at the first occurrence of a fixed closer sequence.
 \item[\textbf{A2}] \emph{Delimited context.} Every untrusted value is routed
 	into a matcher-delimited hole. A value concatenated into host-language syntax
 	outside a hole is unprotected, as with any point-of-use defense.
@@ -74,8 +74,9 @@ Inertness holds under four deployment assumptions
 	to matchers: 20 to a \emph{lone} matcher (\eg \texttt{U+FF3B}$\rightarrow$\texttt{[}),
 	the others to balanced pairs. Canonicalizing before \textsc{Verify} removes
 	them all, so \textsc{Verify} need not model the set.
-\item[\textbf{A4}] \emph{Not a semantic sink.} The host language does not execute the
-	contained value by design (server-side templates, expression languages,
+\item[\textbf{A4}] \emph{Not a semantic sink.}
+	The host language by design does not execute the
+	contained value (server-side templates, expression languages,
 	code evaluation, \verb|javascript:| URLs, a language model that follows
 	instructions in it). Delimiting confines structure, not meaning.
 \end{itemize}
@@ -132,6 +133,7 @@ the locator stops exactly after $v$ for every $v\in L$, so the hole yields one
 token of type $\mathit{hole}$ and lexing resumes at the same position of $P$ in
 the same state. Outside the hole both inputs are the text of $P$, so the
 token-type sequences agree.\hfill$\square$
+
 This paper proves L1 once for all host languages
 (\cref{sec:appendix:lean}) and tests L2 and L3 for SQLite (\cref{sec:prevent:exec}) and
 L2 for HTML (\cref{sec:prevent:html}).

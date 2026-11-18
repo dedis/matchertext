@@ -87,14 +87,15 @@ the breakout set widens to whitespace and \verb|=|.
 A value in a script body, \verb|<script>var n="|\emph{v}\verb|"</script>|, has two
 independent exits: the JavaScript string quote and the raw \verb|</script>|
 sequence that ends the element regardless of JavaScript syntax.
-The recurring bug is applying one escaper, usually HTML-entity encoding, in all
+A recurring bug is applying one escaper, usually HTML-entity encoding, in all
 contexts; it fails in single-quoted and unquoted attributes
 (\cref{sec:prevent:html}).
 
-Matcher-delimiting collapses the three to a single discipline, as for
-SQL.
-Each hole is read verbatim up to a matched close bracket and the host language performs no
-transformation, using matchertext markup forms~\cite{matchertext}
+Matcher-delimiting collapses the three cases into a single discipline,
+as for SQL.
+Each hole is read verbatim up to a matched close bracket
+without transformation,
+using matchertext markup forms~\cite{matchertext}
 (\eg \verb|<div [|\emph{v}\verb|]>|, \verb|value=[|\emph{v}\verb|]|, and
 \verb|<![MDATA[|\emph{v}\verb|]]>|, a CDATA-like section read to matcher balance).
 Because the matchers are \verb|()[]{}| and not \verb|<>|, the characters that
@@ -103,12 +104,13 @@ drove every breakout above, \verb|<|, \verb|&|, the quote, and even the literal
 The parser counts brackets rather than scanning for tags, so an injected
 \verb|<img src=x onerror=steal()>| is inert text.
 The three context-specific sanitizers thus reduce to the single \textsc{Verify}
-recognizer, the same one used for SQL, which rejects only an unmatched
+recognizer, the same as used for SQL, which rejects only an unmatched
 matcher or nesting deeper than $D$.
 
 The guarantee covers one host language: in a \verb|script| or \verb|style|
 body a hole stops the end tag, not the JavaScript or CSS inside
-(\cref{sec:prevent:html}). It stops at sinks that execute their contents by design: a payload kept dutifully inside \verb|<a href=[|\emph{v}\verb|]>| stays within the
+(\cref{sec:prevent:html}). It stops at sinks that execute their contents by design.
+A payload kept dutifully inside \verb|<a href=[|\emph{v}\verb|]>| stays within the
 attribute yet still runs when \emph{v} is a \verb|javascript:| URL, because that
 is an execution context, not a structural breakout; an \verb|onerror| handler is
 the same.
@@ -191,22 +193,23 @@ Structural interpolation & \verb|M{}"(WHERE name = M'({v})')"| & yes: holes fixe
 \end{tabular}
 \end{table*}
 
-Adoption is two problems, not one, and the hosting syntaxes
-of~\cite{matchertext} answer only the second.
+Adoption is two problems,
+of which hosting syntaxes~\cite{matchertext} answer only one.
 Assumption A1 of \cref{sec:threat} constrains the \emph{host language}: the SQL engine, HTML
-parser, or directory server that interprets the composed text must end the
+parser, or directory server that interprets composed text must end the
 embedded value by matcher balance.
 Assumption A2 constrains the \emph{application} that composes it: the untrusted value
 must reach a matcher-delimited hole rather than be concatenated in beside one.
-The two are met by changes to different languages, by different people,
+The two problems are met by changes to different languages, by different people,
 and are worth separating.
 
 \paragraph{Making the host language aware (A1)}
-\Cref{tab:resist:a1} compares the routes.
+\Cref{tab:resist:a1} compares routes.
 Reusing a construct the format \emph{already} reads to matcher balance needs no
 new syntax:
 PDF literal strings (\cref{sec:resist:pdf}) cost no new syntax, though A3 needs
-PDF's own backslash escaping; LDAP filters (\cref{sec:resist:ldap}) keep their syntax but need a
+PDF's own backslash escaping.
+LDAP filters (\cref{sec:resist:ldap}) keep their syntax but need a
 balance-reading parser.
 But this route reaches only the formats built that way.
 Extending a host language's grammar with a hole form reaches the syntaxes where injection
@@ -241,4 +244,4 @@ macros, so the literal form keeps existing code.
 Together the two assumptions replace an obligation on the programmer at every use
 site with an obligation on two parsers: A1 changes a bounded part of the host language's
 parser, and A2 adds a lexical form to the application language.
-Neither removes a parser from the trusted base, and neither is meant to.
+Neither removes a parser from the trusted base, and neither is intended to.
