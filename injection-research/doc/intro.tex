@@ -1,41 +1,60 @@
 \section{Introduction}
 \label{sec:intro}
 
-Software is built by embedding one language inside another: a query, some markup,
+Software systems often embed one language inside another: a query, some markup,
 a document. When the embedded string is untrusted, its boundary with the
 surrounding syntax is where injection lives, as a quote closes a SQL literal or an
-angle bracket opens an HTML tag. The accepted defense escapes, parameterizes, or
-sanitizes the value so it can no longer be read as structure.
+angle bracket opens an HTML tag.
+The accepted best-practice defense escapes, parameterizes, or
+sanitizes the untrusted value so it can no longer be read as structure.
 
-These transforms work one context at a time, which is the whole problem. Each
-is written for a single \emph{host language} (the surrounding language an
-untrusted value is embedded into) and a single syntactic position, chosen by hand
-at each use site, so securing one context means maintaining a separate defense for
-every other. What is missing is the option to defend the boundary once, with a
-check that does not change from one host language to the next.
+These transforms work one context at a time,
+which multiplies attack surface.
+Each transform is for a single \emph{host language}
+(the surrounding language an untrusted value is embedded into)
+and a single syntactic position, chosen by hand at each use site,
+so securing one context means maintaining a separate defense for every other.
+Could we instead defend the structural boundary once,
+with a check that does not change with host language or context?
 
-That option is absent because conventional defenses attack the
-\emph{collision}, rewriting the value so its characters cannot be confused with
-the host language's. This forces each defense to model that syntax: a sanitizer
-shadows the host-language parser, and every divergence is a bypass. The web has no
+Conventional defenses address the \emph{collision}
+between input value and host syntax,
+rewriting the value so its characters cannot be confused with
+the host language's.
+This approach forces each defense to model that syntax: a sanitizer
+shadows the host-language parser, and every divergence is a bypass.
+The web has no
 universal escaper because parse context is per-language and does not
 compose~\cite{owasp_xss}.
 
-So we ask: can one language-independent check replace the per-host-language defenses, what
-does it guarantee against an attacker who knows the check and writes against it,
-and how much of real injection can it reach?
+So we ask:
+can one language-independent check replace per-host-language defenses,
+what does it guarantee against an adversary
+attempting to circumvent this check,
+and how much of real injection vulnerabilities could it reach?
 
-Matchertext~\cite{matchertext} answers by attacking the \emph{boundary} instead:
-its rule names no language, only that the ASCII matcher pairs \verb|()|,
-\verb|[]|, and \verb|{}| must always match. A host language wraps an untrusted
-value in a matcher pair and ends it by matcher balance. Hosted as
-\verb|WHERE name = M'(|\emph{value}\verb|)'|, the payload \verb|' OR '1'='1| cannot
-break out, since escaping would need an unmatched \verb|)| that is not valid
-matchertext. One recognizer inspects only the six matcher characters and serves
-every host language. The rule was built for verbatim embedding, and~\cite{matchertext}
-names injection as one use; this paper states and measures that use.
+\emph{Matchertext} is a syntactic discipline
+requiring only that the ASCII matcher pairs \verb|()|,
+\verb|[]|, and \verb|{}| must always match in a string.
+A companion paper motivates and explores matchertext
+for embedding convenience and usability~\cite{matchertext};
+this paper focuses on the discipline's security implications.
 
-We make four contributions:
+Matchertext shows promise to address injection attacks across languages
+by strengthening the \emph{boundary}
+between host language and embedded value.
+A host first constrains untrusted values to be matchertext
+(escaping unmatched matchers if it must accept arbitrary strings),
+then wraps the untrusted value in a matcher pair
+and ends it by matcher balance.
+Hosted as \verb|WHERE name = M'(|\emph{value}\verb|)'|,
+the payload \verb|' OR '1'='1| cannot break out,
+since escaping would need an unmatched \verb|)| that is invalid
+matchertext.
+One matchertext recognizer inspects only the six matcher characters and serves
+every host language.
+
+This paper makes four contributions:
 \begin{itemize}
 \item A security property, \emph{inertness}: a host language's parse does not
 	depend on what its \emph{holes} (the matcher-delimited slots for untrusted
