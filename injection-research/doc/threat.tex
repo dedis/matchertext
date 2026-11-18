@@ -21,7 +21,7 @@ for that step's \emph{implementation}.
 The attacker supplies $v$ and may choose \emph{arbitrary} bytes, character
 encodings, Unicode, length, and matcher-nesting depth, and may submit strings
 that are \emph{not} valid matchertext.
-Following Kerckhoffs, the attacker knows the discipline, which delimiter kind
+The attacker knows the discipline, which delimiter kind
 guards the hole, and where the hole boundaries lie. The attacker crafts $v$
 \emph{against} the matcher-delimited slot, not the legacy quote or tag-delimited
 host language that the recorded corpus payloads (\cref{sec:results}) target.
@@ -110,8 +110,8 @@ Inertness then rests on three premises, each proved or tested separately:
 \begin{itemize}
 \item[\textbf{L1}] \emph{Boundary.} Reading to matcher balance ends the
 	embedding exactly at $|v|$: every prefix of a valid $v$ has non-negative
-	matcher depth, $v$ returns to depth zero, and the context closer is the
-	first character to drive it negative. Language-independent and machine-checked
+	matcher depth, $v$ returns to depth zero, and the context closer, paired with
+	the hole's opener, is the first character to drive it negative. Language-independent and machine-checked
 	(\cref{sec:appendix:lean}); what remains is verifying a concrete locator
 	(the depth-counting scan of~\cite{matchertext}) against it.
 \item[\textbf{L2}] \emph{Parse inertness.} In $G$ the hole derives exactly one

@@ -1,4 +1,5 @@
-"""Run the full CVE injection-classification pipeline (stages 1-4).
+"""Run the full pipeline: fetch, build_db, classify, syntactic_group, subclass, validate, the SQL and HTML
+replays, export, report, and latex (README, "Reproduce the complete pipeline").
 
 Usage:
   python3 pipeline/run_all.py                      # full corpus
@@ -32,10 +33,17 @@ def pin_toolchain():
         return subprocess.run(cmd, cwd=cwd, input=stdin, capture_output=True, text=True,
                               check=True).stdout.strip().splitlines()[0]
 
+    def commit(path):
+        """The commit of a fork; "-dirty" when its tracked files differ from it, so the record is not taken for
+        the code that ran."""
+        dirty = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=path,
+                               capture_output=True, text=True, check=True).stdout.strip()
+        return first_line("git", "rev-parse", "HEAD", cwd=path) + ("-dirty" if dirty else "")
+
     manifest = json.loads(fetch.MANIFEST.read_text())
     manifest["toolchain"] = {
-        "sqlite-fork": first_line("git", "rev-parse", "HEAD", cwd=fetch.ROOT / "sqlite"),
-        "parse5-fork": first_line("git", "rev-parse", "HEAD", cwd=fetch.ROOT / "parse5"),
+        "sqlite-fork": commit(fetch.ROOT / "sqlite"),
+        "parse5-fork": commit(fetch.ROOT / "parse5"),
         "lean": (fetch.ROOT.parent / "lean" / "lean-toolchain").read_text().strip(),
         "python": platform.python_version(),
         "node": first_line("node", "--version"),

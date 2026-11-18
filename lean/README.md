@@ -9,8 +9,9 @@ what the implementations are allowed to assume.
 lake build
 ```
 
-Requires the toolchain pinned in `lean-toolchain` (`leanprover/lean4:v4.33.0-rc1`)
-and Mathlib, which `lake` fetches from `lakefile.toml`.
+Requires the toolchain pinned in `lean-toolchain` (`leanprover/lean4:v4.35.0`, a stable
+release) and Mathlib at its `v4.35.0` tag, which `lake` fetches from `lakefile.toml`;
+`lake exe cache get` downloads Mathlib's build first.
 
 ## What each file establishes
 

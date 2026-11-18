@@ -4,7 +4,7 @@
 \begin{table}[t]
 \centering
 \caption{Largest injection syntax types, of \dataInjectionCVEs injection CVEs, with
-the count carrying at least one linked proof-of-concept.}
+the count carrying at least one linked proof-of-concept. \textulc{\emph{Other}}: \dataSyntaxOther.}
 \label{tab:syntax}
 \small
 \input{generated/tbl-syntax}
@@ -18,8 +18,8 @@ formula contexts.
 This concentration matters directly for \cref{sec:prevent}: the two dominant
 syntaxes are exactly the ones a matchertext host language can delimit with a matcher pair.
 Exploitation signals are sparse but consistent with severity: \dataInjectionKev injection CVEs
-appear in the CISA Known-Exploited catalog, and command injection, though
-only a tenth of the corpus, carries a disproportionate share of them.
+appear in the CISA Known-Exploited catalog, and command injection, \dataCommandShare
+of the corpus, carries \dataKevCommandShare of them.
 
 \paragraph{Proof-of-concept coverage}
 \textbf{\dataInjectionWithPoc} injection CVEs (\dataInjectionWithPocShare) carry at least one linked PoC.
@@ -34,19 +34,6 @@ Extraction drops a fragment cut inside an open matcher (\dataBalanceDropped) and
 completes one cut short of its closers (\dataBalanceCompleted).
 This linkage is what makes the containment analysis
 of \cref{sec:prevent} possible, since it supplies the real attack strings.
-
-\paragraph{Sub-classification}
-Beyond the two primary axes, each injection CVE is labelled on orthogonal
-facets, each from its strongest available signal, and stored in long form so a
-CVE can carry one label per dimension at once.
-The CVSS vector yields reachability for free: \textbf{\dataSubPrivilegePreAuth} injection CVEs
-are exploitable pre-authentication, \dataSubPrivilegeLowPriv require low privilege, and \dataSubPrivilegeHighPriv
-high privilege.
-Finer \emph{technique} labels come from PoC payloads and descriptions where
-present.
-SQL injections resolve into blind-boolean (\dataSubTechniqueBlindBoolean), union-based (\dataSubTechniqueUnionBased),
-blind-time (\dataSubTechniqueBlindTime), and authentication-bypass (\dataSubTechniqueAuthBypass) attacks.
-XSS resolves into stored (\dataSubTechniqueStored), reflected (\dataSubTechniqueReflected), and DOM-based (\dataSubTechniqueDomBased).
 
 \paragraph{Syntactic groups}
 For the \textbf{\dataPayloadBackedCVEs} injection CVEs with an extractable PoC payload, we

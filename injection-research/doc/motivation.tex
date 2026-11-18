@@ -28,9 +28,9 @@ auto-escaped request data inconsistently, invited double-escaping bugs, and
 was deprecated~\cite{php_magicquotes}. What unites the largest of these cases
 is structural: content meant to be inert data is read as syntax because a
 bracket or quote within it escapes its intended region. Because it recurs
-across language pairs, one discipline can address the breakout-based members
-at once, distinct from the execution and algorithmic members (template
-evaluation, ReDoS, entity expansion) it cannot address.
+across language pairs, one discipline can address the breakout-based members at
+once, not shell separators or the execution and algorithmic members (Log4Shell's
+balanced lookup, template evaluation, ReDoS, entity expansion).
 
 
 \subsection{Prevalence, cost, and the sanitizer attack surface}
@@ -61,7 +61,7 @@ C\#, and 91\% of PHP~\cite{dennis24sql}.
 \label{sec:bg:sanitizer}%
 The sanitizer machinery is itself a recurring source of vulnerabilities.
 A production HTML sanitizer must track the host-language parser's full and
-quirk-laden behavior: DOMPurify's core file runs to roughly 2,400 lines and the larger
+quirk-laden behavior: DOMPurify's core file has 3,081 lines~\cite{dompurify_src} and the larger
 sanitizers reach tens of thousands project-wide.
 Correct only while its model matches every browser exactly, each divergence
 becomes a bypass. The bypasses recur as named classes: mutation

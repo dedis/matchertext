@@ -1,4 +1,8 @@
-import core
+module
+
+public import core
+
+@[expose] public section
 
 variable {α : Type*}
 variable (Pi : Set (α × α))
@@ -44,8 +48,8 @@ theorem depth_zero
     have ho : Opener Pi o := ⟨c, hp⟩
     have hc : Closer Pi c := ⟨o, hp⟩
     have hco : ¬ Opener Pi c := fun hoc => disjoint Pi hdisj c ⟨hoc, hc⟩
-    have hdo: depth Pi [o] = 1 := by simp [depth_singleton, if_pos ho]
-    have hdc: depth Pi [c] = -1 := by simp [depth_singleton, if_neg hco, if_pos hc]
+    have hdo: depth Pi [o] = 1 := by simp [depth_singleton, ite_eq_left ho]
+    have hdc: depth Pi [c] = -1 := by simp [depth_singleton, ite_eq_right hco, ite_eq_left hc]
     simp only [depth_append, ih₁, ih₂, ih₃, hdo, hdc]
     omega
 
@@ -70,8 +74,8 @@ theorem depth_prefix_nonneg
       intro hoc
       exact disjoint Pi hdisj c ⟨hoc, hc⟩
 
-    have hdo : depth Pi [o] = 1 := by simp [depth_singleton, if_pos ho]
-    have hdc : depth Pi [c] = -1 := by simp [depth_singleton, if_neg hco, if_pos hc]
+    have hdo : depth Pi [o] = 1 := by simp [depth_singleton, ite_eq_left ho]
+    have hdc : depth Pi [c] = -1 := by simp [depth_singleton, ite_eq_right hco, ite_eq_left hc]
 
     have hz₁ : depth Pi a₁ = 0 := depth_zero Pi hdisj h₁
     have hz₂ : depth Pi a₂ = 0 := depth_zero Pi hdisj h₂
@@ -131,7 +135,7 @@ theorem embed_boundary
   have hzero : depth Pi m = 0 := depth_zero Pi hdisj hm
   have hco : ¬ Opener Pi c := fun ho => disjoint Pi hdisj c ⟨ho, hc⟩
   refine ⟨fun p hpre => depth_prefix_nonneg Pi hdisj hm p hpre, hzero, ?_⟩
-  rw [depth_append, hzero, depth_singleton, if_neg hco, if_pos hc]
+  rw [depth_append, hzero, depth_singleton, ite_eq_right hco, ite_eq_left hc]
   norm_num
 
 -- 'embed_boundary' depends on axioms: [propext, choice, Quot.sound]

@@ -9,7 +9,7 @@ different coverage. Results go to a long-format table:
 
 Dimensions and their strongest signal:
   privilege / attack_vector / user_interaction  <- CVSS vector (free, ~80%)
-  technique                                     <- PoC payload -> description
+  technique                                     <- PoC payload syntax -> description phrase
   engine                                        <- payload dialect / product name
   injection_point / impact                      <- description phrase rules
   delivery                                      <- description phrase rule (HTML/DOM)
@@ -34,6 +34,9 @@ def _rx(pairs):
 
 
 # --- content-derived facets: (label, regex), first match wins -----------------
+# The technique of a CVE comes from its payload when the payload shows one: these regexes read attack syntax,
+# and run on payloads only, since prose matches them too (a ';' or an '-o' in a sentence). Each list puts
+# the more specific pattern first: a time delay before a command separator, which a delay payload also has.
 TECHNIQUE = {
     "sql": _rx([
         ("union_based", r"\bunion\s+(?:all\s+)?select\b"),
@@ -41,36 +44,67 @@ TECHNIQUE = {
         ("blind_time", r"\bsleep\s*\(|\bwaitfor\s+delay\b|\bpg_sleep\s*\(|\bbenchmark\s*\("),
         ("file_access", r"\binto\s+(?:out|dump)file\b|\bload_file\s*\(|\bxp_cmdshell\b"),
         ("stacked", r";\s*(?:drop|insert|update|delete|exec|create)\b"),
-        ("auth_bypass", r"'\s*or\s*'?1'?\s*=\s*'?1|\bor\s+1\s*=\s*1\b|\badmin'\s*--"),
-        ("blind_boolean", r"\band\s+\d+\s*=\s*\d+|\bboolean-based\b|\bblind\b"),
+        # A tautology serves a login bypass and a boolean probe alike, so it names only itself.
+        ("tautology", r"'\s*or\s*'?1'?\s*=\s*'?1|\bor\s+1\s*=\s*1\b|\badmin'\s*--"),
+        ("blind_boolean", r"\band\s+\d+\s*=\s*\d+"),
     ]),
     "html_dom": _rx([
         # A DOM source marks DOM-based XSS; a sink that a payload calls (document.write, document.cookie) does not.
-        ("dom_based", r"\bDOM[- ]based\b|location\.(?:hash|search)|document\.(?:URL|referrer)|window\.name"),
-        ("mutation", r"\bmutation\b|\bmXSS\b"),
-        ("stored", r"\bstored\b|\bpersistent\b|\bsecond[- ]order\b"),
-        ("reflected", r"\breflected\b|\bnon[- ]persistent\b"),
+        ("dom_based", r"location\.(?:hash|search)|document\.(?:URL|referrer)|window\.name"),
     ]),
     "shell_command": _rx([
         ("substitution", r"\$\([^)]*\)|`[^`]+`"),
+        ("blind", r"\bping\s+-c|\bsleep\s+\d"),
         ("separator", r"[;&|]\s*\w"),
         ("argument", r"(?:^|\s)--?[A-Za-z]"),
-        ("blind", r"\bblind\b|ping\s+-c|sleep\s+\d"),
     ]),
     "code_eval": _rx([
-        ("file_inclusion", r"\b(?:remote|local) file inclusion\b|\bRFI\b|\bLFI\b|\binclude\s*\("),
-        ("deserialization", r"\bdeserial|\bunserialize\b|\bgadget\b|__reduce__|readObject"),
+        ("file_inclusion", r"\b(?:include|require)(?:_once)?\s*\("),
+        ("deserialization", r"__reduce__|readObject|\bunserialize\s*\(|\bO:\d+:\""),
         ("eval", r"\beval\s*\(|\bassert\s*\(|\bsystem\s*\(|\bpassthru\s*\("),
     ]),
-    "template": _rx([("sandbox_escape", r"\bsandbox\b|__class__|__globals__"), ("ssti", r".")]),
-    "expression_language": _rx([("ognl_spel", r"\bognl\b|\bspel\b|T\("), ("el", r".")]),
-    "ldap": _rx([("filter_breakout", r"\*\)\(|\)\(\w+="), ("blind", r"\bblind\b")]),
-    "xpath_xquery": _rx([("blind", r"\bblind\b"), ("filter_breakout", r"'?\s*or\s*'?1'?=")]),
-    "crlf_header": _rx([("response_splitting", r"response splitting|%0d%0a.*%0d%0a"),
-                        ("header_injection", r".")]),
-    "formula_csv": _rx([("dde", r"=cmd\||\bDDE\b"), ("hyperlink", r"=HYPERLINK"), ("macro", r".")]),
-    "nosql": _rx([("operator", r"\$(?:where|ne|gt|regex)"), ("js_injection", r".")]),
-    "xml": _rx([("xxe", r"<!ENTITY|<!DOCTYPE"), ("xml_injection", r".")]),
+    "template": _rx([("sandbox_escape", r"__class__|__globals__|__subclasses__")]),
+    "expression_language": _rx([("ognl_spel", r"#_memberAccess|@java\.|\bT\(")]),
+    "ldap": _rx([("filter_breakout", r"\*\)\(|\)\(\w+=")]),
+    "xpath_xquery": _rx([("filter_breakout", r"'?\s*or\s*'?1'?=")]),
+    "crlf_header": _rx([("response_splitting", r"%0d%0a.*%0d%0a")]),
+    "formula_csv": _rx([("dde", r"=cmd\|"), ("hyperlink", r"=HYPERLINK")]),
+    "nosql": _rx([("operator", r"\$(?:where|ne|gt|regex)")]),
+    "xml": _rx([("xxe", r"<!ENTITY|<!DOCTYPE")]),
+}
+
+# Otherwise the description names the technique. A bare "blind" names no kind of blind attack, so it is its own
+# label. A trailing "." is the default of a syntax whose technique the description need not name.
+TECHNIQUE_TEXT = {
+    "sql": _rx([
+        ("union_based", r"\bunion[- ]based\b|\bunion\s+(?:all\s+)?select\b"),
+        ("error_based", r"\berror[- ]based\b"),
+        ("blind_time", r"\btime[- ]based\b"),
+        ("blind_boolean", r"\bboolean[- ]based\b"),
+        ("stacked", r"\bstacked quer(?:y|ies)\b"),
+        ("auth_bypass", r"\b(?:authentication|login|auth) bypass\b|\bbypass(?:es|ing)? (?:the )?(?:authentication|login)\b"),
+        ("blind", r"\bblind\b"),
+    ]),
+    "html_dom": _rx([
+        ("dom_based", r"\bDOM[- ]based\b|location\.(?:hash|search)|document\.(?:URL|referrer)|window\.name"),
+        ("mutation", r"\bmutation\b|\bmXSS\b"),
+        ("stored", r"\bstored\b|(?<!non-)(?<!non )\bpersistent\b|\bsecond[- ]order\b"),
+        ("reflected", r"\breflected\b|\bnon[- ]persistent\b"),
+    ]),
+    "shell_command": _rx([("blind", r"\bblind\b")]),
+    "code_eval": _rx([
+        ("file_inclusion", r"\b(?:remote|local) file inclusion\b|\bRFI\b|\bLFI\b"),
+        ("deserialization", r"\bdeserial|\bunserialize\b|\bgadget\b"),
+        ("eval", r"\beval\b"),
+    ]),
+    "template": _rx([("sandbox_escape", r"\bsandbox\b"), ("ssti", r".")]),
+    "expression_language": _rx([("ognl_spel", r"\bognl\b|\bspel\b"), ("el", r".")]),
+    "ldap": _rx([("blind", r"\bblind\b")]),
+    "xpath_xquery": _rx([("blind", r"\bblind\b")]),
+    "crlf_header": _rx([("response_splitting", r"response splitting"), ("header_injection", r".")]),
+    "formula_csv": _rx([("dde", r"\bDDE\b"), ("macro", r".")]),
+    "nosql": _rx([("js_injection", r".")]),
+    "xml": _rx([("xxe", r"\bXXE\b|external entit"), ("xml_injection", r".")]),
     "argument": _rx([("argument", r".")]),
 }
 
@@ -94,7 +128,7 @@ ENGINE = {
 ENGINE_GROUP = {"expression_language": "expression_language"}  # else group == syntax
 
 INJECTION_POINT = _rx([
-    ("stored", r"\bstored\b|\bsecond[- ]order\b|\bpersistent\b"),
+    ("stored", r"\bstored\b|\bsecond[- ]order\b|(?<!non-)(?<!non )\bpersistent\b"),
     ("http_header", r"\bheader\b|user[- ]agent|\breferer\b|x-forwarded"),
     ("cookie", r"\bcookie\b"),
     ("order_by", r"\border\s+by\b|\bgroup\s+by\b"),
@@ -175,7 +209,7 @@ def run(args):
         tech = first(TECHNIQUE.get(syn, ()), payload) if payload else None
         if tech:
             rows.append((cid, "technique", tech, "payload", None))
-        elif (tech := first(TECHNIQUE.get(syn, ()), desc)):
+        elif (tech := first(TECHNIQUE_TEXT.get(syn, ()), desc)):
             rows.append((cid, "technique", tech, "rule", None))
 
         eng = first(ENGINE.get(ENGINE_GROUP.get(syn, syn), ()), blob)

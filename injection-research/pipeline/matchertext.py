@@ -1,12 +1,12 @@
-"""Matchertext-prevention analysis of a syntactic skeleton (paper sections 3.1, 4.7).
+"""Matchertext-prevention analysis of a syntactic skeleton (paper: "The discipline", "Injection resistance").
 
-Matchertext prevents an injection under two conditions (paper section 2.4):
+Matchertext prevents an injection under two conditions (paper: "From embedding to security"):
   (1) the slot the untrusted value lands in is delimited by a matcher pair in a
       matchertext-aware host, and
   (2) the value itself is valid matchertext.
-Given (1), condition (2) is a passive check -- VERIFY, Algorithm 1 -- not a
+Given (1), condition (2) is a passive check -- VERIFY, the paper's Verify figure -- not a
 content-modifying transformation. This yields the paper's "fails two ways"
-result for the canonical `x' OR '1'='1` (section 4.7.1): supplied verbatim it is
+result for the canonical `x' OR '1'='1` (paper: "Preventing SQL injection"): supplied verbatim it is
 valid matchertext and embeds as an inert literal (its quote is a nonmatcher, so
 it is ordinary data inside the matched slot); adapted to attack the new `[]`
 delimiter it must emit an unmatched `]`, which is not valid matchertext, so
@@ -59,8 +59,9 @@ def canon(payload):
     measurement of a payload uses this value."""
     return unicodedata.normalize("NFKC", percent_decode(payload))
 
-# Contexts a matchertext host can delimit with a matcher pair (paper 4.7.1-4.7.4).
-HOST = {"sql", "xpath_xquery", "nosql", "html_dom", "ldap"}
+# Contexts a matchertext host can delimit with a matcher pair, for which the paper gives a hole form
+# ("Injection resistance": SQL, HTML, LDAP; PDF has no corpus class).
+HOST = {"sql", "html_dom", "ldap"}
 # Sinks that execute the contained value regardless of delimiting.
 # An LLM acts on the instructions in a prompt however the text is delimited.
 SEMANTIC = {"template", "expression_language", "code_eval", "formula_csv", "llm_prompt"}
@@ -70,6 +71,10 @@ NONMATCHER = {
     "crlf_header": "breakout via CR/LF line breaks, which are not matcher characters",
     "xml": "structure delimited by < > angle brackets, excluded from the matcher set",
     "argument": "breakout via option-flag delimiters, which are not matchers",
+    # No hole form is designed for these two. A NoSQL operator injection is not a textual slot: the value
+    # becomes a query operator or object.
+    "nosql": "breakout via query operators or objects, not a delimited text slot",
+    "xpath_xquery": "breakout via quotes, and no XPath hole form is designed",
 }
 # The only syntax whose verdict reads the payload; elsewhere the syntax label
 # alone decides whether a payload is contained.
@@ -107,24 +112,26 @@ MECHANISM = {
     "inert": "The payload is valid matchertext, so it embeds verbatim in the "
              "matcher-delimited slot and the character that drove the breakout "
              "(a nonmatcher such as the quote or `<`) is ordinary data read to "
-             "the matched close (paper §4.7.1–§4.7.2).",
+             "the matched close (paper: SQL and XSS sections of \"Injection resistance\").",
     "reject": "The payload carries an unmatched matcher — the very delimiter it "
               "would use to close the slot — so it is not valid matchertext and "
-              "VERIFY (Algorithm 1) rejects it, or ToMatchertext escapes it to "
-              "inert data (paper §4.7.3–§4.7.4).",
+              "VERIFY rejects it, or ToMatchertext escapes it to "
+              "inert data (paper: LDAP and PDF sections of \"Injection resistance\").",
 }
 
 
-def verify(skeleton):
-    """VERIFY (Algorithm 1): is the skeleton valid matchertext? Matchers must match."""
+def verify(s):
+    """VERIFY with the depth limit of the C and JavaScript implementations: is s matchertext?
+    The one copy for the pipeline. A skeleton keeps each matcher as a character of its own, so it is
+    checked the same way."""
     stack = []
-    for t in skeleton.split():
-        if t in OPEN:
-            stack.append(t)
-            if len(stack) > MAX_MATCHER_DEPTH:
+    for ch in s:
+        if ch in OPEN:
+            if len(stack) == MAX_MATCHER_DEPTH:
                 return False
-        elif t in PAIR:
-            if not stack or stack.pop() != PAIR[t]:
+            stack.append(ch)
+        elif ch in PAIR:
+            if not stack or stack.pop() != PAIR[ch]:
                 return False
     return not stack
 

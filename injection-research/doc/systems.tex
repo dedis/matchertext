@@ -78,68 +78,54 @@ upstream base, with the option off or on, and serializes it in
 
 \paragraph{Browsers}
 \path{pipeline/browsers.py} installs the Chromium \dataHtmlChromiumVersion, Firefox
-\dataHtmlFirefoxVersion, and WebKit \dataHtmlWebkitVersion builds that Playwright
-\dataPlaywrightVersion pins~\cite{playwright}; they are not branded Chrome,
-Firefox, or Safari, and Playwright picks the WebKit build by operating system.
-Each browser reads a document as a page load does: a document that contains
-\texttt{noscript}, the one element that depends on scripting, loads in a frame
-whose Content-Security-Policy blocks every script and fetch, and any other is
-written into a document without a browsing context, where the full parser runs
-and nothing is fetched or run; a page load gives the same tree for the
-\dataHtmlPageChecked of them that each run samples. \texttt{DOMParser} would
-not: Chromium's and WebKit's read some of them otherwise.
-Each browser judges its \dataHtmlBrowserCases cases against its own reading of
-the benign value. The browsers give parse5's verdict in all but
-\dataHtmlBrowserDiffers cases, all of them concatenation in an \texttt{option},
-where parse5 drops markup that the browsers keep.
+\dataHtmlFirefoxVersion, and WebKit \dataHtmlWebkitVersion builds of Playwright
+\dataPlaywrightVersion~\cite{playwright}.
+A document with \texttt{noscript}, the one element that depends on scripting,
+loads in a frame whose Content-Security-Policy blocks every script and fetch; any
+other is written into a document without a browsing context, where the full
+parser runs and nothing is fetched or run. A page load gives the same tree for
+the \dataHtmlPageChecked documents each run samples; Chromium's and WebKit's
+\texttt{DOMParser} do not. Each browser judges the \dataHtmlBrowserCases cases
+against its own reading of the benign value; all three give parse5's verdict in all
+but \dataHtmlBrowserDiffers, all concatenation in an \texttt{option}, where
+parse5 drops markup that browsers keep.
 
 \paragraph{Escaping}
 The per-context arm applies the four rules of the OWASP cheat
-sheet~\cite{owasp_xss}: entities in element text, \verb|&#xHH;| for every
-non-alphanumeric character below 256 in an attribute value, \verb|\xHH| in the
-JavaScript string, and \verb|\HHHHHH| in CSS. \texttt{html/template} does not
-take the \texttt{onclick} host, where it
-writes the value as a JavaScript string literal, not as the attribute's value.
+sheet~\cite{owasp_xss}: entities in element text, \verb|&#xHH;| in an attribute
+value, \verb|\xHH| in the JavaScript string, and \verb|\HHHHHH| in CSS. \texttt{html/template} skips the
+\texttt{onclick} host, where it writes a JavaScript string literal.
 Neither admits a breakout in the hosts that are not semantic sinks
-(\dataHtmlEscapeContextBreakout, \dataHtmlAutoescapeBreakout). Escaped for
-JavaScript or CSS, the value in the hole differs from $v$, so those cases count
-as altered. Sanitizers such as
-DOMPurify keep the markup they allow, for rich HTML outside the claim
-(\cref{sec:resist:xss}), and Trusted Types admit a value by its type
-(\cref{sec:related}); neither delimits a value, so neither is an arm.
+(\dataHtmlEscapeContextBreakout, \dataHtmlAutoescapeBreakout). Sanitizers and
+Trusted Types delimit no value, so neither is an arm.
 
 \paragraph{JavaScript string}
-The script host writes \verb|var x = "|$v$\verb|";|. Its JavaScript verdict
-reads the string literal by the ECMAScript grammar: inert if the literal ends at
-the quote that the host wrote and holds $v$; otherwise the script is compiled,
-never run, and counts as a breakout if it compiles and as malformed if not. Concatenation breaks out of the string in
-\dataHtmlJsConcatBreakout cases. The per-context arm and \texttt{html/template}
-hold \dataHtmlJsEscapeContextInert and \dataHtmlJsAutoescapeInert strings, the
-JavaScript-encoded hole all \dataHtmlJsComposeInert of \dataHtmlJsComposeCases.
+The script host writes \verb|var x = "|$v$\verb|";|. The JavaScript verdict is
+inert if the string literal ends at the host's quote and holds $v$; otherwise the
+script is compiled, never run: a breakout if it compiles, malformed if not.
+Concatenation breaks out in \dataHtmlJsConcatBreakout cases; the per-context arm
+and \texttt{html/template} hold \dataHtmlJsEscapeContextInert and
+\dataHtmlJsAutoescapeInert strings, the JavaScript-encoded hole all
+\dataHtmlJsComposeInert of \dataHtmlJsComposeCases.
 
 \paragraph{Mutation XSS}
-A hole holds its value as text, so with matchertext the only mutation-XSS route
-for a value is the second parse after a serializer writes that text into raw text
-(L2). DOMPurify's mXSS fixtures~\cite{dompurify_fixtures}
+With matchertext, the only mutation-XSS route for a value is a second parse after
+a serializer writes it into raw text (L2). DOMPurify's mXSS fixtures~\cite{dompurify_fixtures}
 (\dataHtmlMxssProbes values) take that route through every arm as values: the
 stock writer lets \dataHtmlMxssStockBreakout cases out, and no hole, guarded
 writer, or matchertext writer lets any out, in parse5 or a browser
 (\dataHtmlMxssContainedBreakout of \dataHtmlMxssCases cases). Their other route,
-markup that moves to another namespace when a parsed fragment is written and
-parsed again, needs the value parsed as markup, which no hole does; that is the
-rich HTML of \cref{sec:resist:xss}, outside the claim. The default guard checks
-raw text and comments and does not cover it either.
+namespace confusion when a parsed fragment is written and parsed again, needs the
+value parsed as markup, which no hole does (rich HTML, outside the claim).
 
 \paragraph{Client path and fail-stop}
-DOM-based XSS (\dataSubTechniqueDomBased CVEs, named so or with a DOM source)
-runs in the page, so the page composes the HTML: the client arm runs
-\texttt{composeHtml}, serializes the \texttt{html} element with the guard, and
-sets it by \texttt{innerHTML}, which parses it as a fragment. The three browsers
-read no breakout from its \dataHtmlComposeDomCases documents. Browsers parse
-incrementally and recover from every error, so the matchertext checks fail stop
-at the writer: \textsc{Verify}, \texttt{composeHtml}, and the guard refuse before
-any HTML leaves, and a stock browser receives HTML without holes. A reader with
-the option stops at a malformed hole, as an XML parser stops at a well-formedness
-error~\cite{xml10}, which browsers do for XHTML. An element or attribute hole
-lies inside one tag token, which a streaming tokenizer holds until its \verb|>|
-anyway, and an MDATA section ends at matcher balance, with no look-ahead.
+DOM-based XSS (\dataSubTechniqueDomBased CVEs) runs in the page, so the page
+composes the HTML: the client arm runs \texttt{composeHtml}, serializes with the
+guard, and sets the result by \texttt{innerHTML}; the three browsers read no
+breakout from its \dataHtmlComposeDomCases documents. The checks fail stop at
+the writer: \textsc{Verify},
+\texttt{composeHtml}, and the guard refuse before any HTML leaves. A reader with
+the option stops at a malformed hole, as an XML parser does at a well-formedness
+error~\cite{xml10}; a hole lies in one tag token, which a streaming tokenizer
+holds until its \verb|>| anyway, or ends at matcher balance (MDATA), with no
+look-ahead.

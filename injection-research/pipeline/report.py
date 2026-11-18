@@ -438,7 +438,7 @@ def extract_labelled(text, syn):
                     return inner
                 raw = raw.partition("?")[2]
             if syn == "shell_command":
-                raw = re.split(r"&(?:quot|gt|lt);", raw, 1, re.I)[0].rstrip()
+                raw = re.split(r"&(?:quot|gt|lt);", raw, maxsplit=1, flags=re.I)[0].rstrip()
             # The whole labelled value is preferred over a signature match inside
             # it: a signature would capture some suffix such as `SLEEP(5)))vltp)`,
             # whose stray closers make a balanced payload look like a rejection.
@@ -497,8 +497,8 @@ def extract_payload(text, syn, labelled=True, constructed=True, prefer_construct
                     if close:
                         frag = frag[:close.end()]
             if syn == "shell_command":
-                frag = re.split(r"&(?:quot|gt|lt);", frag, 1, re.I)[0].rstrip()
-                frag = re.split(r"\s+HTTP/\d|,\s+then\b", frag, 1, re.I)[0].rstrip()
+                frag = re.split(r"&(?:quot|gt|lt);", frag, maxsplit=1, flags=re.I)[0].rstrip()
+                frag = re.split(r"\s+HTTP/\d|,\s+then\b", frag, maxsplit=1, flags=re.I)[0].rstrip()
                 if _PCT.search(frag):
                     frag = urlform_decode(frag)
             if accept(frag, truncation_check=not whole):
@@ -707,21 +707,21 @@ def matchertext_section(q, groups, mech_counts, prev_cves, total_cves, related):
         "and the quote / angle-bracket breakout is inert data", inert / (inert + reject)) + stat(
         f"{reject / (inert + reject):.0%}", "rejalt", "Rejected by VERIFY",
         f"<strong>{reject:,}</strong> payloads carry an unmatched matcher — the delimiter they "
-        "would escape with — so VERIFY (Alg. 1) rejects them", reject / (inert + reject)) + "</div>")
+        "would escape with — so VERIFY rejects them", reject / (inert + reject)) + "</div>")
     return section("matchertext", "Matchertext prevention by skeleton",
-                   p("Matchertext prevents an injection under two conditions (paper §2.4): "
+                   p("Matchertext prevents an injection under two conditions (paper, §3.2): "
                      "the value lands in a slot a matchertext-aware host delimits with a "
-                     f"matcher pair (\\eg {co('WHERE name = [ v ]')} for SQL), and the value "
+                     f"matcher pair (\\eg {co("WHERE name = M'( v )'")} for SQL), and the value "
                      "itself is valid matchertext, checked by the passive VERIFY scan "
-                     "(Algorithm 1) rather than by escaping. The canonical "
+                     "(paper, Fig. 2) rather than by escaping. The canonical "
                      f"{co('x&#39; OR &#39;1&#39;=&#39;1')} then fails two ways."),
                    callouts,
                    p("Running VERIFY on each payload-backed skeleton in a matcher-hostable "
                      "context splits prevention into the paper's two mechanisms:"),
                    mechbars,
-                   p(f"The {co('inert')} case is SQL/XSS (§4.7.1–2): the payload is valid "
+                   p(f"The {co('inert')} case is SQL/XSS (§5.1–5.2): the payload is valid "
                      "matchertext, so its quote or `<` is ordinary data read to the matched "
-                     f"close. The {co('rejected')} case is LDAP/PDF (§4.7.3–4): the native "
+                     f"close. The {co('rejected')} case is LDAP/PDF (§5.3–5.4): the native "
                      "delimiter is already a matcher, so the real payload carries the unmatched "
                      "one it would break out with, and VERIFY rejects it. A verdict is empty "
                      "only where matchertext structurally cannot help — execution/semantic "

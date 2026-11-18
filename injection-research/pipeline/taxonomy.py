@@ -33,7 +33,9 @@ FAMILY_ANCHORS = {
 SYNTAX_ANCHORS = {
     89: "sql", 564: "sql",
     90: "ldap", 643: "xpath_xquery", 652: "xpath_xquery",
-    77: "shell_command", 78: "shell_command", 88: "argument",
+    # CWE-77 is command injection in general: an OS shell, but also AT, SMTP, or IMAP commands. It gives the
+    # family only; the description names the syntax.
+    78: "shell_command", 88: "argument",
     79: "html_dom", 93: "crlf_header", 113: "crlf_header",
     917: "expression_language", 1336: "template",
     94: "code_eval", 95: "code_eval", 96: "code_eval", 624: "code_eval",
@@ -106,32 +108,38 @@ def whole_document(description):
 # from these may be refined by phrase rules or the NB classifier.
 GENERIC_ANCHORS = {74, 75}
 
-# Ordered phrase rules over descriptions; first match wins.
+# Phrase rules over descriptions. A space in a phrase also matches a hyphen ("SQL-injection"). The phrase
+# that the description names first decides; at the same position, the earlier rule.
 _RULES = [
     (r"\bsql injection\b|\bsqli\b", QUERY, "sql"),
     (r"\bnosql injection\b|\bmongo(?:db)? injection\b", QUERY, "nosql"),
     (r"\bldap injection\b", QUERY, "ldap"),
     (r"\bxpath injection\b|\bxquery injection\b", QUERY, "xpath_xquery"),
     (r"\bprompt injection\b", OTHER, "llm_prompt"),
-    (r"\bcross[- ]site scripting\b|\bxss\b", RENDERING, "html_dom"),
+    (r"\bcross site scripting\b|\bxss\b", RENDERING, "html_dom"),
     (r"\bhtml injection\b", RENDERING, "html_dom"),
-    (r"\b(?:os |shell |operating[- ]system )?command injection\b", COMMAND, "shell_command"),
+    # A command of another protocol (an AT, SMTP, or IMAP command) is not a shell command.
+    (r"\b(?<!\bat )(?<!\bftp )(?<!\birc )(?<!\bpop )(?<!\bpop3 )(?<!\bsmtp )(?<!\bimap )(?<!\bredis )"
+     r"(?<!\bgcode )(?:os |shell |operating system )?command injection\b", COMMAND, "shell_command"),
     (r"\bargument injection\b", COMMAND, "argument"),
-    (r"\bcrlf injection\b|\bresponse splitting\b|\bheader (?:injection|splitting)\b", RENDERING, "crlf_header"),
-    (r"\b(?:server[- ]side )?template injection\b|\bssti\b", CODE, "template"),
+    # A Host header injection changes the value of a header, not the header lines.
+    (r"\bcrlf injection\b|\bresponse splitting\b|\b(?<!\bhost )header (?:injection|splitting)\b", RENDERING,
+     "crlf_header"),
+    (r"\b(?:server side )?template injection\b|\bssti\b", CODE, "template"),
     (r"\bexpression language injection\b|\b(?:el|ognl|spel) injection\b", CODE, "expression_language"),
     (r"\b(?:csv|formula) injection\b", OTHER, "formula_csv"),
     (r"\bxml injection\b", OTHER, "xml"),
     (r"\b(?:code|eval) injection\b", CODE, "code_eval"),
 ]
-RULES = [(re.compile(p, re.I), f, s) for p, f, s in _RULES]
+RULES = [(re.compile(p.replace(" ", "[- ]"), re.I), f, s) for p, f, s in _RULES]
 
 
 def rule_match(text):
-    for rx, fam, syn in RULES:
-        if rx.search(text):
-            return fam, syn
-    return None
+    hits = [(m.start(), k) for k, (rx, _, _) in enumerate(RULES) if (m := rx.search(text))]
+    if not hits:
+        return None
+    _, k = min(hits)
+    return RULES[k][1], RULES[k][2]
 
 
 def mask_rules(text):

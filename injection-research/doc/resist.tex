@@ -10,18 +10,18 @@ A \verb|userName| containing a quote closes the literal early and appends
 attacker-controlled SQL~\cite{clarke12sql}.
 The quote is dangerous precisely because it is a \emph{nonmatcher} the discipline
 leaves unconstrained.
-We instead delimit each untrusted value with the matcher pair
-\verb|[|$\dots$\verb|]| and have the query processor treat the content as
-embedded matchertext.
+We instead delimit each untrusted value with a matcher pair and have the query
+processor treat the content as embedded matchertext.
 It ends the value by matcher balance rather than by scanning for a closing quote,
-so the clause becomes \verb|WHERE name = [|\textit{userName}\verb|]|.
+so the clause becomes \verb|WHERE name = M'(|\textit{userName}\verb|)'|; a name
+goes in \verb|[|$\dots$\verb|]|.
 
 Concretely, the canonical injection \verb|x' OR '1'='1| now fails two ways.
-Supplied verbatim it contains no matchers, so it embeds as the literal name
-\verb|x' OR '1'='1|, its quotes inert because nothing inside \verb|[|$\dots$\verb|]|
+Supplied verbatim it contains no matchers, so it embeds as the literal text
+\verb|x' OR '1'='1|, its quotes inert because nothing inside the hole
 is read as SQL.
-When adapted to attack the new delimiters, as in \verb|] OR 1=1 --|, it carries
-an unmatched \verb|]| which is not matchertext, and thus cannot embed at all.
+When adapted to attack the new delimiters, as in \verb|)' OR 1=1 --|, it carries
+an unmatched \verb|)| which is not matchertext, and thus cannot embed at all.
 Because the guarantee depends only on the delimiter being a matcher, not on what
 the value denotes, it holds wherever untrusted input appears, not only string
 values but numbers and even identifiers such as table or column names.
@@ -62,6 +62,8 @@ no part of the inertness claim, which rests only on output $\in L$
 (\cref{sec:appendix:tomatchertext}).
 A decoder bug corrupts a value. It cannot manufacture a breakout, since the region
 is already inertly delimited before decoding begins.
+Schema storage writes a decoded value in stock quoting (\verb|'...'|, or grave
+accents for a name).
 
 Under a matchertext-aware host language that ends each value by matcher balance,
 matchertext offers a \emph{structural} property: no valid-matchertext value,
@@ -102,8 +104,9 @@ The three context-specific sanitizers thus reduce to the single \textsc{Verify}
 recognizer, the same one used for SQL, which rejects only an unmatched
 matcher or nesting deeper than $D$.
 
-As with the numeric-context caveat for SQL, the guarantee is structural and stops
-at sinks that execute their contents by design.
+The guarantee is structural and stops at sinks that execute their contents by
+design, such as the JavaScript or CSS of a \verb|script| or \verb|style| hole
+unless that language's encoding contains the value.
 A payload kept dutifully inside \verb|<a href=[|\emph{v}\verb|]>| stays within the
 attribute yet still runs when \emph{v} is a \verb|javascript:| URL, because that
 is an execution context, not a structural breakout; an \verb|onerror| handler is
@@ -170,7 +173,7 @@ A1 route & Example & Changes & New syntax & Compatibility & Trusted delta \\
 \hline
 Reuse native matchers & \verb|/URI (|$v$\verb|)| & nothing & none & full & none \\
 Change the reading rule & \verb|(uid=|$v$\verb|)| & host parser & none & per host lang.\ & boundary reader \\
-Extend the host-lang.\ grammar & \verb|WHERE name = [|$v$\verb|]| & host parser & hole form & per host lang.\ & boundary reader \\
+Extend the host-lang.\ grammar & \verb|WHERE name = M'(|$v$\verb|)'| & host parser & hole form & per host lang.\ & boundary reader \\
 Replace the host language & MinML~\cite{matchertext} markup & host parser & wholly new & none & whole parser \\
 \hline
 \end{tabular}
@@ -180,9 +183,9 @@ Replace the host language & MinML~\cite{matchertext} markup & host parser & whol
 \hline
 A2 route & Example & Guarantees A2? & Cost \\
 \hline
-String concatenation & \verb|"... = [" + v + "]"| & no, by inspection only & none \\
-Matchertext literal & \verb|M"(WHERE name = [|$v$\verb|])"| & lexer reads to balance & literal form \\
-Structural interpolation & \verb|M{}"(WHERE name = [{v}])"| & holes fixed before binding & literal + interpolation \\
+String concatenation & \verb|"... = M'(" + v + ")'"| & no, by inspection only & none \\
+Matchertext literal & \verb|M"(WHERE name = M'(|$v$\verb|)')"| & lexer reads to balance & literal form \\
+Structural interpolation & \verb|M{}"(WHERE name = M'({v})')"| & holes fixed before binding & literal + interpolation \\
 \hline
 \end{tabular}
 \end{table*}

@@ -73,9 +73,9 @@ execution/semantic sinks (server-side templates, expression languages, code
 evaluation, spreadsheet formulas, HTML/DOM execution contexts) that the host language
 runs by design: the template payload \verb|{{7*7}}| is already valid matchertext
 yet still executes. \dataOutsideDocument are XSS through an uploaded SVG, HTML,
-or PDF document, which no hole receives (A2). The other \dataOutsideNonmatcher target non-matcher contexts we
+or PDF document, which no hole receives (A2). The other \dataOutsideNonmatcher target contexts we
 give no hole form: shell separators (\verb|;|~\verb-|-~\verb|&|), CR/LF header
-breaks, and XML/XXE angle brackets.
+breaks, XML/XXE angle brackets, and NoSQL and XPath queries.
 
 \paragraph{From the measured subset to the whole corpus}
 The outcomes so far cover only the \dataPayloadBackedCVEs payload-backed CVEs.
@@ -133,7 +133,7 @@ acquired public exploit or PoC code~\cite{mandiant23tte} and VulnCheck reports
 \textbf{26\%} for 2025 identifiers~\cite{vulncheck26exploit}, and
 \dataInjectionWithPoc (\dataInjectionWithPocShare) of our injection CVEs link to a
 PoC. The measurable population is therefore \dataInjectionWithPocShare of the corpus,
-and the fragment-level bound should be read against it, not against
+and the floor of \dataFloorShare should be read against it, not against
 \dataInjectionCVEs.
 
 \subsection{A matchertext-aware SQLite}
@@ -150,7 +150,7 @@ engine,\footnote{The SQLite and parse5 forks are available in an anonymized
 repository: \url{https://anonymous.4open.science/r/matchertext-security-D2DC/}.
 Their drivers are in the repository of \cref{sec:corpus}.} and run the
 recorded SQL payloads through it, from the CVE-derived SQL subset and the
-standalone SQL corpora.
+fuzzdb, PayloadsAllTheThings, and SecLists SQL lists.
 
 \paragraph{The modified engine}
 Our driver realizes the discipline of \cref{sec:resist} directly: it places a
@@ -211,7 +211,7 @@ statements rejected before the parser.}
 \end{table*}
 
 \paragraph{Results}
-Over the effective set no matchertext hole admitted a breakout (\cref{tab:sqli}):
+On every case, no matchertext hole admitted a breakout (\cref{tab:sqli}):
 \dataSqliMtBreakout through the \verb|M'(...)'| value hole, \dataSqliMtStrictBreakout
 through the verify-then-embed route, and \dataSqliIdentMtBreakout through the
 \verb|[|$\dots$\verb|]| name hole; per payload, a rate above
@@ -231,12 +231,11 @@ The admitted paths are the typed \texttt{?V} and
 ordinary parameter, refusing the \dataSqliStrictValueRejected non-matchertext values
 and \dataSqliBenignRejectedShare of benign CVE descriptions.
 Short of strict mode, an application closes the gap itself with the discipline's
-two \textsc{Verify} checks, valid input and a valid assembled statement, which are
-exactly the value-hole and name-hole rows; the concatenation control is their
-absence. The value hole embeds each payload inertly, the verified route refuses the
-\dataSqliMtStrictRejected non-matchertext (inert embedding and rejection,
-\cref{sec:resist}), and the identifier hole holds each as a single name, the one
-position a bound parameter cannot fill.
+encoder and \textsc{Verify}, which are exactly the hole rows; the concatenation
+control is their absence. The value and name holes encode (\texttt{\%m}) and refuse
+nothing: the value hole embeds each payload inertly, the identifier hole holds each
+as one name, the position a bound parameter cannot fill. The verified route refuses
+the \dataSqliMtStrictRejected non-matchertext (\cref{sec:resist}).
 
 \paragraph{Falsifiability}
 A zero is evidence only if the oracle could have reported a one.
@@ -249,7 +248,7 @@ zero is read against demonstrated detection power rather than a blind harness.
 A hole-targeted set stands in for an adaptive attacker
 (\cref{sec:appendix:systems}): its \dataSqliTargetedValues values break out of the
 controls in \dataSqliTargetedEffective pairs and of the holes in none.
-The C scanner and an independent implementation agree on \textsc{Verify} for
+The C scanner and the Go implementation agree on \textsc{Verify} for
 every payload, and the run is deterministic.
 In sum, the simulated SQL containment of \cref{tab:mech} survives a live parser;
 the experiment tests L2 and L3 for SQL, \cref{sec:prevent:html} L2 for HTML,
@@ -278,7 +277,7 @@ A \verb|[| opens an element hole only if its matched \verb|]| is followed by
 hole ends only at its matched closer.
 The counterpart of the typed parameters is \texttt{composeHtml}, which runs \textsc{Verify} on each value, puts it in its hole
 without tokenizing it, and refuses a value outside a hole; like strict SQLite, it
-enforces A2.
+enforces A2, with the verified hole's documents (one row in \cref{tab:html}).
 The fork also changes the serializer, the other half of the mutation-XSS round
 trip: by default it refuses raw text and comments that a parser would read back as
 other markup, such as script text that contains \verb|</script>|. This guard uses
@@ -322,7 +321,7 @@ breakouts in one of three browsers.}
 
 \paragraph{Results}
 Matchertext contains every payload (\cref{tab:html}, lower block). Concatenation breaks out on \dataHtmlEffective (value, host) pairs; in the
-fork, no arm admits a breakout on any of them (\dataHtmlMtBreakout; per payload,
+fork, no arm admits a breakout on any case (\dataHtmlMtBreakout; per payload,
 below \dataHtmlZeroBound at 95\%), nor does a browser. Each payload is inert
 text in its hole,
 or it is refused: the \dataHtmlNonMtPayloads payloads that are not matchertext, once
@@ -349,13 +348,13 @@ The hole forms are not backward compatible. A parser without the option reads \v
 attribute name, and in \dataHtmlLegacyElements of the \dataHtmlLegacyCases
 verified-hole cases (\dataHtmlLegacyElementsShare) it builds elements that the
 payload names. A1 must therefore hold at the reader. An application that serves a
-stock browser parses with the option and sends the guarded serialization, from
-which every matchertext tree of the sweep parses back unchanged, also in the
-browsers and by \texttt{innerHTML} (\cref{sec:appendix:html}).
+stock browser parses with the option and sends the guarded serialization: it
+refuses \dataHtmlTripRefused verified-hole trees, and every other parses back
+unchanged, also in browsers and by \texttt{innerHTML} (\cref{sec:appendix:html}).
 
 \paragraph{Falsifiability}
 Each broken build (\textsc{Verify}, hole locator, option, serializer guard) is
-detected by changed outcomes (\dataHtmlSabotageBreakouts breakouts) or a failed baseline. The fork's \textsc{Verify} and holes agree with an independent
+detected by changed outcomes (\dataHtmlSabotageBreakouts breakouts) or a failed baseline. The fork's \textsc{Verify} and holes agree with the Go
 implementation on random inputs and at the depth limit.
 A hole delimits one host language: \dataHtmlJsHoleEnds of \dataHtmlJsCases
 verified values end the script's JavaScript string, none once JavaScript-encoded

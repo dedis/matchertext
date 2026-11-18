@@ -7,7 +7,7 @@ defaultTargets = ["Matchertext"]
 [[require]]
 name = "mathlib"
 scope = "leanprover-community"
-version = "git#master"
+version = "git#v4.35.0"
 
 [[lean_lib]]
 name = "Matchertext"

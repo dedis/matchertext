@@ -42,8 +42,8 @@ instructions here.
 | [`lean`](lean)                             | Machine-checked proofs of the properties both papers rely on                         |
 | [`LLVM`](LLVM)                             | Clang-based tool that measures matchertext compliance across source trees            |
 
-Smaller items with no README of their own: `perl/escapes.pl` and
-`raku/escapes.raku` sketch matcher escape sequences for those languages, and
+Smaller items with no README of their own: `test/escapes.pl` and
+`test/escapes.raku` sketch matcher escape sequences for those languages, and
 `test/` holds sample MinML documents.
 
 ## Building

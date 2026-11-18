@@ -4,23 +4,24 @@
 \toprule
 Syntax & Inert embed & Rejected & Outside \\
 \midrule
-HTML / DOM (XSS)    & 5{,}049 &  94 & 274 \\
-SQL                 & 4{,}671 & 312 &   0 \\
+HTML / DOM (XSS)    & 5{,}051 &  95 & 276 \\
+SQL                 & 4{,}668 & 311 &   0 \\
 LDAP                &       0 &  12 &   0 \\
-NoSQL               &       5 &   1 &   0 \\
-XPath / XQuery      &       1 &   0 &   0 \\
 \midrule
-Shell command       & --- & --- & 1{,}288 \\
-Code / eval         & --- & --- & 497 \\
-Template            & --- & --- &  68 \\
+Shell command       & --- & --- & 1{,}189 \\
+Code / eval         & --- & --- & 496 \\
+Template            & --- & --- &  77 \\
+CRLF / header       & --- & --- &  59 \\
 HTML document       & --- & --- &  58 \\
-CRLF / header       & --- & --- &  57 \\
+Unknown             & --- & --- &  52 \\
 Formula (CSV)       & --- & --- &  48 \\
-Expression language & --- & --- &  13 \\
-Argument            & --- & --- &  10 \\
-Unknown             & --- & --- &  10 \\
+Argument            & --- & --- &  11 \\
+Expression language & --- & --- &  11 \\
 XML                 & --- & --- &   9 \\
+NoSQL               & --- & --- &   6 \\
+XPath / XQuery      & --- & --- &   1 \\
+LLM prompt          & --- & --- &   1 \\
 \midrule
-Total & 9{,}726 & 419 & 2{,}332 \\
+Total & 9{,}719 & 418 & 2{,}294 \\
 \bottomrule
 \end{tabular}

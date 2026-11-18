@@ -14,7 +14,8 @@ or it has a CWE in the \mbox{CWE-74} (``Injection'') subtree, from the CVE recor
 and NVD, else other sources; the subtree excludes \mbox{CWE-99} and descendants,
 and \mbox{CWE-94} is dropped where the description names memory corruption.
 This yields \textbf{\dataInjectionCVEs} injection CVEs, \textbf{\dataInjectionSharePrecise} of published
-records, spanning \dataInjectionCWEs distinct CWEs.
+records, with \dataInjectionSubtreeCWEs CWEs of the subtree (\dataInjectionCWEs with
+those co-assigned).
 Its neighbors, and the OWASP CWEs outside it, name no language a value is
 parsed in (\cref{sec:appendix:corpus}).
 
@@ -24,8 +25,10 @@ least reliable.
 This mirrors the content-classifier methodology of the matchertext empirical
 study~\cite{matchertext}.
 First, a deterministic map from specific CWEs (\eg \mbox{CWE-89}$\rightarrow$SQL,
-\mbox{CWE-79}$\rightarrow$HTML).
-Second, phrase rules over the CNA description (``SQL injection'', \dots).
+\mbox{CWE-79}$\rightarrow$HTML); within one source, a CWE of the syntax the
+description names wins, then the lower number.
+Second, phrase rules over the CNA description (``SQL injection'', \dots); the
+phrase named first wins.
 Third, a word naive-Bayes classifier, trained on the labeled set and on the
 gate's rejects as a not-injection class, labels the rest above a margin.
 Fourth, an explicit \texttt{unknown} bucket.

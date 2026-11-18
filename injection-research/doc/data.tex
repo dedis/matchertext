@@ -1,9 +1,12 @@
 \subsection{Data sources}
 \label{sec:data}
 
-Every source is keyed on the CVE identifier, so no vulnerability is duplicated;
+Every source is keyed on the CVE identifier, so no record is duplicated;
 each additional database contributes enrichment or PoC rows rather than a second
 copy of the record.
+A CVE ID names a record, not a vulnerability: \dataLongDescriptionTwins injection CVEs
+repeat another's long description, and at most \dataWordpressCnaRepeats of
+\dataWordpressCnaCves WordPress-CNA CVEs repeat another CNA's plugin and version.
 All sources are snapshot-pinned by git commit or content hash in a manifest, so
 the corpus is reproducible.
 
@@ -37,7 +40,8 @@ the \href{https://github.com/trickest/cve}{trickest/cve} exploit index, and
 \href{https://github.com/vulhub/vulhub}{Vulhub}'s reproduction environments.
 The first three, Vulhub's worked exploit requests, and six smaller PoC
 collections are cloned locally so that a payload can be extracted.
-PoC-in-GitHub, trickest, and two similar indexes contribute links only.
+PoC-in-GitHub, trickest, and two similar indexes give links (14 sources in all); a
+linked repository is read at a pinned commit, an advisory as a page, keeping only the payload.
 Of a trickest entry, the candidate exploit repositories and the researchers'
 write-ups count as PoC evidence, not the vendor's commits, issues, and advisories.
 References are unified in one table with a local path where a payload is
