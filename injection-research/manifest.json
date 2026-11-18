@@ -268,7 +268,7 @@
     "node": "v26.0.0",
     "parse5-fork": "a7a595d02d3cf42a03e521126770989d7c304c49",
     "python": "3.14.7",
-    "sqlite-fork": "51a40b27651684f405add11ccab562f0ad89238d-dirty",
+    "sqlite-fork": "e3214f8d8babc6db8e918cabfbeb44de5d8ae8e3",
     "tcl": "9.0.4"
   },
   "trickest-cve": {
