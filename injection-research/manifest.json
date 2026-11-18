@@ -266,7 +266,7 @@
     "cc": "Apple clang version 21.0.0 (clang-2100.4.1.1)",
     "lean": "leanprover/lean4:v4.35.0",
     "node": "v26.0.0",
-    "parse5-fork": "a7a595d02d3cf42a03e521126770989d7c304c49",
+    "parse5-fork": "03aff58744e22932acb7fe90a3a9b02254b847dd",
     "python": "3.14.7",
     "sqlite-fork": "e3214f8d8babc6db8e918cabfbeb44de5d8ae8e3",
     "tcl": "9.0.4"
