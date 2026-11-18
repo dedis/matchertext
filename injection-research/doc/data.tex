@@ -42,8 +42,9 @@ The first three, Vulhub's worked exploit requests, and six smaller PoC
 collections are cloned locally so that a payload can be extracted.
 PoC-in-GitHub, trickest, and two similar indexes give links (14 sources in all); a
 linked repository is read at a pinned commit, an advisory as a page, keeping only the payload.
-Of a trickest entry, the candidate exploit repositories and the researchers'
-write-ups count as PoC evidence, not the vendor's commits, issues, and advisories.
+For a trickest entry, the candidate exploit repositories and the
+researchers' write-ups count as PoC evidence, not the vendor's commits, issues,
+and advisories.
 References are unified in one table with a local path where a payload is
 extractable; because exploit code is dual-use, the corpus stores only links,
 identifiers, and locally-extracted fragments, redistributing no exploit files.
@@ -60,4 +61,5 @@ A key methodological caveat is that these sources have different, sometimes
 mutable, update cadences (NVD in particular re-scores CVEs continuously).
 The analysis therefore fixes the snapshot of \dataSnapshotDate{} and treats ``field missing in
 source'' as distinct from ``property absent in the vulnerability.''
-It also pins the forks and tools; git sources, many under restrictive terms, are not archived.
+The manifest also pins the forks and tools; git sources, many under restrictive
+terms, are not archived but fetched at their pinned commits.

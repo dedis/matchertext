@@ -45,11 +45,3 @@ theorem embed_boundary
       ∧ depth Pi m = 0
       ∧ depth Pi (m ++ [c]) = -1 := by ...
 \end{lstlisting}
-
-\paragraph{Proof of Lemma 1}
-\label{sec:appendix:lemma}
-The lexer state at $s_o$ depends only on the text of $P$ before the hole. By L1
-the locator stops exactly after $v$ for every $v\in L$, so the hole yields one
-token of type $\mathit{hole}$ and lexing resumes at the same position of $P$ in
-the same state. Outside the hole both inputs are the text of $P$, so the
-token-type sequences agree.\hfill$\square$

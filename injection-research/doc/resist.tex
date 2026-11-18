@@ -4,46 +4,47 @@
 \subsection{Preventing SQL injection}
 \label{sec:resist:sql}
 
-Recall the classic vulnerability of \cref{sec:intro}: a server composes a clause
-like \verb|"WHERE name = '"+userName+"'"|.
+In the classic vulnerability, a server composes a clause like \verb|"WHERE name = '"+userName+"'"|.
 A \verb|userName| containing a quote closes the literal early and appends
 attacker-controlled SQL~\cite{clarke12sql}.
-The quote is dangerous precisely because it is a \emph{nonmatcher} the discipline
-leaves unconstrained.
+The quote ends the literal because SQL scans for it; to the discipline it is a
+\emph{nonmatcher}, left unconstrained.
 We instead delimit each untrusted value with a matcher pair and have the query
 processor treat the content as embedded matchertext.
 It ends the value by matcher balance rather than by scanning for a closing quote,
 so the clause becomes \verb|WHERE name = M'(|\textit{userName}\verb|)'|; a name
 goes in \verb|[|$\dots$\verb|]|.
 
-Concretely, the canonical injection \verb|x' OR '1'='1| now fails two ways.
+Concretely, the canonical injection \verb|' OR '1'='1| now fails two ways.
 Supplied verbatim it contains no matchers, so it embeds as the literal text
-\verb|x' OR '1'='1|, its quotes inert because nothing inside the hole
+\verb|' OR '1'='1|, its quotes inert because nothing inside the hole
 is read as SQL.
 When adapted to attack the new delimiters, as in \verb|)' OR 1=1 --|, it carries
-an unmatched \verb|)| which is not matchertext, and thus cannot embed at all.
+an unmatched \verb|)|: \textsc{Verify} rejects it, and \textsc{ToMatchertext}
+escapes the \verb|)| to data.
 Because the guarantee depends only on the delimiter being a matcher, not on what
 the value denotes, it holds wherever untrusted input appears, not only string
 values but numbers and even identifiers such as table or column names.
 Which tables a caller may name remains an authorization question, distinct from
 injection.
 
-Free-form fields -- a name, a comment, a search box -- may legitimately contain
+Free-form fields, such as a name, a comment, or a search box, may contain
 unmatched matchers (\eg a fragment \verb|f(x| or \verb|smile :]|).
 Rather than reject them, we pass them through a total encoder
 \textsc{ToMatchertext}$(v)$ that escapes the \emph{unmatched} matchers in
 $v$~\cite{matchertext}, and decode on read.
-Defined on every input, it never rejects. Because its escapes are themselves
-balanced, its output is always valid matchertext, its sole and language-independent
-obligation (\cref{sec:appendix:tomatchertext}), checkable in isolation by the
-\textsc{Verify} scan and saying nothing about SQL.
+Defined on every input, it never rejects. Its escapes are themselves balanced,
+so its output is always valid matchertext (\cref{sec:appendix:tomatchertext}).
+That is its sole obligation: language-independent, checkable by \textsc{Verify},
+and silent about SQL.
 An encoder bug whose output is still matchertext yields mis-encoded \emph{data},
-not a breakout, where in conventional escaping one missed case \emph{is} the
-injection; a bug in \textsc{Verify} or the host's locator is a breakout.
+not a breakout; a bug in \textsc{Verify} or the host language's locator is a
+breakout.
 
-Reading inverts the encoder. An escape \textsc{esc}$(c)$ is a backslash, a tag,
-and a matched pair (\verb|\o()| for \verb|(|, \verb|\c[]| for \verb|]|); the encoder also escapes the pair of any input run that
-already has that shape, and leaves every other backslash alone. Then
+Reading inverts the encoder. An escape \textsc{esc}$(c)$ is a backslash, a tag
+(\texttt{o} or \texttt{c}), and a matched pair (\verb|\o()| for \verb|(|,
+\verb|\c[]| for \verb|]|). Input already of this shape is escaped too, so it
+decodes to itself; other backslashes stay. Then
 \textsc{FromMatchertext} scans the balance-delimited region once, mapping each
 \textsc{esc}$(c)$ back to its matcher $c$ and copying every other character,
 so that $\forall v, \textsc{FromMatchertext}(\textsc{ToMatchertext}(v)) = v$:
@@ -57,13 +58,13 @@ FromMatchertext(m):
       out += m[i]; i += 1
   return out
 \end{verbatim}
-This round-trip is a data-fidelity property, argued here rather than proved: it is
+This round-trip is a data-fidelity property that we do not prove: it is
 no part of the inertness claim, which rests only on output $\in L$
 (\cref{sec:appendix:tomatchertext}).
-A decoder bug corrupts a value. It cannot manufacture a breakout, since the region
-is already inertly delimited before decoding begins.
-Schema storage writes a decoded value in stock quoting (\verb|'...'|, or grave
-accents for a name).
+A decoder bug only corrupts a value: the region is delimited before decoding
+begins.
+Holes in a statement stored in the schema are rewritten to stock syntax, so
+that a stock build can read the database.
 
 Under a matchertext-aware host language that ends each value by matcher balance,
 matchertext offers a \emph{structural} property: no valid-matchertext value,
@@ -76,7 +77,7 @@ is safe.
 \subsection{Cross-site scripting across HTML contexts}
 \label{sec:resist:xss}
 
-The same discipline addresses cross-site scripting across three different
+The same discipline addresses cross-site scripting across three
 injection sites, each with its own escaping regime.
 A value placed as element content, between \verb|<div>| and \verb|</div>|, breaks
 out on \verb|<| or \verb|&|.
@@ -87,9 +88,10 @@ A value in a script body, \verb|<script>var n="|\emph{v}\verb|"</script>|, has t
 independent exits: the JavaScript string quote and the raw \verb|</script>|
 sequence that ends the element regardless of JavaScript syntax.
 The recurring bug is applying one escaper, usually HTML-entity encoding, in all
-three contexts, where it is correct only for element content.
+contexts; it fails in single-quoted and unquoted attributes
+(\cref{sec:prevent:html}).
 
-Matcher-delimiting collapses the three to a single discipline, exactly as for
+Matcher-delimiting collapses the three to a single discipline, as for
 SQL.
 Each hole is read verbatim up to a matched close bracket and the host language performs no
 transformation, using matchertext markup forms~\cite{matchertext}
@@ -104,17 +106,16 @@ The three context-specific sanitizers thus reduce to the single \textsc{Verify}
 recognizer, the same one used for SQL, which rejects only an unmatched
 matcher or nesting deeper than $D$.
 
-The guarantee is structural and stops at sinks that execute their contents by
-design, such as the JavaScript or CSS of a \verb|script| or \verb|style| hole
-unless that language's encoding contains the value.
-A payload kept dutifully inside \verb|<a href=[|\emph{v}\verb|]>| stays within the
+The guarantee covers one host language: in a \verb|script| or \verb|style|
+body a hole stops the end tag, not the JavaScript or CSS inside
+(\cref{sec:prevent:html}). It stops at sinks that execute their contents by design: a payload kept dutifully inside \verb|<a href=[|\emph{v}\verb|]>| stays within the
 attribute yet still runs when \emph{v} is a \verb|javascript:| URL, because that
 is an execution context, not a structural breakout; an \verb|onerror| handler is
 the same.
 Such semantic sinks are out of scope.
 A second limit is expressiveness: matchertext content is verbatim text and cannot
 carry child markup.
-This restriction is exactly right for embedding an untrusted string as inert data but is not
+This restriction suits embedding an untrusted string as inert data but is not
 a substitute for rendering a user's rich HTML, a harder problem left to
 allow-list sanitizers.
 The clean guarantee covers the data-not-markup case; the \dataDocumentCVEs XSS
@@ -131,8 +132,8 @@ classic attack~\cite{alonso08ldap} is a \verb|userName| such as \verb|*)(uid=*|
 that closes its assertion early, so the password clause no longer constrains the
 bind.
 A filter parser that ends the value by matcher balance rather than at the first
-\verb|)| defeats it exactly as for SQL: the payload carries an unmatched \verb|)|,
-is not matchertext, and cannot embed at all. That reading rule is a parser change:
+\verb|)| defeats it as for SQL: the payload carries an unmatched \verb|)|, so
+\textsc{Verify} rejects it and the encoder escapes it to data. That reading rule is a parser change:
 stock parsers stop at the first \verb|)|, and RFC~4515 escapes every
 parenthesis~\cite{rfc4515}.
 
@@ -160,8 +161,8 @@ runs but can no longer escape its string to \emph{introduce} one.
 
 \begin{table*}[t]
 \centering
-\caption{Routes to premise A1, an aware host language (top; \textulc{\emph{trusted delta}} is what
-each adds to the trusted computing base of \cref{sec:threat}), and to premise
+\caption{Routes to assumption A1, an aware host language (top; \textulc{\emph{trusted delta}} is what
+each adds to the trusted computing base of \cref{sec:threat}), and to assumption
 A2, the value reaching a hole (bottom; only the interpolating form makes the
 template's structure independent of $v$ at composition time).}
 \label{tab:resist:a1}
@@ -183,37 +184,40 @@ Replace the host language & MinML~\cite{matchertext} markup & host parser & whol
 \hline
 A2 route & Example & Guarantees A2? & Cost \\
 \hline
-String concatenation & \verb|"... = M'(" + v + ")'"| & no, by inspection only & none \\
-Matchertext literal & \verb|M"(WHERE name = M'(|$v$\verb|)')"| & lexer reads to balance & literal form \\
-Structural interpolation & \verb|M{}"(WHERE name = M'({v})')"| & holes fixed before binding & literal + interpolation \\
+String concatenation & \verb|"... = M'(" + v + ")'"| & no: inspection only & none \\
+Matchertext literal & \verb|M"(WHERE name = M'(|$v$\verb|)')"| & no: lexer reads to balance & literal form \\
+Structural interpolation & \verb|M{}"(WHERE name = M'({v})')"| & yes: holes fixed before binding & literal + interpolation \\
 \hline
 \end{tabular}
 \end{table*}
 
 Adoption is two problems, not one, and the hosting syntaxes
 of~\cite{matchertext} answer only the second.
-Premise A1 of \cref{sec:threat} constrains the \emph{host language}: the SQL engine, HTML
+Assumption A1 of \cref{sec:threat} constrains the \emph{host language}: the SQL engine, HTML
 parser, or directory server that interprets the composed text must end the
 embedded value by matcher balance.
-Premise A2 constrains the \emph{application} that composes it: the untrusted value
+Assumption A2 constrains the \emph{application} that composes it: the untrusted value
 must reach a matcher-delimited hole rather than be concatenated in beside one.
 The two are met by changes to different languages, by different people,
 and are worth separating.
 
 \paragraph{Making the host language aware (A1)}
 \Cref{tab:resist:a1} compares the routes.
-Reusing a construct the format \emph{already} reads to matcher balance is free:
+Reusing a construct the format \emph{already} reads to matcher balance needs no
+new syntax:
 PDF literal strings (\cref{sec:resist:pdf}) cost no new syntax, though A3 needs
 PDF's own backslash escaping; LDAP filters (\cref{sec:resist:ldap}) keep their syntax but need a
 balance-reading parser.
-It also reaches only the formats built that way.
+But this route reaches only the formats built that way.
 Extending a host language's grammar with a hole form reaches the syntaxes where injection
 actually concentrates, at the price of a change inside the host language's parser.
 The change is not always conservative: T-SQL already gives
 \verb|[|$\dots$\verb|]| a meaning as a delimited identifier.
-A hole form for SQL must either pick different delimiters or accept that it is not
-backward-compatible in the way the \verb|M"|$\dots$\verb|"| literal
-of~\cite{matchertext}, a C string literal read to matcher balance, is for C.
+A hole form for SQL must either pick different delimiters or accept that
+existing code changes meaning, unlike the \verb|M"|$\dots$\verb|"| literal
+of~\cite{matchertext}, a C string literal read to matcher balance, for C.
+Our SQLite fork accepts this for \verb|[|$\dots$\verb|]| names and
+\verb|SELECT m'(x)'| (\cref{sec:appendix:systems}).
 Replacing the host language obtains A1 by construction and reaches everything it
 covers, but only for new deployments, since nothing previously written parses.
 
@@ -231,10 +235,10 @@ surrounding query no matter what it contains.
 This is an application of the discipline that~\cite{matchertext} identifies as its
 security-relevant use of interpolation.
 In C-like languages a marker abutting a quote is a syntax error outside
-macros, so the literal form keeps existing code; SQL already reads it as an alias.
+macros, so the literal form keeps existing code.
 
 
-Together the two premises replace an obligation on the programmer at every use
-site with an obligation on two parsers: A1 relocates a bounded part of the host language's
+Together the two assumptions replace an obligation on the programmer at every use
+site with an obligation on two parsers: A1 changes a bounded part of the host language's
 parser, and A2 adds a lexical form to the application language.
 Neither removes a parser from the trusted base, and neither is meant to.

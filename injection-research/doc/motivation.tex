@@ -4,7 +4,7 @@
 \subsection{A wider family of embedding hazards}
 \label{sec:bg:hazards}
 
-Several hazards are, like SQL injection, outright remote compromises: the 2021
+Several embedding hazards are, like SQL injection, outright remote compromises: the 2021
 Log4Shell vulnerability expanded a \verb|${jndi:...}| sequence appearing
 anywhere in a logged string into a remote lookup that executed
 attacker-supplied code~\cite{cve2021log4shell}. Command injection lets
@@ -14,23 +14,21 @@ turns a CSV field beginning with \verb|=| into code: one Azure activity-log
 entry executed on an administrator's machine on download~\cite{gietzen18csv}.
 Template injection lets an expression such as \verb|{{7*7}}| reach the
 template engine server-side~\cite{portswigger_ssti} or escape the AngularJS
-expression sandbox client-side~\cite{peguero16angular}. Even purpose-built
-defenses are not immune: the DOMPurify sanitizer has been bypassed by
-\emph{mutation} XSS, in which the browser's own parser rewrites
-already-sanitized markup back into an executable form~\cite{heyes20mxss}.
-Other members corrupt data or deny service rather than disclose it: YAML's
+expression sandbox client-side~\cite{peguero16angular}.
+Other hazards corrupt data or deny service rather than disclose it: YAML's
 implicit typing (the ``Norway problem'')~\cite{oconnor23yaml},
 regular-expression denial of service~\cite{owasp_redos}, and the XML
 ``billion laughs'' entity expansion~\cite{sullivan09xml}.
 
 Ad-hoc syntactic fixes also tend to backfire: PHP's \verb|magic_quotes|
 auto-escaped request data inconsistently, invited double-escaping bugs, and
-was deprecated~\cite{php_magicquotes}. What unites the largest of these cases
+was deprecated~\cite{php_magicquotes}. What unites most of these cases
 is structural: content meant to be inert data is read as syntax because a
-bracket or quote within it escapes its intended region. Because it recurs
-across language pairs, one discipline can address the breakout-based members at
-once, not shell separators or the execution and algorithmic members (Log4Shell's
-balanced lookup, template evaluation, ReDoS, entity expansion).
+bracket or quote within it escapes its intended region. Because this breakout recurs
+across language pairs, one discipline can address it everywhere at once. It
+cannot address shell separators, which are not matchers, or the execution and
+algorithmic hazards (Log4Shell's balanced lookup, template evaluation, ReDoS,
+entity expansion).
 
 
 \subsection{Prevalence, cost, and the sanitizer attack surface}
@@ -41,9 +39,10 @@ edition of the OWASP Top~10 since 2010, subsuming cross-site scripting since
 2021~\cite{owasp_top10_2021}, and the underlying weaknesses top MITRE's 2025
 CWE Top~25, XSS (CWE-79) first and SQL injection (CWE-89)
 second~\cite{cwe_top25_2025}. The volumes are large: OWASP's 2025 Injection
-category maps to 62,445 recorded CVEs, more than 30,000 of them XSS and more
+category maps to 62,445 recorded CVEs
+(\cref{sec:appendix:corpus}), more than 30,000 of them XSS and more
 than 14,000 SQL injection~\cite{owasp_top10_2025}. Edgescan's 2025 report
-attributes 28.28\% of critical and high-severity web and API findings to SQL
+attributes 28\% of critical and high-severity web and API findings to SQL
 injection and a further 17\% to XSS~\cite{edgescan25}. A single failure can be
 severe: the 2015 TalkTalk SQL injection exposed the data of over 150,000
 customers and drew a regulatory fine~\cite{ico_talktalk}.
@@ -52,22 +51,22 @@ More telling is \emph{why} these bugs persist: escaping and context-sensitive
 sanitization are empirically error-prone. In one controlled study, all ten
 programmers asked to fix an XSS flaw with a standard output-encoding library
 failed to remove it completely~\cite{wijayarathna18esapi}. Real PHP
-applications carry far more distinct sanitizers than syntactic contexts, one
-defining 95 sanitization functions against thousands of output
-sites~\cite{weinberger11xss}. A 2024 study of nearly a million GitHub projects
+applications carry many sanitizers: one defines 95 sanitization functions for
+thousands of output sites~\cite{weinberger11xss}. Unsafe composition is also
+common: a 2024 study of nearly a million GitHub projects
 found SQL assembled by string concatenation in 42\% of Java files, 56\% of
 C\#, and 91\% of PHP~\cite{dennis24sql}.
 
 \label{sec:bg:sanitizer}%
 The sanitizer machinery is itself a recurring source of vulnerabilities.
 A production HTML sanitizer must track the host-language parser's full and
-quirk-laden behavior: DOMPurify's core file has 3,081 lines~\cite{dompurify_src} and the larger
-sanitizers reach tens of thousands project-wide.
-Correct only while its model matches every browser exactly, each divergence
-becomes a bypass. The bypasses recur as named classes: mutation
-XSS~\cite{heiderich13mxss}, parsing differentials~\cite{klein24parsing}, and DOM
+quirk-laden behavior: DOMPurify's core file has 3,081 lines~\cite{dompurify_src}.
+Such a sanitizer is correct only while its model matches every browser, and
+each divergence is a bypass. The bypasses recur as named classes: mutation
+XSS~\cite{heiderich13mxss,heyes20mxss}, in which the browser's own parser
+rewrites sanitized markup into an executable form, parsing differentials~\cite{klein24parsing}, and DOM
 clobbering~\cite{khodayari23clobbering}.
-The flaws are a steady stream: DOMPurify has carried at least nine CVEs, with
+The flaws are a steady stream: DOMPurify has at least nine CVEs, and it had
 sixteen security advisories in under three months of 2026
 alone~\cite{dompurify_advisories}. The Rails HTML sanitizer disclosed five
 CVEs on a single day~\cite{rails_sanitizer_cves}.
@@ -75,9 +74,9 @@ The point is not that sanitizers are dispensable. It is that a transformation
 re-implementing another language's parser, re-synchronized as it changes, is
 inherently a large attack surface.
 
-This contrast is the concrete case for preferring a structural \emph{check} to a
+This is the concrete case for preferring a structural \emph{check} to a
 structural \emph{transformation}.
-Verifying that a value's matchers balance is language-independent and a short scan.
+Verifying that a value's matchers balance is a short, language-independent scan.
 A sanitizer instead must shadow the host-language parser and its quirks. The security
 literature has repeatedly favored safety by construction, typed template
 contexts, and parameterized queries over ad-hoc
@@ -105,7 +104,7 @@ escaping~\cite{samuel11csas,momot16langsec,owasp_parameterization}.
 	\node[lang] (s1) at (-1.8,-1.3) {SQL};
 	\node[lang] (s2) at (-0.6,-1.3) {HTML};
 	\node[lang] (s3) at ( 0.6,-1.3) {$\cdots$};
-	\node[lang] (s4) at ( 1.8,-1.3) {shell};
+	\node[lang] (s4) at ( 1.8,-1.3) {LDAP};
 	\foreach \a in {t1,t2,t3,t4}
 		\foreach \b in {s1,s2,s3,s4}
 			\draw[link] (\a) -- (\b);
@@ -113,34 +112,29 @@ escaping~\cite{samuel11csas,momot16langsec,owasp_parameterization}.
 \end{scope}
 \begin{scope}[xshift=4.3cm]
 	\node[note] at (0,2.0) {\textbf{With matchertext}};
-	\node[lang] (u1) at (-2.4,1.3) {C};
-	\node[lang] (u2) at (-1.2,1.3) {Java};
-	\node[lang] (u3) at ( 0.0,1.3) {PHP};
-	\node[lang] (u4) at ( 1.2,1.3) {$\cdots$};
-	\node[lang] (u5) at ( 2.4,1.3) {Go};
+	\node[lang] (u1) at (-1.8,1.3) {Java};
+	\node[lang] (u2) at (-0.6,1.3) {PHP};
+	\node[lang] (u3) at ( 0.6,1.3) {$\cdots$};
+	\node[lang] (u4) at ( 1.8,1.3) {Go};
 	\node[waist] (w) at (0,0) {matchers must match};
-	\node[lang] (v1) at (-2.4,-1.3) {SQL};
-	\node[lang] (v2) at (-1.2,-1.3) {HTML};
-	\node[lang] (v3) at ( 0.0,-1.3) {LDAP};
-	\node[lang] (v4) at ( 1.2,-1.3) {$\cdots$};
-	\node[lang] (v5) at ( 2.4,-1.3) {URI};
-	\foreach \a in {u1,u2,u3,u4,u5} \draw[link] (\a) -- (w.north);
-	\foreach \b in {v1,v2,v3,v4,v5} \draw[link] (w.south) -- (\b);
+	\node[lang] (v1) at (-1.8,-1.3) {SQL};
+	\node[lang] (v2) at (-0.6,-1.3) {HTML};
+	\node[lang] (v3) at ( 0.6,-1.3) {$\cdots$};
+	\node[lang] (v4) at ( 1.8,-1.3) {LDAP};
+	\foreach \a in {u1,u2,u3,u4} \draw[link] (\a) -- (w.north);
+	\foreach \b in {v1,v2,v3,v4} \draw[link] (w.south) -- (\b);
 	\node[note] at (0,-2.0) {$N + M$ implementations, one rule each};
 \end{scope}
 \end{tikzpicture}
-\caption{The narrow waist. Escapers are written per language pair; a rule both
-sides implement once decouples them, falling from $N \times M$ escapers to
-$N + M$ implementations. Non-matcher-delimited contexts and execution sinks lie
+\caption{The narrow waist. Today an escaper is written for each pair of an
+emitting language and a host language; a rule that both sides implement once
+replaces the $N \times M$ escapers with $N + M$ implementations. Non-matcher-delimited contexts and execution sinks lie
 outside the waist; \cref{sec:prevent} measures how much that leaves.}
 \label{fig:bg:waist}
 \end{figure*}
 
-\Cref{fig:bg:waist} shows the alternative: a rule that both sides implement
-once decouples them, because the rule mentions neither. A language that emits
-valid matchertext is compatible with every host language that reads to matcher balance.
-Such a host language accepts values from every one of them, without either knowing
-what the other is. The count falls from $N \times M$ relationships to $N + M$
-implementations. This decoupling is the shape the Internet protocol stack takes for the
-same reason: a waist thin enough that what sits above and below it can vary
-independently.
+\Cref{fig:bg:waist} shows the alternative for $N$ emitting languages and $M$
+host languages. The rule names neither side, so any language that emits valid
+matchertext suits any host language that reads to matcher balance, and neither
+needs to know the other. The Internet protocol stack has this shape: a thin
+waist lets the layers above and below vary independently.

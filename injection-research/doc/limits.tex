@@ -1,13 +1,17 @@
 \section{Limitations}
 \label{sec:limits}
 
-The attacker that targets the hole is a generated set
-(\cref{sec:prevent:exec}), not a search that learns from the parser.
-The browsers are Playwright builds; the HTML oracle reads the tree and one
-JavaScript string, not URLs or CSS.
-Syntax labels are audited on a sample (\cref{sec:classify}), and payloads by
-one rater.
-The projection assumes that the payload-backed CVEs of a syntax represent its
-other CVEs; \cref{tab:sens} shows how far it moves if they do not.
-A stock reader misreads the HTML holes and the SQL name hole
-(\cref{sec:prevent:html,sec:appendix:systems}), and the timings are from one machine.
+The hole-targeted attacker is a generated set (\cref{sec:prevent:exec}), not a
+search that learns from the parser. Only two host languages are executed. The
+browsers are Playwright builds; the HTML oracle reads the tree and one
+JavaScript string, not URLs or CSS. Labels are audited on a sample: naive Bayes
+has low precision, and the audited delimitable share exceeds the labeled one
+(\cref{sec:classify}). One rater graded payloads and delivery rules. The
+projection assumes that payload-backed CVEs represent their syntax
+(\cref{tab:sens}). Reach counts disclosed CVEs: \dataKevHostableShare of
+known-exploited ones are delimitable, and existing defenses cover most
+delimitable ones (\cref{sec:prevent}). Stock readers misread holes, an
+undeclared charset breaks A3 (\cref{sec:prevent:exec,sec:prevent:html}), and
+timings are from one machine. NVD records are inconsistent~\cite{anwar22nvd},
+many reports lack what a reproduction needs~\cite{mu18reproducibility}, and
+developer studies remain open~\cite{acar16developer}.

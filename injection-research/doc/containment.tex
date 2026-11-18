@@ -2,34 +2,33 @@
 \label{sec:prevent}
 
 \Cref{sec:resist} argued that matchertext \emph{can} contain injection; this
-section asks \emph{how much} of real injection it reaches, with two measurements
-over the corpus of \cref{sec:corpus}: a simulation replaying every recorded payload
-against a matchertext-aware host language, and executed such host
-languages: a modified SQLite, running the SQL payloads through a live parser
-(\cref{sec:prevent:exec}), and a modified HTML parser, running the HTML payloads
-(\cref{sec:prevent:html}).
+section asks \emph{how much} of real injection it reaches over the corpus of
+\cref{sec:corpus}: a simulation replays the recorded payloads against a
+matchertext-aware host language, and SQLite and parse5 forks execute them
+(\cref{sec:prevent:exec,sec:prevent:html}).
 
 Every payload falls into one of three outcomes, and matchertext helps in two by
 different routes. Under \emph{inert embedding} the value is valid matchertext and
 sits as data inside its matcher-delimited slot, metacharacters read as text; under
-\emph{rejection} it carries an unmatched matcher, fails the passive \textsc{Verify}
-scan, and never embeds. In the third, \emph{outside}, matchertext cannot help: the
-value lands in a context no matcher pair delimits, or a sink the host language runs
-by design. Which outcome an attack falls into is a property of its payload, and so
-measurable.
+\emph{rejection} it carries an unmatched matcher and fails the \textsc{Verify}
+scan. In the third, \emph{outside},
+matchertext cannot help: the value lands in a context no matcher pair delimits, or
+a sink the host language runs by design. So the context decides
+containment; the payload decides only the route and, for HTML, whether it hits an
+execution context.
 
 \begin{figure*}[t]
 \footnotesize
 \input{generated/fig-tree}
 \caption{Containment outcome as two decisions. The context condition is tested
-first, so the \dataOutsideCVEs outside are never candidates rather than escapes; the value
+first, so the \dataOutsideCVEs outside CVEs are never candidates, not escapes; the value
 condition then separates inert embedding from rejection. The leaves reconcile
 with \cref{tab:mech}.}
 \label{fig:prevent:tree}
 \end{figure*}
 
 \paragraph{Simulating containment}
-Payloads are first canonicalized (A3: URL decoding, NFKC; \dataCanonChanged change).
+Payloads are first canonicalized (A3: URL decoding, NFKC; \dataCanonChanged payloads change).
 For each of the \dataPayloadBackedCVEs payload-backed CVEs, we reuse its syntactic
 skeleton and decide whether the target syntax is matcher-delimitable and, if so,
 whether the skeleton passes \textsc{Verify}, contained inertly if it does and by
@@ -41,7 +40,7 @@ a live parser.
 \centering
 \caption{Containment outcome by syntax over all \dataPayloadBackedCVEs
 payload-backed CVEs. Delimitable contexts (upper block) are contained by inert
-embedding or rejection; \textulc{\emph{Outside}} counts CVEs failing a premise of
+embedding or rejection; \textulc{\emph{Outside}} counts CVEs failing an assumption of
 \cref{sec:threat}.}
 \label{tab:mech}
 \small
@@ -55,10 +54,10 @@ payloads of \textbf{\dataContained} (\textbf{\dataContainedShare}, 95\% CI
 by a matcher-delimited slot that a matchertext-aware host language reads to
 matcher balance.
 The split turns on the host language's native delimiter, and the per-syntax
-mechanisms of \cref{sec:resist} appear directly in the corpus. Every LDAP CVE payload is a
-parenthesis breakout that fails \textsc{Verify} (\dataLdapRejected of
-\dataLdapRejected, several templates or prose); general LDAP lists are mostly
-balanced (\dataLdapCorpusInert of \dataLdapCorpus). SQL and XSS break out on nonmatchers, so they are overwhelmingly valid
+mechanisms of \cref{sec:resist} appear directly in the corpus. All \dataLdapRejected LDAP CVE
+payloads are parenthesis breakouts that fail \textsc{Verify}, several in templates
+or prose; general LDAP payload lists are mostly balanced
+(\dataLdapCorpusInert of \dataLdapCorpus). SQL and XSS break out on nonmatchers, so they are overwhelmingly valid
 matchertext and embed inertly, the \dataSqlRejected SQL rejections carrying an
 unbalanced function or subquery parenthesis.
 The ratio is descriptive, not predictive: these payloads were written against
@@ -68,14 +67,15 @@ inert embedding without affecting containment, since both routes hold the value.
 
 \paragraph{Where matchertext cannot help}
 The remaining \dataOutsideCVEs payload-backed CVEs are outside both conditions,
-split by the premise of \cref{sec:threat} they fail. \dataOutsideSemantic target
+split by the assumption of \cref{sec:threat} they fail. \dataOutsideSemantic target
 execution/semantic sinks (server-side templates, expression languages, code
 evaluation, spreadsheet formulas, HTML/DOM execution contexts) that the host language
 runs by design: the template payload \verb|{{7*7}}| is already valid matchertext
 yet still executes. \dataOutsideDocument are XSS through an uploaded SVG, HTML,
 or PDF document, which no hole receives (A2). The other \dataOutsideNonmatcher target contexts we
 give no hole form: shell separators (\verb|;|~\verb-|-~\verb|&|), CR/LF header
-breaks, XML/XXE angle brackets, and NoSQL and XPath queries.
+breaks, XML/XXE angle brackets, and NoSQL and XPath queries. The last
+\dataOutsideUnknown have no syntax label.
 
 \paragraph{From the measured subset to the whole corpus}
 The outcomes so far cover only the \dataPayloadBackedCVEs payload-backed CVEs.
@@ -86,24 +86,22 @@ weighted by each syntax's CVE count.
 Classifying the \emph{mechanism} needs a payload, but the \emph{context}
 condition, whether a syntax is matcher-delimitable at all, reads from the syntax
 label alone, so it projects directly.
-At most \textbf{\dataHostableCVEs} of the \textbf{\dataInjectionCVEs} injection
+As labeled, \textbf{\dataHostableCVEs} of the \textbf{\dataInjectionCVEs} injection
 CVEs (\textbf{\dataHostableShare}) target a matcher-delimitable syntax.
-This is an upper bound: execution contexts (script URLs, JavaScript, template
-expressions) are \textbf{\dataJsSinkRate} (\dataHtmlDomJsSinks) of the HTML/DOM payloads.
+This is an upper bound on reach: execution contexts (script URLs, JavaScript,
+template expressions) are \textbf{\dataJsSinkRate} (\dataHtmlDomJsSinks) of the
+HTML/DOM payloads. The label audit gives \dataAuditHostableShare (\cref{sec:classify}).
 With hole forms for the non-matcher contexts it would be
 \dataHostableWithNonmatcherShare. The ceiling counts disclosed CVEs, not attacks:
 among the \dataKevInjectionCVEs known-exploited CVEs it is \dataKevHostableShare,
 and \dataEpssWeightedHostableShare weighted by EPSS (\cref{tab:sens}): exploited
 injection is mostly shell and code.
-Parameterized queries and auto-escaping cover \dataPerLanguageOfHostable of these.
+Parameterized queries and auto-escaping already cover \dataPerLanguageOfHostable of
+these; matchertext adds one check for every host language.
 
-Within one syntax the simulation leaves little to project: the threat model of
-\cref{sec:threat} contains every payload of a matcher-delimitable syntax and none
-outside, so the syntax label fixes each per-syntax rate, and only HTML/DOM, through
-its execution contexts, depends on the payloads; the forks below replay the
-SQL and HTML/DOM rates.
-What a projection must correct is the syntax mix, because payload-backed CVEs
-are not a random sample. A SQL payload is a literal string a write-up can quote,
+Since the syntax label fixes each per-syntax rate (only HTML/DOM depends on its
+payloads, through its execution contexts), a projection must correct only the
+syntax mix: payload-backed CVEs are not a random sample. A SQL payload is a literal string a write-up can quote,
 whereas code-eval and argument payloads are built at run time and rarely appear
 verbatim, so the syntaxes matchertext can delimit are over-represented among CVEs
 that carry a payload. Applying the pooled contained rate of \dataContainedShare to
@@ -132,9 +130,8 @@ failure: Mandiant finds \textbf{51\%} of 2021--2022 vulnerabilities eventually
 acquired public exploit or PoC code~\cite{mandiant23tte} and VulnCheck reports
 \textbf{26\%} for 2025 identifiers~\cite{vulncheck26exploit}, and
 \dataInjectionWithPoc (\dataInjectionWithPocShare) of our injection CVEs link to a
-PoC. The measurable population is therefore \dataInjectionWithPocShare of the corpus,
-and the floor of \dataFloorShare should be read against it, not against
-\dataInjectionCVEs.
+PoC. The floor of \dataFloorShare thus measures payload availability as much as
+containment.
 
 \subsection{A matchertext-aware SQLite}
 \label{sec:prevent:exec}
@@ -156,7 +153,8 @@ fuzzdb, PayloadsAllTheThings, and SecLists SQL lists.
 Our driver realizes the discipline of \cref{sec:resist} directly: it places a
 value in the SQL text inside an \verb|M'(...)'| text literal, which the fork reads to
 matcher balance, wraps an identifier in
-\verb|[|$\dots$\verb|]| that the engine reads to matcher balance (A1), and
+\verb|[|$\dots$\verb|]|, SQLite's own bracketed name, which the fork reads to
+matcher balance (A1), and
 prepares the statement through the ordinary interface.
 The fork offers this hole beside legacy composition rather than replacing it, so
 existing SQL keeps working: the additive build passes every SQLite test that
@@ -171,6 +169,8 @@ by side.
 \paragraph{Fixtures and oracle}
 A \emph{fixture} is a query with one slot, and an \emph{arm} is one path that
 puts a value into it: concatenation, an escape, a bound parameter, or a hole.
+The hole arms fill a value or name hole by the encoder, which refuses nothing,
+or a value hole after \textsc{Verify}, which refuses non-matchertext.
 We place each of the \dataSqliPayloads distinct SQL payloads (\dataSqliFamilies
 families) through every compatible fixture-arm pair and compare it against the same
 slot holding a benign value.
@@ -183,16 +183,18 @@ fixtures run against \dataSqliValueArms value arms and \dataSqliIdentHosts
 identifier fixtures against \dataSqliIdentArms identifier arms:
 \dataSqliCasesPerPayload cases per payload, \dataSqliCases in all, the two typed
 strict entry points swept separately (\cref{tab:sqli}, right).
-The \dataSqliIdentMtMalformed name-hole cases that do not compile are the
-\dataSqliNulPayloads payloads with a trailing zero byte, which ends a SQLite
-statement wherever it appears rather than the hole failing to contain it. The set
+The \dataSqliIdentMtMalformed name-hole cases that do not compile come from the
+\dataSqliNulPayloads payloads with a trailing zero byte: SQLite ends a statement
+at it wherever it appears, so the hole is not at fault. The set
 retains every recorded payload.
-SQLite variants allow SQL Server \verb|N'...'| text, PostgreSQL dollar-quoted text, and a terminal MySQL \verb|#|
-comment, with no function, operator, query, or objective changed.
+A payload for another dialect also runs as its SQLite equivalent (SQL Server
+\verb|N'...'| and PostgreSQL dollar-quoted text as SQLite text, a terminal MySQL
+\verb|#| as \verb|--|), with no function, operator, query, or objective changed.
 The oracle is the compiled statement, not the string: the \textsc{Explain}
 bytecode with the value operand redacted, the read-only flag, whether any SQL
 follows the first statement, and the rows returned, each read against the benign
-baseline; a name must compile as a real or absent name does. A payload counts against a defense only where the control, naive
+baseline; a name is inert if it compiles as a real column does, or fails as an
+absent column named by the whole payload. A payload counts against a defense only where the control, naive
 concatenation into a value context or a bare name, actually breaks out; most
 recorded payloads are fragments that never parse against SQLite. That effective set
 is \dataSqliEffective payloads.
@@ -217,7 +219,8 @@ through the verify-then-embed route, and \dataSqliIdentMtBreakout through the
 \verb|[|$\dots$\verb|]| name hole; per payload, a rate above
 \dataSqliZeroBound is excluded at 95\%.
 The legacy defenses hold as well: SQLite's \texttt{printf} escapes \texttt{\%Q},
-\texttt{\%q}, and \texttt{"\%w"} and a bound parameter, the baseline.
+\texttt{\%q}, and \texttt{"\%w"}, and the bound parameter, admit no breakout:
+the holes match SQLite's own defenses.
 Concatenation is the contrast: \dataSqliConcatBreakout breakouts of the value
 control and \dataSqliIdentConcatBreakout of the identifier control, on the very
 same payloads.
@@ -230,12 +233,8 @@ The admitted paths are the typed \texttt{?V} and
 \dataSqliStrictIdentBreakout breakouts); \texttt{?V} verifies, then binds an
 ordinary parameter, refusing the \dataSqliStrictValueRejected non-matchertext values
 and \dataSqliBenignRejectedShare of benign CVE descriptions.
-Short of strict mode, an application closes the gap itself with the discipline's
-encoder and \textsc{Verify}, which are exactly the hole rows; the concatenation
-control is their absence. The value and name holes encode (\texttt{\%m}) and refuse
-nothing: the value hole embeds each payload inertly, the identifier hole holds each
-as one name, the position a bound parameter cannot fill. The verified route refuses
-the \dataSqliMtStrictRejected non-matchertext (\cref{sec:resist}).
+Short of strict mode, the hole arms close the gap, the name hole where a bound
+parameter cannot.
 
 \paragraph{Falsifiability}
 A zero is evidence only if the oracle could have reported a one.
@@ -243,16 +242,42 @@ A broken locator, \textsc{Verify}, encoder, or decoder changes an outcome or
 value of the holes resting on it (up to \dataSqliSabotageDetect); the locator
 breaks out \dataSqliSabotageBreakouts recorded cases, and two constructed probes
 show the broken locator and encoder let a value out
-(\dataSqliSabotageProbeBreakouts breakouts). So the honest
+(\dataSqliSabotageProbeBreakouts breakouts). So the
 zero is read against demonstrated detection power rather than a blind harness.
-A hole-targeted set stands in for an adaptive attacker
-(\cref{sec:appendix:systems}): its \dataSqliTargetedValues values break out of the
-controls in \dataSqliTargetedEffective pairs and of the holes in none.
 The C scanner and the Go implementation agree on \textsc{Verify} for
 every payload, and the run is deterministic.
-In sum, the simulated SQL containment of \cref{tab:mech} survives a live parser;
-the experiment tests L2 and L3 for SQL, \cref{sec:prevent:html} L2 for HTML,
-and each further host language needs its own executed check.
+In sum, the simulated SQL containment of \cref{tab:mech} survives a live parser.
+
+\paragraph{Hole-targeted set}
+A hole-targeted set stands in for an adaptive attacker:
+\path{pipeline/adaptive.py} builds, per host language, values aimed at the
+hole rather than at a native closer. A grammar puts one to three hole-boundary
+atoms before a breakout core and up to two after it: matchers, quotes, the
+matchertext escapes, comments, a zero byte, and URL-encoded and fullwidth
+matchers; for SQL also the overlong UTF-8 forms of \verb|)| and \verb|]|, and
+for HTML also \verb|]>|, end tags, comment delimiters, and a character whose
+last UTF-8 byte Shift\_JIS reads as a lead byte. Each grammar value enters twice:
+as built, and made matchertext by added matchers so that \textsc{Verify} accepts it. An
+even sample of up to 500 effective payloads enters with eleven variants each:
+made matchertext; led by each of the three lone closers; trailed by each; and,
+once made matchertext, wrapped in \verb|()|, wrapped in \verb|[]|, with each
+matcher backslash-escaped, or with a trailing zero byte. Two cores enter nested at the depth limit and one past it.
+Each value is canonicalized (A3), and values of the recorded corpus are left
+out. For SQL, \dataSqliTargetedValues values break out of the controls in
+\dataSqliTargetedEffective (value, fixture) pairs and of the holes in none of
+\dataSqliTargetedHoleCases cases. For HTML, \dataHtmlTargetedValues values break
+out of concatenation in \dataHtmlTargetedEffective (value, fixture) pairs and of no
+matchertext arm or guarded writer.
+
+\paragraph{Stock readers}
+\path{test/matchertext/csrc/stock_reader.c} is SQLite built from the same tree
+without matchertext. It reads the statements that the text holes compose for the
+corpus and the hole-targeted set. It refuses all \dataSqliDowngradeValueCases
+value-hole statements, since it reads \verb|M'(| as a name before a string. Of
+\dataSqliDowngradeNameCases name-hole statements, \dataSqliDowngradeNameBreakout
+break out: the encoder writes the value \verb|]AND 0/*M'()| as
+\verb|[\c[]AND 0/*M'()]|, and stock SQLite ends the name at the \verb|]| of
+\verb|\c[]|.
 
 \subsection{A matchertext-aware HTML parser}
 \label{sec:prevent:html}
@@ -276,39 +301,43 @@ A \verb|[| opens an element hole only if its matched \verb|]| is followed by
 \verb|[prop]="x"|). A malformed attribute hole or section stops the parse, so a
 hole ends only at its matched closer.
 The counterpart of the typed parameters is \texttt{composeHtml}, which runs \textsc{Verify} on each value, puts it in its hole
-without tokenizing it, and refuses a value outside a hole; like strict SQLite, it
-enforces A2, with the verified hole's documents (one row in \cref{tab:html}).
+without tokenizing it, and refuses a value outside a hole. Like strict SQLite, it
+enforces A2; its documents are those of the verified hole (one row in
+\cref{tab:html}).
 The fork also changes the serializer, the other half of the mutation-XSS round
 trip: by default it refuses raw text and comments that a parser would read back as
 other markup, such as script text that contains \verb|</script>|. This guard uses
 no hole. With matchertext output, the serializer writes such text as an element
 hole instead, if the text is matchertext.
 
-\paragraph{Hosts and arms}
+\paragraph{Fixtures and arms}
 We put each of the \dataHtmlPayloads distinct HTML payloads in \dataHtmlHosts
-hosts: element text, a table cell, SVG text, \texttt{option},
+fixtures, one position each: element text, a table cell, SVG text, \texttt{option},
 \texttt{template}, \texttt{textarea}, \texttt{title}, \texttt{style},
 \texttt{noscript}, a JavaScript string in \texttt{script}, a comment, and
 double-quoted, single-quoted, and unquoted attributes, with \texttt{href} and
 \texttt{onclick} as semantic sinks (A4).
-Each host takes the \dataHtmlArms arms where they apply (\cref{tab:html},
-\cref{sec:appendix:html}). A writer arm sets the value in a tree and parses the
-serializer's output again; the encoding arm never refuses (balanced runs in MDATA
-sections, other matchers as character references). This gives \dataHtmlCases cases.
+Each fixture takes the \dataHtmlArms arms where they apply (\cref{tab:html},
+\cref{sec:appendix:html}): the rows of \cref{tab:html}, per-context escaping,
+\texttt{html/template}, and three \texttt{composeHtml} paths. A writer arm sets
+the value in a tree and parses the serializer's output again; the encoding arm
+never refuses (balanced runs in MDATA sections, other matchers as character
+references). This gives \dataHtmlCases cases.
 The oracle is the parsed tree, its elements, attributes, and comments with the hole
-marked, and the value in the hole, against the same host and arm with a benign
-value; in the script host, a second verdict reads the JavaScript string.
+marked, and the value in the hole, against the same fixture and arm with a benign
+value; in the script fixture, a second verdict reads the JavaScript string.
 Chromium, Firefox, and WebKit (Playwright \dataPlaywrightVersion
-builds~\cite{playwright}) parse every document that a browser receives. The
-effective set, where concatenation breaks out, is \dataHtmlEffective (value, host)
-pairs.
+builds~\cite{playwright}) parse every document that a browser would receive,
+for a matchertext tree its guarded serialization. The effective set, where concatenation breaks out, is
+\dataHtmlEffective (value, fixture) pairs.
 
 \begin{table}[t]
 \centering
 \caption{Parsed outcome by delivery path over the \dataHtmlPayloads HTML payloads
-in the hosts that are not semantic sinks. Without matchertext, the stock paths
+in the fixtures that are not semantic sinks. Without matchertext, the stock paths
 admit breakouts and the guard of the fork serializer only refuses; with
-matchertext (lower block), no path admits a breakout, in parse5 or in a browser.
+matchertext (lower block), no path admits a breakout, in parse5 or in a browser,
+which reads the guarded serialization.
 \textulc{\emph{Altered}}: the structure is kept but
 the hole holds another value; \textulc{\emph{Refused}}: \textsc{Verify} or the
 serializer refuses the value; \textulc{\emph{Browser breakout}}: the most
@@ -320,16 +349,14 @@ breakouts in one of three browsers.}
 \end{table}
 
 \paragraph{Results}
-Matchertext contains every payload (\cref{tab:html}, lower block). Concatenation breaks out on \dataHtmlEffective (value, host) pairs; in the
+Matchertext contains every payload (\cref{tab:html}, lower block). Concatenation breaks out on \dataHtmlEffective (value, fixture) pairs; in the
 fork, no arm admits a breakout on any case (\dataHtmlMtBreakout; per payload,
 below \dataHtmlZeroBound at 95\%), nor does a browser. Each payload is inert
 text in its hole,
 or it is refused: the \dataHtmlNonMtPayloads payloads that are not matchertext, once
-per host. The encoding arm holds those too, so it contains the whole corpus and
+per fixture. The encoding arm holds those too, so it contains the whole corpus and
 refuses nothing. The few \textulc{\emph{Altered}} cases are a zero byte or a
 carriage return, which every HTML parser reads as U+FFFD or a line feed.
-The hole-targeted set (\dataHtmlTargetedValues values) breaks out of no hole or
-guarded writer.
 The guard, which uses no hole, admits no breakout either
 (\dataHtmlGuardedBreakout), but only because it refuses the \dataHtmlGuardedRefused
 trees that a parser would read back differently. Matchertext output delivers
@@ -340,11 +367,21 @@ Without matchertext, the defenses of stock parse5 fail where
 attributes (\dataHtmlEscapeUncoveredBreakout breakouts; escaping per
 context~\cite{owasp_xss} and \texttt{html/template}~\cite{samuel11csas} admit
 none), and the stock serializer in
-script, style, and comment text, which it writes unescaped
+script, style, noscript, and comment text, which it writes unescaped
 (\dataHtmlDomStockUncoveredBreakout), the L2 violation of mutation XSS.
 
+\paragraph{Charset}
+Two more HTML arms send the verified-hole document of each fixture as UTF-8 bytes.
+Decoded by the WHATWG UTF-8 decoder, all \dataHtmlUtfEightRead such documents of
+the hole-targeted set parse as the string does. Decoded as Shift\_JIS,
+\dataHtmlSjisBreakout break out. In the value \={a}\verb|[x]><img src=x onerror=alert(1)>|,
+the last UTF-8 byte of \={a} (U+0101) is a Shift\_JIS lead byte, which takes the
+\verb|[| as its second byte, so the reader ends the hole at the \verb|]| that
+\textsc{Verify} matched with it. The decoding of A3 thus starts at the bytes: the
+writer declares the charset it verified under.
+
 \paragraph{Legacy readers}
-The hole forms are not backward compatible. A parser without the option reads \verb|[| as an
+A parser without the option reads \verb|[| as an
 attribute name, and in \dataHtmlLegacyElements of the \dataHtmlLegacyCases
 verified-hole cases (\dataHtmlLegacyElementsShare) it builds elements that the
 payload names. A1 must therefore hold at the reader. An application that serves a
@@ -357,5 +394,6 @@ Each broken build (\textsc{Verify}, hole locator, option, serializer guard) is
 detected by changed outcomes (\dataHtmlSabotageBreakouts breakouts) or a failed baseline. The fork's \textsc{Verify} and holes agree with the Go
 implementation on random inputs and at the depth limit.
 A hole delimits one host language: \dataHtmlJsHoleEnds of \dataHtmlJsCases
-verified values end the script's JavaScript string, none once JavaScript-encoded
-first (A3).
+verified values end the script's JavaScript string, and none does once
+JavaScript-encoded before \texttt{composeHtml}, one delimiting per layer.
+In sum, parse5 and browsers fed its output hold every payload.

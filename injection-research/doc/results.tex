@@ -16,8 +16,8 @@ syntaxes (HTML/DOM and SQL together account for \dataTopTwoShare of injection CV
 with a long tail of shell, code-eval, header, template, LDAP, XML, and
 formula contexts.
 This concentration matters directly for \cref{sec:prevent}: the two dominant
-syntaxes are exactly the ones a matchertext host language can delimit with a matcher pair.
-Exploitation signals are sparse but consistent with severity: \dataInjectionKev injection CVEs
+syntaxes are the ones a matchertext host language can delimit with a matcher pair.
+Exploitation signals are sparse: \dataInjectionKev injection CVEs
 appear in the CISA Known-Exploited catalog, and command injection, \dataCommandShare
 of the corpus, carries \dataKevCommandShare of them.
 
@@ -26,19 +26,20 @@ of the corpus, carries \dataKevCommandShare of them.
 The PoC databases overlap, so unifying them raises payload coverage well
 above any single source. \textbf{\dataPayloadBackedCVEs} injection CVEs yield an
 extractable payload, from a PoC file, linked repository, advisory, or the
-description; \dataPayloadPrecisionAllShare are attack strings
-(\cref{sec:appendix:corpus}). Most PoCs yield none: they
+description; in a graded sample, \dataPayloadPrecisionAllShare of them are attack
+strings (\cref{sec:appendix:corpus}). Most PoCs yield none: they
 are links only or exploits from which no literal attack string can be recovered, such as modules
 that construct their payload programmatically.
 Extraction drops a fragment cut inside an open matcher (\dataBalanceDropped) and
-completes one cut short of its closers (\dataBalanceCompleted).
+completes one cut short of its closers with the closers that follow it in the
+source (\dataBalanceCompleted).
 This linkage is what makes the containment analysis
 of \cref{sec:prevent} possible, since it supplies the real attack strings.
 
 \paragraph{Syntactic groups}
-For the \textbf{\dataPayloadBackedCVEs} injection CVEs with an extractable PoC payload, we
+For the \textbf{\dataPayloadBackedCVEs} injection CVEs with an extractable payload, we
 reduce each payload to a \emph{syntactic skeleton}.
-String literals, numbers, and identifiers are abstracted to placeholders
+Quote characters, numbers, and identifiers are abstracted to placeholders
 (\verb|<q>|, \verb|<n>|, \verb|<id>|).
 The structural grammar (matchers, operators, tags, and a curated set of
 injection keywords) is preserved.

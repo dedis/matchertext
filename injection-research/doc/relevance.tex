@@ -29,7 +29,7 @@ $(s_o,s_c)$ is a matched delimiter pair, then $s_o\,m\,s_c\in L$, at any nesting
 depth and with no escaping or expansion.
 Second, a single linear scan, the \textsc{Verify} recognizer
 (\cref{fig:verify}), decides membership in $L$. With a depth limit $D$ it
-accepts only strings of $L$ and rejects the deeper ones.
+accepts only strings of $L$ and rejects those nested deeper than $D$.
 \begin{figure}[t]
 \begin{verbatim}
 Verify(v): stack = []
@@ -41,17 +41,17 @@ Verify(v): stack = []
       if pop() != opener(c): reject
   accept if stack is empty
 \end{verbatim}
-\caption{\textsc{Verify}. Our builds also reject nesting deeper than $D=1000$.}
+\caption{\textsc{Verify}. Our builds set $D=1000$.}
 \label{fig:verify}
 \end{figure}
 Third, a total encoder \textsc{ToMatchertext} maps \emph{any} string into $L$ by
 escaping only its unmatched matchers, so free-form input that legitimately
 contains an unmatched bracket need not be rejected: \verb|f(x| becomes
 \verb|f\o()x|, where \verb|\o()| stands for an opening \verb|(|.
-Closure is machine-checked, and so is
-\textsc{ToMatchertext}'s landing in $L$ on every input
-(\cref{sec:appendix:tomatchertext}), leaving only its decoder round-trip
-informal; the correctness of \textsc{Verify} has a paper proof sketch.
+Closure is machine-checked in~\cite{matchertext}, which also sketches a paper
+proof for \textsc{Verify}. We machine-check that \textsc{ToMatchertext} lands in
+$L$ on every input (\cref{sec:appendix:tomatchertext}), leaving only its decoder
+round-trip informal.
 For the rationale behind $\Pi$, the hosting syntaxes, and the empirical
 compliance study, see~\cite{matchertext}.
 
@@ -61,8 +61,8 @@ compliance study, see~\cite{matchertext}.
 Suppose a host language delimits an
 untrusted value with a matcher pair and finds its end by counting matchers
 rather than by scanning for a terminator. Escaping the region then requires
-emitting an unmatched matcher, and by closure no valid matchertext string
-contains one.
+emitting an unmatched matcher, and by the definition of $L$ no valid matchertext
+string contains one.
 The characters that drive the classic breakouts, the quote in SQL and the angle
 bracket in HTML, are nonmatchers: entirely unconstrained, and ordinary data
 inside a matched region.
@@ -70,7 +70,7 @@ inside a matched region.
 Two consequences make this a security question rather than a syntactic one.
 The check is \emph{language-independent}: \textsc{Verify} inspects only the six
 matcher characters and knows nothing about SQL, HTML, or LDAP, so the same
-recognizer serves every host language, which is exactly what a sanitizer cannot do.
+recognizer serves every host language, which a sanitizer cannot do.
 And the check is a \emph{verification} rather than a transformation, so a
 rejected value is data that does not embed, whereas a missed case in an escaping
 routine \emph{is} the injection.

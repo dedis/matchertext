@@ -20,12 +20,11 @@ Each of these defenses knows the one language it protects and does not transfer
 to LDAP filters, PDF strings, or URIs. \textsc{Verify} inspects six characters,
 so one check serves every host language and covers names as readily as values.
 Correctness then stops depending on a per-context choice, the failure mode that
-defeated every participant in the study of \cref{sec:bg:prevalence}, and a value
-the check rejects is refused data, not a breakout.
+defeated every participant in the study of \cref{sec:bg:prevalence}.
 The cost is where the obligation lands: the baselines ask for a library,
 matchertext for a host language that reads to matcher balance
-(\cref{tab:resist:a1}). The two compose: a parameterized query can carry a
-matcher-delimited identifier, which neither reaches alone.
+(\cref{tab:resist:a1}). The two compose: a parameterized query can bind its
+values and take its names in matcher-delimited holes.
 
 \paragraph{Syntax embedding and safe quotation}
 The closest work makes embedding safe by construction in the language itself.
@@ -34,7 +33,7 @@ into the composing one, adds quotation and antiquotation forms, and assimilates
 the result into API calls, rendering programs injection-proof by construction.
 It is the nearest neighbor to matchertext, and the sharpest contrast: it needs an
 explicit grammar and a combined-syntax toolchain per language pair, where
-matchertext asks only one shared lexical invariant.
+matchertext asks for only one shared lexical invariant.
 The metaprogramming it draws on likewise assumes a known embedded language:
 hygienic macros, staged generation, tagless-final embeddings, and language
 workbenches~\cite{kohlbecker86hygienic,dybvig92syntactic,taha00metaml,sheard02template,mainland07quoted,carette09tagless,renggli10embedding}.
@@ -74,7 +73,7 @@ band}, with no tag to carry.
 Framing removes the in-band boundary: a length-prefixed
 netstring~\cite{bernstein97netstrings} or an argument vector passed to
 \texttt{execve} carries a value that no content can end early, but only in a
-format or API built for it. It remains the fix for the shell contexts that
+format or API built for it. Framing remains the fix for the shell contexts that
 matchertext leaves out.
 
 \paragraph{Prompt injection}
@@ -84,19 +83,14 @@ reserved tokens, delimiters, or encodings. A forged delimiter is a structural
 breakout, which a matcher boundary rules out; a model that follows instructions
 inside the data is an A4 sink, which no delimiter confines.
 
-\paragraph{Defining injection and measuring it}
+\paragraph{Defining injection}
 Formal framings ground the inertness property of \cref{sec:threat}.
 Language-theoretic security frames the root cause as processing rich input
 without first recognizing it~\cite{momot16langsec}. Su and Wassermann define
 injection as untrusted input altering the generated command's syntactic
 structure~\cite{su06essence}, and Ray and Ligatti by whether input is used as a
 normal-form value rather than as code~\cite{ray12defining}, the vocabulary
-matchertext targets. Matchertext addresses the subset of these framings that
-shares a single lexical boundary mechanism. Its language $L$ is a Dyck language
+matchertext targets. Of the injections these framings define, matchertext
+addresses those whose boundary is a single lexical delimiter. Its language $L$ is a Dyck language
 over three pairs with free nonmatchers, a visibly pushdown
 language~\cite{alur04vpl}: one stack recognizes it, with no grammar of the host.
-Our corpus inherits known defects of its sources: NVD records carry
-inconsistent vulnerability types and product names~\cite{anwar22nvd}, many
-reports lack what a reproduction needs~\cite{mu18reproducibility}, and
-developer-centered security~\cite{acar16developer} asks for studies of defenses
-in developers' hands, which we leave open.

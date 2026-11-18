@@ -644,7 +644,7 @@ def html_macros(con):
     ]
     # The legacy defenses break out in the contexts they do not cover: every breakout, as tab:html counts.
     for name, arm, hosts in (("Escape", "escape", ("attr_sq", "attr_unquoted")),
-                             ("DomStock", "dom_stock", ("script_string", "style", "comment"))):
+                             ("DomStock", "dom_stock", ("script_string", "style", "noscript", "comment"))):
         vals.append((f"Html{name}UncoveredBreakout", num(q(
             f"""SELECT COALESCE(SUM(n_breakout), 0) FROM mt_html_combo
                 WHERE arm='{arm}' AND host IN {hosts}"""))))

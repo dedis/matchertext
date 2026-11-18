@@ -1,50 +1,10 @@
-\section{Hole-targeted values, stock readers, and cost}
+\section{Stock compatibility and cost}
 \label{sec:appendix:systems}
-
-\paragraph{Hole-targeted set}
-\path{pipeline/adaptive.py} builds, per host language, values aimed at the
-hole rather than at a native closer. A grammar puts one to three hole-boundary
-atoms before a breakout core and up to two after it: matchers, quotes, the
-matchertext escapes, comments, a zero byte, and URL-encoded and fullwidth
-matchers; for SQL also the overlong UTF-8 forms of \verb|)| and \verb|]|, and
-for HTML also \verb|]>|, end tags, comment delimiters, and a character whose
-last UTF-8 byte Shift\_JIS reads as a lead byte. Each grammar value enters as
-built and made matchertext by added matchers, which \textsc{Verify} accepts. An
-even sample of up to 500 effective payloads enters with eleven variants each:
-made matchertext; led or trailed by each lone closer; and made matchertext, then
-wrapped in \verb|()| or \verb|[]|, with each matcher backslash-escaped, or with a
-trailing zero byte. Two cores enter nested at the depth limit and one past it.
-Each value is canonicalized (A3), and values of the recorded corpus are left
-out. For SQL, \dataSqliTargetedValues values break out of the controls in
-\dataSqliTargetedEffective (value, fixture) pairs and of the holes in none of
-\dataSqliTargetedHoleCases cases. For HTML, \dataHtmlTargetedValues values break
-out of concatenation in \dataHtmlTargetedEffective (value, host) pairs and of no
-matchertext arm or guarded writer.
-
-\paragraph{Charset}
-Two more HTML arms send the verified-hole document of each host as UTF-8 bytes.
-Decoded by the WHATWG UTF-8 decoder, all \dataHtmlUtfEightRead such documents of
-the hole-targeted set parse as the string does. Decoded as Shift\_JIS,
-\dataHtmlSjisBreakout break out. In the value \={a}\verb|[x]><img src=x onerror=alert(1)>|,
-the last UTF-8 byte of \={a} (U+0101) is a Shift\_JIS lead byte, which takes the
-\verb|[| as its second byte, so the reader ends the hole at the \verb|]| that
-\textsc{Verify} matched with it. The decoding of A3 thus starts at the bytes: the
-writer declares the charset it verified under.
-
-\paragraph{Stock readers}
-\path{test/matchertext/csrc/stock_reader.c} is SQLite built from the same tree
-without matchertext. It reads the statements that the text holes compose for the
-corpus and the hole-targeted set. It refuses all \dataSqliDowngradeValueCases
-value-hole statements, since it reads \verb|M'(| as a name before a string. Of
-\dataSqliDowngradeNameCases name-hole statements, \dataSqliDowngradeNameBreakout
-break out: the encoder writes the value \verb|]AND 0/*M'()| as
-\verb|[\c[]AND 0/*M'()]|, and stock SQLite ends the name at the \verb|]| of
-\verb|\c[]|.
 
 \paragraph{Stock SQL}
 The additive build passes every case of SQLite's full Tcl test suite
 (\dataSqliteSuiteTests cases) that the stock build passes; the stock build
-itself fails \dataSqliteSuiteStockErrors cases on our test host. Three forms that
+itself fails \dataSqliteSuiteStockErrors cases on our test machine. Three forms that
 the suite lacks read differently. A bracketed name with an unmatched matcher is
 an error (\verb|[a(b]|), a bracketed name with a matchertext escape is decoded
 (\verb|[a\c()b]| names \verb|a)b|), and an \verb|m| directly before a string that
@@ -83,9 +43,9 @@ upstream base, with the option off or on, and serializes it in
 A document with \texttt{noscript}, the one element that depends on scripting,
 loads in a frame whose Content-Security-Policy blocks every script and fetch; any
 other is written into a document without a browsing context, where the full
-parser runs and nothing is fetched or run. A page load gives the same tree for
-the \dataHtmlPageChecked documents each run samples; Chromium's and WebKit's
-\texttt{DOMParser} do not. Each browser judges the \dataHtmlBrowserCases cases
+parser runs and nothing is fetched or run. For the \dataHtmlPageChecked documents each
+run samples, a page load gives the same tree as this write; Chromium's and
+WebKit's \texttt{DOMParser} do not, and we do not use it. Each browser judges the \dataHtmlBrowserCases cases
 against its own reading of the benign value; all three give parse5's verdict in all
 but \dataHtmlBrowserDiffers, all concatenation in an \texttt{option}, where
 parse5 drops markup that browsers keep.
@@ -94,14 +54,14 @@ parse5 drops markup that browsers keep.
 The per-context arm applies the four rules of the OWASP cheat
 sheet~\cite{owasp_xss}: entities in element text, \verb|&#xHH;| in an attribute
 value, \verb|\xHH| in the JavaScript string, and \verb|\HHHHHH| in CSS. \texttt{html/template} skips the
-\texttt{onclick} host, where it writes a JavaScript string literal.
-Neither admits a breakout in the hosts that are not semantic sinks
+\texttt{onclick} fixture, where it writes a JavaScript string literal.
+Neither admits a breakout in the fixtures that are not semantic sinks
 (\dataHtmlEscapeContextBreakout, \dataHtmlAutoescapeBreakout). Sanitizers and
 Trusted Types delimit no value, so neither is an arm.
 
 \paragraph{JavaScript string}
-The script host writes \verb|var x = "|$v$\verb|";|. The JavaScript verdict is
-inert if the string literal ends at the host's quote and holds $v$; otherwise the
+The script fixture writes \verb|var x = "|$v$\verb|";|. The JavaScript verdict is
+inert if the string literal ends at the fixture's quote and holds $v$; otherwise the
 script is compiled, never run: a breakout if it compiles, malformed if not.
 Concatenation breaks out in \dataHtmlJsConcatBreakout cases; the per-context arm
 and \texttt{html/template} hold \dataHtmlJsEscapeContextInert and
@@ -122,7 +82,7 @@ value parsed as markup, which no hole does (rich HTML, outside the claim).
 DOM-based XSS (\dataSubTechniqueDomBased CVEs) runs in the page, so the page
 composes the HTML: the client arm runs \texttt{composeHtml}, serializes with the
 guard, and sets the result by \texttt{innerHTML}; the three browsers read no
-breakout from its \dataHtmlComposeDomCases documents. The checks fail stop at
+breakout from its \dataHtmlComposeDomCases documents. The checks are fail-stop at
 the writer: \textsc{Verify},
 \texttt{composeHtml}, and the guard refuse before any HTML leaves. A reader with
 the option stops at a malformed hole, as an XML parser does at a well-formedness

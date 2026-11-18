@@ -3,7 +3,7 @@
 
 The declaration heads below summarize the Lean~4 development in
 \texttt{lean/to\_matchertext.lean} that proves the write-path obligation of
-\cref{sec:threat} (TCB item~iii): the total encoder's output is \emph{always}
+\cref{sec:threat} (component~(iii)): the total encoder's output is \emph{always}
 matchertext. It reuses the base definitions of \cref{sec:appendix:lean}
 (\texttt{Opener}, \texttt{Closer}, \texttt{Nonmatcher}, \texttt{MT}, and the
 \texttt{depth}/\texttt{embed\_boundary} results) and the closure lemmas
@@ -11,11 +11,13 @@ matchertext. It reuses the base definitions of \cref{sec:appendix:lean}
 of~\cite{matchertext}.
 Definition bodies are shown in full; tactic proof bodies are elided and given in
 the source file.
-The encoder escapes the unmatched matchers and, by two decisions, may escape more:
-an opener past a depth limit, and a matched pair. Any choice of the two keeps the
-output in $L$, and \texttt{toMatchertextC} fixes them as the C encoder does: the
-host's depth limit, and the pair after an introducer and tag, so that input
-already shaped like an escape decodes to itself. The model is of the algorithm,
+The encoder escapes every unmatched matcher. Two parameters let it escape more:
+\texttt{cap} escapes an opener past a depth limit, and \texttt{split} escapes
+both members of a matched pair. Every choice of them keeps the output in $L$.
+\texttt{toMatchertextC} fixes them as the C encoder does: \texttt{cap} at the
+host language's depth limit, and \texttt{split} for a pair right after a
+backslash and a tag, so that input already shaped like an escape decodes to
+itself. The model is of the algorithm,
 not of the C code, and does not cover \textsc{Verify}.
 
 \begin{lstlisting}

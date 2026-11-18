@@ -14,14 +14,14 @@ at each use site, so securing one context means maintaining a separate defense f
 every other. What is missing is the option to defend the boundary once, with a
 check that does not change from one host language to the next.
 
-That option is absent since conventional defenses attack the
+That option is absent because conventional defenses attack the
 \emph{collision}, rewriting the value so its characters cannot be confused with
-the host language's. This forces each defence to model that syntax: a sanitizer
+the host language's. This forces each defense to model that syntax: a sanitizer
 shadows the host-language parser, and every divergence is a bypass. The web has no
 universal escaper because parse context is per-language and does not
 compose~\cite{owasp_xss}.
 
-So we ask: can one language-independent check replace the per-host-language collection, what
+So we ask: can one language-independent check replace the per-host-language defenses, what
 does it guarantee against an attacker who knows the check and writes against it,
 and how much of real injection can it reach?
 
@@ -32,8 +32,8 @@ value in a matcher pair and ends it by matcher balance. Hosted as
 \verb|WHERE name = M'(|\emph{value}\verb|)'|, the payload \verb|' OR '1'='1| cannot
 break out, since escaping would need an unmatched \verb|)| that is not valid
 matchertext. One recognizer inspects only the six matcher characters and serves
-every host language. The rule was built for verbatim embedding~\cite{matchertext}, which
-names injection as a use; this paper states and measures that use.
+every host language. The rule was built for verbatim embedding, and~\cite{matchertext}
+names injection as one use; this paper states and measures that use.
 
 We make four contributions:
 \begin{itemize}
@@ -41,14 +41,14 @@ We make four contributions:
 	depend on what its \emph{holes} (the matcher-delimited slots for untrusted
 	values) contain. A machine-checked Lean proof covers its boundary premise
 	(\cref{sec:threat}).
-\item Hole forms for SQL, HTML, LDAP, and PDF: free where a format already reads
+\item Hole forms for SQL, HTML, LDAP, and PDF: reused where a format already reads
 	to matcher balance, a bounded parser change elsewhere (\cref{sec:resist}).
 \item A reproducible corpus of \dataInjectionCVEs injection CVEs labeled by
 	target syntax (\cref{sec:corpus,sec:results,sec:prevent}):
 	\dataContainedShare of attacks with a usable payload are contained under the
-	threat model, and at most \dataHostableShare target a delimitable syntax.
+	threat model, and \dataHostableShare as labeled target a delimitable syntax.
 	Execution sinks stay out of reach.
 \item Matchertext-aware forks of SQLite and of the parse5 HTML parser, which
-	admit no breakout over the recorded SQL and HTML payloads, also in three
-	browsers (\cref{sec:prevent:exec,sec:prevent:html}).
+	admit no breakout over the recorded SQL and HTML payloads, also when three
+	browsers read the served output (\cref{sec:prevent:exec,sec:prevent:html}).
 \end{itemize}

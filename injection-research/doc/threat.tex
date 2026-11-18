@@ -13,8 +13,8 @@ is the \textsc{Verify} recognizer: it accepts only strings of the matchertext
 language $L$, and all of them up to its nesting-depth limit $D$. Component (iii) is the total encoder \textsc{ToMatchertext} and
 its inverse. Their output-in-$L$ obligation is proved in
 \cref{sec:appendix:tomatchertext}, narrowing~(iii) to the decoder round-trip.
-The boundary-locating step of (i) is the load-bearing part. Premise L1 below
-proves its principle by machine check, so the host language is trusted only
+The boundary-locating step of (i) is the load-bearing part. Its principle,
+premise L1, is machine-checked, so the host language is trusted only
 for that step's \emph{implementation}.
 
 \paragraph{Attacker}
@@ -29,34 +29,35 @@ The attacker does not control the host-language source, the configuration $(\Sig
 or the trusted components above.
 
 \paragraph{Security property (inertness)}
-We model the aware host as a deterministic lexer emitting the located content as
+We model the aware host language as a deterministic lexer emitting the located content as
 one $\mathit{hole}$ token, and a parser over token types; $\mathrm{skel}(t)$ erases
 a tree's hole lexemes.
 \textbf{Definition 1 (Inertness).} A host language is inert for $P[\cdot]$ if, for
 all $v,v'\in L$, $P[v]$ parses exactly when $P[v']$ does, and then
 $\mathrm{skel}(P[v])=\mathrm{skel}(P[v'])$.
 The attacker wins if a value \textsc{Verify} accepts changes the skeleton; rejection
-is a loss. Every accepted value is in $L$, so Definition~1 covers it. Closure~\cite{matchertext} constrains the
-\emph{string}, inertness the \emph{parser}.
+is a loss. Every accepted value is in $L$, so Definition~1 covers it.
 
-\paragraph{Deployment premises}
-Inertness holds under four premises:
+\paragraph{Deployment assumptions}
+Inertness holds under four deployment assumptions
+(\cref{fig:threat:pipeline} shows where each binds):
 \begin{itemize}
 \item[\textbf{A1}] \emph{Aware host language.} The host language that interprets the composed text
 	is matchertext-aware: it ends the value by matcher balance rather
 	than at its native closer.
 \item[\textbf{A2}] \emph{Delimited context.} Every untrusted value is routed
 	into a matcher-delimited hole. A value concatenated into host-language syntax
-	outside a hole is unprotected, exactly as with any point-of-use defense.
+	outside a hole is unprotected, as with any point-of-use defense.
 	An API enforces A2 by taking host syntax only from source literals, which it
 	may still compose at run time; only an explicit opt-out bypasses it.
 \item[\textbf{A3}] \emph{Canonicalize, then verify.} \textsc{Verify} runs on the
 	\emph{fully decoded and normalized} value, at the last transform boundary
 	before it enters the hole. The host language reads that same representation to
 	matcher balance, performing no further decoding, normalization, or
-	reparsing of the hole contents (PDF's \verb|\(| is such decoding).
+	reparsing of the hole contents (PDF breaks this: its reader skips an escaped \verb|\(| when counting,
+	\cref{sec:resist:pdf}).
 	Decoding starts at the bytes, in the charset the writer declared and verified
-	under: Shift\_JIS can hide a matcher (\cref{sec:appendix:systems}).
+	under: Shift\_JIS can hide a matcher (\cref{sec:prevent:html}).
 	Writing $\mathrm{canon}(v)$ for the composition of every decode and
 	normalization the pipeline applies, the obligation is
 	$\textsc{Verify}(\mathrm{canon}(v))$ with the host language parsing
@@ -69,10 +70,10 @@ Inertness holds under four premises:
 	(percent, entity, backslash, \dots) is not viable: those compose to
 	unbounded depth and vary by pipeline, reintroducing the parser-shadowing
 	burden matchertext avoids (\cref{sec:bg:sanitizer}).
-	Unicode normalization (NFKC, Unicode~16.0) has a finite preimage: exactly 20 code points
-	normalize to a \emph{lone} matcher (\eg \texttt{U+FF3B}$\rightarrow$\texttt{[})
-	and the rest to balanced pairs, so canonicalization eliminates the set
-	outright rather than asking \textsc{Verify} to model it.
+	Unicode normalization (NFKC, Unicode~16.0) maps a finite set of code points
+	to matchers: 20 to a \emph{lone} matcher (\eg \texttt{U+FF3B}$\rightarrow$\texttt{[}),
+	the others to balanced pairs. Canonicalizing before \textsc{Verify} removes
+	them all, so \textsc{Verify} need not model the set.
 \item[\textbf{A4}] \emph{Not a semantic sink.} The host language does not execute the
 	contained value by design (server-side templates, expression languages,
 	code evaluation, \verb|javascript:| URLs, a language model that follows
@@ -93,7 +94,7 @@ Inertness holds under four premises:
 ─────────────┼──────────────────────────────────────────────────────────────────────────────────
   binds:     │      A3            (TCB ii)          A2            A1 · L1 · L2      L3 · A4
 \end{verbatim}
-\caption{Where each premise binds. The attacker chooses $v$ and nothing else;
+\caption{Where each assumption and premise binds. The attacker chooses $v$ and nothing else;
 everything right of the boundary must be correct for inertness to hold. A3 binds
 at the first stage while its violation surfaces at the last. A still-encoded
 value such as \texttt{\%5D} passes \textsc{Verify} and becomes an unmatched
@@ -102,45 +103,46 @@ matcher only when the parser reads it.}
 \end{figure*}
 
 \paragraph{From closure to inertness}
-We model the aware host language of A1 as a grammar $G$ with one distinguished production
-$\mathit{hole}\rightarrow s_o\,\mathit{content}\,s_c$. Here $\mathit{content}$ is
-recovered by the matcher-balance locator and enters $G$ as a single terminal.
-Its lexeme is the value in its canonical, fully-decoded form (A3).
+In the model of Definition~1, the parser's grammar $G$ has one production
+$\mathit{hole}\rightarrow s_o\,\mathit{content}\,s_c$, where the terminal
+$\mathit{content}$ is the hole token: the value that the matcher-balance locator
+recovers, in its canonical, fully-decoded form (A3).
 Inertness then rests on three premises, each proved or tested separately:
 \begin{itemize}
 \item[\textbf{L1}] \emph{Boundary.} Reading to matcher balance ends the
 	embedding exactly at $|v|$: every prefix of a valid $v$ has non-negative
-	matcher depth, $v$ returns to depth zero, and the context closer, paired with
-	the hole's opener, is the first character to drive it negative. Language-independent and machine-checked
-	(\cref{sec:appendix:lean}); what remains is verifying a concrete locator
+	matcher depth, $v$ returns to depth zero, and the hole's closer is the first
+	character to drive it negative. This premise is language-independent and
+	machine-checked (\cref{sec:appendix:lean}); what remains is verifying a concrete locator
 	(the depth-counting scan of~\cite{matchertext}) against it.
 \item[\textbf{L2}] \emph{Parse inertness.} In $G$ the hole derives exactly one
 	terminal with that lexeme, and no other production derives structure from
 	within it: the parser does not re-enter $G$ on hole content. Reparse-based
-	breakouts such as mutation XSS are exactly L2 violations.
+	breakouts such as mutation XSS are L2 violations.
 \item[\textbf{L3}] \emph{Interpreter inertness.} The interpreter binds that
 	terminal as a data value and never re-lexes, reparses, or executes its
 	bytes.
 \end{itemize}
 \textbf{Lemma 1.} If the lexer ends each hole by a locator satisfying L1 and
 resumes after $s_c$ in a state independent of the lexeme, the token-type sequence
-of $P[v]$ is the same for every $v\in L$ (\cref{sec:appendix:lemma}); with L2 the
+of $P[v]$ is the same for every $v\in L$; with L2 the
 skeletons agree (Definition~1), and L3 carries this to execution.
-Closure is machine-checked in the formalism of~\cite{matchertext},
-which gives the correctness of \textsc{Verify} a paper proof sketch. This paper proves L1 once for all host languages
+\emph{Proof.} The lexer state at $s_o$ depends only on the text of $P$ before the hole. By L1
+the locator stops exactly after $v$ for every $v\in L$, so the hole yields one
+token of type $\mathit{hole}$ and lexing resumes at the same position of $P$ in
+the same state. Outside the hole both inputs are the text of $P$, so the
+token-type sequences agree.\hfill$\square$
+This paper proves L1 once for all host languages
 (\cref{sec:appendix:lean}) and tests L2 and L3 for SQLite (\cref{sec:prevent:exec}) and
 L2 for HTML (\cref{sec:prevent:html}).
-
-
-\Cref{fig:threat:pipeline} shows the path an untrusted value takes and where each
-premise binds.
 
 \paragraph{Scope}
 In scope is \emph{structural} injection: an attacker-controlled value that
 alters the host-language parse by escaping its region.
 Out of scope, and excluded from the containment claims throughout, are execution
 and semantic sinks (A4); contexts delimited by non-matchers for which this paper
-builds no hole form (shell separators, CR/LF header breaks, XML/XXE angle brackets);
+builds no hole form (shell separators, CR/LF header breaks, XML/XXE angle brackets,
+NoSQL and XPath queries);
 \emph{semantic} abuse in which a well-formed value is merely unauthorized;
 algorithmic denial of service, which is not a breakout; and second-order
 injection in which stored input is reinterpreted in a different context later,

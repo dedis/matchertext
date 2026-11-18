@@ -11,8 +11,9 @@ how the weakness is categorized.
 \paragraph{Injection gate}
 A CVE is injection-related if an injection phrase rule matches its description
 or it has a CWE in the \mbox{CWE-74} (``Injection'') subtree, from the CVE record
-and NVD, else other sources; the subtree excludes \mbox{CWE-99} and descendants,
-and \mbox{CWE-94} is dropped where the description names memory corruption.
+and NVD, else from other sources; the subtree excludes \mbox{CWE-99} (the value
+names a resource) and descendants, and \mbox{CWE-94} is dropped where the description names memory
+corruption.
 This yields \textbf{\dataInjectionCVEs} injection CVEs, \textbf{\dataInjectionSharePrecise} of published
 records, with \dataInjectionSubtreeCWEs CWEs of the subtree (\dataInjectionCWEs with
 those co-assigned).
@@ -25,29 +26,31 @@ least reliable.
 This mirrors the content-classifier methodology of the matchertext empirical
 study~\cite{matchertext}.
 First, a deterministic map from specific CWEs (\eg \mbox{CWE-89}$\rightarrow$SQL,
-\mbox{CWE-79}$\rightarrow$HTML); within one source, a CWE of the syntax the
-description names wins, then the lower number.
+\mbox{CWE-79}$\rightarrow$HTML); where one source gives several, the CWE whose
+syntax the description names wins, else the lowest CWE number.
 Second, phrase rules over the CNA description (``SQL injection'', \dots); the
 phrase named first wins.
 Third, a word naive-Bayes classifier, trained on the labeled set and on the
 gate's rejects as a not-injection class, labels the rest above a margin.
 Fourth, an explicit \texttt{unknown} bucket.
-Where a language model writes the syntax, the label is an LLM prompt (A4).
+Two \emph{delivery rules} refine the label: LLM prompt (A4) where a language
+model writes the injected syntax, HTML document (A2) for an XSS whole-document
+upload.
 Of the injection CVEs, \dataMethodCwe (\dataMethodCweShare) are labeled deterministically from CWEs,
 \dataMethodRule from phrase rules, \dataMethodNb from naive Bayes, and only \dataMethodUnknown remain
-unknown, so the classification rests overwhelmingly on the deterministic
-layers.
+unknown: the deterministic layers label \dataMethodDeterministicShare.
 
 \paragraph{Label accuracy}
-Two raters labeled a blind sample of \dataAuditPerMethod CVEs per layer from the
-description alone (Cohen's $\kappa=\dataAuditKappa$, \dataAuditGraded graded).
+Two raters labeled a blind sample of \dataAuditPerMethod CVEs per layer,
+unknown included, from the description alone (Cohen's
+$\kappa=\dataAuditKappa$; \dataAuditGraded graded, the rest unclear).
 The exact syntax is right for \dataAuditPrecisionCwe of CWE-map labels,
 \dataAuditPrecisionRule of rule labels, and \dataAuditPrecisionNb of naive-Bayes
-labels (95\% intervals).
-Weighted to the corpus, \dataAuditHostableShare of truly injection CVEs target a
-matcher-delimitable syntax, so the ceiling of \cref{sec:prevent} is conservative;
-resolving the \dataLabelConflictCVEs CVEs whose CWEs span the boundary away from
-it lowers that ceiling from \dataHostableShareExact to \dataHostableLowShare.
+labels, \dataMethodNbShare of the corpus (95\% intervals).
+Weighted to the corpus, \dataAuditHostableShare of the CVEs that the raters judge
+injection target a matcher-delimitable syntax, above the labeled share of
+\cref{sec:prevent}; resolving the \dataLabelConflictCVEs CVEs whose CWEs span the boundary away from
+it lowers that share from \dataHostableShareExact to \dataHostableLowShare.
 
 \paragraph{Weakness families}
 Aggregated to families, the corpus is dominated by rendering injection
