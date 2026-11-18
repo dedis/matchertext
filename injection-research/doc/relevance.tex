@@ -34,17 +34,26 @@ depth and with no escaping or expansion.
 Second, a single linear scan, the \textsc{Verify} recognizer
 (\cref{fig:verify}), decides membership in $L$. With a depth limit $D$ it
 accepts only strings of $L$ and rejects those nested deeper than $D$.
+$D$ is not needed for safety, since a deeper value is rejected, not delimited
+wrongly. A length limit $n$ also bounds depth, but only by $n/2$; $D$ lets a reader
+keep its matcher stack in fixed memory (a fixed array in our C reader).
 \begin{figure}[t]
-\begin{verbatim}
-Verify(v): stack = []
-  for c in v:
-    if c is an opener:
-      push(c); if |stack| > D: reject
-    if c is a closer:
-      if stack is empty: reject
-      if pop() != opener(c): reject
-  accept if stack is empty
-\end{verbatim}
+\small
+\begin{algorithmic}
+\Function{Verify}{$v$}
+  \State $S \gets$ empty stack
+  \For{each character $c$ of $v$}
+    \If{$c$ is an opener}
+      \State push $c$ on $S$; \textbf{if} $|S| > D$ \textbf{then reject}
+    \ElsIf{$c$ is a closer}
+      \If{$S$ is empty \textbf{or} $\mathrm{pop}(S) \ne \mathrm{opener}(c)$}
+        \textbf{reject}
+      \EndIf
+    \EndIf
+  \EndFor
+  \State \textbf{accept} if $S$ is empty, else \textbf{reject}
+\EndFunction
+\end{algorithmic}
 \caption{\textsc{Verify}. Our builds set $D=1000$.}
 \label{fig:verify}
 \end{figure}

@@ -1,6 +1,10 @@
 \section{Injection resistance by matcher-delimiting untrusted input}
 \label{sec:resist}
 
+This section applies the discipline to SQL, HTML, LDAP, and PDF in turn
+(\cref{sec:resist:sql,sec:resist:xss,sec:resist:ldap,sec:resist:pdf}), then
+asks what fitting it into an existing language changes (\cref{sec:resist:fitting}).
+
 \subsection{Preventing SQL injection}
 \label{sec:resist:sql}
 
@@ -46,18 +50,26 @@ Reading inverts the encoder. An escape \textsc{esc}$(c)$ is a backslash, a tag
 \verb|\c[]| for \verb|]|). Input already of this shape is escaped too, so it
 decodes to itself; other backslashes stay. Then
 \textsc{FromMatchertext} scans the balance-delimited region once, mapping each
-\textsc{esc}$(c)$ back to its matcher $c$ and copying every other character,
-so that $\forall v, \textsc{FromMatchertext}(\textsc{ToMatchertext}(v)) = v$:
-\begin{verbatim}
-FromMatchertext(m):
-  out = []; i = 0
-  while i < |m|:
-    if m[i..] begins with esc(c):
-      out += c;    i += |esc(c)|
-    else:
-      out += m[i]; i += 1
-  return out
-\end{verbatim}
+\textsc{esc}$(c)$ back to its matcher $c$ and copying every other character
+(\cref{fig:frommt}), so that $\forall v, \textsc{FromMatchertext}(\textsc{ToMatchertext}(v)) = v$.
+\begin{figure}[t]
+\small
+\begin{algorithmic}
+\Function{FromMatchertext}{$m$}
+  \State $\mathit{out} \gets$ empty string; $i \gets 0$
+  \While{$i < |m|$}
+    \If{$m$ has $\textsc{esc}(c)$ at position $i$ for a matcher $c$}
+      \State append $c$ to $\mathit{out}$; $i \gets i + |\textsc{esc}(c)|$
+    \Else
+      \State append $m[i]$ to $\mathit{out}$; $i \gets i + 1$
+    \EndIf
+  \EndWhile
+  \State \Return $\mathit{out}$
+\EndFunction
+\end{algorithmic}
+\caption{\textsc{FromMatchertext}, the decoder of \textsc{ToMatchertext}.}
+\label{fig:frommt}
+\end{figure}
 This round-trip is a data-fidelity property that we do not prove: it is
 no part of the inertness claim, which rests only on output $\in L$
 (\cref{sec:appendix:tomatchertext}).

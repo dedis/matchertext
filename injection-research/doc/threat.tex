@@ -18,9 +18,9 @@ premise L1, is machine-checked, so the host language is trusted only
 for that step's \emph{implementation}.
 
 \paragraph{Attacker}
-The attacker supplies $v$ and may choose \emph{arbitrary} bytes, character
-encodings, Unicode, length, and matcher-nesting depth, and may submit strings
-that are \emph{not} valid matchertext.
+The attacker supplies $v$ and may choose \emph{arbitrary} characters, encoding,
+length, and matcher-nesting depth, and may submit strings that are \emph{not}
+valid matchertext.
 The attacker knows the discipline, which delimiter kind
 guards the hole, and where the hole boundaries lie. The attacker crafts $v$
 \emph{against} the matcher-delimited slot, not the legacy quote or tag-delimited
@@ -50,36 +50,31 @@ Inertness holds under four deployment assumptions
 	outside a hole is unprotected, as with any point-of-use defense.
 	An API enforces A2 by taking host syntax only from source literals, which it
 	may still compose at run time; only an explicit opt-out bypasses it.
-\item[\textbf{A3}] \emph{Canonicalize, then verify.} \textsc{Verify} runs on the
-	\emph{fully decoded and normalized} value, at the last transform boundary
-	before it enters the hole. The host language reads that same representation to
-	matcher balance, performing no further decoding, normalization, or
-	reparsing of the hole contents (PDF breaks this: its reader skips an escaped \verb|\(| when counting,
-	\cref{sec:resist:pdf}).
-	Decoding starts at the bytes, in the charset the writer declared and verified
-	under: Shift\_JIS can hide a matcher (\cref{sec:prevent:html}).
-	Writing $\mathrm{canon}(v)$ for the composition of every decode and
-	normalization the pipeline applies, the obligation is
-	$\textsc{Verify}(\mathrm{canon}(v))$ with the host language parsing
-	$\mathrm{canon}(v)$. \textsc{Verify} then only needs to track the six literal
-	matcher code points.
-	A check on any earlier, still-encoded representation is unsound: a value
-	valid at that point can acquire an unmatched matcher after a later decode
-	(\eg \verb|%5D|$\rightarrow$\verb|]|) and break out.
-	Making \textsc{Verify} itself robust to \emph{transport} encodings
-	(percent, entity, backslash, \dots) is not viable: those compose to
-	unbounded depth and vary by pipeline, reintroducing the parser-shadowing
-	burden matchertext avoids (\cref{sec:bg:sanitizer}).
-	Unicode normalization (NFKC, Unicode~16.0) maps a finite set of code points
-	to matchers: 20 to a \emph{lone} matcher (\eg \texttt{U+FF3B}$\rightarrow$\texttt{[}),
-	the others to balanced pairs. Canonicalizing before \textsc{Verify} removes
-	them all, so \textsc{Verify} need not model the set.
+\item[\textbf{A3}] \emph{Canonicalize, then verify.} \textsc{Verify} checks
+	$\mathrm{canon}(v)$, the value after every decoding and normalization the
+	pipeline applies, and the host language reads that same string to matcher
+	balance without decoding it again.
 \item[\textbf{A4}] \emph{Not a semantic sink.}
 	The host language by design does not execute the
 	contained value (server-side templates, expression languages,
 	code evaluation, \verb|javascript:| URLs, a language model that follows
 	instructions in it). Delimiting confines structure, not meaning.
 \end{itemize}
+Matchertext works on character strings; A3 is where encodings enter.
+A check on an earlier, still-encoded form is unsound: a later decode can add
+an unmatched matcher (\eg \verb|%5D|$\rightarrow$\verb|]|).
+Making \textsc{Verify} robust to \emph{transport} encodings
+(percent, entity, backslash, \dots) is not viable: those compose to
+unbounded depth and vary by pipeline, reintroducing the parser-shadowing
+burden matchertext avoids (\cref{sec:bg:sanitizer}).
+A reader that decodes inside the hole breaks A3: PDF's reader skips an escaped
+\verb|\(| when counting (\cref{sec:resist:pdf}).
+Unicode normalization (NFKC, Unicode~16.0) maps 20 code points to a \emph{lone}
+matcher (\eg \texttt{U+FF3B}$\rightarrow$\texttt{[}) and others to balanced
+pairs; canonicalizing first removes them all, so \textsc{Verify} tracks only the
+six matcher characters.
+Decoding the bytes into characters must use the charset that the writer declared
+and verified under: Shift\_JIS can hide a matcher (\cref{sec:prevent:html}).
 
 \begin{figure*}[t]
 \footnotesize
@@ -89,7 +84,7 @@ Inertness holds under four deployment assumptions
   attacker   │   canon(v)   ──►   VERIFY   ──►  s_o v s_c    ──►  host parser  ──►  interpreter
      └─ v ───┼─► decode &         v ∈ L ?       value placed      ends value        binds the
   arbitrary  │   normalize        fail ─┐       in the hole       by matcher        terminal
-  bytes,     │                          ▼                         balance           as data
+  strings,   │                          ▼                         balance           as data
   encodings, │              ToMatchertext(v): escape unmatched
   invalid    │              matchers, re-embed at the hole
 ─────────────┼──────────────────────────────────────────────────────────────────────────────────
@@ -122,7 +117,7 @@ Inertness then rests on three premises, each proved or tested separately:
 	breakouts such as mutation XSS are L2 violations.
 \item[\textbf{L3}] \emph{Interpreter inertness.} The interpreter binds that
 	terminal as a data value and never re-lexes, reparses, or executes its
-	bytes.
+	characters.
 \end{itemize}
 \textbf{Lemma 1.} If the lexer ends each hole by a locator satisfying L1 and
 resumes after $s_c$ in a state independent of the lexeme, the token-type sequence
